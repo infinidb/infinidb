@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: we_colextinf.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+ * $Id: we_colextinf.cpp 3615 2012-03-09 16:41:14Z dcathey $
  *
  ******************************************************************************/
 
@@ -51,14 +51,12 @@ namespace WriteEngine
 // the start of a bulk load.  In this case we know the LBID, but have no min/
 // max values to start with when adding this first entry to our collection.
 //------------------------------------------------------------------------------
-// @bug 4806: Added bIsNewExtent; Set CP min/max for very first extent on a PM
 void ColExtInf::addFirstEntry( RID         lastInputRow,
-                               BRM::LBID_t lbid,
-                               bool        bIsNewExtent )
+                               BRM::LBID_t lbid )
 {
     boost::mutex::scoped_lock lock(fMapMutex);
 
-    ColExtInfEntry entry( lbid, bIsNewExtent );
+    ColExtInfEntry entry( lbid );
     fMap[ lastInputRow ] = entry;
 }
 
@@ -85,8 +83,11 @@ void ColExtInf::addOrUpdateEntry( RID     lastInputRow,
     }
     else                    // Update entry
     {
-        // If all rows had null value for this column, then minVal will be
-        // MAX_INT and maxVal will be MIN_INT (see getCPInfoForBRM()).
+        //dmc-When add support for null columns, see if this "if" check will
+        //    take care of case where we have set of rows with no data (all
+        //    null values) for a column, especially char; w/o breaking anything.
+        //if (minVal > maxVal)
+        //    return;
 
         if (iter->second.fMinVal == LLONG_MIN) // init the range
         {

@@ -12,6 +12,7 @@ extern void mysqlSetup();
 extern int sendMsgProcMon( std::string module, ByteStream msg, int requestID, int timeout );
 extern int sendUpgradeRequest(int IserverTypeInstall);
 extern void checkFilesPerPartion(int DBRootCount, Config* sysConfig);
+extern void cleanupFstab();
 }
 
 #endif

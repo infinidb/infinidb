@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: slavecomm.h 1716 2012-09-28 23:08:26Z xlou $
+ * $Id: slavecomm.h 1623 2012-07-03 20:17:56Z pleblanc $
  *
  *****************************************************************************/
 
@@ -27,17 +27,14 @@
 #ifndef SLAVECOMM_H_
 #define SLAVECOMM_H_
 
-#include <unistd.h>
 #include <iostream>
-
-#include <boost/thread/mutex.hpp>
 
 #include "brmtypes.h"
 #include "slavedbrmnode.h"
 #include "messagequeue.h"
 #include "bytestream.h"
 
-#if defined(_MSC_VER) && defined(xxxSLAVECOMM_DLLEXPORT)
+#if defined(_MSC_VER) && defined(SLAVECOMM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -68,18 +65,15 @@ class SlaveComm {
 
 		void processCommand(messageqcpp::ByteStream &msg);
 
-		void do_createStripeColumnExtents(messageqcpp::ByteStream &msg);
-		void do_createColumnExtent_DBroot(messageqcpp::ByteStream &msg);
-		void do_createColumnExtentExactFile(messageqcpp::ByteStream &msg);
+		void do_createColumnExtent(messageqcpp::ByteStream &msg);
 		void do_createDictStoreExtent(messageqcpp::ByteStream &msg);
-		void do_rollbackColumnExtents_DBroot(messageqcpp::ByteStream &msg);
+		void do_rollbackColumnExtents(messageqcpp::ByteStream &msg);
 		void do_deleteEmptyColExtents(messageqcpp::ByteStream &msg);
 		void do_deleteEmptyDictStoreExtents(messageqcpp::ByteStream &msg);
-		void do_rollbackDictStoreExtents_DBroot(messageqcpp::ByteStream &msg);
+		void do_rollbackDictStoreExtents(messageqcpp::ByteStream &msg);
 		void do_deleteOID(messageqcpp::ByteStream &msg); 
 		void do_deleteOIDs(messageqcpp::ByteStream &msg);
 		void do_setLocalHWM(messageqcpp::ByteStream &msg);
-		void do_bulkSetHWM(messageqcpp::ByteStream &msg);
 		void do_bulkSetHWMAndCP(messageqcpp::ByteStream &msg);
 		void do_writeVBEntry(messageqcpp::ByteStream &msg); 
 		void do_beginVBCopy(messageqcpp::ByteStream &msg);
@@ -87,6 +81,10 @@ class SlaveComm {
 		void do_vbRollback1(messageqcpp::ByteStream &msg);
 		void do_vbRollback2(messageqcpp::ByteStream &msg);
 		void do_vbCommit(messageqcpp::ByteStream &msg);
+		void do_undo(); 
+		void do_confirm();
+		void do_flushInodeCache();
+		void do_clear();
 		void do_markInvalid(messageqcpp::ByteStream &msg);
 		void do_markManyExtentsInvalid(messageqcpp::ByteStream &msg);
 		void do_mergeExtentsMaxMin(messageqcpp::ByteStream &msg);
@@ -96,19 +94,11 @@ class SlaveComm {
 		void do_markPartitionForDeletion(messageqcpp::ByteStream &msg);
 		void do_markAllPartitionForDeletion(messageqcpp::ByteStream &msg);
 		void do_restorePartition(messageqcpp::ByteStream &msg);
-		void do_dmlLockLBIDRanges(messageqcpp::ByteStream &msg);
-		void do_dmlReleaseLBIDRanges(messageqcpp::ByteStream &msg);
-		void do_deleteDBRoot(messageqcpp::ByteStream &msg);
-		void do_bulkUpdateDBRoot(messageqcpp::ByteStream &msg);
-
-		void do_undo();
-		void do_confirm();
-		void do_flushInodeCache();
-		void do_clear();
-		void do_ownerCheck(messageqcpp::ByteStream &msg);
+        void do_dmlLockLBIDRanges(messageqcpp::ByteStream &msg);
+        void do_dmlReleaseLBIDRanges(messageqcpp::ByteStream &msg);
 		void do_takeSnapshot();
+
 		void saveDelta();
-		bool processExists(const uint32_t pid, const std::string& pname);
 
 		messageqcpp::MessageQueueServer *server;
 		messageqcpp::IOSocket master;
@@ -121,11 +111,6 @@ class SlaveComm {
 		std::fstream journal;
 		int64_t snapshotInterval, journalCount;
 		struct timespec MSG_TIMEOUT;
-#ifdef _MSC_VER
-	boost::mutex fPidMemLock;
-	DWORD* fPids;
-	DWORD fMaxPids;
-#endif
 };
 
 }

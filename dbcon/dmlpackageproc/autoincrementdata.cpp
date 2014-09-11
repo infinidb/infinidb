@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2009-2012 Calpont Corporation.
+  Copyright (C) 2009 Calpont Corp.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -70,17 +70,17 @@ AutoincrementData::~AutoincrementData()
 {
 }
 
-void AutoincrementData::setNextValue(uint32_t columnOid, long long nextValue)
+void AutoincrementData::setNextValue(uint32_t tableOid, long long nextValue)
 {
 	boost::mutex::scoped_lock lk(fOIDnextvalLock);	
-	fOidNextValueMap[columnOid] = nextValue;	
+	fOidNextValueMap[tableOid] = nextValue;	
 }
 
-long long AutoincrementData::getNextValue(uint32_t columnOid)
+long long AutoincrementData::getNextValue(uint32_t tableOid)
 {
 	boost::mutex::scoped_lock lk(fOIDnextvalLock);	
 	long long nextValue = 0;
-	OIDNextValue::iterator it = fOidNextValueMap.find(columnOid);
+	OIDNextValue::iterator it = fOidNextValueMap.find(tableOid);
 	if (it != fOidNextValueMap.end())
 	{
 		nextValue = it->second;

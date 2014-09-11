@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: inetstreamsocket.cpp 3292 2012-09-19 14:24:59Z rdempsey $
+*   $Id: inetstreamsocket.cpp 2436 2011-03-07 17:48:38Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -29,22 +29,16 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <iphlpapi.h>
-#include <icmpapi.h>
 #include <stdio.h>
 #else
 #if __FreeBSD__
 #include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
 #endif
 #include <sys/socket.h>
 #include <poll.h>
 #include <netinet/in.h>
-#include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
-#include <fcntl.h>
 #endif
 #include <sys/types.h>
 #include <sys/time.h>
@@ -58,12 +52,10 @@ using namespace std;
 #include <boost/scoped_array.hpp>
 using boost::scoped_array;
 
-#define INETSTREAMSOCKET_DLLEXPORT
-#include "inetstreamsocket.h"
-#undef INETSTREAMSOCKET_DLLEXPORT
 #include "bytestream.h"
 #include "iosocket.h"
 #include "socketparms.h"
+#include "inetstreamsocket.h"
 #include "socketclosed.h"
 #include "logger.h"
 #include "loggingid.h"
@@ -83,27 +75,13 @@ using messageqcpp::ByteStream;
 const int MaxSendPacketSize=64 * 1024;
 #endif
 
-int in_cksum(unsigned short* buf, int sz)
+bool pollfd(int fd) 
 {
-	int nleft = sz;
-	int sum = 0;
-	unsigned short* w = buf;
-	unsigned short ans = 0;
-
-	while (nleft > 1) {
-		sum += *w++;
-		nleft -= 2;
-	}
-
-	if (nleft == 1) {
-		*(unsigned char*)(&ans) = *(unsigned char*)w;
-		sum += ans;
-	}
-
-	sum = (sum >> 16) + (sum & 0xFFFF);
-	sum += (sum >> 16);
-	ans = ~sum;
-	return ans;
+	struct pollfd pfd[1];
+	pfd[0].fd = fd;
+	pfd[0].events = POLLOUT;
+		poll(pfd, 1, 0);
+	return ((pfd[0].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0);
 }
 
 } //namespace anon
@@ -579,10 +557,10 @@ void InetStreamSocket::write_raw(const ByteStream& msg) const
 	}
 }
 
-void InetStreamSocket::bind(const sockaddr* serv_addr)
+void InetStreamSocket::bind(const struct sockaddr_in* serv_addr)
 {
-	memcpy(&fSa, serv_addr, sizeof(sockaddr_in));
-	if (::bind(fSocketParms.sd(), serv_addr, sizeof(sockaddr_in)) != 0)
+	fSa = *serv_addr;
+	if (::bind(fSocketParms.sd(), (struct sockaddr*)serv_addr, sizeof(*serv_addr)) != 0)
 	{
 		int e = errno;
 		string msg = "InetStreamSocket::bind: bind() error: ";
@@ -603,9 +581,6 @@ void InetStreamSocket::bind(const sockaddr* serv_addr)
 
 void InetStreamSocket::listen(int backlog)
 {
-#ifndef _MSC_VER
-	fcntl(socketParms().sd(), F_SETFD, fcntl(socketParms().sd(), F_GETFD) | FD_CLOEXEC);
-#endif
 	if (::listen(socketParms().sd(), backlog) != 0)
 	{
 		int e = errno;
@@ -644,12 +619,12 @@ const IOSocket InetStreamSocket::accept(const struct timespec* timeout)
 			return ios;
 	}
 
-	struct sockaddr sa;
+	struct sockaddr_in sa;
 	socklen_t sl = sizeof(sa);
 	int e;
 	do
 	{
-		clientfd = ::accept(socketParms().sd(), &sa, &sl);
+		clientfd = ::accept(socketParms().sd(), reinterpret_cast<sockaddr*>(&sa), &sl);
 		e = errno;
 	} while (clientfd < 0 && (e == EINTR ||
 #ifdef ERESTART
@@ -708,39 +683,28 @@ const IOSocket InetStreamSocket::accept(const struct timespec* timeout)
 	sp = ios.socketParms();
 	sp.sd(clientfd);
 	ios.socketParms(sp);
-	ios.sa(&sa);
+	ios.sa(sa);
 	return ios;
 
 }
 
-void InetStreamSocket::connect(const sockaddr* serv_addr)
+void InetStreamSocket::connect(const struct sockaddr_in* serv_addr)
 {
-	memcpy(&fSa, serv_addr, sizeof(sockaddr_in));
-	if (::connect(socketParms().sd(), serv_addr, sizeof(sockaddr_in)))
+	fSa = *serv_addr;
+	if (::connect(socketParms().sd(), (struct sockaddr*)serv_addr, sizeof(*serv_addr)))
 	{
 		int e = errno;
 		string msg = "InetStreamSocket::connect: connect() error: ";
-#ifdef _MSC_VER
-		char m[80];
-		int x = WSAGetLastError();
-		if (x == WSAECONNREFUSED)
-			strcpy(m, "connection refused");
-		else
-			sprintf(m, "%d 0x%x", x, x);
-		msg += m;
-#else
  		scoped_array<char> buf(new char[80]);
-  #if STRERROR_R_CHAR_P
+#if STRERROR_R_CHAR_P
 		const char* p;
 		if ((p = strerror_r(e, buf.get(), 80)) != 0)
 			msg += p;
-  #else
+#else
 		int p;
 		if ((p = strerror_r(e, buf.get(), 80)) == 0)
 			msg += buf.get();
-  #endif
 #endif
-		msg += " to: " + toString();
 		throw runtime_error(msg);
 	}
 
@@ -872,133 +836,6 @@ ssize_t InetStreamSocket::writen(int fd, const ByteStream::byte* ptr, size_t nby
 	}
 
 	return nbytes;
-}
-
-const string InetStreamSocket::addr2String() const
-{
-	string s;
-#ifdef _MSC_VER
-	//This is documented to be thread-safe in Windows
-	s = inet_ntoa(fSa.sin_addr);
-#else
-	char dst[INET_ADDRSTRLEN];
-	s = inet_ntop(AF_INET, &fSa.sin_addr, dst, INET_ADDRSTRLEN);
-#endif
-	return s;
-}
-
-const bool InetStreamSocket::isSameAddr(const Socket* rhs) const
-{
-	const InetStreamSocket* issp = dynamic_cast<const InetStreamSocket*>(rhs);
-	if (!issp) return false;
-	return (fSa.sin_addr.s_addr == issp->fSa.sin_addr.s_addr);
-}
-
-/*static*/
-int InetStreamSocket::ping(const std::string& ipaddr, const struct timespec* timeout)
-{
-	sockaddr_in pingaddr;
-	memset(&pingaddr, 0, sizeof(pingaddr));
-	if (inet_aton(ipaddr.c_str(), &pingaddr.sin_addr) == 0)
-		return -1;
-
-	long msecs = 30 * 1000;
-
-	if (timeout)
-		msecs = timeout->tv_sec * 1000 + timeout->tv_nsec / 1000000;
-
-#ifndef _MSC_VER
-	int pingsock;
-	pingsock = ::socket(PF_INET, SOCK_RAW, IPPROTO_ICMP);
-	if (pingsock < 0)
-		return -1;
-
-	ssize_t len = 0;
-	size_t pktlen = 0;
-	const size_t PktSize = 1024;
-	char pkt[PktSize];
-	memset(pkt, 0, PktSize);
-	struct icmp* pingPktPtr = reinterpret_cast<struct icmp*>(pkt);
-
-	pingPktPtr->icmp_type = ICMP_ECHO;
-	pingPktPtr->icmp_cksum = in_cksum(reinterpret_cast<unsigned short*>(pkt), PktSize);
-
-	pktlen = 56 + ICMP_MINLEN;
-	len = ::sendto(pingsock, pkt, pktlen, 0, reinterpret_cast<const struct sockaddr*>(&pingaddr),
-		sizeof(pingaddr));
-	if (len < 0 || static_cast<size_t>(len) != pktlen)
-	{
-		::close(pingsock);
-		return -1;
-	}
-
-	memset(pkt, 0, PktSize);
-	pktlen = PktSize;
-
-	int pollrc = 0;
-	pollrc = pollConnection(pingsock, msecs);
-
-	if (pollrc != 1)
-	{
-		::close(pingsock);
-		return -1;
-	}
-
-	len = ::recvfrom(pingsock, pkt, pktlen, 0, 0, 0);
-
-	if (len < 76)
-	{
-		::close(pingsock);
-		return -1;
-	}
-
-	struct ip* iphdr = reinterpret_cast<struct ip*>(pkt);
-	pingPktPtr = reinterpret_cast<struct icmp*>(pkt + (iphdr->ip_hl << 2));
-	if (pingPktPtr->icmp_type != ICMP_ECHOREPLY)
-	{
-		::close(pingsock);
-		return -1;
-	}
-
-	::close(pingsock);
-
-#else //Windows version
-	HANDLE icmpFile;
-	icmpFile = IcmpCreateFile();
-	if (icmpFile == INVALID_HANDLE_VALUE)
-		return -1;
-
-	DWORD ret;
-	const size_t PingPktSize=1024;
-	char rqd[PingPktSize];
-	WORD rqs = PingPktSize;
-	char rpd[PingPktSize];
-	DWORD rps = PingPktSize;
-
-	ZeroMemory(rqd, PingPktSize);
-	ZeroMemory(rpd, PingPktSize);
-
-	rqs = 64;
-
-	ret = IcmpSendEcho(icmpFile, pingaddr.sin_addr.s_addr, rqd, rqs, 0, rpd, rps, msecs);
-
-	if (ret <= 0)
-	{
-		IcmpCloseHandle(icmpFile);
-		return -1;
-	}
-
-	PICMP_ECHO_REPLY echoReply = (PICMP_ECHO_REPLY)rpd;
-	if (echoReply->Status != IP_SUCCESS)
-	{
-		IcmpCloseHandle(icmpFile);
-		return -1;
-	}
-
-	IcmpCloseHandle(icmpFile);
-#endif
-
-	return 0;
 }
 
 } //namespace messageqcpp

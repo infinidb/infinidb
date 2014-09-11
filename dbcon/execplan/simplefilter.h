@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplefilter.h 8816 2012-08-15 18:51:49Z dhall $
+*   $Id: simplefilter.h 7792 2011-06-20 21:00:33Z zzhu $
 *
 *
 ***********************************************************************/
@@ -158,8 +158,7 @@ public:
 	  *  @param f the filter that this fiter tries to combine with
 	  *  @param op the operator that connects the two filters. if one or both of the
 	  *  two filters is constantFilter, need to make sure operator is consistant.
-	  *  @return a filter(constantfilter) if successfully combined. otherwise
-	  *     	 return NULL
+	  *  @return a filter(constantfilter) if sucessfully combined. otherwise return NULL
 	  */
 	 virtual Filter* combinable(Filter* f, Operator* op);
 	 

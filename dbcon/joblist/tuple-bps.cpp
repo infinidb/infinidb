@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuple-bps.cpp 9469 2013-05-01 18:38:43Z pleblanc $
+//  $Id: tuple-bps.cpp 8840 2012-08-29 14:54:30Z pleblanc $
 
 
 #include <unistd.h>
@@ -26,17 +26,16 @@
 #include <algorithm>
 #include <ctime>
 #include <sys/time.h>
-#include <deque>
+#include <boost/thread.hpp>
+#include <boost/thread/condition.hpp>
 using namespace std;
 
 #include <boost/thread.hpp>
-#include <boost/thread/condition.hpp>
 using namespace boost;
 
 #include "bpp-jl.h"
 #include "distributedenginecomm.h"
 #include "elementtype.h"
-#include "primitivestep.h"
 #include "unique32generator.h"
 using namespace joblist;
 
@@ -50,8 +49,6 @@ using namespace config;
 #include "errorcodes.h"
 #include "rowestimator.h"
 #include "errorids.h"
-#include "liboamcpp.h"
-#include "exceptclasses.h"
 using namespace logging;
 
 #include "calpontsystemcatalog.h"
@@ -60,15 +57,69 @@ using namespace execplan;
 #include "brm.h"
 using namespace BRM;
 
-#include "oamcache.h"
-
 using namespace rowgroup;
 
 // #define DEBUG 1
 
+//#define PROFILE
 
 //uint TBPSCount = 0;
 
+#ifdef PROFILE
+#include<profiling.h>
+
+// unname namespace for BatchPrimitiveStep profiling
+namespace
+{
+
+enum
+{
+	sendPrimMsg_c = 0,
+	sendWork_Scan,
+	tableBand_c,
+	getLBID_c,
+	write_c,
+	sendLock1_c,
+	sendLock2_c,
+	nextAddFilters1_c,
+	nextAddFilters2_c,
+	numOfSendCheckPoints,
+
+	recvCheckpointOffset = numOfSendCheckPoints,
+	recvPrimMsg_c = 0,
+	recvWork_c,
+	recvLock_c,
+	recvWait_c,
+	read_c,
+	insert1_c,
+	insert2_c,
+	numOfRecvCheckPoints,
+
+	TotalCheckPoints = numOfSendCheckPoints + numOfRecvCheckPoints
+};
+
+// !!these strings are for stats output. should be in the same order as the enum above. !!
+static string CheckPoints[TotalCheckPoints] = {
+	"betweenFirstSendAndFirstRead",
+	"totalScanSend",
+	"getTableBandUsed",
+	"getLBID in send",
+	"fDec->write in send",
+	"mutex_lock_1 in send",
+	"mutex_lock_2 in send",
+	"1st ridList->next in addFilters",
+	"ridList->next in addFilters",
+
+	"receivePrimitiveMessages",
+	"receive work",
+	"mutex_lock in receive",
+	"cond_wait in receive",
+	"fDec->read in receive",
+	"dlp->insert_1 in receive",
+	"dlp->insert_2 in receive"
+	};
+}
+#endif
 
 extern boost::mutex fileLock_g;
 
@@ -167,18 +218,23 @@ void TupleBPS::initializeConfigParms()
 	fProcessorThreadsPerScan = fRm.getJlProcessorThreadsPerScan();
 	fExtentRows = fRm.getExtentRows()/BLOCK_SIZE; // convert to Blocks;
 
-	if (fRequestSize >= fMaxOutstandingRequests)
+	if ( fRequestSize >= fMaxOutstandingRequests )
 		fRequestSize = 1;
-	fNumThreads = fRm.getJlNumScanReceiveThreads();
+	fNumThreads = fRm.getJlNumScanReceiveThreads();	
 
 	fProducerThread.reset(new SPTHD[fNumThreads]);
+	//pthread_mutex_init(&mutex, NULL);
+	//pthread_mutex_init(&dlMutex, NULL);
+	//pthread_mutex_init(&cpMutex, NULL);
+	//pthread_cond_init(&condvar, NULL);
+	//pthread_cond_init(&condvarWakeupProducer, NULL);
 }
 
-TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pColStep& rhs) : fRm (rhs.fRm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
-	fDec = 0;
+	fDec = rhs.dec();
 	fSessionId = rhs.sessionId();
 	fTxnId = rhs.txnId();
 	fVerId = rhs.verId();
@@ -222,13 +278,13 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 	name(rhs.name());
 	fColWidth = fColType.colWidth;
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
-	initializeConfigParms();
-	fBPP->setSessionID(fSessionId);
+	initializeConfigParms ( );
+	fBPP->setSessionID( fSessionId );
 	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
-	fBPP->setTxnID(fTxnId);
+	fBPP->setVersionNum( fVerId );
+	fBPP->setTxnID( fTxnId );
 	fTraceFlags = rhs.fTraceFlags;
-	fBPP->setTraceFlags(fTraceFlags);
+	fBPP->setTraceFlags( fTraceFlags );
 	fBPP->setOutputType(ROW_GROUP);
 //	if (fOid>=3000)
 //		cout << "BPS:initalized from pColStep. fSessionId=" << fSessionId << endl;
@@ -237,7 +293,7 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -246,7 +302,7 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 	fRunExecuted = false;
 	fSwallowRows = false;
 	smallOuterJoiner = -1;
-
+	
 	// @1098 initialize scanFlags to be true
 	scanFlags.assign(numExtents, true);
 	runtimeCPFlags.assign(numExtents, true);
@@ -259,11 +315,11 @@ TupleBPS::TupleBPS(const pColStep& rhs) : fRm(rhs.fRm)
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
-TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm (rhs.fRm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
-	fDec = 0;
+	fDec = rhs.dec();
 	fSessionId = rhs.sessionId();
 	fTxnId = rhs.txnId();
 	fVerId = rhs.verId();
@@ -277,7 +333,6 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	extentSize = rhs.extentSize;
 	lbidRanges = rhs.lbidRanges;
 
-	/* These lines are obsoleted by initExtentMarkers.  Need to remove & retest. */
 	scannedExtents = rhs.extents;
 	extentsMap[fOid] = tr1::unordered_map<int64_t, EMEntry>();
 	tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[fOid];
@@ -285,6 +340,7 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 		ref[rhs.extents[z].range.start] = rhs.extents[z];
 
 	divShift = rhs.divShift;
+	//numExtents = rhs.numExtents;
 	msgsSent = 0;
 	msgsRecvd = 0;
 	ridsReturned = 0;
@@ -304,30 +360,30 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	alias(rhs.alias());
 	view(rhs.view());
 	name(rhs.name());
-
+	
 	fColWidth = fColType.colWidth;
 	lbidList = rhs.lbidList;
-
+			
 	fLogger = rhs.logger();
 	finishedSending = sendWaiting = false;
 	firstRead = true;
 	fSwallowRows = false;
 	recvExited = 0;
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
-	initializeConfigParms();
-	fBPP->setSessionID(fSessionId);
-	fBPP->setVersionNum(fVerId);
-	fBPP->setTxnID(fTxnId);
+	initializeConfigParms ( );
+	fBPP->setSessionID( fSessionId );
+	fBPP->setVersionNum( fVerId );
+	fBPP->setTxnID( fTxnId );
 	fTraceFlags = rhs.fTraceFlags;
-	fBPP->setTraceFlags(fTraceFlags);
+	fBPP->setTraceFlags( fTraceFlags );
 //	if (fOid>=3000)
 //		cout << "BPS:initalized from pColScanStep. fSessionId=" << fSessionId << endl;
-	fBPP->setStepID(fStepId);
+	fBPP->setStepID( fStepId );
 	fBPP->setOutputType(ROW_GROUP);
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -345,14 +401,43 @@ TupleBPS::TupleBPS(const pColScanStep& rhs) : fRm(rhs.fRm)
 	isDelivery = false;
 	fExtendedInfo = "TBPS: ";
 
+//	const std::vector<struct BRM::EMEntry> &scannedExtents = rhs.extents;
+#if 0
+	uint lastExtent = 0;
+	hwm = 0;
+	if (scannedExtents.size()>0)
+	{
+		for (uint i = 0; i < scannedExtents.size(); i++) {
+			if (scannedExtents[i].HWM != 0 && scannedExtents[i].status != EXTENTOUTOFSERVICE)
+				hwm += (scannedExtents[i].HWM + 1);
+			if ( (scannedExtents[i].status == EXTENTAVAILABLE) &&
+				((scannedExtents[i].partitionNum >  scannedExtents[lastExtent].partitionNum) ||
+				((scannedExtents[i].partitionNum == scannedExtents[lastExtent].partitionNum) &&
+				 (scannedExtents[i].blockOffset  >  scannedExtents[lastExtent].blockOffset)) ||
+				((scannedExtents[i].partitionNum == scannedExtents[lastExtent].partitionNum) &&
+				 (scannedExtents[i].blockOffset  == scannedExtents[lastExtent].blockOffset) &&
+				 (scannedExtents[i].segmentNum   >= scannedExtents[lastExtent].segmentNum))) )
+			lastExtent = i;
+		}
+		// if only 1 block is written in the last extent, HWM is 0 and didn't get counted.
+		if (scannedExtents[lastExtent].HWM == 0)
+			hwm++;
+		lastScannedLBID = scannedExtents[lastExtent].range.start + (scannedExtents[lastExtent].HWM - 
+			scannedExtents[lastExtent].blockOffset);
+		if (hwm > 0)
+			hwm--;
+	}
+#endif
+
 	initExtentMarkers();
+//	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
-TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm (rhs.fRm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
-	fDec = 0;
+	fDec = rhs.dec();
 	fSessionId = rhs.sessionId();
 	fTxnId = rhs.txnId();
 	fVerId = rhs.verId();
@@ -381,24 +466,24 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 	name(rhs.name());
 	fColWidth = fColType.colWidth;
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
-	initializeConfigParms();
-	fBPP->setSessionID(fSessionId);
+	initializeConfigParms ( );
+	fBPP->setSessionID( fSessionId );
 	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
-	fBPP->setTxnID(fTxnId);
+	fBPP->setVersionNum( fVerId );
+	fBPP->setTxnID( fTxnId );
 	fTraceFlags = rhs.fTraceFlags;
-	fBPP->setTraceFlags(fTraceFlags);
+	fBPP->setTraceFlags( fTraceFlags );
 	fBPP->setOutputType(ROW_GROUP);
 //	if (fOid>=3000)
 //		cout << "BPS:initalized from PassThruStep. fSessionId=" << fSessionId << endl;
-
+	
 	finishedSending = sendWaiting = false;
 	fSwallowRows = false;
 	fNumBlksSkipped = 0;
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	doJoin = false;
 	hasPMJoin = false;
@@ -406,7 +491,7 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 	fRunExecuted = false;
 	isFilterFeeder = false;
 	smallOuterJoiner = -1;
-
+	
 	// @1098 initialize scanFlags to be true
 	scanFlags.assign(numExtents, true);
 	runtimeCPFlags.assign(numExtents, true);
@@ -419,11 +504,11 @@ TupleBPS::TupleBPS(const PassThruStep& rhs) : fRm(rhs.fRm)
 //	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
-TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
+TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm (rhs.fRm)
 {
 	fInputJobStepAssociation = rhs.inputAssociation();
 	fOutputJobStepAssociation = rhs.outputAssociation();
-	fDec = 0;
+	fDec = rhs.dec();
 	fSessionId = rhs.sessionId();
 	fTxnId = rhs.txnId();
 	fVerId = rhs.verId();
@@ -455,20 +540,20 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
 	finishedSending = sendWaiting = false;
 	recvExited = 0;
 	fBPP.reset(new BatchPrimitiveProcessorJL(fRm));
-	initializeConfigParms();
-	fBPP->setSessionID(fSessionId);
+	initializeConfigParms ( );
+	fBPP->setSessionID( fSessionId );
 //	if (fOid>=3000)
 //		cout << "BPS:initalized from DictionaryStep. fSessionId=" << fSessionId << endl;
-	fBPP->setStepID(fStepId);
-	fBPP->setVersionNum(fVerId);
-	fBPP->setTxnID(fTxnId);
+	fBPP->setStepID( fStepId );
+	fBPP->setVersionNum( fVerId );
+	fBPP->setTxnID( fTxnId );
 	fTraceFlags = rhs.fTraceFlags;
-	fBPP->setTraceFlags(fTraceFlags);
+	fBPP->setTraceFlags( fTraceFlags );
 	fBPP->setOutputType(ROW_GROUP);
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -491,14 +576,18 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs) : fRm(rhs.fRm)
 
 TupleBPS::~TupleBPS()
 {
+	//pthread_mutex_destroy(&mutex);
+	//pthread_mutex_destroy(&dlMutex);
+	//pthread_mutex_destroy(&cpMutex);
+	//pthread_cond_destroy(&condvar);
+	//pthread_cond_destroy(&condvarWakeupProducer);
 	if (fDec) {
 		fDec->removeDECEventListener(this);
 		if (BPPIsAllocated) {
 			ByteStream bs;
 			fBPP->destroyBPP(bs);
 			try {
-				fMsgBytesOut += bs.length() * fDec->getPmCount();
-				fDec->write(uniqueID, bs);
+				fDec->write(bs);
 			}
 			catch (const std::exception& e)
 			{
@@ -517,7 +606,7 @@ TupleBPS::~TupleBPS()
 //	cout << "~TBPSCount = " << --TBPSCount << endl;
 }
 
-void TupleBPS::setBPP(JobStep* jobStep)
+void TupleBPS::setBPP( JobStep* jobStep )
 { 
 	fCardinality = jobStep->cardinality();
 
@@ -526,7 +615,7 @@ void TupleBPS::setBPP(JobStep* jobStep)
 	int colWidth = 0;
 	if (pcsp != 0)
 	{
-		fBPP->addFilterStep(*pcsp); 
+		fBPP->addFilterStep( *pcsp ); 
 
 		extentsMap[pcsp->fOid] = tr1::unordered_map<int64_t, EMEntry>();
 		tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[pcsp->fOid];
@@ -543,9 +632,9 @@ void TupleBPS::setBPP(JobStep* jobStep)
 	else 
 	{
 		pColScanStep* pcss = dynamic_cast<pColScanStep*>(jobStep);
-		if (pcss != 0)
+		if (pcss != 0)	
 		{
-			fBPP->addFilterStep(*pcss, lastScannedLBID);
+			fBPP->addFilterStep( *pcss, lastScannedLBID );
 
 			extentsMap[pcss->fOid] = tr1::unordered_map<int64_t, EMEntry>();
 			tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[pcss->fOid];
@@ -558,41 +647,41 @@ void TupleBPS::setBPP(JobStep* jobStep)
 		else 
 		{
 			pDictionaryStep* pdsp = dynamic_cast<pDictionaryStep*>(jobStep);
-			if (pdsp != 0)
-			{
-				fBPP->addFilterStep(*pdsp);
+			if (pdsp != 0)	
+			{	
+				fBPP->addFilterStep( *pdsp );
 				colWidth = (pdsp->colType()).colWidth;
 			}
 			else
 			{
 				FilterStep* pfsp = dynamic_cast<FilterStep*>(jobStep);
-				if (pfsp)
+				if ( pfsp )
 				{
-					fBPP->addFilterStep(*pfsp);
+					fBPP->addFilterStep( *pfsp );					
 				}
 			}
 
 		}
 	}
 
-	if (colWidth > fColWidth)
+	if ( colWidth > fColWidth )
 	{
 		fColWidth = colWidth;
 	}
 }
 
-void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
+void TupleBPS::setProjectBPP( JobStep* jobStep1, JobStep* jobStep2 )
 {
 	int colWidth = 0;
 
-	if (jobStep2 != NULL)
+	if ( jobStep2 != NULL )
 	{
 		pDictionaryStep* pdsp = 0;
 		pColStep* pcsp = dynamic_cast<pColStep*>(jobStep1);
 		if (pcsp != 0)
-		{
+		{	
 			pdsp = dynamic_cast<pDictionaryStep*>(jobStep2);
-			fBPP->addProjectStep(*pcsp, *pdsp);
+			fBPP->addProjectStep( *pcsp, *pdsp );
 			//@Bug 961
 			if (!pcsp->isExeMgr())
 				fBPP->setNeedRidsAtDelivery(true);
@@ -605,12 +694,12 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 		{
 			PassThruStep* psth = dynamic_cast<PassThruStep*>(jobStep1);
 			if (psth != 0)
-			{
+			{	
 				pdsp = dynamic_cast<pDictionaryStep*>(jobStep2);
-				fBPP->addProjectStep(*psth, *pdsp);
+				fBPP->addProjectStep( *psth, *pdsp );
 				//@Bug 961
-				if (!psth->isExeMgr())
-					fBPP->setNeedRidsAtDelivery(true);
+				if ( !psth->isExeMgr())
+					fBPP->setNeedRidsAtDelivery( true );
 				projectOids.push_back(jobStep1->oid());
 				colWidth = (psth->colType()).colWidth;
 //				if (fOid>=3000)
@@ -623,7 +712,7 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 		pColStep* pcsp = dynamic_cast<pColStep*>(jobStep1);
 		if (pcsp != 0)
 		{
-			fBPP->addProjectStep(*pcsp);
+			fBPP->addProjectStep( *pcsp );
 
 			extentsMap[pcsp->fOid] = tr1::unordered_map<int64_t, EMEntry>();
 			tr1::unordered_map<int64_t, EMEntry> &ref = extentsMap[pcsp->fOid];
@@ -632,16 +721,16 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 
 			//@Bug 961
 			if (!pcsp->isExeMgr())
-				fBPP->setNeedRidsAtDelivery(true);
+				fBPP->setNeedRidsAtDelivery( true );
 			colWidth = (pcsp->colType()).colWidth;
 			projectOids.push_back(jobStep1->oid());
 		}
 		else 
 		{
 			PassThruStep* passthru = dynamic_cast<PassThruStep*>(jobStep1);
-			if (passthru!= 0)
-			{
-				idbassert(!fBPP->getFilterSteps().empty());
+			if (passthru!= 0)	
+			{	
+				assert(!fBPP->getFilterSteps().empty());
 				if (static_cast<CalpontSystemCatalog::OID>(fBPP->getFilterSteps().back()->getOID()) != passthru->oid())
 				{
 					SJSTEP pts;
@@ -655,18 +744,26 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 				}
 				else
 				{
-					fBPP->addProjectStep(*passthru);
+					fBPP->addProjectStep( *passthru );
 					//@Bug 961
-					if (!passthru->isExeMgr())
-						fBPP->setNeedRidsAtDelivery(true);
+					if ( !passthru->isExeMgr())
+						fBPP->setNeedRidsAtDelivery( true );
 					colWidth = (passthru->colType()).colWidth;
 					projectOids.push_back(jobStep1->oid());
+				}
+			}
+			else
+			{
+				DeliveryStep* ds = dynamic_cast<DeliveryStep*>(jobStep1);
+				if ( ds != 0 ) {
+					fBPP->addDeliveryStep( *ds );
+					fTableName = ds->tableName();
 				}
 			}
 		}
 	}
 
-	if (colWidth > fColWidth)
+	if ( colWidth > fColWidth )
 	{
 		fColWidth = colWidth;
 	}
@@ -688,27 +785,36 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 
 	if (colCmdVec.size() == 0)
 		return;
-
+	
+	// ZZ debug -- please keep it for a couple of releases
+	// vector < vector<bool> > scanFs;
+	// cout << "storeCasualPartitionInfo" << endl;
+	
 	for (uint i = 0; i < colCmdVec.size(); i++)
 	{
 		colCmd = dynamic_cast<ColumnCommandJL*>(colCmdVec[i].get());
 		// bug 2116. skip CP check for function column
-		if (!colCmd || colCmd->fcnOrd() !=0) 
+		if (!colCmd || colCmd->fcnOrd() !=0 ) 
 			continue;
 
-		SP_LBIDList tmplbidList(new LBIDList(0));
+		SP_LBIDList tmplbidList(new LBIDList(0) );
 		if (tmplbidList->CasualPartitionDataType(colCmd->getColType().colDataType, colCmd->getColType().colWidth))
 		{
 			lbidListVec.push_back(tmplbidList);
 			cpColVec.push_back(colCmd);
 		}
 
-		// @Bug 3503. Use the total table size as the estimate for non CP columns.
-		else if (fEstimatedRows == 0 && estimateRowCounts)
-		{
-	        RowEstimator rowEstimator;
-    	    fEstimatedRows = rowEstimator.estimateRowsForNonCPColumn(*colCmd);
-		}
+        // @Bug 3503. Use the total table size as the estimate for non CP columns.
+        else if (fEstimatedRows == 0 && estimateRowCounts)
+        {
+			RowEstimator rowEstimator;
+			fEstimatedRows = rowEstimator.estimateRowsForNonCPColumn(*colCmd);
+        }
+
+		// debug
+	// vector<bool> scan;
+	// scan.assign(numExtents, true);
+	// scanFs.push_back(scan);
 	}
 
 	//cout << "cp column number=" << cpColVec.size() << " 1st col extents size= " << scanFlags.size() << endl;
@@ -717,14 +823,14 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 		return;
 
 	const bool ignoreCP = ((fTraceFlags & CalpontSelectExecutionPlan::IGNORE_CP) != 0);
-
+	
 	for (uint idx=0; idx <numExtents; idx++)
 	{
 		scanFlags[idx] = true;
 		for (uint i = 0; i < cpColVec.size(); i++)
 		{
 			colCmd = cpColVec[i];
-			const EMEntry &extent = colCmd->getExtents()[idx];
+			EMEntry &extent = colCmd->getExtents()[idx];
 
 			/* If any column filter eliminates an extent, it doesn't get scanned */
 			scanFlags[idx] = scanFlags[idx] &&
@@ -737,10 +843,37 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 							colCmd->getColType(),
 							colCmd->getBOP())
 				);
-			if (!scanFlags[idx]) {
+			if (!scanFlags[idx])
+				break;
+		}
+
+/*  Original version.  The code above should be equivalent.
+ 			scanFlags[idx] = false;
+			colCmd = cpColVec[i];
+
+			// if any extents that logically lined up with the first evaluate 
+			// true then this colCmd gives a true.
+			// If tracing says to ignore cp data, we still want to do all the work, then skip
+			if (colCmd->getExtents()[idx].partition.cprange.isValid != BRM::CP_VALID ||
+					lbidListVec[i]->CasualPartitionPredicate(
+										colCmd->getExtents()[idx].partition.cprange.lo_val,
+										colCmd->getExtents()[idx].partition.cprange.hi_val,
+										&(colCmd->getFilterString()),
+										colCmd->getFilterCount(),
+										colCmd->getColType(),
+										colCmd->getBOP()) || ignoreCP )
+			{
+				scanFlags[idx] = true;
+			}
+			// if any colCmd gives a false, then this extent scanflag is false
+			if (!scanFlags[idx])
+			{
+				//scanFs[i][idx] = false; // debug
 				break;
 			}
 		}
+*/
+
 	}
 
 	// @bug 2123.  Use the casual partitioning information to estimate the number of rows that will be returned for use in estimating
@@ -750,6 +883,19 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 		RowEstimator rowEstimator;
 		fEstimatedRows = rowEstimator.estimateRows(cpColVec, scanFlags, dbrm, fOid);
 	}
+	
+	// debug
+	/*for (uint i = 0; i < scanFs.size(); i++)
+	{
+			cout << "column " << i << ": ";
+		for (uint k = 0; k < scanFs[i].size(); k++)
+			cout << scanFs[i][k] << " ";
+		cout << endl;
+	}
+	cout << "final: "
+	for (uint i = 0; i < scanFlags.size(); i++)
+		cout << scanFlags[i] << " ";
+	cout << endl;*/
 }
 
 void TupleBPS::startPrimitiveThread()
@@ -776,8 +922,7 @@ void TupleBPS::serializeJoiner()
 #ifdef JLF_DEBUG
 		cout << "serializing joiner into " << bs.length() << " bytes" << endl;
 #endif
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
-		fDec->write(uniqueID, bs);
+		fDec->write(bs);
 		bs.restart();
 	}
 }
@@ -791,29 +936,8 @@ void TupleBPS::serializeJoiner(uint conn)
 		it's not exactly the exit condition*/
 	while (more) {
 		more = fBPP->nextTupleJoinerMsg(bs);
-		fMsgBytesOut += bs.length();
 		fDec->write(bs, conn);
 		bs.restart();
-	}
-}
-
-void TupleBPS::prepCasualPartitioning()
-{
-	uint i;
-	int64_t min, max, seq;
-	mutex::scoped_lock lk(cpMutex);
-
-	for (i = 0; i < scannedExtents.size(); i++) {
-		if (fOid >= 3000) {
-			//if (scanFlags[i] && !runtimeCPFlags[i])
-			//	cout << "runtime flags eliminated an extent!\n";
-			scanFlags[i] = scanFlags[i] && runtimeCPFlags[i];
-			if (scanFlags[i] && lbidList->CasualPartitionDataType(fColType.colDataType,
-					fColType.colWidth))
-				lbidList->GetMinMax(min, max, seq, (int64_t) scannedExtents[i].range.start, &scannedExtents);
-		}
-		else
-			scanFlags[i] = true;
 	}
 }
 
@@ -821,7 +945,7 @@ bool TupleBPS::goodExtentCount()
 {
 	uint eCount = extentsMap.begin()->second.size();
 	map<CalpontSystemCatalog::OID, tr1::unordered_map<int64_t, EMEntry> >
-		::iterator it;
+	  ::iterator it;
 
 	for (it = extentsMap.begin(); it != extentsMap.end(); ++it)
 		if (it->second.size() != eCount)
@@ -831,53 +955,46 @@ bool TupleBPS::goodExtentCount()
 
 void TupleBPS::initExtentMarkers()
 {
-
-	numDBRoots = fRm.getDBRootCount();
-	lastExtent.resize(numDBRoots);
-	lastScannedLBID.resize(numDBRoots);
-
 	tr1::unordered_map<int64_t, struct BRM::EMEntry> &ref = extentsMap[fOid];
-	tr1::unordered_map<int64_t, struct BRM::EMEntry>::iterator it;
+    tr1::unordered_map<int64_t, struct BRM::EMEntry>::iterator it;
+	uint lastExtent = 0;
 
-	scannedExtents.clear();
-	for (it = ref.begin(); it != ref.end(); ++it)
-		scannedExtents.push_back(it->second);
+    scannedExtents.clear();
+    for (it = ref.begin(); it != ref.end(); ++it)
+    	scannedExtents.push_back(it->second);
 
-	sort(scannedExtents.begin(), scannedExtents.end(), ExtentSorter());
+    sort(scannedExtents.begin(), scannedExtents.end(), ExtentSorter());
 
-	numExtents = scannedExtents.size();
-	// @1098 initialize scanFlags to be true
-	scanFlags.assign(numExtents, true);
-	runtimeCPFlags.assign(numExtents, true);
+    numExtents = scannedExtents.size();
+    // @1098 initialize scanFlags to be true
+    scanFlags.assign(numExtents, true);
+    runtimeCPFlags.assign(numExtents, true);
 
-	for (uint i = 0; i < numDBRoots; i++)
-		lastExtent[i] = -1;
-
-	for (uint i = 0; i < scannedExtents.size(); i++) {
-		uint dbRoot = scannedExtents[i].dbRoot - 1;
-
-		/* Kludge to account for gaps in the dbroot mapping. */
-		if (scannedExtents[i].dbRoot > numDBRoots) {
-			lastExtent.resize(scannedExtents[i].dbRoot);
-			lastScannedLBID.resize(scannedExtents[i].dbRoot);
-			for (uint z = numDBRoots; z < scannedExtents[i].dbRoot; z++)
-				lastExtent[z] = -1;
-			numDBRoots = scannedExtents[i].dbRoot;
+	hwm = 0;
+	if (scannedExtents.size()>0)
+	{
+		for (uint i = 0; i < scannedExtents.size(); i++) {
+			if (scannedExtents[i].HWM != 0 && scannedExtents[i].status != EXTENTOUTOFSERVICE)
+				hwm += (scannedExtents[i].HWM + 1);
+			if ( (scannedExtents[i].status == EXTENTAVAILABLE) &&
+				((scannedExtents[i].partitionNum >  scannedExtents[lastExtent].partitionNum) ||
+				((scannedExtents[i].partitionNum == scannedExtents[lastExtent].partitionNum) &&
+				 (scannedExtents[i].blockOffset  >  scannedExtents[lastExtent].blockOffset)) ||
+				((scannedExtents[i].partitionNum == scannedExtents[lastExtent].partitionNum) &&
+				 (scannedExtents[i].blockOffset  == scannedExtents[lastExtent].blockOffset) &&
+				 (scannedExtents[i].segmentNum   >= scannedExtents[lastExtent].segmentNum))) )
+			lastExtent = i;
 		}
-
-		if ((scannedExtents[i].status == EXTENTAVAILABLE) && (lastExtent[dbRoot] < (int) i))
-			lastExtent[dbRoot] = i;
-	}
-
-	// if only 1 block is written in the last extent, HWM is 0 and didn't get counted.
-	for (uint i = 0; i < numDBRoots; i++) {
-		if (lastExtent[i] != -1)
-			lastScannedLBID[i] = scannedExtents[lastExtent[i]].range.start +
-			  (scannedExtents[lastExtent[i]].HWM - scannedExtents[lastExtent[i]].blockOffset);
-		else
-			lastScannedLBID[i] = -1;
+		// if only 1 block is written in the last extent, HWM is 0 and didn't get counted.
+		if (scannedExtents[lastExtent].HWM == 0)
+			hwm++;
+		lastScannedLBID = scannedExtents[lastExtent].range.start + (scannedExtents[lastExtent].HWM -
+			scannedExtents[lastExtent].blockOffset);
+		if (hwm > 0)
+			hwm--;
 	}
 }
+
 
 void TupleBPS::reloadExtentLists()
 {
@@ -918,7 +1035,7 @@ void TupleBPS::reloadExtentLists()
 		if (cc == NULL)
 			continue;
 
-		const vector<EMEntry> &extents = cc->getExtents();
+		vector<EMEntry> &extents = cc->getExtents();
 		oid = cc->getOID();
 
 		extentsMap[oid] = tr1::unordered_map<int64_t, struct BRM::EMEntry>();
@@ -932,7 +1049,7 @@ void TupleBPS::reloadExtentLists()
 		if (cc == NULL)
 			continue;
 
-		const vector<EMEntry> &extents = cc->getExtents();
+		vector<EMEntry> &extents = cc->getExtents();
 		oid = cc->getOID();
 
 		extentsMap[oid] = tr1::unordered_map<int64_t, struct BRM::EMEntry>();
@@ -940,7 +1057,7 @@ void TupleBPS::reloadExtentLists()
 		for (j = 0; j < extents.size(); j++)
 			mref[extents[j].range.start] = extents[j];
 	}
-	
+
 	initExtentMarkers();
 }
 
@@ -952,9 +1069,32 @@ void TupleBPS::run()
 	const uint retryMax = 1000;   // 50s max; we've seen a 15s window so 50s should be 'safe'
 	const uint waitInterval = 50000;  // in us
 
+
 	if (fRunExecuted)
 		return;
+
+// 	cout << "TupleBPS::run()\n";
+
 	fRunExecuted = true;
+
+#ifdef PROFILE
+	if (fOid>=3000)
+	{
+		fProfileData.initialize("");
+
+		ProfileGroup sendGroup, recvGroup;
+		sendGroup.initialize(numOfSendCheckPoints, CheckPoints);
+		recvGroup.initialize(numOfRecvCheckPoints, CheckPoints+recvCheckpointOffset);
+
+		fProfileData.addGroup(sendGroup);
+		fProfileData.addGroup(recvGroup);
+	}
+#endif
+	if (traceOn())
+	{
+		syslogStartStep(16,           // exemgr subsystem
+			std::string("TupleBPS")); // step name
+	}
 
 	// make sure each numeric column has the same # of extents! See bugs 4564 and 3607
 	try {
@@ -966,27 +1106,20 @@ void TupleBPS::run()
 	catch (std::exception &e) {
 		ostringstream os;
 		os << "TupleBPS: Could not get a consistent extent count for each column.  Got '"
-				<< e.what() << "'\n";
+		  << e.what() << "'\n";
 		catchHandler(os.str());
 		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+			fOutputJobStepAssociation.status(tupleBPSErr);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		return;
-
 	}
 
 	if (retryCounter == retryMax) {
 		catchHandler("TupleBPS: Could not get a consistent extent count for each column.");
 		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+			fOutputJobStepAssociation.status(tupleBPSErr);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 		return;
-	}
-
-	if (traceOn())
-	{
-		syslogStartStep(16,           // exemgr subsystem
-			std::string("TupleBPS")); // step name
 	}
 
 	ByteStream bs;
@@ -1021,18 +1154,22 @@ void TupleBPS::run()
 
 	try {
 		fDec->addDECEventListener(this);
-		fBPP->priority(priority());
 		fBPP->createBPP(bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
-		fDec->write(uniqueID, bs);
+		fDec->write(bs);
 		BPPIsAllocated = true;
 		if (doJoin && tjoiners[0]->inPM())
 			serializeJoiner();
-		prepCasualPartitioning();
 
 		startPrimitiveThread();
+
 		if (!isDelivery)
 			startAggregationThreads();
+	}
+	catch (const IDBExcept &e) {
+		catchHandler(e.what());
+		if (fOutputJobStepAssociation.status() == 0)
+			fOutputJobStepAssociation.status(e.errorCode());
+		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 	}
 	catch (const std::exception& e)
 	{
@@ -1040,7 +1177,7 @@ void TupleBPS::run()
 		cerr << "tuple-bps::run() caught: " << e.what() << endl;
 		catchHandler(e.what());
 		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+			fOutputJobStepAssociation.status(tupleBPSErr);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 	}
 	catch (...)
@@ -1048,7 +1185,7 @@ void TupleBPS::run()
 		cerr << "tuple-bps::run() caught unknown exception" << endl;
 		catchHandler("tuple-bps::run() caught unknown exception");
 		if (fOutputJobStepAssociation.status() == 0)
-			fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+			fOutputJobStepAssociation.status(tupleBPSErr);
 		fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 	}
 }
@@ -1070,7 +1207,11 @@ void TupleBPS::join()
 			mutex.unlock(); //pthread_mutex_unlock(&mutex);
 			// wait for the PM to return all results before destroying the BPPs
 			while (msgsRecvd + fDec->size(uniqueID) < msgsSent)
+#ifdef _MSC_VER
+				Sleep(1 * 1000);
+#else
 				sleep(1);
+#endif
 		}
 
 		if (pThread)
@@ -1085,8 +1226,13 @@ void TupleBPS::join()
 			fBPP->destroyBPP(bs);
 
 			try {
-				fMsgBytesOut += bs.length() * fDec->getPmCount();
-				fDec->write(uniqueID, bs);
+				fDec->write(bs);
+			}
+			catch (const IDBExcept &e) {
+				catchHandler(e.what());
+				if (fOutputJobStepAssociation.status() == 0)
+					fOutputJobStepAssociation.status(e.errorCode());
+				fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
 			}
 			catch (const std::exception& e)
 			{
@@ -1110,17 +1256,18 @@ void TupleBPS::join()
 void TupleBPS::sendError(uint16_t status)
 {
 	ByteStream msgBpp;
-	fBPP->setCount(1);
-	fBPP->setStatus(status);
+	fBPP->setCount ( 1 );
+	fBPP->setStatus( status );
 	fBPP->runErrorBPP(msgBpp);
 	fMsgBytesOut += msgBpp.lengthWithHdrOverhead();
 	try {
-		fDec->write(uniqueID, msgBpp);
+		fDec->write(msgBpp);
 	}
 	catch(...) {
 		// this fcn is only called in exception handlers
 		// let the first error take precidence
 	}
+
 	fMsgBppsToPm++;
 	fBPP->reset();
 //	msgsSent++;   // not expecting a response from this msg
@@ -1132,7 +1279,7 @@ void TupleBPS::sendError(uint16_t status)
 /* XXXPAT: This function is ridiculous.  Need to replace it with code that uses
  * the multithreaded recv fcn & a FIFO once we get tighter control over memory usage.
  */
-uint TupleBPS::nextBand(messageqcpp::ByteStream &bs)
+uint TupleBPS::nextBand ( messageqcpp::ByteStream &bs )
 {
 	int64_t min;
 	int64_t max;
@@ -1153,20 +1300,23 @@ try
 {
 	while (msgsRecvd == msgsSent && !finishedSending &&
 	  !fInputJobStepAssociation.status())
-		usleep(1000);
+		usleep ( 1000 );
 
 	/* "If there are no more messages expected, or if there was an error somewhere else in the joblist..." */
 	if ((msgsRecvd == msgsSent && finishedSending) || fInputJobStepAssociation.status())
 	{
 		bsIn.reset(new ByteStream());
-		if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();
-		if (fOid>=3000 && traceOn()) dlTimes.setEndOfInputTime();
+		if ( fOid>=3000 && traceOn() ) dlTimes.setLastReadTime();
+		if ( fOid>=3000 && traceOn() ) dlTimes.setEndOfInputTime();
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.start ( 0, tableBand_c );
+#endif
 		/* "If there was an error, make a response with the error code... */
-		if (die || fBPP->getStatus() || 0 < fInputJobStepAssociation.status())
+		if ( die || fBPP->getStatus() || 0 < fInputJobStepAssociation.status() )
 		{
 			/* Note, doesn't matter which rowgroup is used here */
 			rgData = fBPP->getErrorRowGroupData(fInputJobStepAssociation.status());
-			//cout << "TBPS: returning error status " << fInputJobStepAssociation.status() << endl;
+			cout << "TBPS: returning error status " << fInputJobStepAssociation.status() << endl;
 			rows = 0;
 			if (!fInputJobStepAssociation.status())
 				fInputJobStepAssociation.status(fBPP->getStatus());
@@ -1176,7 +1326,7 @@ try
 		{
 			/* else, send the special, 0-row last message. */
 			bool unused;
-			rgData = fBPP->getRowGroupData(*bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
+			rgData = fBPP->getRowGroupData( *bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
 
 			primRowGroup.setData(rgData.get());
 			if (fe2)
@@ -1190,24 +1340,27 @@ try
 			rows = realOutputRG.getRowCount();
 			bs.load(realOutputRG.getData(), realOutputRG.getDataSize());
 
+#ifdef PROFILE
+			if ( fOid>=3000 ) fProfileData.stop ( 0, tableBand_c );
+#endif
 			/* send the cleanup commands to the PM & DEC */
 			ByteStream dbs;
 			fDec->removeDECEventListener(this);
 			fBPP->destroyBPP(dbs);
-			fMsgBytesOut += bs.length() * fDec->getPmCount();
 			try {
-				fDec->write(uniqueID, dbs);
+				fDec->write(dbs);
 			}
 			catch (...) {
 				// return the result since it's
 				// completed instead of returning an error.
 			}
+
 			BPPIsAllocated = false;
 			fDec->removeQueue(uniqueID);
 			tjoiners.clear();
 
 			/* A pile of stats gathering */
-			if (fOid>=3000)
+			if ( fOid>=3000 )
 			{
 				struct timeval tvbuf;
 				gettimeofday(&tvbuf, 0);
@@ -1217,11 +1370,11 @@ try
 
 				//...Sum up the blocked FIFO reads for all input associations
 				size_t inDlCnt  = fInputJobStepAssociation.outSize();
-				for (size_t iDataList=0; iDataList<inDlCnt; iDataList++)
+				for ( size_t iDataList=0; iDataList<inDlCnt; iDataList++ )
 				{
 					pFifo = dynamic_cast<FIFO<boost::shared_array<uint8_t> > *>(
 						fInputJobStepAssociation.outAt(iDataList)->rowGroupDL());
-					if (pFifo)
+					if ( pFifo )
 					{
 						totalBlockedReadCount += pFifo->blockedReadCount();
 					}
@@ -1229,17 +1382,17 @@ try
 
 				//...Sum up the blocked FIFO writes for all output associations
 				size_t outDlCnt = fOutputJobStepAssociation.outSize();
-				for (size_t iDataList=0; iDataList<outDlCnt; iDataList++)
+				for ( size_t iDataList=0; iDataList<outDlCnt; iDataList++ )
 				{
 					pFifo = dynamic_cast<FIFO<boost::shared_array<uint8_t> > *>(
 						fOutputJobStepAssociation.outAt(iDataList)->rowGroupDL());
-					if (pFifo)
+					if ( pFifo )
 					{
 						totalBlockedWriteCount += pFifo->blockedWriteCount();
 					}
 				}
 
-				if (traceOn())
+				if ( traceOn() )
 				{
 					//...Roundoff msg byte counts to nearest KB for display
 					uint64_t msgBytesInKB  = fMsgBytesIn >> 10;
@@ -1264,27 +1417,35 @@ try
 					"; EOI " << dlTimes.EndOfInputTimeString() << "; runtime-" <<
 					JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
 					<< "s\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
-					logEnd(logStr.str().c_str());
-					syslogReadBlockCounts(16,                   // exemgr sybsystem
+					logEnd ( logStr.str().c_str() );
+					syslogReadBlockCounts ( 16,                 // exemgr sybsystem
 									fPhysicalIO,                // # blocks read from disk
 									fCacheIO,                   // # blocks read from cache
-									fNumBlksSkipped);           // # casual partition block hits
-					syslogProcessingTimes(16,                   // exemgr subsystem
+									fNumBlksSkipped );          // # casual partition block hits
+					syslogProcessingTimes ( 16,                 // exemgr subsystem
 									dlTimes.FirstReadTime(),    // first datalist read
 									dlTimes.LastReadTime(),     // last  datalist read
 									dlTimes.FirstInsertTime(),  // first datalist write
-									dlTimes.EndOfInputTime());  // last (endOfInput) datalist write
-					syslogEndStep(16,                           // exemgr subsystem
+									dlTimes.EndOfInputTime() ); // last (endOfInput) datalist write
+					syslogEndStep ( 16,                         // exemgr subsystem
 									totalBlockedReadCount,      // blocked datalist input
 									totalBlockedWriteCount,     // blocked datalist output
 									fMsgBytesIn,                // incoming msg byte count
-									fMsgBytesOut);              // outgoing msg byte count
+									fMsgBytesOut );             // outgoing msg byte count
 					fExtendedInfo += toString() + logStr.str();
 					formatMiniStats();
 				}
+
+#ifdef PROFILE
+				if ( fOid>=3000 )
+				{
+					cout << "BPS (st: " << fStepId << ") execution stats:" << endl;
+					cout << "  total runtime: " << fProfileData << endl;
+				}
+#endif
 			}
 
-			if (fOid>=3000 && (ffirstStepType == SCAN) && bop == BOP_AND) {
+			if ( fOid>=3000 && ( ffirstStepType == SCAN ) && bop == BOP_AND) {
 				cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
 				lbidList->UpdateAllPartitionInfo();
 				cpMutex.unlock(); //pthread_mutex_unlock(&cpMutex);
@@ -1295,9 +1456,12 @@ try
 	/* .. else, this is the next msg to process from the PM... */
 	else
 	{
-		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec ==0)
+		if ( fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec ==0 )
 			dlTimes.setFirstReadTime();
-		fDec->read(uniqueID, bsIn);
+		fDec->read(uniqueID, bsIn );
+#ifdef PROFILE
+		if ( fOid>=3000 && firstRead ) fProfileData.stop ( 0, sendPrimMsg_c );
+#endif
 		firstRead = false;
 		fMsgBytesIn += bsIn->lengthWithHdrOverhead();
 		if (bsIn->length() != 0 && fBPP->countThisMsg(*bsIn)) {
@@ -1305,7 +1469,7 @@ try
 			msgsRecvd++;
 			//@Bug 1424, 1298
 			if ((sendWaiting) && ((msgsSent - msgsRecvd) <=
-			    (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)))
+			  (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)))
 			{
 				condvarWakeupProducer.notify_one(); //pthread_cond_signal(&condvarWakeupProducer);
 				THROTTLEDEBUG << "nextBand wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
@@ -1313,13 +1477,17 @@ try
 			mutex.unlock(); //pthread_mutex_unlock(&mutex);
 		}
 
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.start ( 0, tableBand_c );
+#endif
+
 		ISMPacketHeader *hdr = (ISMPacketHeader*)bsIn->buf();
 
 		// Check for errors and abort
-		if (bsIn->length() == 0 || 0 < hdr->Status || 0 < fBPP->getStatus() || 0 < fOutputJobStepAssociation.status())
+		if (bsIn->length() == 0 || 0 < hdr->Status || 0 < fBPP->getStatus() || 0 < fOutputJobStepAssociation.status() )
 		{
 			if (bsIn->length() == 0)
-				fOutputJobStepAssociation.status(ERR_PRIMPROC_DOWN);
+				fOutputJobStepAssociation.status(primitiveServerErr);
 			else if (hdr->Status) {
 				string errmsg;
 				bsIn->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
@@ -1344,7 +1512,7 @@ try
 		else
 		{
 			bool unused;
-			rgData = fBPP->getRowGroupData(*bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
+			rgData = fBPP->getRowGroupData( *bsIn, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks, &unused, 0);
 
 			primRowGroup.setData(rgData.get());
 			if (fe2) {
@@ -1357,7 +1525,7 @@ try
 			if (dupColumns.size() > 0)
 				dupOutputColumns(realOutputRG);
 
-			if (fOid>=3000 && (ffirstStepType == SCAN) && bop == BOP_AND)
+			if ( fOid>=3000 && ( ffirstStepType == SCAN ) && bop == BOP_AND)
 			{
 				cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
 				lbidList->UpdateMinMax(min, max, lbid, fColType.colDataType, validCPData);
@@ -1372,13 +1540,16 @@ try
 // 			cout << "loaded\n";
 
 		}
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.stop ( 0, tableBand_c );
+#endif
 
 		fPhysicalIO += physIO;
 		fCacheIO += cachedIO;
 		fBlockTouched += touchedBlocks;
 
 #if 0
-		if (fOid>=3000 && (ffirstStepType == SCAN) && bop == BOP_AND)
+		if ( fOid>=3000 && ( ffirstStepType == SCAN ) && bop == BOP_AND)
 		{
 			cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
 			lbidList->UpdateMinMax(min, max, lbid, fColType.colDataType, validCPData);
@@ -1399,9 +1570,9 @@ catch(const std::exception& ex)
 	std::string errstr("TupleBPS next band caught exception: ");
 	errstr.append(ex.what());
 	catchHandler(errstr, fSessionId);
-	fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+	fOutputJobStepAssociation.status(tupleBPSErr);
 	bs.restart();
-	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
+	rgData = fBPP->getErrorRowGroupData(tupleBPSErr);
 	primRowGroup.setData(rgData.get());
 	bs.load(rgData.get(), primRowGroup.getDataSize());
 	return 0;
@@ -1409,9 +1580,9 @@ catch(const std::exception& ex)
 catch(...)
 {
 	catchHandler("TupleBPS next band caught an unknown exception", fSessionId);
-	fOutputJobStepAssociation.status(ERR_TUPLE_BPS);
+	fOutputJobStepAssociation.status(tupleBPSErr);
 	bs.restart();
-	rgData = fBPP->getErrorRowGroupData(ERR_TUPLE_BPS);
+	rgData = fBPP->getErrorRowGroupData(tupleBPSErr);
 	primRowGroup.setData(rgData.get());
 	bs.load(rgData.get(), primRowGroup.getDataSize());
 	return 0;
@@ -1419,206 +1590,333 @@ catch(...)
 	return rows;
 }
 
-
-/* The current interleaving rotates over PMs, clustering jobs for a single PM
- * by dbroot to keep block accesses adjacent & make best use of prefetching &
- * cache.
- */
-void TupleBPS::interleaveJobs(vector<Job> *jobs) const
-{
-	vector<Job> newJobs;
-	uint i;
-	uint pmCount = 0;
-	scoped_array<deque<Job> > bins;
-
-	// the input is grouped by dbroot
-
-	if (pmCount == 1)
-		return;
-
-	/* Need to get the 'real' PM count */
-	for (i = 0; i < jobs->size(); i++)
-		if (pmCount < (*jobs)[i].connectionNum + 1)
-			pmCount = (*jobs)[i].connectionNum + 1;
-
-	bins.reset(new deque<Job>[pmCount]);
-
-	// group by connection number
-	for (i = 0; i < jobs->size(); i++)
-		bins[(*jobs)[i].connectionNum].push_back((*jobs)[i]);
-
-	// interleave by connection num
-	bool noWorkDone;
-	while (newJobs.size() < jobs->size()) {
-		noWorkDone = true;
-		for (i = 0; i < pmCount; i++) {
-			if (!bins[i].empty()) {
-				newJobs.push_back(bins[i].front());
-				bins[i].pop_front();
-				noWorkDone = false;
-			}
-		}
-		idbassert(!noWorkDone);
-	}
-
-#if 0
-	/* Work in progress */
-	// up to this point, only the first connection to a PM is used.
-	// the last step is to round-robin on the connections of each PM.
-	// ex: on a 3 PM system where connections per PM is 2,
-	// connections 0 and 3 are for PM 1, 1 and 4 are PM2, 2 and 5 are PM3.
-	uint *jobCounters = (uint *) alloca(pmCount * sizeof(uint));
-	memset(jobCounters, 0, pmCount * sizeof(uint));
-	for (i = 0; i < newJobs.size(); i++) {
-		uint &conn = newJobs[i].connectionNum;  // for readability's sake
-		conn = conn + (pmCount * jobCounters[conn]);
-		jobCounters[conn]++;
-	}
-#endif
-
-	jobs->swap(newJobs);
-//	cout << "-------------\n";
-//	for (i = 0; i < jobs->size(); i++)
-//		cout << "job " << i+1 << ": dbroot " << (*jobs)[i].dbroot << ", PM "
-//				<< (*jobs)[i].connectionNum + 1 << endl;
-}
-
-void TupleBPS::sendJobs(const vector<Job> &jobs)
-{
-	uint i;
-
-	for (i = 0; i < jobs.size() && !die && !fInputJobStepAssociation.status(); i++) {
-		//cout << "sending a job for dbroot " << jobs[i].dbroot << ", PM " << jobs[i].connectionNum << endl;
-		fDec->write(uniqueID, *(jobs[i].msg));
-		mutex.lock();
-		fMsgBytesOut += (jobs[i].msg)->length() * fDec->getPmCount();
-		msgsSent += jobs[i].expectedResponses;
-		if (recvWaiting)
-			condvar.notify_all();
-		while ((msgsSent - msgsRecvd > fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)
-				&& !die) {
-			sendWaiting = true;
-			condvarWakeupProducer.wait(mutex);
-			sendWaiting = false;
-		}
-		mutex.unlock();
-	}
-}
-
-void TupleBPS::makeJobs(vector<Job> *jobs)
-{
-	shared_ptr<ByteStream> bs;
-	uint i;
-	uint lbidsToScan;
-	uint blocksToScan;
-	uint blocksPerJob;
-	LBID_t startingLBID;
-	oam::OamCache *oamCache = oam::OamCache::makeOamCache();
-	shared_ptr<map<int, int> > dbRootConnectionMap = oamCache->getDBRootToConnectionMap();
-
-	idbassert(ffirstStepType == SCAN);
-
-	if (fOid >= 3000 && bop == BOP_AND)
-		storeCasualPartitionInfo(false);
-
-	for (i = 0; i < scannedExtents.size(); i++) {
-
-		// the # of LBIDs to scan in this extent, if it will be scanned
-		if (scannedExtents[i].HWM == 0 && (int) i < lastExtent[scannedExtents[i].dbRoot-1])
-			lbidsToScan = scannedExtents[i].range.size * 1024;
-        else
-            lbidsToScan = scannedExtents[i].HWM - scannedExtents[i].blockOffset + 1;
-
-		// skip this extent if CP data rules it out or the scan has already passed
-		// the last extent for that DBRoot (import may be adding extents that shouldn't
-		// be read yet).
-		if (!scanFlags[i] && (int)i <= lastExtent[scannedExtents[i].dbRoot-1])
-			fNumBlksSkipped += lbidsToScan;
-		if (!scanFlags[i] || (int)i > lastExtent[scannedExtents[i].dbRoot-1])
-			continue;
-
-		/* Figure out many blocks have data in this extent
-		 * Calc how many jobs to issue,
-		 * Get the dbroot,
-		 * construct the job msgs
-		 */
-
-		// a necessary DB root is offline
-		if (dbRootConnectionMap->find(scannedExtents[i].dbRoot) == dbRootConnectionMap->end())
-			throw IDBExcept(ERR_DATA_OFFLINE);
-
-//		cout << "   session " << fSessionId << " idx = " << i << " HWM = " << scannedExtents[i].HWM
-//				<< " ... will scan " << lbidsToScan << " lbids\n";
-
-		// the # of logical blocks in this extent
-		if (lbidsToScan % fColType.colWidth)
-			blocksToScan = lbidsToScan/fColType.colWidth + 1;
-		else
-			blocksToScan = lbidsToScan/fColType.colWidth;
-
-		// how many logical blocks to process with a single job (& single thread on the PM)
-#ifdef _MSC_VER
-		blocksPerJob = max(blocksToScan/fProcessorThreadsPerScan, 16UL);
-#else
-		blocksPerJob = max(blocksToScan/fProcessorThreadsPerScan, 16U);
-#endif
-		//cout << "blocks to scan = " << blocksToScan << " blocks per job = " << blocksPerJob <<
-		//	" HWM == " << scannedExtents[i].HWM << endl;
-
-		startingLBID = scannedExtents[i].range.start;
-		while (blocksToScan > 0) {
-			uint blocksThisJob = min(blocksToScan, blocksPerJob);
-			//cout << "starting LBID = " << startingLBID << " count = " << blocksThisJob <<
-			//	" dbroot = " << scannedExtents[i].dbRoot << endl;
-
-			fBPP->setLBID(startingLBID, scannedExtents[i].dbRoot);
-			fBPP->setCount(blocksThisJob);
-			bs.reset(new ByteStream());
-			fBPP->runBPP(*bs, (*dbRootConnectionMap)[scannedExtents[i].dbRoot]);
-			//cout << "making job for connection # " << (*dbRootConnectionMap)[scannedExtents[i].dbRoot] << endl;
-			jobs->push_back(Job(scannedExtents[i].dbRoot, (*dbRootConnectionMap)[scannedExtents[i].dbRoot],
-					blocksThisJob, bs));
-			blocksToScan -= blocksThisJob;
-			startingLBID += fColType.colWidth * blocksThisJob;
-			fBPP->reset();
-		}
-	}
-
-//	cout << "session " << fSessionId << " sees " << extentCounter << " extents" << endl;
-}
-
 void TupleBPS::sendPrimitiveMessages()
 {
-	vector<Job> jobs;
-
-	idbassert(ffirstStepType == SCAN);
+	int it = -1;
+	bool more = false;
+	ByteStream msgBpp;
+	int msgsSkip=0;
+	
+	int64_t Min=0;
+	int64_t Max=0;
+	int64_t SeqNum=0;
+	bool MinMaxValid=true;
+	RowGroupDL *in=0;
+	boost::shared_array<uint8_t> rgData;
+	const std::tr1::unordered_map<int64_t, BRM::EMEntry> &extents = extentsMap[fOid];
 
 	if (fInputJobStepAssociation.status() != 0)
 		goto abort;
 
-	try {
-		makeJobs(&jobs);
-		interleaveJobs(&jobs);
-		sendJobs(jobs);
+try
+{
+	if (fOid >= 3000 && bop == BOP_AND)
+		storeCasualPartitionInfo(false);
+
+	// Get the starting DBRoot for the column.  We want to send use the starting DBRoot to send the right messages
+	// to the right PMs.  If the first extent, is on DBRoot1, the message will go to the first connection.  If it's
+	// DBRoot2, the first extent will get sent to the second connection, and so on.  This is a change for the 
+	// multiple files per OID enhancement as a precurser to shared nothing.
+	uint16_t startingDBRoot = 1;
+	uint32_t startingPartitionNumber = 0;
+	dbrm.getStartExtent(fOid, startingDBRoot, startingPartitionNumber);	
+
+	if ( ffirstStepType == SCAN )
+	{
+#ifdef PROFILE
+	if (fOid>=3000) fProfileData.start(0, sendWork_Scan);
+#endif
+		uint32_t  extentIndex;
+		uint64_t  fbo;
+		bool cpPredicate = true;
+		bool firstSend = true;
+		//@Bug 913 
+		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0) {
+			dlTimes.setFirstReadTime();
+		}
+
+		LBIDRange *it;
+		LBIDRange tmpLBIDRange;
+		it = &tmpLBIDRange;
+		for (extentIndex = 0, fbo = 0; extentIndex < scannedExtents.size();
+				fbo += it->size, extentIndex++)   {
+
+			tmpLBIDRange.start = scannedExtents[extentIndex].range.start;
+			tmpLBIDRange.size = scannedExtents[extentIndex].range.size * 1024;
+			if (hwm < fbo)
+				continue;
+
+			if (fOid >= 3000 && bop == BOP_AND)
+			{
+				// @bug 1297. getMinMax to prepare partition vector should consider
+				// cpPredicate. only scanned lbidrange will be pushed into the vector.
+
+				cpPredicate = scanFlags[extentIndex] && runtimeCPFlags[extentIndex];
+				//if (scanFlags[extentIndex] && !runtimeCPFlags[extentIndex])
+				//	cout << "HJ feedback eliminated an extent!\n";
+
+				// @bug 1090. cal getMinMax to prepare the CP vector and update later
+				if (cpPredicate && lbidList->CasualPartitionDataType(fColType.colDataType, fColType.colWidth)) {
+					cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
+					MinMaxValid = lbidList->GetMinMax(&Min, &Max, &SeqNum,
+									it->start, extents);
+					cpMutex.unlock(); //pthread_mutex_unlock(&cpMutex);
+				}
+			}
+
+			if (cpPredicate==false){ //don't scan this extent
+				//...Track the number of LBIDs we skip due to Casual Partioning.
+				//...We use the same equation we use to initialize remainingLbids
+				//...in the code that follows down below this.
+				fNumBlksSkipped += ( (hwm > (fbo + it->size - 1)) ?
+							(it->size) : (hwm - fbo + 1) );
+				continue;
+			}
+
+			LBID_t    msgLbidStart   = it->start;
+			u_int32_t remainingLbids = 0;
+			u_int32_t lbidToBeSent =
+				( (hwm > (fbo + it->size - 1)) ? (it->size) : (hwm - fbo + 1) );
+			u_int32_t msgLbidCount   = 0;
+			u_int32_t msgLbidCountBatch   = 0;	
+			u_int32_t totalLbid = 0;
+			u_int32_t requestLbids = 0;
+			u_int32_t sentLbids = 0;
+			u_int32_t maxOutstandingLbids = 0;
+			if ( lbidToBeSent % fColType.colWidth == 0 )
+			 	totalLbid= lbidToBeSent/fColType.colWidth;
+			else
+				totalLbid= lbidToBeSent/fColType.colWidth + 1;
+			
+			remainingLbids =  totalLbid; // logical blocks
+//			cout << "fColWidth=" << fColWidth<< endl;
+//			msgLbidCount = extentSize/fColWidth;
+
+			// @bug 977
+			// @bug 1264.  Changed the number of logical blocks per BPS scan to be configurable based on the LogicalBlocksPerScan Calpont.xml
+			//             entry.
+			// msgLbidCount = extentSize/8;
+			if ( fColWidth == 0 )
+				fColWidth = fColType.colWidth;
+
+			//We've lost the original CW depending on the other cols in the query, recalc it here
+			const int realColWidth = extentSize / fExtentRows;
+			requestLbids = fRequestSize * (extentSize / realColWidth);
+			msgLbidCount =(requestLbids/fProcessorThreadsPerScan)/fRequestSize;
+			maxOutstandingLbids = fMaxOutstandingRequests * (extentSize / realColWidth);
+#if 0
+cout << " rs = " << fRequestSize;
+cout << " es = " << extentSize;
+cout << " cw = " << fColWidth;
+cout << " rcw = " << realColWidth;
+cout << " rl (rs*(es/rcw) = " << requestLbids;
+cout << " tps = " << fProcessorThreadsPerScan;
+cout << " mlc ((rl/tps)/rs) = " << msgLbidCount;
+cout << " mor = " << fMaxOutstandingRequests;
+cout << " mol (mor*(es/rcw)) = " << maxOutstandingLbids;
+cout << endl;
+#endif
+			while ( remainingLbids > 0 && 0 == fInputJobStepAssociation.status() && !die)
+			{
+				msgLbidCountBatch = msgLbidCount;
+				if ( remainingLbids < requestLbids)
+					requestLbids = remainingLbids;
+
+				//@Bug 1424,1298Send one requestSize a batch
+				while ( sentLbids < requestLbids )
+				{
+					if ( (requestLbids - sentLbids) < msgLbidCountBatch )
+						msgLbidCountBatch = requestLbids - sentLbids;
+					/**
+					if ( fOid>=3000) {
+						cout << "st:" << fStepId
+							<< " LbidStart=" << msgLbidStart 
+							<< " LbidCount="<< msgLbidCountBatch
+							<< " colW=" << fColWidth
+							<< " oid = " << fOid
+							<< " numExts:" << numExtents 
+							<< " extSize:  " << extentSize
+							<< " hwm: " << hwm
+							<< " sentLbids: " << sentLbids
+							<< " reqLbids: " << requestLbids
+							<< " remLbids: " << remainingLbids
+							<< " PTR: " << fProcessorThreadsPerScan
+							<< endl;
+					}
+					**/
+
+					fBPP->setLBID( msgLbidStart );
+					assert(msgLbidCountBatch>0);
+					fBPP->setCount ( msgLbidCountBatch );
+					fBPP->runBPP(msgBpp, startingDBRoot);
+					fMsgBytesOut += msgBpp.lengthWithHdrOverhead();
+					//cout << "Requesting " << msgLbidCount << " logical blocks at " << msgLbidStart;
+					//cout << "  sending fOid " << fOid << endl;
+#ifdef SHARED_NOTHING_DEMO
+					fDec->write(msgBpp, fOid);
+#else
+					fDec->write(msgBpp);
+#endif
+					fMsgBppsToPm++;
+				
+					msgBpp.restart();
+					fBPP->reset();
+					firstSend = false;
+					msgLbidStart += msgLbidCountBatch * fColType.colWidth; //OK
+					sentLbids += msgLbidCountBatch;
+				}
+				mutex.lock(); //pthread_mutex_lock(&mutex);
+				msgsSent += sentLbids;
+					
+				if (recvWaiting)
+					condvar.notify_all(); //pthread_cond_broadcast(&condvar); //signal consumer to resume
+	
+				//Bug 939
+				while (!fSwallowRows &&
+					(( msgsSent - msgsRecvd) >  maxOutstandingLbids) && !die)
+				{
+					sendWaiting = true;
+					THROTTLEDEBUG << "BPS send thread wait on step " << fStepId << " oid = " << fOid
+					<< "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
+					condvarWakeupProducer.wait(mutex); //pthread_cond_wait ( &condvarWakeupProducer, &mutex );
+					sendWaiting = false;
+				}
+				mutex.unlock(); //pthread_mutex_unlock(&mutex);
+				sentLbids = 0;
+				remainingLbids -= requestLbids;
+			}
+		}
 	}
-	catch(const IDBExcept &e) {
-		sendError(e.errorCode());
-		processError(e.what(), e.errorCode(), "TupleBPS::sendPrimitiveMessages()");
+	else if ( ffirstStepType == COLSTEP )
+	{
+		/*
+			read a RowGroup from input
+			check casual partitioning
+			build the msg
+			wait for throttling
+			send it
+			update all the counters
+		*/
+
+		uint64_t baseRid;
+		const uint throttleCheckInterval = fRequestSize << LOGICAL_EXTENT_CONVERTER;
+		uint lastCheck = 0;
+
+		assert(fInputJobStepAssociation.outSize() >= 1);
+		in = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+		assert(in);
+		it = in->getIterator();
+
+		more = in->next(it, &rgData);
+		if (fOid >= 3000 && traceOn() && dlTimes.FirstReadTime().tv_sec == 0)
+			dlTimes.setFirstReadTime();
+
+		for (; more && !die; more = in->next(it, &rgData)) {
+
+			/* error checking */
+			if (fInputJobStepAssociation.status() > 0) {
+				sendError(fInputJobStepAssociation.status());
+				break;
+			}
+
+			/* grab the data */
+			inputRowGroup.setData(rgData.get());
+
+			/* Check casual partitioning */
+			baseRid = inputRowGroup.getBaseRid();
+			if (!scanit(baseRid) && bop == BOP_AND) {
+				msgsSkip++;
+				continue;
+			}
+
+			/* build the msg & do accounting */
+			ridsRequested += inputRowGroup.getRowCount();
+			if (inputRowGroup.getRowCount() == 0)
+				continue;
+
+			fBPP->setRowGroupData(inputRowGroup);
+			fBPP->runBPP(msgBpp, startingDBRoot);
+
+			/* Do some elaborate throttling */
+			if (lastCheck >= throttleCheckInterval) {
+				lastCheck = 0;
+				mutex.lock(); //pthread_mutex_lock(&mutex);
+
+				while (msgsSent - msgsRecvd >
+				  (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER) && !die) {
+					sendWaiting = true;
+					condvarWakeupProducer.wait(mutex); //pthread_cond_wait(&condvarWakeupProducer, &mutex);
+					sendWaiting = false;
+				}
+				mutex.unlock(); //pthread_mutex_unlock(&mutex);
+			}
+			else
+				lastCheck++;
+
+			/* Send the msg */
+			#ifdef SHARED_NOTHING_DEMO
+			fDec->write(msgBpp, fOid);
+			#else
+			fDec->write(msgBpp);
+			#endif
+			fMsgBytesOut += msgBpp.lengthWithHdrOverhead();
+
+			fBPP->reset();
+			msgBpp.restart();
+			msgsSent++;
+		}
+
+	/* last bunch of accounting */
+	fMsgBppsToPm = msgsSent;
 	}
-	catch(const std::exception& ex) {
-		sendError(ERR_TUPLE_BPS);
-		processError(ex.what(), ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
-	}
-	catch(...) {
-		sendError(ERR_TUPLE_BPS);
-		processError("unknown", ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
-	}
+	
+	if (fOid>=3000 && traceOn()) dlTimes.setLastReadTime();
+
+}  // try
+catch(IDBExcept &e)
+{
+	finishedSending = true;
+	msgBpp.reset();
+	sendError(e.errorCode());
+	processError(e.what(), e.errorCode(), "TupleBPS::SendPrimitiveMessages()");
+}
+catch(const std::exception& ex)
+{
+	finishedSending = true;
+	msgBpp.reset();
+	sendError(tupleBPSErr);
+	processError(ex.what(), tupleBPSErr, "TupleBPS::SendPrimitiveMessages()");
+}
+catch(...)
+{
+	finishedSending = true;
+	msgBpp.reset();
+	sendError(tupleBPSErr);
+	processError("unknown", tupleBPSErr, "TupleBPS::SendPrimitiveMessages()");
+}
 
 abort:
-	mutex.lock();
+	if (more && (die || fInputJobStepAssociation.status() > 0) && 
+	  ffirstStepType != SCAN)
+		while (more)
+			more = in->next(it, &rgData);
+
+	mutex.lock(); //pthread_mutex_lock(&mutex);
 	finishedSending = true;
-	condvar.notify_all();
-	mutex.unlock();
+//	cout << "send finished, requested " << msgsSent << " logical blocks\n";
+	if (recvWaiting)
+		condvar.notify_all(); //pthread_cond_broadcast(&condvar); //signal consumer to resume
+	mutex.unlock(); //pthread_mutex_unlock(&mutex);
+	msgBpp.reset();
+	//if ( fOid >=3000 )
+	//	cout << "st: "<< fStepId << " requested " << ridsRequested << endl;
+		
+	//...Track the number of LBIDs we skip due to Casual Partioning.
+	fNumBlksSkipped += msgsSkip;
+#ifdef PROFILE
+	if (fOid>=3000) fProfileData.stop(0, sendWork_Scan);
+#endif
+
 }
 
 struct _CPInfo {
@@ -1634,7 +1932,7 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint threadID)
 	AnyDataListSPtr dl = fOutputJobStepAssociation.outAt(0);
 	RowGroupDL* dlp = dl->rowGroupDL();
 
-	uint size = 0;
+	uint size = 0, vecSize = 0;
 	vector<boost::shared_ptr<ByteStream> > bsv;
 
 	boost::shared_array<uint8_t> rgData;
@@ -1706,7 +2004,7 @@ try
 		joinedBaseRowData.reset(new uint8_t[joinedBaseRow.getSize()]);
 		joinedBaseRow.setData(joinedBaseRowData.get());
 		largeMapping = makeMapping(local_primRG, local_outputRG);
-
+		
 		bool hasJoinFE = false;
 		for (i = 0; i < smallSideCount; i++) {
 			joinerMatchesRGs[i].initRow(&smallSideRows[i]);
@@ -1749,7 +2047,7 @@ try
 				tmp8 = joinerMatchesRGs[i].getData();
 				joinerMatchesRGs[i].setData(NULL);
 				cout << "small-side[" << i << "] RG: " << joinerMatchesRGs[i].toString() << endl;
-			}
+			}	
 			tmp8 = local_outputRG.getData();
 			local_outputRG.setData(NULL);
 			cout << "output RG: " << local_outputRG.toString() << endl;
@@ -1772,7 +2070,7 @@ try
 	mutex.lock();
 
 	while (1) {
-		// sync with the send side 
+		// sync with the send side 	
 		while (!finishedSending && msgsSent == msgsRecvd) {
 			recvWaiting++;
 			condvar.wait(mutex);
@@ -1791,14 +2089,11 @@ try
 		//@Bug 1424,1298
 
 		if (sendWaiting && ((msgsSent - msgsRecvd) <=
-		   (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER))) {
+		  (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER))) {
 			condvarWakeupProducer.notify_one(); //pthread_cond_signal(&condvarWakeupProducer);
 			THROTTLEDEBUG << "receiveMultiPrimitiveMessages wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
 		}
 
-		// @bug 4562
-		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0)
-			dlTimes.setFirstReadTime();
 
 		/* If there's an error and the joblist is being aborted, don't
 			sit around forever waiting for responses.  */
@@ -1850,12 +2145,12 @@ try
 				mutex.lock();
 				if (bs->length() == 0)
 				{
-					fOutputJobStepAssociation.status(ERR_PRIMPROC_DOWN);
+					fOutputJobStepAssociation.status(primitiveServerErr);
 				}
 				else
 				{
 					string errMsg;
-
+					
 					bs->advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 					*bs >> errMsg;
 					fOutputJobStepAssociation.status(hdr->Status);
@@ -1871,6 +2166,7 @@ try
 			}
 
 			msgBytesIn_Thread += bs->lengthWithHdrOverhead();
+			vecSize = 0;
 
 			rgData = fBPP->getRowGroupData(*bs, &validCPData, &lbid, &min, &max,
 				&cachedIO, &physIO, &touchedBlocks, &unused, threadID);
@@ -1885,7 +2181,6 @@ try
 				joinedData.reset(new uint8_t[local_outputRG.getMaxDataSize()]);
 				local_outputRG.setData(joinedData.get());
 				local_outputRG.resetRowGroup(local_primRG.getBaseRid());
-				local_outputRG.setDBRoot(local_primRG.getDBRoot());
 // 				local_outputRG.getRow(0, &joinedRow);
 				local_primRG.getRow(0, &largeSideRow);
 				for (k = 0; k < local_primRG.getRowCount() && !die; k++, largeSideRow.nextRow()) {
@@ -1957,7 +2252,7 @@ try
 
 						if (matchCount == 0 && tjoiners[j]->innerJoin())
 							break;
-
+							
 						/* Scalar check */
 						if (tjoiners[j]->scalar() && matchCount > 1) {
 							fOutputJobStepAssociation.status(ERR_MORE_THAN_1_ROW);
@@ -2018,10 +2313,6 @@ try
 				rgDataVecToDl(rgDatav, local_outputRG, dlp);
 		}
 
-		// @bug 4562
-		if (fOid>=3000 && traceOn() && dlTimes.FirstInsertTime().tv_sec==0)
-			dlTimes.setFirstInsertTime();
-
 		//update casual partition
 		size = cpv.size();
 		if (size > 0 && fInputJobStepAssociation.status() == 0) {
@@ -2034,24 +2325,23 @@ try
 		}
 		cpv.clear();
 		mutex.lock();
-	} // done reading
+	} // done reading	
 
 }//try
 catch(const std::exception& ex)
 {
-	processError(ex.what(), ERR_TUPLE_BPS, "TupleBPS::receiveMultiPrimitiveMessages()");
+	processError(ex.what(), tupleBPSErr, "TupleBPS::receiveMultiPrimitiveMessages()");
 }
 catch(...)
 {
-	processError("unknown", ERR_TUPLE_BPS, "TupleBPS::receiveMultiPrimitiveMessages()");
+	processError("unknown", tupleBPSErr, "TupleBPS::receiveMultiPrimitiveMessages()");
 }
 
 out:
 	if (++recvExited == fNumThreads) {
-
+		
 		if (doJoin && smallOuterJoiner != -1 &&
 		  fInputJobStepAssociation.status() == 0 && !die) {
-			mutex.unlock(); //Bug 5499
 			/* If this was a left outer join, this needs to put the unmatched
 			   rows from the joiner into the output 
 			   XXXPAT: This might be a problem if later steps depend
@@ -2100,7 +2390,7 @@ out:
 			if (local_outputRG.getRowCount() > 0) {
 				if (fe2) {
 					rgDatav.push_back(joinedData);
-					idbassert(joinedData);
+					assert(joinedData);
 					processFE2(local_outputRG, local_fe2Output, postJoinRow, local_fe2OutRow, &rgDatav, &local_fe2);
 					if (rgDatav.size() > 0)
 						rgDataToDl(rgDatav[0], local_fe2Output, dlp);
@@ -2109,27 +2399,22 @@ out:
 				else
 					rgDataToDl(joinedData, local_outputRG, dlp);
 			}
-			mutex.lock(); //Bug 5499
 		}
 
-		if (fOid>=3000 && traceOn()) {
-			//...Casual partitioning could cause us to do no processing.  In that
-			//...case these time stamps did not get set.  So we set them here.
-			if (dlTimes.FirstReadTime().tv_sec==0) {
-				dlTimes.setFirstReadTime();
-				dlTimes.setLastReadTime();
-				dlTimes.setFirstInsertTime();
-			}
-
-			dlTimes.setEndOfInputTime();
+		//...Casual partitioning could cause us to do no processing.  In that
+		//...case these time stamps did not get set.  So we set them here.
+		if (fOid>=3000 && traceOn() && dlTimes.FirstReadTime().tv_sec==0) {
+			dlTimes.setFirstReadTime();
+			dlTimes.setLastReadTime();
+			dlTimes.setFirstInsertTime();
 		}
-
+		if (fOid>=3000 && traceOn()) dlTimes.setEndOfInputTime();
+			
 		ByteStream bs;
 		try {
 			fDec->removeDECEventListener(this);
 			fBPP->destroyBPP(bs);
-			fMsgBytesOut += bs.length() * fDec->getPmCount();
-			fDec->write(uniqueID, bs);
+			fDec->write(bs);
 			BPPIsAllocated = false;
 			fDec->removeQueue(uniqueID);
 			tjoiners.clear();
@@ -2153,7 +2438,7 @@ out:
 	fBlockTouched += touchedBlocks_Thread;
 	fMsgBytesIn += msgBytesIn_Thread;
 	mutex.unlock();
-
+	
 	if (fTableOid >= 3000 && lastThread)
 	{
 		struct timeval tvbuf;
@@ -2161,7 +2446,7 @@ out:
 		FIFO<boost::shared_array<uint8_t> > *pFifo = 0;
 		uint64_t totalBlockedReadCount  = 0;
 		uint64_t totalBlockedWriteCount = 0;
-
+		
 		//...Sum up the blocked FIFO reads for all input associations
 		size_t inDlCnt  = fInputJobStepAssociation.outSize();
 		for (size_t iDataList=0; iDataList<inDlCnt; iDataList++)
@@ -2185,7 +2470,7 @@ out:
 				totalBlockedWriteCount += pFifo->blockedWriteCount();
 			}
 		}
-
+		
 		//...Roundoff msg byte counts to nearest KB for display
 		uint64_t msgBytesInKB  = fMsgBytesIn >> 10;
 		uint64_t msgBytesOutKB = fMsgBytesOut >> 10;
@@ -2213,26 +2498,26 @@ out:
 			JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(),dlTimes.FirstReadTime())
 			<< "s\n\tJob completion status " << fOutputJobStepAssociation.status() << endl;
 			logEnd(logStr.str().c_str());
-
-			syslogReadBlockCounts(16,      // exemgr sybsystem
-				fPhysicalIO,               // # blocks read from disk
-				fCacheIO,                  // # blocks read from cache
-				fNumBlksSkipped);          // # casual partition block hits
-			syslogProcessingTimes(16,      // exemgr subsystem
+		
+			syslogReadBlockCounts(16,    // exemgr sybsystem
+				fPhysicalIO,             // # blocks read from disk
+				fCacheIO,                // # blocks read from cache
+				fNumBlksSkipped);        // # casual partition block hits
+			syslogProcessingTimes(16,    // exemgr subsystem
 				dlTimes.FirstReadTime(),   // first datalist read
 				dlTimes.LastReadTime(),    // last  datalist read
 				dlTimes.FirstInsertTime(), // first datalist write
 				dlTimes.EndOfInputTime()); // last (endOfInput) datalist write
-			syslogEndStep(16,              // exemgr subsystem
-				totalBlockedReadCount,     // blocked datalist input
-				totalBlockedWriteCount,    // blocked datalist output
-				fMsgBytesIn,               // incoming msg byte count
-				fMsgBytesOut);             // outgoing msg byte count
+			syslogEndStep(16,            // exemgr subsystem
+				totalBlockedReadCount,   // blocked datalist input
+				totalBlockedWriteCount,  // blocked datalist output
+				fMsgBytesIn,             // incoming msg byte count
+				fMsgBytesOut);           // outgoing msg byte count
 			fExtendedInfo += toString() + logStr.str();
 			formatMiniStats();
 		}
-
-		if (ffirstStepType == SCAN && bop == BOP_AND && !(fInputJobStepAssociation.status() != 0 || die))
+		
+		if ( ffirstStepType == SCAN && bop == BOP_AND)
 		{
 			cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
  			lbidList->UpdateAllPartitionInfo();
@@ -2367,7 +2652,6 @@ void TupleBPS::newPMOnline(uint connectionNumber)
 	ByteStream bs;
 
 	fBPP->createBPP(bs);
-	fMsgBytesOut += bs.length() * fDec->getPmCount();
 	try {
 		fDec->write(bs, connectionNumber);
 		if (hasPMJoin)
@@ -2431,13 +2715,11 @@ void TupleBPS::generateJoinResultSet(const vector<vector<uint8_t *> > &joinerOut
 		  outputRG.incRowCount()) {
 			smallRow.setData(joinerOutput[depth][i]);
 			if (UNLIKELY(outputRG.getRowCount() == 8192)) {
-				uint dbRoot = outputRG.getDBRoot();
 // 				cout << "GJRS adding data\n";
 				outputData->push_back(rgData);
 				rgData.reset(new uint8_t[outputRG.getMaxDataSize()]);
 				outputRG.setData(rgData.get());
 				outputRG.resetRowGroup(baseRow.getRid());
-				outputRG.setDBRoot(dbRoot);
 				outputRG.getRow(0, &joinedRow);
 			}
 // 			cout << "depth " << depth << ", size " << joinerOutput[depth].size() << ", row " << i << ": " << smallRow.toString() << endl;
@@ -2478,7 +2760,7 @@ void TupleBPS::setJobInfo(const JobInfo* jobInfo)
 
 uint64_t TupleBPS::getEstimatedRowCount()
 {
-	// Call function that populates the scanFlags array based on the extents that qualify based on casual partitioning.
+	// Call function that populates the scanFlags array based on the extents that qualify based on casual partitioning.	
 	storeCasualPartitionInfo(true);
 	// TODO:  Strip out the cout below after a few days of testing.
 #ifdef JLF_DEBUG
@@ -2582,7 +2864,6 @@ void TupleBPS::processFE2_oneRG(RowGroup &input, RowGroup &output, Row &inRow,
 	uint i;
 
 	output.resetRowGroup(input.getBaseRid());
-	output.setDBRoot(input.getDBRoot());
 	output.getRow(0, &outRow);
 	input.getRow(0, &inRow);
 	for (i = 0; i < input.getRowCount(); i++, inRow.nextRow()) {
@@ -2612,10 +2893,8 @@ void TupleBPS::processFE2(RowGroup &input, RowGroup &output, Row &inRow, Row &ou
 
 	for (i = 0; i < rgData->size(); i++) {
 		input.setData((*rgData)[i].get());
-		if (output.getRowCount() == 0) {
+		if (output.getRowCount() == 0)
 			output.resetRowGroup(input.getBaseRid());
-			output.setDBRoot(input.getDBRoot());
-		}
 		input.getRow(0, &inRow);
 		for (j = 0; j < input.getRowCount(); j++, inRow.nextRow()) {
 			ret = local_fe->evaluate(&inRow);
@@ -2625,7 +2904,6 @@ void TupleBPS::processFE2(RowGroup &input, RowGroup &output, Row &inRow, Row &ou
 				output.incRowCount();
 				outRow.nextRow();
 				if (output.getRowCount() == 8192 ||
-				  output.getDBRoot() != input.getDBRoot() ||
 				  output.getBaseRid() != input.getBaseRid()
 				) {
 //					cout << "FE2 produced a full RG\n";
@@ -2633,7 +2911,6 @@ void TupleBPS::processFE2(RowGroup &input, RowGroup &output, Row &inRow, Row &ou
 					result.reset(new uint8_t[output.getMaxDataSize()]);
 					output.setData(result.get());
 					output.resetRowGroup(input.getBaseRid());
-					output.setDBRoot(input.getDBRoot());
 					output.getRow(0, &outRow);
 				}
 			}
@@ -2709,21 +2986,21 @@ void TupleBPS::setJoinFERG(const RowGroup &rg)
 
 void TupleBPS::addCPPredicates(uint32_t OID, const vector<int64_t> &vals, bool isRange)
 {
-
+	
 	if (fTraceFlags & CalpontSelectExecutionPlan::IGNORE_CP || fOid < 3000)
 		return;
-
+	
 	uint i, j, k;
 	int64_t min, max, seq;
 	bool isValid, intersection;
 	vector<SCommand> colCmdVec = fBPP->getFilterSteps();
 	ColumnCommandJL *cmd;
-
+	
 	for (i = 0; i < fBPP->getProjectSteps().size(); i++)
 		colCmdVec.push_back(fBPP->getProjectSteps()[i]);
-
+	
 	LBIDList ll(OID, 0);
-
+		
 	/* Find the columncommand with that OID.
 	 * Check that the column type is one handled by CP.
 	 * For each extent in that OID,
@@ -2800,9 +3077,8 @@ void TupleBPS::abort_nolock()
 	if (fDec) {
 		ByteStream bs;
 		fBPP->abortProcessing(&bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		try {
-			fDec->write(uniqueID, bs);
+			fDec->write(bs);
 		}
 		catch(...) {
 			// this throws only if there are no PMs left.  If there are none,
@@ -2824,9 +3100,8 @@ void TupleBPS::abort()
 	if (fDec) {
 		ByteStream bs;
 		fBPP->abortProcessing(&bs);
-		fMsgBytesOut += bs.length() * fDec->getPmCount();
 		try {
-			fDec->write(uniqueID, bs);
+			fDec->write(bs);
 		}
 		catch(...) {
 			// this throws only if there are no PMs left.  If there are none,

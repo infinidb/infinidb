@@ -80,8 +80,7 @@ libdmlpackageproc_la_LIBADD =
 am_libdmlpackageproc_la_OBJECTS = deletepackageprocessor.lo \
 	dmlpackageprocessor.lo dmlpackageprocessorfactory.lo \
 	insertpackageprocessor.lo updatepackageprocessor.lo \
-	commandpackageprocessor.lo autoincrementdata.lo \
-	tablelockdata.lo
+	commandpackageprocessor.lo autoincrementdata.lo
 libdmlpackageproc_la_OBJECTS = $(am_libdmlpackageproc_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -235,8 +234,7 @@ dmlpackageprocessorfactory.cpp \
 insertpackageprocessor.cpp \
 updatepackageprocessor.cpp \
 commandpackageprocessor.cpp \
-autoincrementdata.cpp \
-tablelockdata.cpp
+autoincrementdata.cpp
 
 include_HEADERS = deletepackageprocessor.h \
 dmlpackageprocessor.h \
@@ -244,8 +242,7 @@ dmlpackageprocessorfactory.h \
 insertpackageprocessor.h \
 updatepackageprocessor.h \
 commandpackageprocessor.h\
-autoincrementdata.h \
-tablelockdata.h
+autoincrementdata.h
 
 all: all-am
 
@@ -322,7 +319,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlpackageprocessor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlpackageprocessorfactory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insertpackageprocessor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tablelockdata.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/updatepackageprocessor.Plo@am__quote@
 
 .cpp.o:

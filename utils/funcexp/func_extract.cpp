@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_extract.cpp 3283 2012-09-13 20:21:54Z zzhu $
+* $Id: func_extract.cpp 2676 2011-06-06 18:17:52Z dhill $
 *
 *
 ****************************************************************************/
@@ -154,38 +154,15 @@ int64_t Func_extract::getIntVal(rowgroup::Row& row,
 							bool& isNull,
 							CalpontSystemCatalog::ColType& ct)
 {
+	uint64_t time = parm[0]->data()->getIntVal(row, isNull);
 	string unit = parm[1]->data()->getStrVal(row, isNull);
-	uint64_t time;	
-	
-	//@bug4678 handle conversion from non date/datetime datatype
-	switch (parm[0]->data()->resultType().colDataType)
-	{
-	case CalpontSystemCatalog::DATE:
-	case CalpontSystemCatalog::DATETIME:
-		time = parm[0]->data()->getDatetimeIntVal(row, isNull);
-		break;
-	case CalpontSystemCatalog::VARCHAR:
-	case CalpontSystemCatalog::CHAR:
-	{
-		string val = parm[0]->data()->getStrVal(row, isNull);
-		time = dataconvert::DataConvert::stringToDatetime(val);
-		break;
-	}
-	case CalpontSystemCatalog::INT:
-	case CalpontSystemCatalog::TINYINT:
-	case CalpontSystemCatalog::MEDINT:
-	case CalpontSystemCatalog::BIGINT:
-	case CalpontSystemCatalog::SMALLINT:
-	{
-		int64_t val = parm[0]->data()->getIntVal(row, isNull);
-		time = dataconvert::DataConvert::intToDatetime(val);
-		break;
-	}
-	default:
-		time = parm[0]->data()->getIntVal(row, isNull);
-	}
 
-	long long value = dateGet( time, unit, false );
+	bool dateType = true;
+
+	if (parm[0]->data()->resultType().colDataType != CalpontSystemCatalog::DATE)
+		dateType = false;
+
+	long long value = dateGet( time, unit, dateType );
 
 	return value;
 }

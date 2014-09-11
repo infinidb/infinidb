@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: batchprimitivestep.cpp 8476 2012-04-25 22:28:15Z xlou $
+*   $Id: batchprimitivestep.cpp 8272 2012-01-19 16:28:34Z xlou $
 *
 *
 ***********************************************************************/
@@ -47,7 +47,6 @@ using namespace config;
 #include "messageobj.h"
 #include "loggingid.h"
 #include "errorcodes.h"
-#include "liboamcpp.h"
 using namespace logging;
 
 #include "calpontsystemcatalog.h"
@@ -56,11 +55,12 @@ using namespace execplan;
 #include "brm.h"
 using namespace BRM;
 
-#include "oamcache.h"
-using namespace utils;
-
 // #define DEBUG 1
 
+//#define PROFILE
+
+#ifdef PROFILE
+#include<profiling.h>
 
 // unname namespace for BatchPrimitiveStep profiling
 namespace
@@ -283,7 +283,6 @@ void BatchPrimitiveStep::initializeConfigParms()
 	//...    rids must fall below, before the producer can send more rids.
 
 	//These could go in constructor
-	numDBRoots = fRm.getDBRootCount();
 	fRequestSize = fRm.getJlRequestSize();
 	fMaxOutstandingRequests = fRm.getJlMaxOutstandingRequests();
 	fProcessorThreadsPerScan = fRm.getJlProcessorThreadsPerScan();
@@ -386,7 +385,7 @@ BatchPrimitiveStep::BatchPrimitiveStep(const pColStep& rhs) : fRm (rhs.fRm), fUp
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -459,7 +458,7 @@ BatchPrimitiveStep::BatchPrimitiveStep(const pColScanStep& rhs) : fRm (rhs.fRm),
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -517,7 +516,7 @@ BatchPrimitiveStep::BatchPrimitiveStep(const PassThruStep& rhs) : fRm (rhs.fRm),
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	doJoin = false;
 	fRunExecuted = false;
@@ -571,7 +570,7 @@ BatchPrimitiveStep::BatchPrimitiveStep(const pDictionaryStep& rhs) : fRm (rhs.fR
 	fPhysicalIO = 0;
 	fCacheIO = 0;
 	BPPIsAllocated = false;
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	fBPP->setUniqueID(uniqueID);
 	fCardinality = rhs.cardinality();
 	doJoin = false;
@@ -931,6 +930,19 @@ void BatchPrimitiveStep::run()
 {
 	fRunExecuted = true;
 	
+#ifdef PROFILE
+	if (fOid>=3000)
+	{
+		fProfileData.initialize("");
+
+		ProfileGroup sendGroup, recvGroup;
+		sendGroup.initialize(numOfSendCheckPoints, CheckPoints);
+		recvGroup.initialize(numOfRecvCheckPoints, CheckPoints+recvCheckpointOffset);
+
+		fProfileData.addGroup(sendGroup);
+		fProfileData.addGroup(recvGroup);
+	}
+#endif
 	if (traceOn())
 	{
 		syslogStartStep(16,                     // exemgr subsystem
@@ -1099,7 +1111,11 @@ void BatchPrimitiveStep::join()
 			mutex.unlock(); //pthread_mutex_unlock(&mutex);
 			// wait for the PM to return all results before destroying the BPPs
 			while (msgsRecvd + fDec->size(uniqueID) < msgsSent)
+#ifdef _MSC_VER
+				Sleep(1 * 1000);
+#else
 				sleep(1);
+#endif
 		}
 
 		if (pThread.get())
@@ -1250,20 +1266,20 @@ inline uint64_t BatchPrimitiveStep::getRowCount()
 	return rwCount;
 }
 
-inline void BatchPrimitiveStep::addElementToBPP(uint64_t i, uint dbroot)
+inline void BatchPrimitiveStep::addElementToBPP(uint64_t i)
 {
 	switch ( fInputType ){
 		case DATALIST: 	
-			fBPP->addElementType(e, dbroot);
+			fBPP->addElementType(e);		 
 			break;
 		case FIFODATALIST: 
-			fBPP->addElementType(rw.et[i], dbroot);
+			fBPP->addElementType(rw.et[i]);
 			break;
 		case STRINGDATALIST: 
-			fBPP->addElementType(strE, dbroot);
+			fBPP->addElementType(strE);	
 			break;
 		case STRINGFIFODATALIST:
-			fBPP->addElementType(strRw.et[i], dbroot);
+			fBPP->addElementType(strRw.et[i]);
 			break;
 			default:
 				throw runtime_error("BatchPrimitiveStep: invalid input data type!");
@@ -1306,6 +1322,9 @@ try
 //			cout << "BPS: sending last band for Table OID " << fTableOid << endl;
 		if ( fOid>=3000 ) dlTimes.setLastReadTime();
 		if ( fOid>=3000 ) dlTimes.setEndOfInputTime();
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.start ( 0, tableBand_c );
+#endif
 		if ( fBPP->getStatus() || 0 < fOutputJobStepAssociation.status() )
 		{
 			rows = fBPP->getErrorTableBand(fOutputJobStepAssociation.status(), &bs );
@@ -1316,6 +1335,9 @@ try
 		{
 			rows = fBPP->getTableBand ( *bsIn, &bs, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks );
 		}
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.stop ( 0, tableBand_c );
+#endif
 		ByteStream dbs;
 		fDec->removeDECEventListener(this);
 		fBPP->destroyBPP(dbs);
@@ -1329,7 +1351,7 @@ try
 			time_t t = time ( 0 );
 			char timeString[50];
 			ctime_r ( &t, timeString );
-			timeString[strlen ( timeString )-1 ] = '\0';
+			timeString[ strlen ( timeString )-1 ] = '\0';
 			FifoDataList* pFifo = 0;
 			uint64_t totalBlockedReadCount = 0;
 			uint64_t totalBlockedWriteCount = 0;
@@ -1396,6 +1418,14 @@ try
 								fMsgBytesIn,             // incoming msg byte count
 								fMsgBytesOut );          // outgoing msg byte count
 			}
+
+#ifdef PROFILE
+			if ( fOid>=3000 )
+			{
+				cout << "BPS (st: " << fStepId << ") execution stats:" << endl;
+				cout << "  total runtime: " << fProfileData << endl;
+			}
+#endif
 		}
 
 		if ( fOid>=3000 && ( ffirstStepType == SCAN ) ) {
@@ -1410,6 +1440,9 @@ try
 			dlTimes.setFirstReadTime();
 		fDec->read(uniqueID, bsIn );
 		/* XXXPAT: Need to check for 0-length BS here */
+#ifdef PROFILE
+		if ( fOid>=3000 && firstRead ) fProfileData.stop ( 0, sendPrimMsg_c );
+#endif
 		firstRead = false;
 		fMsgBytesIn += bsIn->lengthWithHdrOverhead();
 		mutex.lock(); //pthread_mutex_lock(&mutex);
@@ -1421,6 +1454,10 @@ try
 			THROTTLEDEBUG << "nextBand wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;
 		}
 		mutex.unlock(); //pthread_mutex_unlock(&mutex);
+
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.start ( 0, tableBand_c );
+#endif
 
 		ISMPacketHeader *hdr = (ISMPacketHeader*)bsIn->buf();
 		
@@ -1448,6 +1485,9 @@ try
 		{
 			rows = fBPP->getTableBand ( *bsIn, &bs, &validCPData, &lbid, &min, &max, &cachedIO, &physIO, &touchedBlocks );
 		}
+#ifdef PROFILE
+		if ( fOid>=3000 ) fProfileData.stop ( 0, tableBand_c );
+#endif
 		fPhysicalIO += physIO;
 		fCacheIO += cachedIO;
 		fBlockTouched += touchedBlocks;
@@ -1526,13 +1566,13 @@ try
 	// multiple files per OID enhancement as a precurser to shared nothing.
 	uint16_t startingDBRoot = 1;
 	uint32_t startingPartitionNumber = 0;
-	oam::OamCache *oamCache = oam::OamCache::makeOamCache();
-	boost::shared_ptr<map<int, int> > dbRootPMMap = oamCache->getDBRootToPMMap();
-
 	dbrm.getStartExtent(fOid, startingDBRoot, startingPartitionNumber);
 
 	if ( ffirstStepType == SCAN )
 	{
+#ifdef PROFILE
+	if (fOid>=3000) fProfileData.start(0, sendWork_Scan);
+#endif
 		LBIDRange_v::iterator it;
 		uint32_t  extentIndex;
 		uint64_t  fbo;
@@ -1550,12 +1590,11 @@ try
 			if (hwm < fbo)
 				continue;				
 					
-			extentIndex = fbo >> divShift;
 			if (fOid >= 3000)
 			{
 				// @bug 1297. getMinMax to prepare partition vector should consider
 				// cpPredicate. only scanned lbidrange will be pushed into the vector.
-
+				extentIndex = fbo >> divShift;
 				cpPredicate = (scanFlags[extentIndex] != 0);
 				// @bug 1090. cal getMinMax to prepare the CP vector and update later
 				if (lbidList->CasualPartitionDataType(fColType.colDataType, fColType.colWidth) && cpPredicate) {
@@ -1576,9 +1615,6 @@ try
 				continue;
 			}								
 			
-			if (dbRootPMMap->find(extents[extentIndex].dbRoot) == dbRootPMMap->end())
-				throw IDBExcept(ERR_DATA_OFFLINE);
-
 			LBID_t    msgLbidStart   = it->start;
 			u_int32_t remainingLbids = 0;
 			u_int32_t lbidToBeSent =
@@ -1625,10 +1661,10 @@ try
 					THROTTLEDEBUG << "oid = " << fOid << "  numExtents:" << numExtents << "   extentSize:  " << extentSize << endl;
 				}
 
-					fBPP->setLBID( msgLbidStart, extents[extentIndex].dbRoot);
-					idbassert(msgLbidCountBatch>0);
+					fBPP->setLBID( msgLbidStart );
+					assert(msgLbidCountBatch>0);
 					fBPP->setCount ( msgLbidCountBatch );
-					fBPP->runBPP(msgBpp, (*dbRootPMMap)[extents[extentIndex].dbRoot]);
+					fBPP->runBPP(msgBpp, startingDBRoot);
 					fMsgBytesOut += msgBpp.lengthWithHdrOverhead();
 					//cout << "Requesting " << msgLbidCount << " logical blocks at LBID " << msgLbidStart; 
 					//cout << "  sending fOid " << fOid << endl;
@@ -1724,7 +1760,7 @@ try
 					scan = scanit(absoluteRID);
 				if (msgLargeBlock == nextLargeBlock) {
 					if (scanThisBlock) {
-						addElementToBPP(i, startingDBRoot);
+						addElementToBPP(i);
 						ridsRequested++;
 					}
 					// @bug 1301. msgsSkip should not increment for every skipped row
@@ -1774,7 +1810,7 @@ try
 					}
 																									
 					if (scanThisBlock) {
-						addElementToBPP(i, startingDBRoot);
+						addElementToBPP(i);
 						ridsRequested++;
 					}
 					else
@@ -1823,6 +1859,9 @@ done:
 		
 	//...Track the number of LBIDs we skip due to Casual Partioning.
 	fNumBlksSkipped += msgsSkip;
+#ifdef PROFILE
+	if (fOid>=3000) fProfileData.stop(0, sendWork_Scan);
+#endif
 }  // try
 catch(const std::exception& ex)
 {
@@ -2039,7 +2078,7 @@ catch(...)
 		time_t t = time(0);
 		char timeString[50];
 		ctime_r(&t, timeString);
-		timeString[strlen(timeString)-1 ] = '\0';
+		timeString[ strlen(timeString)-1 ] = '\0';
 		
 		FifoDataList* pFifo = 0;
 		uint64_t totalBlockedReadCount = 0;
@@ -2199,7 +2238,11 @@ try
 			else if (!didEOF) {
 				didEOF = true;
 				while (recvExited < fNumThreads - 1)
+#ifdef _MSC_VER
+					Sleep(1 * 1000);
+#else
 					sleep(1);
+#endif
 				if (fifo)
 					fifo->endOfInput();
 				else if ( strFifo )
@@ -2213,7 +2256,11 @@ try
 			}
 			if (size != 0)  // got something, reset the timer
 				errorTimeout = 0;
+#ifdef _MSC_VER
+			Sleep(1 * 1000);
+#else
 			sleep(1);
+#endif
 			mutex.lock(); //pthread_mutex_lock(&mutex);
 			if (++errorTimeout == 30)
 				break;
@@ -2467,7 +2514,7 @@ catch(...)
 		time_t t = time(0);
 		char timeString[50];
 		ctime_r(&t, timeString);
-		timeString[strlen(timeString)-1 ] = '\0';
+		timeString[ strlen(timeString)-1 ] = '\0';
 		
 		FifoDataList* pFifo = 0;
 		uint64_t totalBlockedReadCount = 0;
@@ -2601,7 +2648,7 @@ void BatchPrimitiveStep::addFilters()
 	DataList_t* bdl = dl->dataList();
 	FifoDataList* fifo = fInputJobStepAssociation.outAt(0)->fifoDL();
 
-	idbassert(bdl);
+	assert(bdl);
 	bool more;
 	ElementType e;
 	int64_t token;

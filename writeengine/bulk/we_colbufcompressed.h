@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbufcompressed.h 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colbufcompressed.h 2922 2011-03-21 13:53:44Z dcathey $
  *
  *****************************************************************************/
 
@@ -63,11 +63,10 @@ class ColumnBufferCompressed : public ColumnBuffer {
      */
     virtual int finishFile(bool bTruncFile);
 
-    /** @brief Reset the ColBuf to-be-compressed buffer prior to importing the
-     * next extent.
-     * @param startFileOffset Byte offset where next extent chunk will start
+    /** @brief Reset the ColBuf buffer prior to importing the next extent
+     * @param startFileOffset Byte offset where next extent will start.
      */
-    virtual int resetToBeCompressedColBuf(long long& startFileOffset );
+    virtual int resetColBuf(long long& startFileOffset );
 
     /** @brief file mutator
      *
@@ -114,4 +113,4 @@ class ColumnBufferCompressed : public ColumnBuffer {
 
 }
 
-#endif //WRITEENGINE_COLUMNBUFCOMPRESSED_H
+#endif //WRITEENGINE_COLUMNBUF_H

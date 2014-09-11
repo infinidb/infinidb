@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: dml.y 8707 2012-07-13 19:08:12Z rdempsey $ */
+/* $Id: dml.y 7407 2011-02-08 14:05:21Z rdempsey $ */
 /* This describes a substantial subset of SQL92 DML with some
    enhancements from various vendors.  
 
@@ -63,11 +63,7 @@
 #undef DECIMAL
 #undef DELETE
 #undef IN
-#ifdef _MSC_VER
-#include "dml-gram-win.h"
-#else
 #include "dml-gram.h"
-#endif
 
 using namespace std;
 using namespace dmlpackage;	

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbuf.h 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colbuf.h 2873 2011-02-08 14:35:57Z rdempsey $
  *
  *****************************************************************************/
 
@@ -54,7 +54,7 @@ class ColumnBuffer {
     virtual ~ColumnBuffer();
 
     /** @brief Final flushing of data and headers prior to closing the file.
-     * This is a no-op for uncompressed columns.
+     * This is a no-op for uncompressed files.
      * @param bTruncFile is file to be truncated
      * @return NO_ERROR or success
      */
@@ -64,11 +64,9 @@ class ColumnBuffer {
      */
     int getSize() const { return fBufSize; }
 
-    /** @brief Reset the ColBuf to-be-compressed buffer prior to importing the
-     *  next extent.  This is a no-op for uncompressed columns.
-     * @param startFileOffset (output) File offset to start of active chunk
+    /** @brief Reset the ColBuf buffer prior to importing the next extent
      */
-    virtual int resetToBeCompressedColBuf( long long& startFileOffset );
+    virtual int resetColBuf( long long& startFileOffset );
 
     /** @brief Set the FILE* destination for the applicable col segment file.
      * 

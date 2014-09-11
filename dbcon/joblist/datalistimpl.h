@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: datalistimpl.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: datalistimpl.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -211,7 +211,7 @@ template<typename container_t, typename element_t>
 inline bool DataListImpl<container_t, element_t>::next(uint64_t id, element_t *e)
 {
 
-// 	idbassert(id < numConsumers);
+// 	assert(id < numConsumers);
 	if (c == 0 || cIterators[id] == c->end())
 		return false;
 	*e = *(cIterators[id]);
@@ -222,14 +222,14 @@ inline bool DataListImpl<container_t, element_t>::next(uint64_t id, element_t *e
 template<typename container_t, typename element_t>
 bool DataListImpl<container_t, element_t>::endOfData(uint64_t id) const
 {
-	idbassert(id < numConsumers);
+	assert(id < numConsumers);
 	return (cIterators[id] == c->end());
 }
 
 template<typename container_t, typename element_t>
 void DataListImpl<container_t, element_t>::eraseUpTo(uint64_t id)
 {
-	idbassert(id < numConsumers);
+	assert(id < numConsumers);
 #ifdef DEBUG
 	uint64_t i;
 	typename container_t::iterator it;

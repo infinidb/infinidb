@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: mastersegmenttable.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: mastersegmenttable.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -43,7 +43,7 @@
 #include "rwlock.h"
 #include "shmkeys.h"
 
-#if defined(_MSC_VER) && defined(xxxMASTERSEGMENTTABLE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(MASTERSEGMENTTABLE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -180,7 +180,7 @@ class MasterSegmentTable {
 		MasterSegmentTable& operator=(const MasterSegmentTable& mst);
 
 		int shmid;
-		mutable boost::scoped_ptr<rwlock::RWLock> rwlock[nTables];
+		mutable rwlock::RWLock *rwlock[nTables];
 		
 		static const int MSTshmsize = nTables * sizeof(MSTEntry);
 		int RWLockKeys[nTables];

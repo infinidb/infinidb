@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontdmlpackage.cpp 8817 2012-08-15 18:52:12Z dhall $
+ *   $Id: calpontdmlpackage.cpp 7479 2011-02-23 21:04:29Z zzhu $
  *
  *
  ***********************************************************************/
@@ -31,7 +31,7 @@ namespace dmlpackage
      */
 
     CalpontDMLPackage::CalpontDMLPackage()
-        :fPlan(new messageqcpp::ByteStream()), fTable(0), fHasFilter(0), fLogging(true), fIsInsertSelect(false), fIsBatchInsert(false), fIsAutocommitOn(false), fTableOid(0)
+        :fPlan(0), fTable(0), fHasFilter(0), fLogging(true), fIsInsertSelect(false)
     {
 
     }
@@ -39,8 +39,7 @@ namespace dmlpackage
     CalpontDMLPackage::CalpontDMLPackage( std::string schemaName, std::string tableName,
         std::string dmlStatement, int sessionID )
         :fSchemaName(schemaName), fTableName( tableName ), fDMLStatement( dmlStatement ),
-        fSessionID(sessionID), fPlan(new messageqcpp::ByteStream()), fTable(0), fHasFilter(false), fLogging(true), fIsInsertSelect(false), 
-		fIsBatchInsert(false), fIsAutocommitOn(false), fTableOid(0)
+        fSessionID(sessionID), fPlan(0), fTable(0), fHasFilter(false), fLogging(true), fIsInsertSelect(false)
     {
 
     }
@@ -49,6 +48,8 @@ namespace dmlpackage
     {
         if ( 0 != fTable )
             delete fTable;
+	if( 0 != fPlan )
+	    delete fPlan;
     }
 
     /*

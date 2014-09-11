@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: brmtypes.cpp 1704 2012-09-19 18:26:16Z pleblanc $
+ * $Id: brmtypes.cpp 1600 2012-06-14 20:29:24Z pleblanc $
  *
  ****************************************************************************/
 
@@ -130,12 +130,18 @@ _TxnID::_TxnID()
 
 _SIDTIDEntry::_SIDTIDEntry()
 {
-	init();
+	sessionid = 0;
+	tableOID = 0;
+	processID = 0;
+    processName[0] = '\0';
 }
 
 void _SIDTIDEntry::init()
 {
 	sessionid      = 0;
+	tableOID       = 0;
+	processID      = 0;
+    memset( processName, 0, MAX_PROCNAME );
 	txnid.id       = 0;
 	txnid.valid    = false;
 }
@@ -339,86 +345,5 @@ void errString(int rc, string& errMsg)
 		}
 	}
 }
-
-/* Tablelock impl */
-
-bool TableLockInfo::overlaps(const TableLockInfo &t, const std::set<uint32_t> &sDbrootList) const
-{
-	if (tableOID != t.tableOID)
-		return false;
-	for (uint i = 0; i < dbrootList.size(); i++)
-		if (sDbrootList.find(dbrootList[i]) != sDbrootList.end())
-			return true;
-	return false;
-}
-
-void TableLockInfo::serialize(ByteStream &bs) const
-{
-	bs << id << tableOID << ownerName << ownerPID << (uint32_t) ownerSessionID <<
-			(uint32_t) ownerTxnID << (uint8_t) state;
-	bs << (uint64_t) creationTime;
-	serializeInlineVector(bs, dbrootList);
-}
-
-void TableLockInfo::deserialize(ByteStream &bs)
-{
-	uint8_t tmp8;
-	uint32_t tmp321, tmp322;
-	uint64_t tmp64;
-	bs >> id >> tableOID >> ownerName >> ownerPID >> tmp321 >> tmp322 >> tmp8 >> tmp64;
-	ownerSessionID = tmp321;
-	ownerTxnID = tmp322;
-	state = (LockState) tmp8;
-	creationTime = tmp64;
-	deserializeInlineVector(bs, dbrootList);
-}
-
-void TableLockInfo::serialize(ostream &o) const
-{
-	uint16_t nameLen = ownerName.length();
-	uint16_t dbrootListSize = dbrootList.size();
-
-	o.write((char *) &id, 8);
-	o.write((char *) &tableOID, 4);
-	o.write((char *) &ownerPID, 4);
-	o.write((char *) &state, 4);
-	o.write((char *) &ownerSessionID, 4);
-	o.write((char *) &ownerTxnID, 4);
-	o.write((char *) &creationTime, sizeof(time_t));
-	o.write((char *) &nameLen, 2);
-	o.write((char *) ownerName.c_str(), nameLen);
-	o.write((char *) &dbrootListSize, 2);
-	for (uint j = 0; j < dbrootListSize; j++)
-		o.write((char *) &dbrootList[j], 4);
-}
-
-void TableLockInfo::deserialize(istream &i)
-{
-	uint16_t nameLen;
-	uint16_t dbrootListSize;
-	boost::scoped_array<char> buf;
-
-	i.read((char *) &id, 8);
-	i.read((char *) &tableOID, 4);
-	i.read((char *) &ownerPID, 4);
-	i.read((char *) &state, 4);
-	i.read((char *) &ownerSessionID, 4);
-	i.read((char *) &ownerTxnID, 4);
-	i.read((char *) &creationTime, sizeof(time_t));
-	i.read((char *) &nameLen, 2);
-	buf.reset(new char[nameLen]);
-	i.read(buf.get(), nameLen);
-	ownerName = string(buf.get(), nameLen);
-	i.read((char *) &dbrootListSize, 2);
-	dbrootList.resize(dbrootListSize);
-	for (uint j = 0; j < dbrootListSize; j++)
-		i.read((char *) &dbrootList[j], 4);
-}
-
-bool TableLockInfo::operator<(const TableLockInfo &tli) const
-{
-	return (id < tli.id);
-}
-
 
 }  //namespace

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: expressionstep.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: expressionstep.h 8326 2012-02-15 18:58:10Z xlou $
 
 
 /** @file
@@ -65,15 +65,10 @@ class ExpressionStep : public JobStep
 	uint32_t statementId() const { return fStatementId; }
 	void logger(const SPJL& logger) { fLogger = logger; }
 
-	execplan::CalpontSystemCatalog::OID oid() const
-	{ return fOids.empty() ? 0 : fOids.front(); }
 	execplan::CalpontSystemCatalog::OID tableOid() const
 	{ return fTableOids.empty() ? 0 : fTableOids.front(); }
 	std::string alias() const { return fAliases.empty() ? "" : fAliases.front(); }
 	std::string view() const { return fViews.empty() ? "" : fViews.front(); }
-	std::string schema() const { return fSchemas.empty() ? "" : fSchemas.front(); }
-	uint tableKey() const { return fTableKeys.empty() ? -1 : fTableKeys.front(); }
-	uint columnKey() const { return fColumnKeys.empty() ? -1 : fColumnKeys.front(); }
 
 	void expression(const execplan::SRCP exp, JobInfo& jobInfo);
 	execplan::SRCP expression() const { return fExpression; }
@@ -89,17 +84,6 @@ class ExpressionStep : public JobStep
 	const std::vector<execplan::CalpontSystemCatalog::OID>& oids() const { return fOids; }
 	const std::vector<std::string>& aliases() const { return fAliases; }
 	const std::vector<std::string>& views() const { return fViews; }
-	const std::vector<std::string>& schemas() const { return fSchemas; }
-	const std::vector<uint>& tableKeys() const { return fTableKeys; }
-	const std::vector<uint>& columnKeys() const { return fColumnKeys; }
-
-	std::vector<execplan::CalpontSystemCatalog::OID>& tableOids() { return fTableOids; }
-	std::vector<execplan::CalpontSystemCatalog::OID>& oids() { return fOids; }
-	std::vector<std::string>& aliases() { return fAliases; }
-	std::vector<std::string>& views() { return fViews; }
-	std::vector<std::string>& schemas() { return fSchemas; }
-	std::vector<uint>& tableKeys() { return fTableKeys; }
-	std::vector<uint>& columnKeys() { return fColumnKeys; }
 
 	virtual void updateInputIndex(std::map<uint, uint>& indexMap, const JobInfo& jobInfo);
 	virtual void updateOutputIndex(std::map<uint, uint>& indexMap, const JobInfo& jobInfo);
@@ -136,9 +120,6 @@ class ExpressionStep : public JobStep
 	std::vector<execplan::CalpontSystemCatalog::OID> fOids;
 	std::vector<std::string>                         fAliases;
 	std::vector<std::string>                         fViews;
-	std::vector<std::string>                         fSchemas;
-	std::vector<uint>                                fTableKeys;
-	std::vector<uint>                                fColumnKeys;
 	std::vector<execplan::ReturnedColumn*>           fColumns;
 
   private:

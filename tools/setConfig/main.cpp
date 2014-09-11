@@ -19,7 +19,6 @@
 * $Id: main.cpp 210 2007-06-08 17:08:26Z rdempsey $
 *
 *****************************************************************************/
-#include <unistd.h>
 #include <iostream>
 #include <cassert>
 #include <stdexcept>
@@ -36,13 +35,12 @@ namespace
 
 void usage(const string& pname)
 {
-	cout << "usage: " << pname << " [-vdhx] [-c config_file] section param value" << endl <<
+	cout << "usage: " << pname << " [-vdh] [-c config_file] section param value" << endl <<
 		"   Updates configuration variable param in section section with value." << endl <<
 		"   -c config_file use config file config_file" << endl <<
 		"   -v display verbose information" << endl <<
 		"   -d don't perform misc checks and don't try to distribute the config file" << endl <<
 		"      after changes are made" << endl <<
-		"   -x delete the param from section (value is still required but ignored)" << endl <<
 		"   -h display this help text" << endl;
 }
 
@@ -54,12 +52,11 @@ int main(int argc, char** argv)
 	string pname(argv[0]);
 	bool vflg = false;
 	bool dflg = false;
-	bool xflg = false;
 	string configFile;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "c:vdxh")) != EOF)
+	while ((c = getopt(argc, argv, "c:vdh")) != EOF)
 		switch (c)
 		{
 		case 'v':
@@ -70,9 +67,6 @@ int main(int argc, char** argv)
 			break;
 		case 'c':
 			configFile = optarg;
-			break;
-		case 'x':
-			xflg = true;
 			break;
 		case 'h':
 		case '?':
@@ -126,10 +120,7 @@ int main(int argc, char** argv)
 	if (vflg)
 		cout << "Using config file: " << cf->configFile() << endl;
 
-	if (xflg)
-		cf->delConfig(argv[optind + 0], argv[optind + 1]);
-	else
-		cf->setConfig(argv[optind + 0], argv[optind + 1], argv[optind + 2]);
+	cf->setConfig(argv[optind + 0], argv[optind + 1], argv[optind + 2]);
 	cf->write();
 
 	if (dflg || serverInstallType == oam::INSTALL_COMBINE_DM_UM_PM)
@@ -141,9 +132,18 @@ int main(int argc, char** argv)
 	try {
 		oam.distributeConfigFile();
 		//sleep to give time for change to be distributed
+#ifdef _MSC_VER
+		Sleep(atoi(count.c_str()) * 1000);
+#else
 		sleep(atoi(count.c_str()));
+#endif
+	}
+	catch (std::exception& ex) {
+//		cerr << "setConfig: caught an exception during Oam::distributeConfigFile(): " << ex.what() << "!" << endl;
+		return 1;
 	}
 	catch (...) {
+//		cerr << "setConfig: caught an unknown exception during Oam::distributeConfigFile()!" << endl;
 		return 1;
 	}
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: tableband.cpp 8582 2012-06-01 20:09:05Z xlou $
+ * $Id: tableband.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 #include <boost/any.hpp>
@@ -562,8 +562,7 @@ ostream& TableBand::formatToCSV(ostream& os, char sep) const
 							//biggest 64-bit number is 19 digits, + 1 for sign,
 							//     + 1 for dp, + 1 for NULL
 							char tmp[22];
-							snprintf(&tmp[1],
-								21,
+							sprintf(&tmp[1],
 #ifndef __LP64__
 								"%lld",
 #else

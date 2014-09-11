@@ -104,8 +104,8 @@ int main(int argc, char** argv)
 	in.clear();
 	in.seekg(0, ios_base::beg);
 
-	idbassert(in.good());
-	idbassert(in.tellg() == static_cast<streampos>(0));
+	assert(in.good());
+	assert(in.tellg() == static_cast<streampos>(0));
 
 	string outname(argv[1]);
 	outname += ".out";

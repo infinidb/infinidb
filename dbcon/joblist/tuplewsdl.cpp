@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: tuplewsdl.cpp 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: tuplewsdl.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -24,6 +24,7 @@
 #include <boost/thread/condition.hpp>
 
 #include "tuplewsdl.h"
+#include "bucketreuse.h"
 #include "configcpp.h"
 
 #ifndef O_BINARY
@@ -43,7 +44,7 @@ using namespace std;
 using namespace config;
 
 namespace joblist {
-extern const string defaultTempDiskPath;          // defined in resourcemanager.cpp
+extern const string defaultTempDiskPath;          // defined in bucketreuse.cpp
   //const uint64_t defaultInitialCapacity = 1 * 1024*1024;     // 1M
 
 TupleWSDL::TupleWSDL(uint64_t nm, uint64_t maxSize, ResourceManager& rm) : 

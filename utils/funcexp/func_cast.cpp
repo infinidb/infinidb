@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: func_cast.cpp 3274 2012-09-12 21:40:47Z bwilkinson $
+//  $Id: func_cast.cpp 2847 2011-09-02 22:31:37Z zzhu $
 
 
 #include <string>
@@ -37,9 +37,6 @@ using namespace rowgroup;
 #include "idberrorinfo.h"
 #include "errorids.h"
 using namespace logging;
-
-#include "dataconvert.h"
-using namespace dataconvert;
 
 namespace funcexp
 {
@@ -139,18 +136,38 @@ int64_t Func_cast_signed::getIntVal(Row& row,
 		{
 			int64_t time = parm[0]->data()->getDateIntVal(row, isNull);
 
-			Date d(time);
-			return d.convertToMySQLint();
+			int32_t year = 0, 
+					month = 0, 
+					day = 0;
+			
+			year = (uint32_t)((time >> 16) & 0xffff);
+			month = (uint32_t)((time >> 12) & 0xf);
+			day = (uint32_t)((time >> 6) & 0x3f);
+
+			return (int64_t) (year*10000)+(month*100)+day;
 		}
 		break;
 
 		case execplan::CalpontSystemCatalog::DATETIME:
 		{
-			int64_t time = parm[0]->data()->getDatetimeIntVal(row, isNull);
+			 int64_t time = parm[0]->data()->getDatetimeIntVal(row, isNull);
 
-			// @bug 4703 need to include year
-			DateTime dt(time);
-			return dt.convertToMySQLint();
+			int32_t year = 0, 
+					month = 0, 
+					day = 0, 
+					hour = 0, 
+					min = 0, 
+					sec = 0;
+		
+					year = (uint32_t)((time >> 48) & 0xffff);
+					month = (uint32_t)((time >> 44) & 0xf);
+					day = (uint32_t)((time >> 38) & 0x3f);
+					hour = (uint32_t)((time >> 32) & 0x3f);
+					min = (uint32_t)((time >> 26) & 0x3f);
+					sec = (uint32_t)((time >> 20) & 0x3f);
+
+//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+			return (int64_t) (month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;		
 		}
 		break;
 
@@ -459,14 +476,10 @@ int64_t Func_cast_date::getDatetimeIntVal(rowgroup::Row& row,
 		}
 		case execplan::CalpontSystemCatalog::DATETIME:
 		{
-			// @bug 4703 eliminated unnecessary conversion from datetime to string and back
-			//           need to zero out the time portions since we are casting to date
-			DateTime val1(parm[0]->data()->getDatetimeIntVal(row, isNull));
-			val1.hour = 0;
-			val1.minute = 0;
-			val1.second = 0;
-			val1.msecond = 0;
-			return *(reinterpret_cast<uint64_t*>(&val1));
+			int64_t val1  = parm[0]->data()->getDatetimeIntVal(row, isNull);
+			string value = dataconvert::DataConvert::datetimeToString(val1);
+			value = value.substr(0,10);
+			return dataconvert::DataConvert::stringToDatetime(value);
 		}
 		default:
 		{

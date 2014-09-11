@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand.cpp 2058 2013-02-13 18:07:30Z pleblanc $
+// $Id: columncommand.cpp 1975 2012-10-25 22:16:45Z pleblanc $
 // C++ Implementation: columncommand
 //
 // Description: 
@@ -166,7 +166,8 @@ void ColumnCommand::makeScanMsg()
 
 void ColumnCommand::makeStepMsg()
 {
-	memcpy(&inputMsg[baseMsgLength], bpp->relRids, bpp->ridCount << 1);
+// 	assert((baseMsgLength + (bpp->ridCount << 1)) <= BatchPrimitiveProcessor::BUFFER_SIZE);
+	memcpy(inputMsg + baseMsgLength, bpp->relRids, bpp->ridCount << 1);
 	primMsg->RidFlags = bpp->ridMap;
 	primMsg->ism.Size = baseMsgLength +  (bpp->ridCount << 1);
 	primMsg->NVALS = bpp->ridCount;
@@ -272,6 +273,7 @@ void ColumnCommand::issuePrimitive()
 	else
 		bpp->pp.setParsedColumnFilter(emptyFilter);
 	bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize, fUdfFuncPtr);
+// 	assert(iPlaceholder <= bpp->outMsgSize);
 
 	/* Update CP data */
 	if (_isScan) {
@@ -384,7 +386,7 @@ void ColumnCommand::processResult()
 	   the containing BPP */
 
 // 	if (filterCount == 0 && !_isScan)
-// 		idbassert(outMsg->NVALS == bpp->ridCount);
+// 		assert(outMsg->NVALS == bpp->ridCount);
 
 	switch (outMsg->OutputType) {
 		case OT_BOTH: process_OT_BOTH(); break;
@@ -443,11 +445,7 @@ void ColumnCommand::createCommand(ByteStream &bs)
 		args.add(tmp8);
 		mlp->logMessage(logging::M0069, args);
 	}
-	deserializeInlineVector(bs, lastLbid);
-//	cout << "lastLbid count=" << lastLbid.size() << endl;
-//	for (uint i = 0; i < lastLbid.size(); i++)
-//		cout << "  " << lastLbid[i];
-
+	bs >> lastLbid;
 
 	//cout << "CreateCommand() o:" << getOID() << " lastLbid: " << lastLbid << endl;
 	Command::createCommand(bs);
@@ -473,17 +471,11 @@ void ColumnCommand::resetCommand(ByteStream &bs)
 void ColumnCommand::prep(int8_t outputType, bool absRids)
 {
 	/* make the template NewColRequestHeader */
-
-	baseMsgLength = sizeof(NewColRequestHeader) +
-		  (suppressFilter ? 0 : filterString.length());
-
-	if (!inputMsg)
-		inputMsg.reset(new uint8_t[baseMsgLength + (LOGICAL_BLOCK_RIDS * 2)]);
-	primMsg = (NewColRequestHeader *) inputMsg.get();
+	primMsg = (NewColRequestHeader *) inputMsg;
 	outMsg = (NewColResultHeader *) bpp->outputMsg.get();
 	makeAbsRids = absRids;
 
-	primMsg->ism.Interleave = 0;
+	primMsg->ism.Reserve = 0;
 	primMsg->ism.Flags = 0;
 // 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);	
 	primMsg->ism.Command=COL_BY_SCAN;
@@ -513,7 +505,8 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
 //  were still there.
 // 	memcpy(primMsg + 1, filterString.buf(), filterString.length());
 
-
+	baseMsgLength = sizeof(NewColRequestHeader) +
+	  (suppressFilter ? 0 : filterString.length());
 
 	switch (colType.colWidth) {
 		case 1: shift = 8; mask = 0xFF; break;
@@ -541,11 +534,11 @@ void ColumnCommand::projectResult()
 		ostringstream os;
 		BRM::DBRM brm;
 		BRM::OID_t oid;
-		uint16_t l_dbroot;
+		uint16_t dbroot;
 		uint32_t partNum;
 		uint16_t segNum;
 		uint32_t fbo;
-		brm.lookupLocal(lbid, 0, false, oid, l_dbroot, partNum, segNum, fbo);
+		brm.lookupLocal(lbid, 0, false, oid, dbroot, partNum, segNum, fbo);
 		
 		os << __FILE__ << " error on projection for oid " << oid << " lbid " << lbid;
 		if (primMsg->NVALS != outMsg->NVALS )
@@ -559,8 +552,8 @@ void ColumnCommand::projectResult()
 		else
 			throw PrimitiveColumnProjectResultExcept(os.str());
 	}
-	idbassert(primMsg->NVALS == outMsg->NVALS);
-	idbassert(outMsg->NVALS == bpp->ridCount);
+	assert(primMsg->NVALS == outMsg->NVALS);
+	assert(outMsg->NVALS == bpp->ridCount);
 	*bpp->serialized << (uint32_t) (outMsg->NVALS * colType.colWidth);
 	bpp->serialized->append((uint8_t *) (outMsg + 1), outMsg->NVALS * colType.colWidth);
 }
@@ -606,8 +599,8 @@ void ColumnCommand::projectResultRG(RowGroup &rg, uint pos)
 			throw PrimitiveColumnProjectResultExcept(os.str());
 	}
 
-	idbassert(primMsg->NVALS == outMsg->NVALS);
-	idbassert(outMsg->NVALS == bpp->ridCount);
+	assert(primMsg->NVALS == outMsg->NVALS);
+	assert(outMsg->NVALS == bpp->ridCount);
 	rg.getRow(0, &r);
 	switch (colType.colWidth) {
 		case 1: {
@@ -751,7 +744,6 @@ bool ColumnCommand::willPrefetch()
 //	if (!((double)loadCount)/((double)blockCount) > bpp->prefetchThreshold)
 //		cout << "suppressing prefetch\n";
 
-	//return false;
 	return (blockCount == 0 || ((double)loadCount)/((double)blockCount) >
 		bpp->prefetchThreshold);
 }
@@ -842,28 +834,6 @@ void ColumnCommand::getLBIDList(uint loopCount, vector<int64_t> *lbids)
 	
 	for (i = firstLBID; i <= lastLBID; i++)
 		lbids->push_back(i);
-}
-
-const int64_t ColumnCommand::getLastLbid()
-{
-	if (!_isScan)
-		return 0;
-	return lastLbid[bpp->dbRoot-1];
-
-#if 0
-	/* PL - each dbroot has a different HWM; need to look up the local HWM on start */
-	BRM::DBRM dbrm;
-	BRM::OID_t oid;
-	uint32_t partNum;
-	uint16_t segNum;
-	uint32_t fbo;
-
-	dbrm.lookupLocal(primMsg->LBID, bpp->versionNum, false, oid, dbRoot, partNum, segNum, fbo);
-	gotDBRoot = true;
-	cout << "I think I'm on dbroot " << dbRoot << " lbid=" << primMsg->LBID << " ver=" << bpp->versionNum << endl;
-	dbRoot--;
-	return lastLbid[dbRoot];
-#endif
 }
 
 }

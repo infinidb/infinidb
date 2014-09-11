@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: rtscommand.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+// $Id: rtscommand.cpp 1749 2011-09-29 20:24:41Z pleblanc $
 // C++ Implementation: rtscommand
 //
 // Description: 
@@ -31,7 +31,6 @@
 #include <unistd.h>
 
 #include "bpp.h"
-#include "exceptclasses.h"
 
 using namespace std;
 using namespace messageqcpp;
@@ -77,7 +76,7 @@ void RTSCommand::project()
 			bpp->absRids.reset(new uint64_t[LOGICAL_BLOCK_RIDS]);
 
 		col.execute(tmpValues);
-		
+
 		if (old_rc != bpp->ridCount) {
 			ostringstream os;
 

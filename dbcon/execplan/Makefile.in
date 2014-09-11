@@ -84,11 +84,11 @@ am_libexecplan_la_OBJECTS = calpontsystemcatalog.lo aggregatecolumn.lo \
 	groupconcatcolumn.lo mysqlexecutionplan.lo objectidmanager.lo \
 	objectreader.lo operator.lo outerjoinonfilter.lo \
 	oracleexecutionplan.lo range.lo returnedcolumn.lo rowcolumn.lo \
-	selectfilter.lo sessionmanager.lo simplecolumn.lo \
-	simplefilter.lo simplescalarfilter.lo vendorexecutionplan.lo \
-	treenode.lo expressionparser.lo treenodeimpl.lo \
-	constantfilter.lo clientrotator.lo arithmeticoperator.lo \
-	logicoperator.lo predicateoperator.lo
+	selectfilter.lo sessionmanager.lo sessionmonitor.lo \
+	simplecolumn.lo simplefilter.lo simplescalarfilter.lo \
+	vendorexecutionplan.lo treenode.lo expressionparser.lo \
+	treenodeimpl.lo constantfilter.lo clientrotator.lo \
+	arithmeticoperator.lo logicoperator.lo predicateoperator.lo
 libexecplan_la_OBJECTS = $(am_libexecplan_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -258,6 +258,7 @@ returnedcolumn.cpp \
 rowcolumn.cpp \
 selectfilter.cpp \
 sessionmanager.cpp \
+sessionmonitor.cpp \
 simplecolumn.cpp \
 simplefilter.cpp \
 simplescalarfilter.cpp \
@@ -294,6 +295,7 @@ returnedcolumn.h \
 rowcolumn.h \
 selectfilter.h \
 sessionmanager.h \
+sessionmonitor.h \
 simplecolumn.h \
 simplefilter.h \
 simplescalarfilter.h \
@@ -410,6 +412,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rowcolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/selectfilter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sessionmanager.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sessionmonitor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simplecolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simplefilter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simplescalarfilter.Plo@am__quote@

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: dictionary.cpp 2124 2013-07-08 19:47:42Z bpaul $
+ * $Id: dictionary.cpp 1830 2012-02-01 20:39:07Z rdempsey $
  */
 
 #include <iostream>
@@ -29,10 +29,8 @@ using namespace std;
 #include "messagelog.h"
 #include "messageobj.h"
 #include "exceptclasses.h"
-#include "utils_utf8.h"
 #include <sstream>
 
-using namespace funcexp;
 using namespace logging;
 
 const char *nullString = " ";  // this is not NULL to preempt segfaults.
@@ -161,6 +159,7 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 		args = reinterpret_cast<const DataValue *>(&niceInput[argsOffset]);
 
 		string sig_utf8;
+		size_t alen = 0;
 		string arg_utf8;
 
 		if (eqFilter) {
@@ -171,11 +170,16 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 			goto no_store;
 		}
 
-		// BUG 5110: If it is utf, we need to create utf strings to compare
-		if(utf8)
-		{
-		  	sig_utf8 = string(sig, siglen);
-		    arg_utf8 = string(args->data, args->len);
+		if ( utf8) {
+			string tmpString(sig, siglen);
+			sig_utf8 = tmpString;
+			//TODO: there's a utf8-specifc form that can go here: don't count if >= 0x80 and <= 0xBF
+			// because those are continuation bytes
+			siglen = mbstowcs(0, sig_utf8.c_str(), 0);
+			alen = args->len;
+			string tmp1(args->data, alen);
+			arg_utf8 = tmp1;
+			alen = mbstowcs(0, arg_utf8.c_str(), 0);
 		}
 		switch (h->NVALS) {
 			case 1: {
@@ -190,8 +194,8 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 				}
 				else {
 					if (utf8) {
-						tmp = utf8::idb_strcoll(sig_utf8.c_str(), arg_utf8.c_str());
-						cmpResult = compare(tmp, h->COP1, siglen, args->len);
+						tmp = strcoll(sig_utf8.c_str(), arg_utf8.c_str());
+						cmpResult = compare(tmp, h->COP1, siglen, alen);
 					} else {
 						tmp = strncmp(sig, args->data, std::min(siglen, args->len));
 						cmpResult = compare(tmp, h->COP1, siglen, args->len);
@@ -214,8 +218,8 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 
 				else {
 					if (utf8) {
-						tmp = utf8::idb_strcoll(sig_utf8.c_str(), arg_utf8.c_str());
-						cmpResult = compare(tmp, h->COP1, siglen, args->len);
+						tmp = strcoll(sig_utf8.c_str(), arg_utf8.c_str());
+						cmpResult = compare(tmp, h->COP1, siglen, alen);
 					} else {
 						tmp = strncmp(sig, args->data, std::min(siglen, args->len));
 						cmpResult = compare(tmp, h->COP1, siglen, args->len);
@@ -242,9 +246,11 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 
 				else {
 					if (utf8) {
-						arg_utf8 = string(args->data, args->len);
-						tmp = utf8::idb_strcoll(sig_utf8.c_str(), arg_utf8.c_str());
-						cmpResult = compare(tmp, h->COP2, siglen, args->len);
+						alen = args->len;
+						arg_utf8 = string(args->data, alen);
+						alen = mbstowcs(0, arg_utf8.c_str(), 0);
+						tmp = strcoll(sig_utf8.c_str(), arg_utf8.c_str());
+						cmpResult = compare(tmp, h->COP2, siglen, alen);
 					} else {
 						tmp = strncmp(sig, args->data, std::min(siglen, args->len));
 						cmpResult = compare(tmp, h->COP2, siglen, args->len);
@@ -269,8 +275,8 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 
 					else {
 						if (utf8) {
-							tmp = utf8::idb_strcoll(sig_utf8.c_str(), arg_utf8.c_str());
-							cmpResult = compare(tmp, h->COP2, siglen, args->len);
+							tmp = strcoll(sig_utf8.c_str(), arg_utf8.c_str());
+							cmpResult = compare(tmp, h->COP2, siglen, alen);
 						} else {
 							tmp = strncmp(sig, args->data, std::min(siglen, args->len));
 							cmpResult = compare(tmp, h->COP1, siglen, args->len);
@@ -286,7 +292,9 @@ void PrimitiveProcessor::p_TokenByScan(const TokenByScanRequestHeader *h,
 					argIndex++;
 					args = (DataValue *) &niceInput[argsOffset];
 					if ( utf8) {
-						arg_utf8 = string(args->data, args->len);
+						alen = args->len;
+						arg_utf8 = string(args->data, alen);
+						alen = mbstowcs(0, arg_utf8.c_str(), 0);
 					}
 				}
 				if (i == h->NVALS && cmpResult)
@@ -433,7 +441,6 @@ again:
 				else
 					ret->data = &niceBlock[offsets[oldParams[dict_OffsetIndex].offsetIndex]];
 			}
-// 			idbassert(ret->len >= 0);
 			currentOffsetIndex = oldParams[dict_OffsetIndex].offsetIndex;
 			dict_OffsetIndex++;
 			return;
@@ -502,7 +509,7 @@ void PrimitiveProcessor::p_AggregateSignature(const AggregateSignatureRequestHea
 			string cMin_utf8(cMin, cMinLen);
 			string tmpString((char*)sigptr.data, sigptr.len);
 			sig_utf8 = tmpString;
-			cmp = utf8::idb_strcoll(cMin_utf8.c_str(), sig_utf8.c_str());
+			cmp = strcoll(cMin_utf8.c_str(), sig_utf8.c_str());
 		} else {
 			cmp = strncmp(cMin, (char*)sigptr.data, std::min(cMinLen, sigptr.len));
 		}
@@ -512,7 +519,7 @@ void PrimitiveProcessor::p_AggregateSignature(const AggregateSignatureRequestHea
 		}
 		if (utf8) {
 			string cMax_utf8(cMax, cMaxLen);
-			cmp = utf8::idb_strcoll(cMax_utf8.c_str(), sig_utf8.c_str());
+			cmp = strcoll(cMax_utf8.c_str(), sig_utf8.c_str());
 		} else {
 			cmp = strncmp(cMax, (char*)sigptr.data, std::min(cMaxLen, sigptr.len));
 		}
@@ -689,12 +696,8 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 	bool cmpResult;
 	DictOutput header;
 
-	// default size of the ouput to something sufficiently large to prevent
-	// excessive reallocation and copy when resizing
-	const unsigned DEF_OUTSIZE = 16*1024;
-	// use this factor to scale out size of future resize calls
-	const int SCALE_FACTOR = 2;
-	out->resize(DEF_OUTSIZE);
+	// leave space at the front for the header, will be filled in at the end
+	out->resize(sizeof(DictOutput));
 
 	block8 = reinterpret_cast<const u_int8_t *>(block);
 	in8 = reinterpret_cast<const u_int8_t *>(in);
@@ -733,7 +736,7 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 			if (max.len != 0) {
 				if (utf8 ) {
 					string max_utf8((char*)max.data, max.len);
-					tmp = utf8::idb_strcoll(sig_utf8.c_str(), max_utf8.c_str());
+					tmp = strcoll(sig_utf8.c_str(), max_utf8.c_str());
 				} else {
 					tmp = strncmp((char *)sigptr.data, (char *)max.data, std::min(sigptr.len, max.len));
 				}
@@ -746,7 +749,7 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 			if (min.len != 0) {
 				if (utf8) {
 					string min_utf8((char*)min.data, min.len);
-					tmp = utf8::idb_strcoll(sig_utf8.c_str(), min_utf8.c_str());
+					tmp = strcoll(sig_utf8.c_str(), min_utf8.c_str());
 				} else {
 					tmp = strncmp((char *)sigptr.data, (char *)min.data, std::min(sigptr.len, min.len));
 				}
@@ -779,7 +782,7 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 			if (utf8) {
 				string tmpString((const char *)filter->data, filter->len);
 				filt_utf8 = tmpString;
-				filt_utf8_len = filt_utf8.length();
+				filt_utf8_len = mbstowcs(0, filt_utf8.c_str(), 0);
 			}
 
 			if (filter->COP & COMPARE_LIKE) {
@@ -789,8 +792,8 @@ void PrimitiveProcessor::p_Dictionary(const DictInput *in, vector<uint8_t> *out,
 			}
 			else {
 				if (utf8) {
-					size_t sig_utf8_len = sig_utf8.length();
-					tmp = utf8::idb_strcoll(sig_utf8.c_str(), filt_utf8.c_str());
+					size_t sig_utf8_len = mbstowcs(0, sig_utf8.c_str(), 0);
+					tmp = strcoll(sig_utf8.c_str(), filt_utf8.c_str());
 					cmpResult = compare(tmp, filter->COP, sig_utf8_len, filt_utf8_len);
 				} else {
 					tmp = strncmp((const char *) sigptr.data, (const char *)filter->data, 
@@ -813,11 +816,7 @@ store:
 				const OldGetSigParams *oldParams;
 				u_int64_t *outRid;
 				oldParams = reinterpret_cast<const OldGetSigParams *>(in->tokens);
-				uint32_t newlen = header.NBYTES + 8;
-				if( newlen > out->size() )
-				{
-					out->resize( out->size() * SCALE_FACTOR );
-				}
+				out->resize(header.NBYTES + 8);
 				outRid = (uint64_t *) &(*out)[header.NBYTES];
 				// mask off the upper bit of the rid; signifies the NULL token was passed in
 				*outRid = (oldParams[dict_OffsetIndex - 1].rid & 0x7fffffffffffffffLL);
@@ -825,22 +824,14 @@ store:
 			}
 
 			if (in->OutputType & OT_INPUTARG && in->InputFlags == 0) {
-				uint32_t newlen = header.NBYTES + sizeof(DataValue) + filter->len;
-				if( newlen > out->size() )
-				{
-					out->resize( out->size() * SCALE_FACTOR );
-				}
+				out->resize(header.NBYTES + sizeof(DataValue) + filter->len);
 				outValue = reinterpret_cast<DataValue *>(&(*out)[header.NBYTES]);
 				outValue->len = filter->len;
 				memcpy(outValue->data, filter->data, filter->len);
 				header.NBYTES += sizeof(DataValue) + filter->len;
 			}
 			if (in->OutputType & OT_TOKEN) {
-				uint32_t newlen = header.NBYTES + sizeof(PrimToken);
-				if( newlen > out->size() )
-				{
-					out->resize( out->size() * SCALE_FACTOR );
-				}
+				out->resize(header.NBYTES + sizeof(PrimToken));
 				outToken = reinterpret_cast<PrimToken *>(&(*out)[header.NBYTES]);
 				outToken->LBID = in->LBID;
 				outToken->offset = currentOffsetIndex;
@@ -848,11 +839,7 @@ store:
 				header.NBYTES += sizeof(PrimToken);
 			}
 			if (in->OutputType & OT_DATAVALUE) {
-				uint32_t newlen = header.NBYTES + sizeof(DataValue) + sigptr.len;
-				if( newlen > out->size() )
-				{
-					out->resize( out->size() * SCALE_FACTOR );
-				}
+				out->resize(header.NBYTES + sizeof(DataValue) + sigptr.len);
 				outValue = reinterpret_cast<DataValue *>(&(*out)[header.NBYTES]);
 				outValue->len = sigptr.len;
 				memcpy(outValue->data, sigptr.data, sigptr.len);
@@ -863,11 +850,7 @@ no_store: ;  // intentional
 	}
 
 	if (in->OutputType & OT_AGGREGATE) {
-		uint32_t newlen = header.NBYTES + 3*sizeof(uint16_t) + min.len + max.len;
-		if( newlen > out->size() )
-		{
-			out->resize( out->size() * SCALE_FACTOR );
-		}
+		out->resize(header.NBYTES + 3*sizeof(uint16_t) + min.len + max.len);
 		uint16_t *tmp16 = reinterpret_cast<uint16_t *>(&(*out)[header.NBYTES]);
 		DataValue *tmpDV = reinterpret_cast<DataValue *>(&(*out)[header.NBYTES + sizeof(uint16_t)]);
 
@@ -881,8 +864,6 @@ no_store: ;  // intentional
 		memcpy(tmpDV->data, max.data, max.len);
 		header.NBYTES += sizeof(uint16_t) + max.len;
 	}
-
-	out->resize( header.NBYTES );
 
 	memcpy(&(*out)[0], &header, sizeof(DictOutput));
 }

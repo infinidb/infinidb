@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id$
+# $Id: system_installer.sh 1066 2008-11-13 21:44:44Z dhill $
 #
 # Install RPM and custom OS files on system
 # Argument 1 - Remote Module Name
@@ -10,6 +10,7 @@
 # Argument 5 - Install Type, "initial" or "upgrade"
 # Argument 6 - Debug flag 1 for on, 0 for off
 set timeout 10
+set USERNAME root
 set MODULE [lindex $argv 0]
 set SERVER [lindex $argv 1]
 set PASSWORD [lindex $argv 2]
@@ -18,27 +19,16 @@ set CALPONTMYSQLRPM [lindex $argv 4]
 set CALPONTMYSQLDRPM [lindex $argv 5]
 set INSTALLTYPE [lindex $argv 6]
 set DEBUG [lindex $argv 7]
-set INSTALLDIR "/usr/local/Calpont"
-set IDIR [lindex $argv 8]
-if { $IDIR != "" } {
-	set INSTALLDIR $IDIR
-}
-set USERNAME "root"
-set UNM [lindex $argv 9]
-if { $UNM != "" } {
-	set USERNAME $UNM
-}
-
 log_user $DEBUG
 spawn -noecho /bin/bash
 #
 if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# 
-	# erase Calpont-MySql package
+	# unmount disk
 	#
-	send_user "Erase Calpont-Mysql Package on Module           "
+	send_user "Unmount disk                                    "
 	expect -re "# "
-	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont-mysql'\n"
+	send "ssh $USERNAME@$SERVER 'umount /usr/local/Calpont/data*'\n"
 	expect {
 		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit }
 		-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit }
@@ -50,6 +40,17 @@ if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 		-re "word: " { send "$PASSWORD\n" } abort
 		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
 	}
+	expect {
+		-re "# "                  { send_user "DONE" } abort
+	}
+	send_user "\n"
+	# 
+	# erase Calpont-MySql package
+	#
+	send_user "Erase Calpont-Mysql Package on Module           "
+	expect -re "# "
+	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont-mysql'\n"
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	expect {
@@ -227,7 +228,7 @@ if { $INSTALLTYPE == "initial"} {
 	# install package
 	#
 	send_user "Running Calpont-MySql Setup Scripts on Module   "
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysql-install'\n"
+	send "ssh $USERNAME@$SERVER '/usr/local/Calpont/bin/post-mysql-install'\n"
 	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
@@ -244,7 +245,7 @@ if { $INSTALLTYPE == "initial"} {
 	# install package
 	#
 	send_user "Running Calpont-MySqld Setup Scripts on Module  "
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysqld-install'\n"
+	send "ssh $USERNAME@$SERVER '/usr/local/Calpont/bin/post-mysqld-install'\n"
 	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
@@ -322,7 +323,7 @@ if { $INSTALLTYPE == "initial"} {
 	# install package
 	#
 	send_user "Running Calpont-MySql Setup Scripts on Module   "
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysql-install'\n"
+	send "ssh $USERNAME@$SERVER '/usr/local/Calpont/bin/post-mysql-install'\n"
 	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
@@ -339,7 +340,7 @@ if { $INSTALLTYPE == "initial"} {
 	# install package
 	#
 	send_user "Running Calpont-MySqld Setup Scripts on Module  "
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/post-mysqld-install'\n"
+	send "ssh $USERNAME@$SERVER '/usr/local/Calpont/bin/post-mysqld-install'\n"
 	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
@@ -360,7 +361,7 @@ if { $INSTALLTYPE == "initial"} {
 	# copy over calpont OS files
 	#
 	send_user "Copy Calpont OS files to Module                 "
-	send "scp $INSTALLDIR/local/etc/$MODULE/*  $USERNAME@$SERVER:$INSTALLDIR/local/.\n"
+	send "scp /usr/local/Calpont/local/etc/$MODULE/*  $USERNAME@$SERVER:/usr/local/Calpont/local/.\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
@@ -373,7 +374,7 @@ if { $INSTALLTYPE == "initial"} {
 	# copy over calpont config file
 	#
 	send_user "Copy Calpont Config file to Module              "
-	send "scp $INSTALLDIR/etc/*  $USERNAME@$SERVER:$INSTALLDIR/etc/.\n"
+	send "scp /usr/local/Calpont/etc/*  $USERNAME@$SERVER:/usr/local/Calpont/etc/.\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
@@ -386,7 +387,7 @@ if { $INSTALLTYPE == "initial"} {
 	# copy over custom OS tmp files
 	#
 	send_user "Copy Custom OS files to Module                  "
-	send "scp -r $INSTALLDIR/local/etc  $USERNAME@$SERVER:$INSTALLDIR/local/.\n"
+	send "scp -r /usr/local/Calpont/local/etc  $USERNAME@$SERVER:/usr/local/Calpont/local/.\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"
@@ -399,7 +400,7 @@ if { $INSTALLTYPE == "initial"} {
 	# Start module installer to setup Customer OS files
 	#
 	send_user "Run Module Installer                            "
-	send "ssh $USERNAME@$SERVER '$INSTALLDIR/bin/module_installer.sh'\n"
+	send "ssh $USERNAME@$SERVER '/usr/local/Calpont/bin/module_installer.sh'\n"
 	expect -re "word: "
 	# send the password
 	send "$PASSWORD\n"

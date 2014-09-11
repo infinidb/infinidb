@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 /******************************************************************************************
-* $Id: genMsgId.pl 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: genMsgId.pl 2399 2011-02-10 14:23:16Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -114,15 +114,11 @@ const unsigned M0084 = 84;
 const unsigned M0085 = 85;
 const unsigned M0086 = 86;
 const unsigned M0087 = 87;
-const unsigned M0088 = 88;
-const unsigned M0089 = 89;
-const unsigned M0090 = 90;
 const unsigned M0091 = 91;
 const unsigned M0092 = 92;
 const unsigned M0093 = 93;
 const unsigned M0094 = 94;
 const unsigned M0095 = 95;
-const unsigned M0103 = 103;
 
 }//namespace logging
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: clientsocket.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: clientsocket.h 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -39,8 +39,6 @@ namespace messageqcpp {
 
 /** an IOSocket that can be connected to a server
  *
- * @note this class doesn't seem to do anything useful...all the public methods call the base class
- *       implementations.
  */
 class ClientSocket : public IOSocket
 {
@@ -61,7 +59,7 @@ public:
 	 * connect this IOSocket to the server specified in serv_addr. Will throw a runtime_exception
 	 * if the connection fails.
 	 */
-	inline virtual void connect(const struct sockaddr* serv_addr);
+	inline virtual void connect(const struct sockaddr_in* serv_addr);
 
 	/** set the connection timeout on a connect() call for this socket.
 	 *
@@ -75,28 +73,14 @@ public:
 	 */
 	inline virtual void syncProto(bool use);
 
-	/**
-	 * @brief return the address as a string
-	 */
-	inline virtual const std::string addr2String() const;
-
-	/**
-	 * @brief compare the addresses of 2 ClientSocket
-	 */
-	inline virtual const bool isSameAddr(const ClientSocket& rhs) const;
-
 private:
-	typedef IOSocket base;
-
 	ClientSocket(const ClientSocket& rhs);
 	ClientSocket& operator=(const ClientSocket& rhs);
 };
 
-inline void ClientSocket::connect(const struct sockaddr* serv_addr) { base::connect(serv_addr); }
-inline void ClientSocket::connectionTimeout(const struct timespec* timeout) { base::connectionTimeout(timeout); }
-inline void ClientSocket::syncProto(bool use) { base::syncProto(use); }
-inline const std::string ClientSocket::addr2String() const { return base::addr2String(); }
-inline const bool ClientSocket::isSameAddr(const ClientSocket& rhs) const { return base::isSameAddr(&rhs); }
+inline void ClientSocket::connect(const struct sockaddr_in* serv_addr) { connect_(serv_addr); }
+inline void ClientSocket::connectionTimeout(const struct timespec* timeout) { connectionTimeout_(timeout); }
+inline void ClientSocket::syncProto(bool use) { syncProto_(use); }
 
 } //namespace messageqcpp
 

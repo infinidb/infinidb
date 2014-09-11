@@ -20,19 +20,15 @@ INSTALL_ROOT_POST=$(INSTALL_ROOT)/post
 INSTALL_ROOT_LOCAL=$(INSTALL_ROOT)/local
 INSTALL_ROOT_MYSQL=$(INSTALL_ROOT)/mysql
 INSTALL_ROOT_TOOLS=$(INSTALL_ROOT)/tools
-INSTALL_ROOT_DATDUP=$(INSTALL_ROOT)/gluster
 INSTALL_MIB=$(INSTALL_ROOT)/share/snmp/mibs
 
 CALPONT_LIBRARY_PATH=$(EXPORT_ROOT)/lib
 CALPONT_INCLUDE_PATH=$(EXPORT_ROOT)/include
 
 IDB_COMMON_LIBS=-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ludfsdk -loamcpp -lsnmpmanager \
--ldataconvert -lbrm -lcacheutils -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock -lcommon -lcompress -lxml2 -lidbboot \
--lboost_idb -lmysqlcl_idb -lquerystats
-IDB_WRITE_LIBS=-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcompress -lcacheutils
+-ldataconvert -lbrm -lmessageqcpp -lloggingcpp -lconfigcpp -lrwlock -lcommon -lcompress -lxml2 -lboost_idb
+IDB_WRITE_LIBS=-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lcompress -ldm -lcacheutils
 IDB_SNMP_LIBS=-lnetsnmpagent -lnetsnmp -lnetsnmpmibs -lnetsnmphelpers
-
-LDFLAGS=-Wl,--no-as-needed 
 
 #DEBUG_FLAGS=-ggdb3
 DEBUG_FLAGS=-g0 -O3 -fno-strict-aliasing

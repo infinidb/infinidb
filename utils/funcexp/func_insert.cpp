@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -55,9 +54,9 @@ std::string Func_insert::getStrVal(rowgroup::Row& row,
 	if (isNull)
 		return "";
 
-	size_t strwclen = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+	size_t strwclen = mbstowcs(0, tstr.c_str(), 0) + 1;
 	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-	strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
+	strwclen = mbstowcs(wcbuf, tstr.c_str(), strwclen);
 	wstring str(wcbuf, strwclen);
 
 	int64_t strLen = static_cast<int64_t>(str.length());
@@ -66,9 +65,9 @@ std::string Func_insert::getStrVal(rowgroup::Row& row,
 	if (isNull)
 		return "";
 
-	strwclen = utf8::idb_mbstowcs(0, tnewstr.c_str(), 0) + 1;
+	strwclen = mbstowcs(0, tnewstr.c_str(), 0) + 1;
 	wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-	strwclen = utf8::idb_mbstowcs(wcbuf, tnewstr.c_str(), strwclen);
+	strwclen = mbstowcs(wcbuf, tnewstr.c_str(), strwclen);
 	wstring newstr(wcbuf, strwclen);
 
 	int64_t newstrLen = static_cast<int64_t>(newstr.length());
@@ -97,9 +96,9 @@ std::string Func_insert::getStrVal(rowgroup::Row& row,
 	else
 		out = str.substr(0, pos-1) + newstr.substr(0, newstrLen) + str.substr((pos-1+len), strLen);
 
-	size_t strmblen = utf8::idb_wcstombs(0, out.c_str(), 0) + 1;
+	size_t strmblen = wcstombs(0, out.c_str(), 0) + 1;
 	char* outbuf = (char*)alloca(strmblen * sizeof(char));
-	strmblen = utf8::idb_wcstombs(outbuf, out.c_str(), strmblen);
+	strmblen = wcstombs(outbuf, out.c_str(), strmblen);
 	return string(outbuf, strmblen);
 
 

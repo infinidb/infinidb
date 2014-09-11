@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: infinidb.os 2937 2012-05-30 18:17:09Z rdempsey $
+# $Id: infinidb.os 2862 2012-05-03 19:12:46Z dhill $
 #
 #
 # infinidb        Starts Calpont InfiniDB database platform
@@ -38,17 +38,7 @@ pathmunge () {
 	fi
 }
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-CALPONT_HOME=$INFINIDB_INSTALL_DIR
+CALPONT_HOME=/usr/local/Calpont
 export CALPONT_CONFIG_FILE=$CALPONT_HOME/etc/Calpont.xml
 export CALPONT_LIB=$CALPONT_HOME/lib
 
@@ -137,7 +127,7 @@ funTest() {
 	#check logging functionality
 	echo -n " InfiniDB Logging check: " 
 	logger -p local1.debug "Functional Test"
-	status=`grep -s "Functional Test" /var/log/Calpont/debug.log > /tmp/debug.check`
+	status=`grep "Functional Test" /var/log/Calpont/debug.log > /tmp/debug.check`
 	if [ `cat /tmp/debug.check | wc -c` -eq 0 ]; then
 		echo "ERROR: InfiniDB logging not functioning"
 	else
@@ -242,12 +232,12 @@ funTest() {
 	fi
 
 	echo -n " MySQL Daemon check: "
-	test -x /etc/init.d/mysql-Calpont && /etc/init.d/mysql-Calpont status
+	/etc/init.d/mysql-Calpont status
 
 	#check dbrm
 	echo -n " Database check: "
 
-	$CALPONT_HOME/bin/dbrmctl status > /tmp/dbrmctl.status
+	/usr/local/Calpont/bin/dbrmctl status > /tmp/dbrmctl.status
 	status=`cat /tmp/dbrmctl.status | awk '{print $1}'`
 	if [ $status != "OK." ]; then
 		echo -n "ERROR: "
@@ -259,7 +249,7 @@ funTest() {
 		return
 	fi
 
-	$CALPONT_HOME/bin/editem -o 2001 > /tmp/editem.status 2>&1
+	/usr/local/Calpont/bin/editem -o 2001 > /tmp/editem.status 2>&1
 	cnt=`cat /tmp/editem.status | wc -l`
 	if [ $cnt -eq 0 ]; then
 		echo "ERROR: NO system catalog data"
@@ -272,10 +262,10 @@ funTest() {
 	fi
 
 	#run save_brm to get a current file and run post-test
-	$CALPONT_HOME/bin/save_brm > /tmp/savebrm.status 2>&1
-	$CALPONT_HOME/bin/startupTests.sh > /tmp/startupTests.status 2>&1
+	/usr/local/Calpont/bin/save_brm > /tmp/savebrm.status 2>&1
+	/usr/local/Calpont/bin/startupTests.sh > /tmp/startupTests.status 2>&1
 	status=`cat /tmp/startupTests.status | awk '{print $1}'`
-	if [ x$status != "xOK" ]; then
+	if [ $status != "OK" ]; then
 		echo "ERROR: Check /var/log/Calpont/crit.log files for additional information"
 		echo " "
 		echo "***Stopping InfiniDB to allow the problem to be resolved."
@@ -296,9 +286,6 @@ killProcesses() {
 	killproc DMLProc -9 > /dev/null
 	killproc DDLProc -9 > /dev/null
 	killproc ExeMgr -9 > /dev/null
-	killproc WriteEngineServer -9 > /dev/null
-	# only first 15 chars can be used on debian
-	killproc WriteEngineServ -9 > /dev/null
 	killproc PrimProc -9 > /dev/null
 	killproc controllernode -9 > /dev/null
 	killproc workernode -9 > /dev/null
@@ -332,9 +319,6 @@ start() {
 	run.sh PrimProc >/dev/null 2>&1 &
 	sleep 1
 	echo -n "."
-	run.sh WriteEngineServer >/dev/null 2>&1 &
-	sleep 1
-	echo -n "."
 	run.sh ExeMgr >/dev/null 2>&1 &
 	sleep 1
 	echo -n "."
@@ -347,7 +331,7 @@ start() {
 	checkForSysCat
 	RETVAL=0
  	echo "Starting Calpont InfiniDB MySQL: "
-	test -x /etc/init.d/mysql-Calpont && /etc/init.d/mysql-Calpont start
+	/etc/init.d/mysql-Calpont start
 	sleep 2
 	upgradeDB
 	[ $RETVAL -eq 0 ] && [ -d /var/lock/subsys ] && touch /var/lock/subsys/infinidb
@@ -358,7 +342,7 @@ start() {
 stop() {
  	echo "Shutting down Calpont InfiniDB MySQL: "
 	touch /tmp/StopCalpont
-	test -x /etc/init.d/mysql-Calpont && /etc/init.d/mysql-Calpont stop
+	/etc/init.d/mysql-Calpont stop
 	echo "Shutting down Calpont InfiniDB Database Platform: "
 	killProcesses
 	reset_locks > /dev/null 2>&1

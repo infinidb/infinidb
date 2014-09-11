@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: anydatalist.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: anydatalist.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 
 #include "elementtype.h"
 
@@ -31,14 +31,14 @@ static const int showOidInDataList_Index = std::ios_base::xalloc();
 AnyDataList::DataListTypes AnyDataList::dlType(const DataList_t* dl)
 {
 	if (dl == 0) return UNKNOWN_DATALIST;
-//	if (typeid(*dl) == typeid(BandedDataList)) return BANDED_DATALIST;
-//	if (typeid(*dl) == typeid(WorkingSetDataList)) return WORKING_SET_DATALIST;
+	if (typeid(*dl) == typeid(BandedDataList)) return BANDED_DATALIST;
+	if (typeid(*dl) == typeid(WorkingSetDataList)) return WORKING_SET_DATALIST;
 	if (typeid(*dl) == typeid(FifoDataList)) return FIFO_DATALIST;
-//	if (typeid(*dl) == typeid(BucketDataList)) return BUCKET_DATALIST;
-//	if (typeid(*dl) == typeid(ConstantDataList_t)) return CONSTANT_DATALIST;
-//	if (typeid(*dl) == typeid(SortedWSDL)) return SORTED_WORKING_SET_DATALIST;
-//	if (typeid(*dl) == typeid(ZonedDL)) return ZONED_DATALIST;
-//	if (typeid(*dl) == typeid(DeliveryWSDL)) return DELIVERYWSDL;
+	if (typeid(*dl) == typeid(BucketDataList)) return BUCKET_DATALIST;
+	if (typeid(*dl) == typeid(ConstantDataList_t)) return CONSTANT_DATALIST;
+	if (typeid(*dl) == typeid(SortedWSDL)) return SORTED_WORKING_SET_DATALIST;
+	if (typeid(*dl) == typeid(ZonedDL)) return ZONED_DATALIST;
+	if (typeid(*dl) == typeid(DeliveryWSDL)) return DELIVERYWSDL;
 	if (typeid(*dl) == typeid(RowGroupDL)) return ROWGROUP_DATALIST;
 	return UNKNOWN_DATALIST;
 }
@@ -46,29 +46,29 @@ AnyDataList::DataListTypes AnyDataList::dlType(const DataList_t* dl)
 AnyDataList::DataListTypes AnyDataList::strDlType(const StrDataList* dl)
 {
 	if (dl == 0) return UNKNOWN_DATALIST;
-//	if (typeid(*dl) == typeid(StringDataList)) return STRINGBANDED_DATALIST;
-//	if (typeid(*dl) == typeid(StringFifoDataList)) return STRINGFIFO_DATALIST;
-//	if (typeid(*dl) == typeid(StringBucketDataList)) return STRINGBUCKET_DATALIST;
+	if (typeid(*dl) == typeid(StringDataList)) return STRINGBANDED_DATALIST;
+	if (typeid(*dl) == typeid(StringFifoDataList)) return STRINGFIFO_DATALIST;
+	if (typeid(*dl) == typeid(StringBucketDataList)) return STRINGBUCKET_DATALIST;
 	if (typeid(*dl) == typeid(StrDataList)) return STRING_DATALIST;
-//	if (typeid(*dl) == typeid(StringConstantDataList_t)) return STRINGCONSTANT_DATALIST;
-//	if (typeid(*dl) == typeid(StringSortedWSDL)) return STRINGSORTED_WORKING_SET_DATALIST;
-//	if (typeid(*dl) == typeid(StringZonedDL)) return STRINGZONED_DATALIST;
+	if (typeid(*dl) == typeid(StringConstantDataList_t)) return STRINGCONSTANT_DATALIST;
+	if (typeid(*dl) == typeid(StringSortedWSDL)) return STRINGSORTED_WORKING_SET_DATALIST;
+	if (typeid(*dl) == typeid(StringZonedDL)) return STRINGZONED_DATALIST;
 	return UNKNOWN_DATALIST;
 }
 
-//AnyDataList::DataListTypes AnyDataList::tupleDlType(const TupleDataList* dl)
-//{
-//    if (dl == 0) return UNKNOWN_DATALIST; 
-//    if (typeid(*dl) == typeid(TupleBucketDataList)) return TUPLEBUCKET_DATALIST;
-//    return UNKNOWN_DATALIST;
-//}
+AnyDataList::DataListTypes AnyDataList::tupleDlType(const TupleDataList* dl)
+{
+    if (dl == 0) return UNKNOWN_DATALIST; 
+    if (typeid(*dl) == typeid(TupleBucketDataList)) return TUPLEBUCKET_DATALIST;
+    return UNKNOWN_DATALIST;
+}
 
 std::ostream& operator<<(std::ostream& oss, const AnyDataListSPtr& dl)
 {
 	DataList_t          * dle = NULL;
 	StrDataList         * dls = NULL;
-//	DoubleDataList      * dld = NULL;
-//	TupleBucketDataList * dlt = NULL;
+	DoubleDataList      * dld = NULL;
+	TupleBucketDataList * dlt = NULL;
 	bool withOid = (oss.iword(showOidInDataList_Index) != 0);
 
 	if ((dle = dl->dataList()) != NULL)
@@ -107,29 +107,29 @@ std::ostream& operator<<(std::ostream& oss, const AnyDataListSPtr& dl)
 			<< std::hex << (ptrdiff_t)dls << std::dec << "[" <<
 			AnyDataList::strDlType(dls) << "]" << elemSizeStr.str() << ")";
 	}
-//	else if ((dld = dl->doubleDL()) != NULL)
-//	{
-//		if (withOid)
-//			oss << dld->OID() << " ";
-//
-//		//...If this datalist is saved to disk, then include the saved
-//		//...element size in the printed information.
-//		std::ostringstream elemSizeStr;
-//		if ( dld->useDisk() )
-//		{
-//			elemSizeStr << "(" << dld->getDiskElemSize1st() << "," <<
-//				dld->getDiskElemSize2nd() << ")";
-//		}
-//
-//		oss << "(0x"
-//			<< std::hex << (ptrdiff_t)dld << std::dec << "[" <<
-//			AnyDataList::DOUBLE_DATALIST << "])";
-//	}
-//	else if ((dlt = dl->tupleBucketDL()) != NULL)
-//	{
-//		oss << dlt->OID() << " (0x";
-//		oss << std::hex << (ptrdiff_t)dlt << std::dec << "[" << AnyDataList::TUPLEBUCKET_DATALIST << "]), ";
-//	}
+	else if ((dld = dl->doubleDL()) != NULL)
+	{
+		if (withOid)
+			oss << dld->OID() << " ";
+
+		//...If this datalist is saved to disk, then include the saved
+		//...element size in the printed information.
+		std::ostringstream elemSizeStr;
+		if ( dld->useDisk() )
+		{
+			elemSizeStr << "(" << dld->getDiskElemSize1st() << "," <<
+				dld->getDiskElemSize2nd() << ")";
+		}
+
+		oss << "(0x"
+			<< std::hex << (ptrdiff_t)dld << std::dec << "[" <<
+			AnyDataList::DOUBLE_DATALIST << "])";
+	}
+	else if ((dlt = dl->tupleBucketDL()) != NULL)
+	{
+		oss << dlt->OID() << " (0x";
+		oss << std::hex << (ptrdiff_t)dlt << std::dec << "[" << AnyDataList::TUPLEBUCKET_DATALIST << "]), ";
+	}
 	else
 	{
 		oss << "0 (0x0000 [0])";

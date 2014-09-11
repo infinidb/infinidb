@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colopcompress.h 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_colopcompress.h 3052 2011-08-31 18:22:45Z chao $
 
 
 /** @file */
@@ -111,7 +111,7 @@ public:
    /**
    * @brief virtual method in FileOp
    */
-   int expandAbbrevColumnExtent(FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width);
+   const int expandAbbrevColumnExtent(FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width);
 
    /**
    * @brief virtual method in ColumnOp
@@ -130,12 +130,8 @@ public:
    */
    int blocksInFile(FILE* pFile) const;
 
-//   void chunkManager(ChunkManager* cm);
-
-   /**
-   * @brief virtual method in FileOp
-   */
-   void setTransId(const TxnID& transId) {ColumnOp::setTransId(transId); if (m_chunkManager) m_chunkManager->setTransId(transId);}
+   void chunkManager(ChunkManager* cm);
+   void setTransId(const TxnID& transId) {ColumnOp::setTransId(transId); fChunkManager->setTransId(transId);}
    
 protected:
 
@@ -159,13 +155,9 @@ protected:
    */
    int saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo);
 
-   /**
-   * @brief Set the IsInsert flag in the ChunkManager. 
-   * This forces flush at end of statement. Used only for bulk insert. 
-   */
-   void setIsInsert(bool isInsert) { m_chunkManager->setIsInsert(isInsert); }
-
 private:
+   ChunkManager* fChunkManager;
+   bool fIsInsert;
 };
 
 

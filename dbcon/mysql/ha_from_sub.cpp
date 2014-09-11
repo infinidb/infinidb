@@ -36,40 +36,39 @@ using namespace execplan;
 
 namespace cal_impl_if
 {
-FromSubQuery::FromSubQuery(gp_walk_info& gwip) : SubQuery(gwip) 
+FromSubQuery::FromSubQuery() : SubQuery() 
 {}
 
-FromSubQuery::FromSubQuery(gp_walk_info& gwip, SELECT_LEX* sub) :
-	SubQuery(gwip),
+FromSubQuery::FromSubQuery(SELECT_LEX* sub) :
+	SubQuery(),
 	fFromSub(sub)
 {}
 
 FromSubQuery::~FromSubQuery()
 {}
 
-SCSEP FromSubQuery::transform()
+CalpontSelectExecutionPlan* FromSubQuery::transform()
 {
 	assert (fFromSub);
-	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);	
+	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
+	csep->sessionID(fGwip->sessionid);	
 	csep->location(CalpontSelectExecutionPlan::FROM);
 	csep->subType (CalpontSelectExecutionPlan::FROM_SUBS);
 	
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fGwip.thd;
+	gwi.thd = fGwip->thd;
 	gwi.subQuery = this;
-	gwi.viewName = fGwip.viewName;
+	gwi.viewName = fGwip->viewName;
 
-	if (getSelectPlan(gwi, *fFromSub, csep) != 0)
+	if (getSelectPlan(gwi, *fFromSub, *csep) != 0)
 	{
-		fGwip.fatalParseError = true;		
+		fGwip->fatalParseError = true;		
 		if (!gwi.parseErrorText.empty())
-			fGwip.parseErrorText = gwi.parseErrorText;
+			fGwip->parseErrorText = gwi.parseErrorText;
 		else
-			fGwip.parseErrorText = "Error occured in FromSubQuery::transform()";
-		csep.reset();
-		return csep;
+			fGwip->parseErrorText = "Error occured in FromSubQuery::transform()";
+		return NULL;
 	}
 	csep->derivedTbAlias(fAlias); // always lower case
 	return csep;	

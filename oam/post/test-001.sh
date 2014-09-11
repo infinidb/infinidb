@@ -1,18 +1,8 @@
 #!/bin/bash
 #
-# $Id: test-001.sh 2937 2012-05-30 18:17:09Z rdempsey $
+# $Id: test-001.sh 2176 2010-11-02 19:14:53Z dhill $
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
+test -f /usr/local/Calpont/post/functions && . /usr/local/Calpont/post/functions
 
 scrname=`basename $0`
 tname="check-syscat-oids"
@@ -26,7 +16,7 @@ fi
 
 #check for dbrm and data1, don't run if missing both
 if firstboot; then
-	if [ -d $INFINIDB_INSTALL_DIR/data1/000.dir ]; then
+	if [ -d /usr/local/Calpont/data1/000.dir ]; then
 		cplogger -c 50 $scrname "$tname" "missing dbrm data with existing 000.dir"
 		exit 1
 	else

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_tableinfo.cpp 4195 2012-09-19 18:12:27Z dcathey $
+* $Id: we_tableinfo.cpp 3830 2012-05-07 12:52:34Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -34,17 +34,9 @@ using namespace boost;
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
-#include <utility>
-// @bug 2099+
-#include <iostream>
-// @bug 2099-
-#include <boost/filesystem/path.hpp>
 
 #include "we_config.h"
 #include "we_simplesyslog.h"
-#include "we_bulkrollbackmgr.h"
-
-#include "cacheutils.h"
 
 namespace
 {
@@ -53,7 +45,7 @@ namespace
     const std::string  BOLD_START      = "\033[0;1m";
     const std::string  BOLD_STOP       = "\033[0;39m";
 }
-
+
 namespace WriteEngine
 {
 //------------------------------------------------------------------------------
@@ -67,7 +59,7 @@ void TableInfo::sleepMS(long ms)
     rm_ts.tv_sec = ms/1000; 
     rm_ts.tv_nsec = ms%1000 *1000000;
 #ifdef _MSC_VER
-    Sleep(ms);
+	Sleep(ms);
 #else
     struct timespec abs_ts;
     do
@@ -78,7 +70,7 @@ void TableInfo::sleepMS(long ms)
     while(nanosleep(&abs_ts,&rm_ts) < 0);
 #endif
 }
-
+
 //------------------------------------------------------------------------------
 // TableInfo constructor
 //------------------------------------------------------------------------------
@@ -95,25 +87,18 @@ TableInfo::TableInfo(Log* logger, const BRM::TxnID txnID,
     fLastBufferId(-1), fFileBuffer(NULL), fCurrentParseBuffer(0), 
     fNumberOfColsParsed(0), fLocker(-1), fTableName(tableName),
     fTableOID(tableOID), fJobId(0), fLog(logger), fTxnID(txnID),
-    fRBMetaWriter(processName, logger),
+    fRBMetaWriter(logger),
     fProcessName(processName),
     fKeepRbMetaFile(bKeepRbMetaFile),
-#ifdef _MSC_VER
-    fTableLocked(0),
-#else
     fTableLocked(false),
-#endif
     fReadFromStdin(false),
     fNullStringMode(false),
     fEnclosedByChar('\0'),
     fEscapeChar('\0'),
     fProcessingBegun(false),
-    fBulkMode(BULK_MODE_LOCAL),
     fBRMReporter(logger, tableName),
-    fTableLockID(0),
     fRejectDataCnt(0),
-    fRejectErrCnt(0),
-    fExtentStrAlloc(tableOID, logger)
+    fRejectErrCnt(0)
 {
     fBuffers.clear();
     fColumns.clear();
@@ -126,10 +111,9 @@ TableInfo::TableInfo(Log* logger, const BRM::TxnID txnID,
 //------------------------------------------------------------------------------
 TableInfo::~TableInfo()
 {
-	fBRMReporter.sendErrMsgToFile(fBRMRptFileName);
     freeProcessingBuffers();
 }
-
+
 //------------------------------------------------------------------------------
 // Frees up processing buffer memory.  We don't reset fReadBufCount to 0,
 // because BulkLoad::lockColumnForParse() is calling getNumberOfBuffers()
@@ -147,21 +131,13 @@ void TableInfo::freeProcessingBuffers()
     fColumns.clear();
     fNumberOfColumns = 0;
 }
-
+
 //------------------------------------------------------------------------------
 // Close any database column or dictionary store files left open for this table.
 // Under "normal" circumstances, there should be no files left open when we
 // reach the end of the job, but in some error cases, the parsing threads may
 // bail out without closing a file.  So this function is called as part of
 // EOJ cleanup for any tables that are still holding a table lock.
-//
-// Files will automatically get closed when the program terminates, but when
-// we are preparing for a bulk rollback, we want to explicitly close the files
-// before we "reopen" them and start rolling back the contents of the files.
-//
-// For mode1 and mode2 imports, cpimport.bin does not lock the table or perform
-// a bulk rollback, and closeOpenDbFile() is not called.  We instead rely on
-// the program to implicitly close the files.
 //------------------------------------------------------------------------------
 void TableInfo::closeOpenDbFiles()
 {
@@ -190,7 +166,7 @@ void TableInfo::closeOpenDbFiles()
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Locks this table for reading to the specified thread (locker) "if" the table
 // has not yet been assigned to a read thread.
@@ -208,7 +184,7 @@ bool TableInfo::lockForRead(const int & locker)
     }
     return false;
 }
-
+
 //------------------------------------------------------------------------------
 // Loop thru reading the import file(s) assigned to this TableInfo object.
 //------------------------------------------------------------------------------
@@ -251,7 +227,7 @@ int  TableInfo::readTableData( )
             boost::mutex::scoped_lock lock(fSyncUpdatesTI);
             fStartTime = readStart;
             fStatusTI  = WriteEngine::ERR;
-            throw SecondaryShutdownException( "TableInfo::"
+            throw SecondaryShutdownExcept( "TableInfo::"
                 "readTableData(1) responding to job termination");
         }
 
@@ -281,7 +257,7 @@ int  TableInfo::readTableData( )
                 boost::mutex::scoped_lock lock(fSyncUpdatesTI);
                 fStartTime = readStart;
                 fStatusTI  = WriteEngine::ERR;
-                throw SecondaryShutdownException( "TableInfo::"
+                throw SecondaryShutdownExcept( "TableInfo::"
                     "readTableData(2) responding to job termination");
             }
 
@@ -379,10 +355,6 @@ int  TableInfo::readTableData( )
 
         if(fTotalErrRows > fMaxErrorRows)
         {
-            // flush the reject data file and output the rejected rows
-            // flush err file and output the rejected row id and the reason.
-            writeErrorList( 0, 0, true );
-
             // number of errors > maximum allowed. hence return error.
             {
                 boost::mutex::scoped_lock lock(fSyncUpdatesTI);
@@ -397,8 +369,9 @@ int  TableInfo::readTableData( )
                 ") allowed for table " << fTableName;
             fLog->logMsg(oss5.str(), ERR_BULK_MAX_ERR_NUM, MSGLVL_ERROR);
 
-            // List Err and Bad files to report file (if applicable)
-            fBRMReporter.rptMaxErrJob( fBRMRptFileName, fErrFiles, fBadFiles );
+            // flush the reject data file and output the rejected rows
+            // flush err file and output the rejected row id and the reason.
+            writeErrorList( 0, 0, true );
 
             return ERR_BULK_MAX_ERR_NUM;
         }
@@ -419,8 +392,8 @@ int  TableInfo::readTableData( )
             
         fCurrentReadBuffer = (fCurrentReadBuffer + 1) % fReadBufCount;
 
-        // bufferCount++;
-        if( feof(fHandle) )
+        //bufferCount++;
+        if(feof(fHandle) )
         {
             timeval readFinished;
             gettimeofday(&readFinished, NULL);
@@ -453,37 +426,37 @@ int  TableInfo::readTableData( )
             // If > 1 file for this table, then open next file in the list
             if ( fileCounter < filesTBProcessed ) 
             {
-                fFileName = fLoadFileList[fileCounter];
-                int rc = openTableFile();
-                if(rc != NO_ERROR) 
-                {
-                    // Mark the table status as error and exit.
-                    fStatusTI   = WriteEngine::ERR;
-                    return rc;
-                }
-                fileCounter++;
-                fTotalReadRows += totalRowsPerInputFile;
-                totalRowsPerInputFile = 0;
+              fFileName = fLoadFileList[fileCounter];
+              int rc = openTableFile();
+              if(rc != NO_ERROR) 
+              {
+                // Mark the table status as error and exit.
+                fStatusTI   = WriteEngine::ERR;
+                return rc;
+              }
+              fileCounter++;
+              fTotalReadRows += totalRowsPerInputFile;
+              totalRowsPerInputFile = 0;
             }
             else  // All files read for this table; break out of read loop
             {
-                fStatusTI     = WriteEngine::READ_COMPLETE;
-                fLastBufferId = readBufNo;
-                fTotalReadRows += totalRowsPerInputFile;
-                break;
+              fStatusTI     = WriteEngine::READ_COMPLETE;
+              fLastBufferId = readBufNo;
+              fTotalReadRows += totalRowsPerInputFile;
+              break;
             }
 
             gettimeofday(&readStart, NULL);
-        } // reached EOF
+        }
 #ifdef PROFILE
         Stats::stopReadEvent(WE_STATS_COMPLETING_READ);
 #endif
-        } // mark buffer status as read-complete within scope of a mutex
-    }     // loop to read all data for this table
+        }
+    }
            
     return NO_ERROR;    
 }
-
+
 //------------------------------------------------------------------------------
 // writeErrorList()
 //   errorRows    - vector of row numbers and corresponding error messages
@@ -520,7 +493,7 @@ void TableInfo::writeErrorList(const std::vector< std::pair<RID,
         fTotalErrRows += errorRowsCount;
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Parse the specified column (columnId) in the specified buffer (bufferId).
 //------------------------------------------------------------------------------
@@ -539,10 +512,10 @@ int  TableInfo::parseColumn(const int &columnId, const int & bufferId,
 
     processingTime = (parseEnd.tv_usec / 1000 + parseEnd.tv_sec * 1000) - 
                      (parseStart.tv_usec / 1000 + parseStart.tv_sec * 1000);
-        
+
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Mark the specified column (columnId) in the specified buffer (bufferId) as
 // PARSE_COMPLETE.  If this is the last column to be parsed for this buffer,
@@ -600,14 +573,6 @@ int TableInfo::setParseComplete(const int &columnId,
         // allBuffersDoneForAColumn==TRUE means we are finished parsing columnId
         if(allBuffersDoneForAColumn)
         {
-            // Accumulate list of HWM dictionary blocks to be flushed from cache
-            std::vector<BRM::LBID_t> dictBlksToFlush;
-            fColumns[columnId].getDictFlushBlks( dictBlksToFlush );
-            for (unsigned kk=0; kk<dictBlksToFlush.size(); kk++)
-            {
-                fDictFlushBlks.push_back( dictBlksToFlush[kk] );
-            }
-
             int rc = fColumns[columnId].finishParsing( );
             if (rc != NO_ERROR)
             {
@@ -628,32 +593,55 @@ int TableInfo::setParseComplete(const int &columnId,
             //
             if(fNumberOfColsParsed >= fNumberOfColumns)
             {
-                // After closing the column and dictionary store files,
-                // flush any updated dictionary blocks in PrimProc.
-                if (fDictFlushBlks.size() > 0)
+                // Flush inode cache now so that applicable servers
+                // will have access to data "before" we set HWM
+                ostringstream oss3;
+                oss3 << "Flushing inode cache after loading table " <<
+                    fTableName;
+                fLog->logMsg(oss3.str(), MSGLVL_INFO2);
+                int flush_rc =BRMWrapper::getInstance()->flushInodeCaches();
+                if (flush_rc != 0)
                 {
-#ifdef PROFILE
-                    Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    cacheutils::flushPrimProcAllverBlocks(fDictFlushBlks);
-#ifdef PROFILE
-                    Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    fDictFlushBlks.clear();
+                    WErrorCodes ec;
+                    ostringstream oss4;
+                    oss4 << "Error flushing inode cache for table " <<
+                            fTableName << "; " << ec.errorString(flush_rc);
+                    fLog->logMsg(oss4.str(), flush_rc, MSGLVL_ERROR);
                 }
 
                 // Update auto-increment next value if applicable.
-                rc = synchronizeAutoInc( );
-                if (rc != NO_ERROR)
+                // WARNING: This step may be dependent on SHARED EVERYTHING,
+                //   since writing directly to syscat db file at this point.
+                for(unsigned i=0; i < fColumns.size(); ++i)
                 {
-                    WErrorCodes ec;
-                    ostringstream oss;
-                    oss << "setParseComplete: autoInc update error; "
-                        "Failed to load table: " << fTableName <<
-                        "; " << ec.errorString(rc);
-                    fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
-                    fStatusTI = WriteEngine::ERR;
-                    return rc;
+                    if (fColumns[i].column.autoIncFlag)
+                    {
+                        long long nextValue = fColumns[i].getAutoInc();
+                        ostringstream oss6;
+                        oss6 << "Updating next auto increment for table-" <<
+                            fTableName << ", column-" <<
+                            fColumns[i].column.colName <<
+                            "; autoincrement " << nextValue;
+                        fLog->logMsg( oss6.str(), MSGLVL_INFO2 );
+
+                        // TBD: Rollback flush cache error for autoinc.
+                        // Not sure we should bail out and rollback on a
+                        // ERR_BLKCACHE_FLUSH_LIST error, but we currently
+                        // rollback for "any" updateNextValue() error
+                        rc = BulkLoad::updateNextValue( fTableOID, nextValue );
+                        if (rc != NO_ERROR)
+                        {
+                            WErrorCodes ec;
+                            ostringstream oss;
+                            oss << "setParseComplete: autoInc update error; "
+                                "Failed to load table: " << fTableName <<
+                                "; " << ec.errorString(rc);
+                            fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
+                            fStatusTI = WriteEngine::ERR;
+                            return rc;
+                        }
+                        break; // okay to break; only 1 autoinc column per table
+                    }
                 }
 
                 //..Validate that all the HWM's are consistent and in-sync
@@ -691,24 +679,9 @@ int TableInfo::setParseComplete(const int &columnId,
                     return rc;
                 }
 
-                // Change table lock state to CLEANUP
-                rc = changeTableLockState( );
-                if (rc != NO_ERROR)
-                {
-                    WErrorCodes ec;
-                    ostringstream oss;
-                    oss << "setParseComplete: table lock state change error; "
-                        "Table load completed: " << fTableName << "; " <<
-                        ec.errorString(rc);
-                    fLog->logMsg(oss.str(), rc, MSGLVL_ERROR);
-                    fStatusTI = WriteEngine::ERR;
-                    return rc;
-                }
-
                 // Finished with this table, so delete bulk rollback
                 // meta data file and release the table lock.
                 deleteMetaDataRollbackFile();
-
                 rc = releaseTableLock( );
                 if (rc != NO_ERROR)
                 {
@@ -743,7 +716,56 @@ int TableInfo::setParseComplete(const int &columnId,
                     (fStartTime.tv_sec + (fStartTime.tv_usec / 1000000.0));
 
                 fStatusTI = WriteEngine::PARSE_COMPLETE;
-                reportTotals(elapsedTime);
+                ostringstream oss2;
+                oss2 << "For table " << fTableName <<
+                    ": " << fTotalReadRows << " rows processed and " <<
+                    (fTotalReadRows - fTotalErrRows) << " rows inserted.";
+
+                fLog->logMsg(oss2.str(), MSGLVL_INFO1);
+
+                ostringstream oss2a;
+                oss2a << "For table " << fTableName << ": " << 
+                    "Elapsed time to load this table: " <<
+                    elapsedTime << " secs";
+
+                fLog->logMsg(oss2a.str(), MSGLVL_INFO2);
+
+                // @bug 3504: Loop through columns to print saturation counts
+                for(unsigned i=0; i < fColumns.size(); ++i)
+                {
+                    long long satCount = fColumns[i].saturatedCnt();
+                    if (satCount > 0)
+                    {   // @bug 3375: report invalid dates/times set to null
+                        ostringstream ossSatCnt;
+                        ossSatCnt << "Column " << fTableName << '.' <<
+                            fColumns[i].column.colName << "; Number of ";
+                        if (fColumns[i].column.dataType == DATE)
+                            ossSatCnt <<
+                                "invalid dates replaced with null: ";
+                        else if (fColumns[i].column.dataType == DATETIME)
+                            ossSatCnt <<
+                                "invalid date/times replaced with null: ";
+                        else
+                            ossSatCnt <<
+                                "rows inserted with saturated values: ";
+                        ossSatCnt << satCount;
+                        fLog->logMsg(ossSatCnt.str(), MSGLVL_WARNING);
+                    }
+                }
+
+                logging::Message::Args tblFinishedMsgArgs;
+                tblFinishedMsgArgs.add( fJobId );
+                tblFinishedMsgArgs.add( fTableName );
+                tblFinishedMsgArgs.add( (fTotalReadRows - fTotalErrRows) );
+                SimpleSysLog::instance()->logMsg(
+                    tblFinishedMsgArgs,
+                    logging::LOG_TYPE_INFO,
+                    logging::M0083);
+
+                //Bug1375 - cpimport did not add entries to the transaction
+                //          log file: data_mods.log  
+                if ((fTotalReadRows - fTotalErrRows) > 0 )
+                	logToDataMods(fjobFileName, oss2.str());
 
                 // Reduce memory use by allocating and releasing as needed
                 freeProcessingBuffers();
@@ -777,97 +799,9 @@ int TableInfo::setParseComplete(const int &columnId,
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
-// Report summary totals to applicable destination (stdout, cpimport.bin log
-// file, BRMReport file (for mode1) etc).
-// elapsedTime is number of seconds taken to import this table.
-//------------------------------------------------------------------------------
-void TableInfo::reportTotals(double elapsedTime)
-{
-    ostringstream oss1;
-    oss1 << "For table " << fTableName <<
-        ": " << fTotalReadRows << " rows processed and " <<
-        (fTotalReadRows - fTotalErrRows) << " rows inserted.";
-
-    fLog->logMsg(oss1.str(), MSGLVL_INFO1);
-
-    ostringstream oss2;
-    oss2 << "For table " << fTableName << ": " << 
-        "Elapsed time to load this table: " <<
-        elapsedTime << " secs";
-
-    fLog->logMsg(oss2.str(), MSGLVL_INFO2);
-
-    // @bug 3504: Loop through columns to print saturation counts
-    std::vector<boost::tuple<ColDataType,std::string,u_int64_t> > satCounts;
-    for (unsigned i=0; i < fColumns.size(); ++i)
-    {
-        std::string colName(fTableName);
-        colName += '.';
-        colName += fColumns[i].column.colName;
-        long long satCount = fColumns[i].saturatedCnt();
-
-        satCounts.push_back(boost::make_tuple(fColumns[i].column.dataType, 
-                                              colName, 
-                                              satCount));
-
-
-        if (satCount > 0)
-        {   // @bug 3375: report invalid dates/times set to null
-            ostringstream ossSatCnt;
-            ossSatCnt << "Column " << fTableName << '.' <<
-                fColumns[i].column.colName << "; Number of ";
-            if (fColumns[i].column.dataType == DATE)
-			{
-				if(!fColumns[i].column.fNotNull)
-                	ossSatCnt << "invalid dates replaced with null: ";
-				else
-                	ossSatCnt << "invalid dates replaced with minimum value: ";
-			}
-            else if (fColumns[i].column.dataType == DATETIME)
-			{
-				if(!fColumns[i].column.fNotNull)
-                	ossSatCnt << "invalid date/times replaced with null: ";
-				else
-                	ossSatCnt << "invalid date/times replaced with minimum value: ";
-			}
-            else if (fColumns[i].column.dataType == CHAR)
-                ossSatCnt <<
-                    "character strings truncated: ";
-            else if (fColumns[i].column.dataType == VARCHAR)
-                ossSatCnt <<
-                    "character strings truncated: ";
-            else
-                ossSatCnt <<
-                    "rows inserted with saturated values: ";
-            ossSatCnt << satCount;
-            fLog->logMsg(ossSatCnt.str(), MSGLVL_WARNING);
-        }
-    }
-
-    logging::Message::Args tblFinishedMsgArgs;
-    tblFinishedMsgArgs.add( fJobId );
-    tblFinishedMsgArgs.add( fTableName );
-    tblFinishedMsgArgs.add( (fTotalReadRows - fTotalErrRows) );
-    SimpleSysLog::instance()->logMsg(
-        tblFinishedMsgArgs,
-        logging::LOG_TYPE_INFO,
-        logging::M0083);
-
-    //Bug1375 - cpimport.bin did not add entries to the transaction
-    //          log file: data_mods.log  
-    if ((fTotalReadRows - fTotalErrRows) > 0 )
-        logToDataMods(fjobFileName, oss1.str());
-
-    // Log totals in report file if applicable
-    fBRMReporter.reportTotals( fTotalReadRows,
-        (fTotalReadRows - fTotalErrRows),
-        satCounts );
-}
-
-//------------------------------------------------------------------------------
-// Report BRM updates to a report file or to BRM directly.
+// Report BRM updates to BRM.
 //------------------------------------------------------------------------------
 int TableInfo::finishBRM( )
 {
@@ -877,20 +811,8 @@ int TableInfo::finishBRM( )
         fColumns[i].getBRMUpdateInfo( fBRMReporter );
     }
 
-    // We use mutex not to synchronize contention among parallel threads,
-    // because we should be the only thread accessing the fErrFiles and
-    // fBadFiles at this point.  But we do use the mutex as a memory barrier
-    // to make sure we have the latest copy of the data.
-    std::vector<std::string>* errFiles = 0;
-    std::vector<std::string>* badFiles = 0;
-    {
-        boost::mutex::scoped_lock lock(fErrorRptInfoMutex);
-        errFiles = &fErrFiles;
-        badFiles = &fBadFiles;
-    }
-
-    // Save the info just collected, to a report file or send to BRM
-    int rc = fBRMReporter.sendBRMInfo( fBRMRptFileName, *errFiles, *badFiles );
+    // Send the info just collected, to BRM
+    int rc = fBRMReporter.sendBRMInfo( );
 
     return rc;
 }
@@ -907,7 +829,7 @@ void TableInfo::setParseError( )
     boost::mutex::scoped_lock lock(fSyncUpdatesTI);
     fStatusTI = WriteEngine::ERR;
 }
-
+
 //------------------------------------------------------------------------------
 // Locks a column from the specified buffer (bufferId) for the specified parse
 // thread (id); and returns the column id.  A return value of -1 means no
@@ -929,7 +851,7 @@ int  TableInfo::getColumnForParse(const int & id,
         if (BulkStatus::getJobStatus() == EXIT_FAILURE)
         {
             fStatusTI = WriteEngine::ERR;
-            throw SecondaryShutdownException( "TableInfo::"
+            throw SecondaryShutdownExcept( "TableInfo::"
                 "getColumnForParse() responding to job termination");
         }
 
@@ -1002,36 +924,7 @@ int  TableInfo::getColumnForParse(const int & id,
         }
     }
 }
-
-//------------------------------------------------------------------------------
-// Check if the specified buffer is ready for parsing (status == READ_COMPLETE)
-// @bug 2099.  Temporary hack to diagnose deadlock.  Added report parm
-//             and couts below.
-//------------------------------------------------------------------------------
-bool TableInfo::bufferReadyForParse(const int &bufferId, bool report) const
-{
-    if (fBuffers.size() == 0)
-        return false;
 
-    Status stat = fBuffers[bufferId].getStatusBLB();
-    if(report) {
-        ostringstream oss;
-        string bufStatusStr;
-        ColumnInfo::convertStatusToString( stat,
-                                           bufStatusStr );
-#ifdef _MSC_VER
-        oss << " --- " << GetCurrentThreadId() <<
-#else
-        oss << " --- " << pthread_self() <<
-#endif
-            ":fBuffers[" << bufferId << "]=" << bufStatusStr <<
-            " (" << stat << ")" << std::endl;
-        cout << oss.str();
-    }
-
-    return (stat == WriteEngine::READ_COMPLETE) ? true : false;
-}
-
 //------------------------------------------------------------------------------
 // Create the specified number (noOfBuffer) of BulkLoadBuffer objects and store
 // them in fBuffers.  jobFieldRefList lists the fields in this import.
@@ -1040,13 +933,13 @@ void TableInfo::initializeBuffers(const int & noOfBuffers,
                                   const JobFieldRefList& jobFieldRefList)
 {
 #ifdef _MSC_VER
-    //@bug 3751
-    //When reading from STDIN, Windows doesn't like the huge default buffer of
-    //  1M, so turn it down.
-    if (fReadFromStdin)
-    {
-        fBufferSize = std::min(10240, fBufferSize);
-    }
+	//@bug 3751
+	//When reading from STDIN, Windows doesn't like the huge default buffer of
+	//  1M, so turn it down.
+	if (fReadFromStdin)
+	{
+		fBufferSize = std::min(10240, fBufferSize);
+	}
 #endif
     fReadBufCount = noOfBuffers;
     // initialize and populate the buffer vector.
@@ -1060,7 +953,6 @@ void TableInfo::initializeBuffers(const int & noOfBuffers,
         buffer->setNullStringMode(fNullStringMode);
         buffer->setEnclosedByChar(fEnclosedByChar);
         buffer->setEscapeChar    (fEscapeChar    );
-        buffer->setTruncationAsError(getTruncationAsError());
         fBuffers.push_back(buffer);
     }
 }
@@ -1072,11 +964,8 @@ void TableInfo::addColumn(ColumnInfo * info)
 {
     fColumns.push_back(info);
     fNumberOfColumns = fColumns.size();
-
-    fExtentStrAlloc.addColumn( info->column.mapOid,
-                               info->column.width );
 }
-
+
 //------------------------------------------------------------------------------
 // Open the file corresponding to fFileName so that we can import it's contents.
 // A buffer is also allocated and passed to setvbuf().
@@ -1089,12 +978,12 @@ int TableInfo::openTableFile()
 
     if (fReadFromStdin)
     {
-        fHandle = stdin;
+		fHandle = stdin;
 
 #ifdef _MSC_VER
-        fFileBuffer = 0;
+		fFileBuffer = 0;
 #else
-        // Not 100% sure that calling setvbuf on stdin does much, but in
+		// Not 100% sure that calling setvbuf on stdin does much, but in
         // some tests, it made a slight difference.
         fFileBuffer = new char[fFileBufSize];
         setvbuf(fHandle, fFileBuffer, _IOFBF, fFileBufSize);
@@ -1131,7 +1020,7 @@ int TableInfo::openTableFile()
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Close the current open file we have been importing.
 //------------------------------------------------------------------------------
@@ -1153,7 +1042,7 @@ void TableInfo::closeTableFile()
         fHandle = 0;
     }
 }
-
+
 //------------------------------------------------------------------------------
 // "Grabs" the current read buffer for TableInfo so that the read thread that
 // is calling this function, can read the next buffer's set of data.
@@ -1187,7 +1076,7 @@ bool TableInfo::isBufferAvailable(bool report)
 
     return false;
 }
-
+
 //------------------------------------------------------------------------------
 // Report whether rows were rejected, and if so, then list them out into the
 // reject file.
@@ -1209,7 +1098,7 @@ void TableInfo::writeBadRows( const std::vector<std::string>* errorDatRows,
             fRejectDataFileName = rejectFileName.str();
             fRejectDataFile.open( rejectFileName.str().c_str(),
                                   ofstream::out );
-            if( !fRejectDataFile )
+            if( !fRejectDataFile ) 
             {
                 ostringstream oss;
                 oss << "Unable to create file: " << rejectFileName.str() <<
@@ -1244,25 +1133,10 @@ void TableInfo::writeBadRows( const std::vector<std::string>* errorDatRows,
             fLog->logMsg(oss.str(), MSGLVL_INFO1);
 
             fRejectDataCnt = 0;
-
-            // Construct/report complete file name and save in list of files
-            boost::filesystem::path p(fRejectDataFileName);
-            if (!p.has_root_path())
-            {
-                char cwdPath[4096];
-                getcwd(cwdPath, sizeof(cwdPath));
-                boost::filesystem::path rejectFileName2( cwdPath );
-                rejectFileName2 /= fRejectDataFileName;
-                fBadFiles.push_back( rejectFileName2.string() );
-            }
-            else
-            {
-                fBadFiles.push_back( fRejectDataFileName );
-            }
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Report whether rows were rejected, and if so, then list out the row numbers
 // and error reasons into the error file.
@@ -1294,7 +1168,7 @@ void  TableInfo::writeErrReason( const std::vector< std::pair<RID,
 
                 return;
             }
-        }
+        }    
 
         for(std::vector< std::pair<RID,std::string> >::const_iterator iter =
             errorRows->begin();
@@ -1318,29 +1192,14 @@ void  TableInfo::writeErrReason( const std::vector< std::pair<RID,
             ostringstream oss;
             oss << "Number of rows with errors = " << fRejectErrCnt <<
                 ".  Row numbers with error reasons are listed in file " <<
-                fRejectErrFileName; 
+                fRejectErrFileName;
             fLog->logMsg(oss.str(), MSGLVL_INFO1);
 
             fRejectErrCnt = 0;
-
-            // Construct/report complete file name and save in list of files
-            boost::filesystem::path p(fRejectErrFileName);
-            if (!p.has_root_path())
-            {
-                char cwdPath[4096];
-                getcwd(cwdPath, sizeof(cwdPath));
-                boost::filesystem::path errFileName2( cwdPath );
-                errFileName2 /= fRejectErrFileName;
-                fErrFiles.push_back( errFileName2.string() );
-            }
-            else
-            {
-                fErrFiles.push_back( fRejectErrFileName );
-            }
         }
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Logs "Bulkload |Job" message along with the specified message text
 // (messageText) to the critical log.
@@ -1360,80 +1219,44 @@ void TableInfo::logToDataMods(const string& jobFile, const string&  messageText)
         m.format(args);
         messageLog.logCriticalMessage(m);
 }
-
+
 //------------------------------------------------------------------------------
 // Acquires DB table lock for this TableInfo object.
 // Function employs retry logic based on the SystemConfig/WaitPeriod.
 //------------------------------------------------------------------------------
 int TableInfo::acquireTableLock( )
 {
-    // Save DBRoot list at start of job; used to compare at EOJ.
-    Config::getRootIdList( fOrigDbRootIds );
-
-    // If executing distributed (mode1) or central command (mode2) then
-    // don't worry about table locks.  The client front-end will manage locks.
-    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        if (fLog->isDebug( DEBUG_1 ))
-        {
-            ostringstream oss;
-            oss << "Bypass acquiring table lock in distributed mode, "
-                "for table" << fTableName << "; OID-" << fTableOID;
-            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-        return NO_ERROR;
-    }
-
     const int SLEEP_INTERVAL    = 100; // sleep 100 milliseconds between checks
     const int NUM_TRIES_PER_SEC = 10;  // try 10 times per second
 
     int waitSeconds     = Config::getWaitPeriod();
     const int NUM_TRIES = NUM_TRIES_PER_SEC * waitSeconds;
-    std::string tblLockErrMsg;
 
     // Retry loop to lock the db table associated with this TableInfo object
-    std::string processName;
-    u_int32_t   processId;
-    int32_t     sessionId;
-    int32_t     transId;
-    ostringstream pmModOss;
-    pmModOss << " (pm" << Config::getLocalModuleID() << ')';
     for (int i=0; i<NUM_TRIES; i++)
     {
-        processName = fProcessName;
-        processName+= pmModOss.str();
-        processId   = ::getpid();
-        sessionId   = -1;
-        transId     = -1;
-        int rc = BRMWrapper::getInstance()->getTableLock (
+        int rc = BRMWrapper::getInstance()->setTableLock (
             fTableOID,
-            processName,
-            processId,
-            sessionId,
-            transId,
-            fTableLockID,
-            tblLockErrMsg);
+            0,      // always use 0 for cpimport session id
+            ::getpid(),
+            fProcessName,
+            true ); // true -> acquires the table lock
 
-        if ((rc == NO_ERROR) && (fTableLockID > 0))
+        if (rc == 0)
         {
-#ifdef _MSC_VER
-            (void)InterlockedCompareExchange (&fTableLocked, 1, 0);
-#else
-            (void)__sync_val_compare_and_swap(&fTableLocked, false, true);
-#endif
+            fTableLocked = true;
 
             if (fLog->isDebug( DEBUG_1 ))
             {
                 ostringstream oss;
                 oss << "Table lock acquired for table " << fTableName <<
-                    "; OID-" << fTableOID << "; lockID-" << fTableLockID;
+                    "; OID-" << fTableOID;
                 fLog->logMsg( oss.str(), MSGLVL_INFO2 );
             }
 
             return NO_ERROR;
         }
-        else if (fTableLockID == 0)
+        else if (BRMWrapper::getBrmRc() == BRM::ERR_TABLE_LOCKED_ALREADY)
         {
             // sleep and then go back and try getting table lock again
             sleepMS(SLEEP_INTERVAL);
@@ -1448,183 +1271,75 @@ int TableInfo::acquireTableLock( )
         }
         else
         {
+			//@Bug 3048. Display brm error instead of WE error
+            string errorMsg;
+			BRM::errString( BRMWrapper::getBrmRc(), errorMsg );
             ostringstream oss;
             oss << "Error in acquiring table lock for table " << fTableName <<
-                "; OID-" << fTableOID << "; " << tblLockErrMsg;
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
+                "; OID-" << fTableOID << "; " << errorMsg;
+            fLog->logMsg( oss.str(), ERR_LOCK_FAIL, MSGLVL_ERROR );
 
-            return rc;
+            return ERR_LOCK_FAIL;
         }
     }
 
     ostringstream oss;
     oss << "Unable to acquire lock for table " << fTableName <<
-        "; OID-" << fTableOID << "; table currently locked by process-" <<
-        processName << "; pid-" << processId <<
-        "; session-" << sessionId <<
-        "; txn-" << transId;
-    fLog->logMsg( oss.str(), ERR_TBLLOCK_GET_LOCK_LOCKED, MSGLVL_ERROR );
+        "; OID-" << fTableOID << "; table already locked";
+    fLog->logMsg( oss.str(), ERR_LOCK_FAIL, MSGLVL_ERROR );
 
-    return ERR_TBLLOCK_GET_LOCK_LOCKED;
+    return ERR_LOCK_FAIL;
 }
-
-//------------------------------------------------------------------------------
-// Change table lock state (to cleanup)
-//------------------------------------------------------------------------------
-int TableInfo::changeTableLockState( )
-{
-    // If executing distributed (mode1) or central command (mode2) then
-    // don't worry about table locks.  The client front-end will manage locks.
-    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        return NO_ERROR;
-    }
 
-    std::string tblLockErrMsg;
-    bool bChanged = false;
-
-    int rc = BRMWrapper::getInstance()->changeTableLockState (
-        fTableLockID,
-        BRM::CLEANUP,
-        bChanged,
-        tblLockErrMsg );   
-
-    if (rc == NO_ERROR)
-    {
-        if (fLog->isDebug( DEBUG_1 ))
-        {
-            ostringstream oss;
-            if (bChanged)
-            {
-                oss << "Table lock state changed to CLEANUP for table " <<
-                    fTableName <<
-                    "; OID-" << fTableOID <<
-                    "; lockID-" << fTableLockID;
-            }
-            else
-            {
-                oss << "Table lock state not changed to CLEANUP for table " <<
-                    fTableName <<
-                    "; OID-"    << fTableOID <<
-                    "; lockID-" << fTableLockID <<
-                    ".  Table lot locked.";
-            }
-            
-            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-    }
-    else
-    {
-        ostringstream oss;
-        oss << "Error in changing table state for table " << fTableName <<
-            "; OID-"    << fTableOID    <<
-            "; lockID-" << fTableLockID << "; " <<tblLockErrMsg;
-        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-        return rc;
-    }
-
-    return NO_ERROR;
-}
-
 //------------------------------------------------------------------------------
 // Releases DB table lock assigned to this TableInfo object.
 //------------------------------------------------------------------------------
 int TableInfo::releaseTableLock( )
 {
-    // If executing distributed (mode1) or central command (mode2) then
-    // don't worry about table locks.  The client front-end will manage locks.
-    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        if (fLog->isDebug( DEBUG_1 ))
-        {
-            ostringstream oss;
-            oss << "Bypass releasing table lock in distributed mode, "
-                "for table " << fTableName << "; OID-" << fTableOID;
-            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-        return NO_ERROR;
-    }
-
-    std::string tblLockErrMsg;
-    bool bReleased = false;
-
     // Unlock the database table
-    int rc = BRMWrapper::getInstance()->releaseTableLock (
-        fTableLockID,
-        bReleased,
-        tblLockErrMsg );   
+    int rc = BRMWrapper::getInstance()->setTableLock (
+        fTableOID,
+        0,       // always use 0 for cpimport session id
+        ::getpid(),
+        fProcessName,
+        false ); // false -> releases the table lock
 
-    if (rc == NO_ERROR)
+    if (rc == 0)
     {
-#ifdef _MSC_VER
-        (void)InterlockedCompareExchange (&fTableLocked, 0, 1);
-#else
-        (void)__sync_val_compare_and_swap(&fTableLocked, true, false);
-#endif
+        fTableLocked = false;
 
         if (fLog->isDebug( DEBUG_1 ))
         {
             ostringstream oss;
-            if (bReleased)
-            {
-                oss << "Table lock released for table " << fTableName <<
-                    "; OID-" << fTableOID <<
-                    "; lockID-" << fTableLockID;
-            }
-            else
-            {
-                oss << "Table lock not released for table " << fTableName <<
-                    "; OID-"    << fTableOID <<
-                    "; lockID-" << fTableLockID <<
-                    ".  Table not locked.";
-            }
-            
+            oss << "Table lock released for table " << fTableName <<
+                "; OID-" << fTableOID;
             fLog->logMsg( oss.str(), MSGLVL_INFO2 );
         }
     }
     else
     {
+		//@Bug 3048. Display brm error instead of WE error
+        string errorMsg;
+		BRM::errString( BRMWrapper::getBrmRc(), errorMsg );
         ostringstream oss;
         oss << "Error in releasing table lock for table " << fTableName <<
-            "; OID-"    << fTableOID <<
-            "; lockID-" << fTableLockID << "; " <<tblLockErrMsg;
-        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-        return rc;
+            "; OID-" << fTableOID << "; " << errorMsg;
+        fLog->logMsg( oss.str(), ERR_UNLOCK_FAIL, MSGLVL_ERROR );
+        return ERR_UNLOCK_FAIL;
     }
 
     return NO_ERROR;
-}
-
+} 
+
 //------------------------------------------------------------------------------
 // Delete bulk rollback metadata file.
 //------------------------------------------------------------------------------
 void TableInfo::deleteMetaDataRollbackFile( )
 {
-    // If executing distributed (mode1) or central command (mode2) then
-    // don't worry about table locks, or deleting meta data files.  The
-    // client front-end will manage these tasks after all imports are finished.
-    if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-        (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        return;
-    }
-
     if (!fKeepRbMetaFile)
-    {
-        // Treat any error as non-fatal, though we log it.
-        try {
-            fRBMetaWriter.deleteFile();
-        }
-        catch (WeException& ex) {
-            ostringstream oss;
-            oss << "Error deleting meta file; " << ex.what();
-            fLog->logMsg(oss.str(), ex.errorCode(), MSGLVL_ERROR);
-        }
-    }
+        fRBMetaWriter.deleteFile();
 }
-
+
 //------------------------------------------------------------------------------
 // Validates the correctness of the current HWMs for this table.
 // The HWMs for all the 1 byte columns should be identical.  Same goes
@@ -1886,233 +1601,6 @@ errorCheck:
             "; width-"     << jobColIdx.width;
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
     }
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// DESCRIPTION:
-//    Initialize the bulk rollback metadata writer for this table.
-// RETURN:
-//    NO_ERROR if success
-//    other if fail
-//------------------------------------------------------------------------------
-int TableInfo::initBulkRollbackMetaData( )
-{
-    int rc = NO_ERROR;
-
-    try
-    {
-        fRBMetaWriter.init( fTableOID, fTableName );
-    }
-    catch (WeException& ex)
-    {
-        fLog->logMsg(ex.what(), ex.errorCode(), MSGLVL_ERROR);
-        rc = ex.errorCode();
-    }
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// DESCRIPTION:
-//    Saves snapshot of extentmap into a bulk rollback meta data file, for
-//    use in a bulk rollback, if the current cpimport.bin job should fail.
-//    The source code in RBMetaWriter::saveBulkRollbackMetaData() used to
-//    reside in this TableInfo function.  But much of the source code was
-//    factored out to create RBMetaWriter::saveBulkRollbackMetaData(), so
-//    that the function would reside in the shared library for reuse by DML.
-// PARAMETERS:
-//    job - current job
-//    segFileInfo - Vector of File objects carrying starting DBRoot, partition,
-//                  etc, for each column belonging to tableNo.
-//    dbRootHWMInfoVecCol - vector of last local HWM info for each DBRoot
-//        (asssigned to current PM) for each column in "this" table.
-// RETURN:
-//    NO_ERROR if success
-//    other if fail
-//------------------------------------------------------------------------------
-int TableInfo::saveBulkRollbackMetaData( Job& job,
-    const std::vector<File>& segFileInfo,
-    const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoVecCol )
-{
-    int rc = NO_ERROR;
-
-    std::vector<Column> cols;
-    std::vector<OID>    dctnryOids;
-
-    // Loop through the columns in the specified table
-    for ( size_t i = 0; i < job.jobTableList[fTableId].colList.size(); i++ ) 
-    {
-        JobColumn& jobCol = job.jobTableList[fTableId].colList[i];
-
-        Column col;
-        col.colNo               = i;
-        col.colWidth            = jobCol.width;
-        col.colType             = jobCol.weType;
-        col.colDataType         = jobCol.dataType;
-        col.dataFile.oid        = jobCol.mapOid;
-        col.dataFile.fid        = jobCol.mapOid;
-        col.dataFile.hwm        = segFileInfo[i].hwm;         // starting HWM
-        col.dataFile.pFile      = 0;
-        col.dataFile.fPartition = segFileInfo[i].fPartition;  // starting Part#
-        col.dataFile.fSegment   = segFileInfo[i].fSegment;    // starting seg#
-        col.dataFile.fDbRoot    = segFileInfo[i].fDbRoot;     // starting DBRoot
-        col.compressionType     = jobCol.compressionType;
-        cols.push_back( col );
-
-        OID dctnryOid = 0;
-        if (jobCol.colType == COL_TYPE_DICT)
-            dctnryOid = jobCol.dctnry.dctnryOid;
-        dctnryOids.push_back( dctnryOid );
-
-    }   // end of loop through columns
-
-    try
-    {
-        fRBMetaWriter.saveBulkRollbackMetaData(
-            cols,
-            dctnryOids,
-            dbRootHWMInfoVecCol );
-    }
-    catch (WeException& ex)
-    {
-        fLog->logMsg(ex.what(), ex.errorCode(), MSGLVL_ERROR);
-        rc = ex.errorCode();
-    }
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// Synchronize system catalog auto-increment next value with BRM.
-// This function is called at the end of normal processing to get the system
-// catalog back in line with the latest auto increment next value generated by
-// BRM.
-//------------------------------------------------------------------------------
-int TableInfo::synchronizeAutoInc( )
-{
-    for(unsigned i=0; i < fColumns.size(); ++i)
-    {
-        if (fColumns[i].column.autoIncFlag)
-        {
-            // TBD: Do we rollback flush cache error for autoinc.
-            // Not sure we should bail out and rollback on a
-            // ERR_BLKCACHE_FLUSH_LIST error, but we currently
-            // rollback for "any" updateNextValue() error
-            int rc = fColumns[i].finishAutoInc( );
-            if (rc != NO_ERROR)
-            {
-                return rc;
-            }
-            break; // okay to break; only 1 autoinc column per table
-        }
-    }
-
-    return NO_ERROR;
-}
-
-//------------------------------------------------------------------------------
-// Rollback changes made to "this" table by the current import job, delete the
-// meta-data files, and release the table lock.  This function only applies to
-// mode3 import.  Table lock and bulk rollbacks are managed by parent cpimport
-// (file splitter) process for mode1 and mode2.
-//------------------------------------------------------------------------------
-int TableInfo::rollbackWork( )
-{
-    // Close any column or store files left open by abnormal termination.
-    // We want to do this before reopening the files and doing a bulk rollback.
-    closeOpenDbFiles();
-
-    // Abort "local" bulk rollback if a DBRoot from the start of the job, is
-    // now missing.  User should run cleartablelock to execute a rollback on
-    // this PM "and" the PM where the DBRoot was moved to.
-    std::vector<u_int16_t> dbRootIds;
-    Config::getRootIdList( dbRootIds );
-    for (unsigned int j=0; j<fOrigDbRootIds.size(); j++)
-    {
-        bool bFound = false;
-        for (unsigned int k=0; k<dbRootIds.size(); k++)
-        {
-            if (fOrigDbRootIds[j] == dbRootIds[k])
-            {
-                bFound = true;
-                break;
-            }
-        }
-
-        if (!bFound)
-        {
-            ostringstream oss;
-            oss << "Mode3 bulk rollback not performed for table " <<
-                fTableName << "; DBRoot" << fOrigDbRootIds[j] <<
-                " moved from this PM during bulk load. " <<
-                " Run cleartablelock to rollback and release the table lock " <<
-                "across PMs.";
-            int rc = ERR_BULK_ROLLBACK_MISS_ROOT;
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-            return rc;
-        }
-    }
-
-    // Restore/rollback the DB files if we got far enough to begin processing
-    // this table.
-    int rc = NO_ERROR;
-    if (hasProcessingBegun())
-    {
-        BulkRollbackMgr rbMgr( fTableOID,
-            fTableLockID,
-            fTableName,
-            fProcessName, fLog );
-
-        rc = rbMgr.rollback( fKeepRbMetaFile );
-        if (rc != NO_ERROR)
-        {
-            ostringstream oss;
-            oss << "Error rolling back table " << fTableName <<
-                "; " << rbMgr.getErrorMsg();
-            fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-            return rc;
-        }
-    }
-    
-    // Delete the meta data files after rollback is complete
-    deleteMetaDataRollbackFile( );
-
-    // Release the table lock
-    rc = releaseTableLock( );
-    if (rc != NO_ERROR)
-    {
-        ostringstream oss;
-        oss << "Table lock not cleared for table " << fTableName;
-        fLog->logMsg( oss.str(), rc, MSGLVL_ERROR );
-        return rc;
-    }
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// Allocate extent from BRM (through the stripe allocator).
-//------------------------------------------------------------------------------
-int TableInfo::allocateBRMColumnExtent(OID columnOID,
-    uint16_t     dbRoot,
-    uint32_t&    partition,
-    uint16_t&    segment,
-    BRM::LBID_t& startLbid,
-    int&         allocSize,
-    HWM&         hwm,
-    std::string& errMsg )
-{
-    int rc = fExtentStrAlloc.allocateExtent( columnOID,
-        dbRoot,
-        partition,
-        segment,
-        startLbid,
-        allocSize,
-        hwm,
-        errMsg );
-    //fExtentStrAlloc.print();
 
     return rc;
 }

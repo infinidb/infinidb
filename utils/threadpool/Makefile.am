@@ -15,7 +15,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
-# $Id: Makefile.am 3194 2012-07-24 13:15:08Z rdempsey $
+# $Id: Makefile.am 2425 2011-02-24 20:54:35Z rdempsey $
 ## Process this file with automake to produce Makefile.in
 
 AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
@@ -23,8 +23,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libthreadpool.la
-libthreadpool_la_SOURCES = weightedthreadpool.cpp threadpool.cpp prioritythreadpool.cpp
-include_HEADERS = weightedthreadpool.h threadpool.h prioritythreadpool.h
+libthreadpool_la_SOURCES = weightedthreadpool.cpp threadpool.cpp
+include_HEADERS = weightedthreadpool.h threadpool.h
 
 test:
 

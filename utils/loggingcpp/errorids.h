@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 /******************************************************************************************
-* $Id: genErrId.pl 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: genErrId.pl 2399 2011-02-10 14:23:16Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -42,7 +42,6 @@ const unsigned ERR_UPDATE_NOT_SUPPORT_FEATURE = 1012;
 const unsigned ERR_CREATE_AUTOINCREMENT_NOT_SUPPORT = 1013;
 const unsigned ERR_ROLLUP_NOT_SUPPORT = 1014;
 const unsigned ERR_OUTER_JOIN_SUBSELECT = 1015;
-const unsigned ERR_PARTITION_BY_RANGE = 1016;
 const unsigned ERR_SP_FUNCTION_NOT_SUPPORT = 1017;
 const unsigned ERR_JOIN_TOO_BIG = 2001;
 const unsigned ERR_UNION_TOO_BIG = 2002;
@@ -56,7 +55,7 @@ const unsigned ERR_TABLE_LOCKED = 2009;
 const unsigned ERR_ACTIVE_TRANSACTION = 2010;
 const unsigned ERR_VIOLATE_NOT_NULL = 2011;
 const unsigned ERR_EXTENT_DISK_SPACE = 2012;
-const unsigned ERR_NON_NUMERIC_DATA = 2013;
+const unsigned ERR_NON_NUMERCAL_DATA = 2013;
 const unsigned ERR_JOBLIST = 2014;
 const unsigned ERR_ORDERBY_TOO_BIG = 2015;
 const unsigned ERR_NON_SUPPORT_GROUP_BY = 2016;
@@ -77,18 +76,6 @@ const unsigned ERR_FILTER_COND_EXP = 2030;
 const unsigned ERR_BRM_LOOKUP = 2031;
 const unsigned ERR_INCORRECT_VALUE = 2032;
 const unsigned ERR_SYSTEM_CATALOG = 2033;
-const unsigned ERR_DATA_OFFLINE = 2034;
-const unsigned ERR_ASSERTION_FAILURE = 2035;
-const unsigned ERR_PARTITION_NO_SCHEMA = 2036;
-const unsigned ERR_INVALID_FUNC_ARGUMENT = 2037;
-const unsigned ERR_O_DIRECT = 2038;
-const unsigned ERR_ENOENT = 2039;
-const unsigned WARN_NO_PARTITION_FOUND = 2040;
-const unsigned SYSTABLE_PARTITION = 2041;
-const unsigned WARN_NO_PARTITION_PERFORMED = 2042;
-const unsigned ERR_DICTIONARY_SCAN = 2043;
-const unsigned ERR_TUPLE_BPS = 2044;
-const unsigned ERR_PRIMPROC_DOWN = 2045;
 const unsigned ERR_NON_SUPPORT_SUB_QUERY_TYPE = 3001;
 const unsigned ERR_MORE_THAN_1_ROW = 3002;
 const unsigned ERR_MEMORY_MAX_FOR_LIMIT_TOO_LOW = 3003;
@@ -112,8 +99,6 @@ const unsigned ERR_NON_SUPPORT_INSERT_SUB = 3020;
 const unsigned ERR_SUB_EXPRESSION = 3021;
 const unsigned ERR_NON_SUPPORT_FUNC_SUB = 3022;
 const unsigned ERR_CORRELATED_SUB_OR = 3033;
-const unsigned ERR_CORRELATE_COL_MISSING = 3034;
-const unsigned ERR_NON_SUPPORT_NEQ_AGG_SUB = 3035;
 const unsigned ERR_INVALID_LAST_PARTITION = 4001;
 const unsigned ERR_PARTITION_ALREADY_DISABLED = 4002;
 const unsigned ERR_PARTITION_NOT_EXIST = 4003;
@@ -128,17 +113,13 @@ const unsigned ERR_INVALID_STARTVALUE = 4011;
 const unsigned ERR_EXCEED_LIMIT = 4012;
 const unsigned ERR_INVALID_VARBINARYVALUE = 4013;
 const unsigned ERR_CONSTRAINTS = 4014;
-const unsigned ERR_NOT_NULL_CONSTRAINTS = 4015;
 const unsigned ERR_FUNC_NON_IMPLEMENT = 5001;
 const unsigned ERR_NETWORK = 6001;
 const unsigned ERR_BRM_MUTEX = 6002;
 const unsigned ERR_UNRECOVERABLE_LOCK_STATE = 6003;
 const unsigned ERR_RECOVERABLE_LOCK_STATE = 6004;
 const unsigned ERR_SUCCESSFUL_RECOVERY = 6005;
-const unsigned ERR_HARD_FAILURE = 6006;
 const unsigned ERR_NON_IDB_TABLE = 7001;
-const unsigned ERR_CROSS_ENGINE_CONFIG = 8001;
-const unsigned ERR_CROSS_ENGINE_CONNECT = 8002;
 
 }//namespace logging
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_timediff.cpp 3614 2013-02-28 16:45:09Z dhall $
+* $Id: func_timediff.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -52,15 +52,16 @@ string timediff( int64_t time1, int64_t time2)
 	long long seconds;
 	long long microseconds;
 	int l_sign = 1;
+	int l_sign3 = 1;
 
 	if ( (time1 < 0 && time2 >= 0) ||
 			(time2 < 0 && time1 >= 0) )
 		l_sign = -l_sign;
 
 	if ( time1 > time2 )
-		calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
+		l_sign3 = calc_time_diff(time1, time2, l_sign, &seconds, &microseconds);
 	else
-		calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
+		l_sign3 = calc_time_diff(time2, time1, l_sign, &seconds, &microseconds);
 
 	long t_seconds;
 	int hour= seconds/3600L;
@@ -68,13 +69,6 @@ string timediff( int64_t time1, int64_t time2)
 	int minute= t_seconds/60L;
 	int second= t_seconds%60L;
 
-    // Bug 5099: Standardize to mysql behavior. No timediff may be > 838:59:59
-    if (hour > 838)
-    {
-        hour = 838;
-        minute = 59;
-        second = 59;
-    }
 	int sign = 0;
 	if ( time1 < time2 )
 		sign = 1;

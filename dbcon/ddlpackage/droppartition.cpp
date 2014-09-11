@@ -36,12 +36,7 @@ DropPartitionStatement::DropPartitionStatement(QualifiedName *qualifiedName) :
 
 ostream& DropPartitionStatement::put(ostream& os) const
 {
-	os << "Mark partitions out of service: " << *fTableName << endl;
-	os << " partitions: ";
-	set<BRM::LogicalPartition>::const_iterator it;
-	for (it=fPartitions.begin(); it!=fPartitions.end(); ++it)
-                os << (*it) << "  ";
-	os << endl;
+	os << "Mark partition out of service: " << *fTableName << " partition " << fPartition << endl;
 	return os;
 }
 

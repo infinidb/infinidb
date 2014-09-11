@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: hashjoin.h 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: hashjoin.h 7406 2011-02-08 02:05:10Z zzhu $
 // C++ Interface: hashjoin
 //
 // Description: 

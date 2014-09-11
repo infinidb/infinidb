@@ -17,7 +17,7 @@
 
 #ifndef IOMANAGER_H
 #define IOMANAGER_H
-// $Id: iomanager.h 2089 2013-05-06 17:56:34Z pleblanc $
+// $Id: iomanager.h 1754 2011-10-04 19:12:34Z xlou $
 //
 // C++ Interface: iomanager
 //
@@ -107,8 +107,9 @@ private:
 	FileBufferMgr& fIOMfbMgr;
 	fileBlockRequestQueue& fIOMRequestQueue;
 	int fThreadCount;
-	boost::thread_group fThreadArr;
-	void createReaders();
+	//pthread_t fPoppertid;
+	boost::thread fThreadArr[256];
+	int createReaders();
 	config::Config* fConfig;
 	BRM::DBRM fdbrm;
 	WriteEngine::FileOp fFileOp;
@@ -126,9 +127,10 @@ private:
 };
 
 // @bug2631, for remount filesystem by loadBlock() in primitiveserver
-// Shared Nothing update: Remount is no longer necessary, might have a use for these though.
 void setReadLock();
 void releaseReadLock();
+bool try_remount(char *filename, BRM::OID_t oid, uint16_t dbroot, uint32_t partNum, uint16_t segNum,
+		int compType, int& fd, std::string& writePM, std::string& localModuleName, bool toCache);
 void dropFDCache();
 
 

@@ -7,8 +7,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = calpontDBWrite
 calpontDBWrite_SOURCES = calpontDB.cpp
-calpontDBWrite_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-calpontDBWrite_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+calpontDBWrite_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+calpontDBWrite_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ -lreadline -lncurses $(AM_LDFLAGS)
 
 test:
 

@@ -17,7 +17,7 @@
 
 #ifndef LARGEHASHJOIN_H
 #define LARGEHASHJOIN_H
-// $Id: largehashjoin.h 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: largehashjoin.h 7409 2011-02-08 14:38:50Z rdempsey $
 //
 // C++ Implementation: hashjoin
 //
@@ -356,7 +356,7 @@ int HashJoin<element_t>::performThreadedJoin(const uint32_t numThreads)
 #endif
     }
 
-    idbassert((unsigned)realCnt == maxThreads);
+    assert((unsigned)realCnt == maxThreads);
 	} // try
 	catch (std::exception& e) {
 		std::ostringstream errMsg;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontdmlfactory.cpp 8707 2012-07-13 19:08:12Z rdempsey $
+ *   $Id: calpontdmlfactory.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -33,11 +33,7 @@
 #undef DECIMAL
 #undef DELETE
 #undef IN
-#ifdef _MSC_VER
-#include "dml-gram-win.h"
-#else
 #include "dml-gram.h"
-#endif
 
 #include <stdexcept>
 #include <iostream>

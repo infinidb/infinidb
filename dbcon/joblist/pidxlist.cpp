@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: pidxlist.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: pidxlist.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -143,7 +143,7 @@ namespace joblist
     fMutex(),
     fCondvar()
 {	  
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	if (fDec)
 		fDec->addQueue(uniqueID);
 }
@@ -192,7 +192,7 @@ pIdxList::~pIdxList()
 
   void pIdxList::makeIndexHeader(IndexListHeader& indexHdr)
   {
-    indexHdr.ism.Interleave=0;
+    indexHdr.ism.Reserve=0;
     indexHdr.ism.Flags=planFlagsToPrimFlags(fTraceFlags);
     indexHdr.ism.Command=INDEX_LIST;
     indexHdr.ism.Type=2;

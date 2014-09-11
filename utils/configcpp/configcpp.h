@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: configcpp.h 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: configcpp.h 3092 2012-05-10 18:26:32Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -33,8 +33,6 @@
 
 #include <sys/types.h>
 #include <libxml/parser.h>
-
-#include "xmlparser.h"
 
 #if defined(_MSC_VER) && defined(LIBCONFIG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -76,7 +74,7 @@ public:
 	* @param section the name of the config file section to search
 	* @param name the param name whose value is to be returned
 	*/
-	EXPORT const std::string getConfig(const std::string& section, const std::string& name);
+	EXPORT const std::string getConfig(const std::string& section, const std::string& name, const bool close = false) const;
 
 	/** @brief get all name's values from a section
 	*
@@ -86,7 +84,7 @@ public:
 	* @param values the values in the section are returned in this vector
 	*/
 	EXPORT void getConfig(const std::string& section, const std::string& name,
-													std::vector<std::string>& values);
+													std::vector<std::string>& values) const;
 
 	/** @brief set name's value in section
 	*
@@ -147,21 +145,11 @@ public:
 	*/
 	static inline uint64_t uFromText(const std::string& text) { return static_cast<uint64_t>(fromText(text)); }
 
-	/** @brief Used externally to check whether there has been a config change without loading everything
-	 *
-	 */
-	inline time_t getLastMTime() const { return fMtime; }
-
-	/** @brief Used externally to check whether there has been a config change without loading everything
-	 *
-	 */
-	EXPORT time_t getCurrentMTime();
-
 protected:
 	/** @brief parse the XML file
 	*
 	*/
-	void parseDoc(void);
+	void parseDoc(void) const;
 
 	/** @brief write the XML tree to disk
 	*
@@ -171,7 +159,7 @@ protected:
 	/** @brief stop processing this XML file
 	*
 	*/
-	void closeConfig(void);
+	void closeConfig(void) const;
 
 private:
 	typedef std::map<std::string, Config*> configMap_t;
@@ -187,15 +175,18 @@ private:
 	*/
 	Config(const std::string& configFile, const std::string& installDir);
 
+	/** @brief expand macros in config file to actual values
+	*/
+	const std::string expand(const std::string& in) const;
+
 	static configMap_t fInstanceMap;
 	static boost::mutex fInstanceMapMutex;
 
-	xmlDocPtr fDoc;
+	mutable xmlDocPtr fDoc;
 	const std::string fConfigFile;
-	time_t fMtime;
-	boost::mutex fLock;
+	mutable time_t fMtime;
+	mutable boost::mutex fLock;
 	const std::string fInstallDir;
-	XMLParser fParser;
 
 };
 
@@ -204,5 +195,3 @@ private:
 #undef EXPORT
 
 #endif
-// vim:ts=4 sw=4:
-

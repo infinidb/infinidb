@@ -25,12 +25,6 @@ extern pthread_mutex_t MEMORY_LOCK;
  * constants define
  */ 
 
-struct PendingSQLStatement
-{
-	string 		sqlStatement;
-	time_t 		startTime;
-};
-
 
 /*****************************************************************************************
 * @brief	msgProcessor Thread
@@ -76,11 +70,6 @@ void msgProcessor()
 		Config* sysConfig = Config::makeConfig();
 		string port = sysConfig->getConfig(msgPort, "Port");
 		string cmd = "fuser -k " + port + "/tcp";
-		int user;
-		user = getuid();
-		if (user != 0)
-			cmd = "sudo fuser -k " + port + "/tcp";
-
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -313,177 +302,158 @@ void msgProcessor()
 								// get Active SQL Query
 								//  determined from UM debug.log file
 								//
-								map<uint64_t, PendingSQLStatement> pendingSQLStatements;
-								map<uint64_t, PendingSQLStatement>::iterator pendingIter;
 
 								ByteStream ackmsg;
-								char line[15100];
-								char* pos;
-								uint64_t  currentSessionID;
-								const char* szStartSql = "Start SQL statement";
-								const char* szEndSql = "End SQL statement";
-
-								time_t rawtime;
-								struct tm tmStartTime;
-								time_t moduleStartTime = 0;
-								time_t queryStartTime = 0;
 
 								string fileName = "/var/log/Calpont/debug.log";
-								try
+							
+								ifstream file (fileName.c_str());
+								if (!file) {
+									ackmsg << (ByteStream::byte) API_FILE_OPEN_ERROR;
+									fIos.write(ackmsg);
+									break;
+								}
+
+								vector <string> lines;
+								char line[15100];
+								string buf;
+								string startSql = "Start SQL statement";
+								string endSql = "End SQL statement";
+								vector <string> sessionID;
+								vector <string> sqlStatement;
+								vector <string> startTime;
+								vector <string> sendSessionID;
+								string currentSessionID;
+
+								while (file.getline(line, 15100, '\n'))
 								{
-									// Get ServerMonitor start time. We don't report any SQL that started before then.
+									buf = line;
+									lines.push_back(buf);
+								}
+
+								file.close();
+
+								vector <string>::reverse_iterator aPtr = lines.rbegin();
+								for (; aPtr != lines.rend() ; aPtr++)
+								{
+									string::size_type pos = (*aPtr).find(endSql,0);
+									if (pos != string::npos)
+									{
+										string::size_type pos1 = (*aPtr).find("|",0);
+										if (pos1 != string::npos)
+										{
+											string::size_type pos2 = (*aPtr).find("|",pos1+1);
+											if (pos2 != string::npos)
+											{
+												sessionID.push_back((*aPtr).substr(pos1+1, pos2-pos1-1));
+											}
+										}
+									}
+									else
+									{
+										string::size_type pos = (*aPtr).find(startSql,0);
+										if (pos != string::npos)
+										{
+											string::size_type pos1 = (*aPtr).find("|",0);
+											if (pos1 != string::npos)
+											{
+												string::size_type pos2 = (*aPtr).find("|",pos1+1);
+												if (pos2 != string::npos)
+												{
+													currentSessionID = (*aPtr).substr(pos1+1, pos2-pos1-1);
+
+													bool FOUND=false;
+													vector <string>::iterator bPtr = sessionID.begin();
+
+													for (; bPtr != sessionID.end() ; bPtr++)
+													{
+														if ( *bPtr == currentSessionID )
+														{
+															sessionID.erase(bPtr);
+															FOUND=true;
+															break;
+														}
+													}
+
+													if(!FOUND) {
+														//filter out System Catalog inqueries
+														string SQLStatement = (*aPtr).substr(pos+21, 15000);
+														string::size_type pos3 = SQLStatement.find("/FE",SQLStatement.size()-5);
+														string::size_type pos4 = SQLStatement.find("/EC",SQLStatement.size()-5);
+
+														if ( pos3 == string::npos && pos4 == string::npos ) {
+															sqlStatement.push_back(SQLStatement);
+															startTime.push_back((*aPtr).substr(0, 16));
+															sendSessionID.push_back(currentSessionID);
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+
+								//get local ExeMgr start time and filter out queries
+								SystemStatus systemstatus;
+								SystemModuleTypeConfig systemmoduletypeconfig;
+								ModuleTypeConfig moduletypeconfig;
+								struct tm tm;
+								time_t moduleStartTime = 0;
+
+								try {
 									Oam oam;
 									ProcessStatus procstat;
 									oam.getProcessStatus("ExeMgr", moduleName, procstat);
 
-									if (strptime((procstat.StateChangeDate).c_str(), "%a %b %d %H:%M:%S %Y", &tmStartTime) != NULL)
-									{
-										tmStartTime.tm_isdst = -1;
-										moduleStartTime = mktime(&tmStartTime);
+									if( strptime((procstat.StateChangeDate).c_str(), "%a %b %d %H:%M:%S %Y", &tm) != NULL) {
+										tm.tm_isdst = -1;
+										moduleStartTime = mktime(&tm);
 									}
 
-									cout << "UM start time " << moduleStartTime << endl;
-									// Open the Calpont debug.log file
-									ifstream file (fileName.c_str());
-									if (!file)
+									vector <string>::iterator bPtr = sqlStatement.begin();
+									vector <string>::iterator cPtr = startTime.begin();
+									vector <string>::iterator dPtr = sendSessionID.begin();
+	
+									ackmsg << (ByteStream::byte) sqlStatement.size();
+	
+									for (; bPtr != sqlStatement.end(); ++bPtr,++cPtr,++dPtr)
 									{
-										ackmsg << (ByteStream::byte) API_FILE_OPEN_ERROR;
-										fIos.write(ackmsg);
-										break;
-									}
-
-									// Read the file. Filter out anything we don't care about. Store
-									// each SQL Start statement. When a SQL End statement is found, remove the
-									// corresponding SQL statement from the collection.
-									while (file.good())
-									{
-										file.getline(line, 15100, '\n');
-										pos = strstr(line, szStartSql);
-
-										if (pos)
-										{
-											//filter out System Catalog inqueries
-											if (strstr(pos+21, "/FE") || strstr(pos+21, "/EC"))
-											{
+										//filter out queries that started before a UM start time
+										time_t queryStartTime;
+										if( strptime((*cPtr).c_str(), "%b %d %H:%M:%S", &tm) != NULL) {
+											tm.tm_isdst = -1;
+											time_t rawtime;
+											struct tm timeinfo;
+											time ( &rawtime );
+											localtime_r ( &rawtime, &timeinfo );
+											tm.tm_year = timeinfo.tm_year;
+											queryStartTime = mktime(&tm);
+	
+											if ( queryStartTime < moduleStartTime ) {
+												//send dummy info, need to match count already sent
+												ackmsg << "-1";
+												ackmsg << "-1";
+												ackmsg << "-1";
 												continue;
-											}
-											// Filter any query that started before the ServerMonitor
-											if (strptime(line, "%b %d %H:%M:%S", &tmStartTime) != NULL)
-											{
-												// The date in the debug.log file doesn't have a year.
-												// Assume the start time is no more than a year ago.
-												struct tm tmNow;
-												tmStartTime.tm_isdst = -1;
-												time ( &rawtime );
-												localtime_r ( &rawtime, &tmNow );
-												// Allow for New year turnover
-												if (tmStartTime.tm_mon > tmNow.tm_mon)
-												{
-													tmStartTime.tm_year = tmNow.tm_year - 1;
-												}
-												else
-												{
-													tmStartTime.tm_year = tmNow.tm_year;
-												}
-												queryStartTime = mktime(&tmStartTime);
-
-												// Ignore if the query started before this process
-												if (queryStartTime < moduleStartTime)
-												{
-													continue;
-												}
-											}
-											else
-											{
-												continue;
-											}
-
-											// Find the sessionid
-											char* pos1;
-											char* pos2;
-											pos1 = strchr(line, '|');
-											if (!pos1)
-											{
-												continue;
-											}
-											pos2 = strchr(pos1+1, '|');
-											if (!pos2)
-											{
-												continue;
-											}
-
-											currentSessionID = strtoll(pos1+1, NULL, 0);
-
-											// Check the map for this sessionid. If found, we have two pending
-											// SQL statements from the same session, which is theoretically
-											// impossible. Throw the first one away for now. Error handling?
-											if ((pendingIter = pendingSQLStatements.find(currentSessionID)) != pendingSQLStatements.end())
-											{
-												pendingSQLStatements.erase(pendingIter);
-											}
-
-											PendingSQLStatement pendingSQLStatement;
-											pendingSQLStatement.sqlStatement = pos + 21;
-											pendingSQLStatement.startTime = queryStartTime;
-											pair<int64_t, PendingSQLStatement> sqlPair;
-											sqlPair.first = currentSessionID;
-											sqlPair.second = pendingSQLStatement;
-											pendingSQLStatements.insert(sqlPair);
-										}
-										else
-										{
-											pos = strstr(line, szEndSql);
-											if (pos)
-											{
-												// Find the sessionid
-												char* pos1;
-												char* pos2;
-												pos1 = strchr(line, '|');
-												if (!pos1)
-												{
-													continue;
-												}
-												pos2 = strchr(pos1+1, '|');
-												if (!pos2)
-												{
-													continue;
-												}
-
-												currentSessionID = strtoll(pos1+1, NULL, 0);
-
-												// Check the map for this sessionid. If found, this is a completed SQL statement
-												// remove it from our collection
-												if ((pendingIter = pendingSQLStatements.find(currentSessionID)) != pendingSQLStatements.end())
-												{
-													pendingSQLStatements.erase(pendingIter);
-												}
 											}
 										}
+	
+										//send query and start time and sessions ID
+										ackmsg << *bPtr;
+										ackmsg << *cPtr;
+										ackmsg << *dPtr;
 									}
 
-									file.close();
-
-									// Send the number of pending statements
-									ackmsg << (ByteStream::byte) pendingSQLStatements.size();
-
-									// Send the pending statements we discovered.
-									for (pendingIter = pendingSQLStatements.begin(); 
-										 pendingIter != pendingSQLStatements.end();
-										 ++pendingIter)
-									{
-										ackmsg << (*pendingIter).second.sqlStatement;
-										ackmsg << (unsigned)(*pendingIter).second.startTime;
-										ackmsg << (*pendingIter).first;
-									}
 								}
-								catch (...)
-								{
-								}
+								catch(...)
+								{}
+
 
 								fIos.write(ackmsg);
 								ackmsg.reset();
+
+								break;
 							}
-							break;
 
 							case RUN_DBHEALTH_CHECK:
 							{

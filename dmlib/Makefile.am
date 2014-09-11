@@ -24,6 +24,7 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libdm.la
 libdm_la_SOURCES = dm.c
+include_HEADERS = dm.h
 
 test:
 
@@ -33,5 +34,5 @@ leakcheck:
 
 docs:
 
-bootstrap:
+bootstrap: install-data-am
 

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_fileop.h 4496 2013-01-31 19:13:20Z pleblanc $
+//  $Id: we_fileop.h 3792 2012-04-25 19:28:25Z dcathey $
 
 /** @file */
 
@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <string>
 #include <vector>
-#include <map>
 #include <boost/thread.hpp>
 
 #ifdef _MSC_VER
@@ -42,7 +41,6 @@
 #include "we_brm.h"
 #include "we_config.h"
 #include "we_stats.h"
-#include "idbcompress.h"
 
 #if defined(_MSC_VER) && defined(WRITEENGINEFILEOP_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -63,80 +61,77 @@ public:
    /**
     * @brief Constructor
     */
-    EXPORT explicit FileOp(bool doAlloc=true);
+   EXPORT explicit FileOp(bool doAlloc=true);
 
    /**
-    * @brief Destructor
+    * @brief Default Destructor
     */
-    EXPORT virtual ~FileOp();
+   EXPORT virtual ~FileOp();
 
    /**
     * @brief Close a file
     */
-    EXPORT void         closeFile( FILE* pFile ) const;
+   EXPORT void           closeFile( FILE* pFile ) const;
 
    /**
     * @brief Create a directory
     */
-    EXPORT int          createDir( const char* dirName, mode_t mode ) const;
-    int                 createDir( const char* dirName ) const;
+   EXPORT const int      createDir( const char* dirName, mode_t mode ) const;
+   const int      createDir( const char* dirName ) const
+                     { return createDir( dirName, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ); }
 
    /**
     * @brief Create a file with a fixed file size and file id
     */
-    EXPORT int          createFile( FID fid,
-                            int & allocSize,
-                            uint16_t dbRoot, uint32_t partition,
-                            i64 emptyVal = 0, int width = 1 ) ;
+   EXPORT const int      createFile( const FID fid,
+                              int & allocSize,
+                              const uint16_t dbRoot, const uint32_t partition,
+                              const i64 emptyVal = 0, const int width = 1 ) ;
 
    /**
     * @brief Delete a file
     */
-    EXPORT int          deleteFile( const char* fileName ) const;
+   EXPORT const int      deleteFile( const char* fileName ) const;
 
    /**
     * @brief Delete the db files corresponding to the specified file id
     */
-    EXPORT int          deleteFile( FID fid ) const;
+   EXPORT const int      deleteFile( const FID fid ) const;
    
    /**
     * @brief Delete the db files corresponding to the specified file id
     */
-    EXPORT int          deleteFiles( const std::vector<int32_t>& fids ) const;
+   EXPORT const int      deleteFiles( const std::vector<int32_t>& fids ) const;
 
-   
    /**
-    * @brief Delete db files corresponding to specified file id and partition
+    * @brief Delete the db files corresponding to the specified file id and partition
     */
-    EXPORT int          deletePartitions( const std::vector<OID>& fids, 
-                            const std::vector<BRM::PartitionInfo>& partitions )
-                            const;
+   EXPORT const int      deletePartition( const std::vector<int32_t>& fids, const uint32_t partition ) const;
    
    /**
     * @brief Delete a specific database segment file.
     */
-    EXPORT int          deleteFile( FID fid, u_int16_t dbRoot,
-                            u_int32_t partition,
-                            u_int16_t segment ) const;
+   EXPORT const int      deleteFile( const FID fid, const u_int16_t dbRoot,
+      const u_int32_t partition, const u_int16_t segment ) const;
 
    /**
     * @brief Check whether a file exists or not
     */
-    EXPORT bool         exists( const char* fileName ) const;
+   EXPORT const bool     exists( const char* fileName ) const;
 
    /**
-    * @brief @brief Check whether file exists or not by using file id, DBRoot,
+    * @brief @brief Check whether a file exists or not by using file id, DBRoot,
     * partition, and segment number.
     */
-    EXPORT bool         exists( FID fid, u_int16_t dbRoot,
-                            u_int32_t partition, u_int16_t segment ) const;
+   EXPORT const bool     exists( const FID fid, const u_int16_t dbRoot,
+      const u_int32_t partition, const u_int16_t segment ) const;
 
    /**
     * @brief Check whether a column exists or not by using file id.  Since this
     * is not enough to fully qualify a db filename, all it can do is to verify
     * that the OID directory exists on one or more of the DBRoots.
     */
-    EXPORT bool         existsOIDDir( FID fid ) const;
+   EXPORT const bool     existsOIDDir( const FID fid ) const;
 
    /**
     * @brief Expand current abbreviated extent for this column to a full extent
@@ -146,105 +141,53 @@ public:
     * @param emptyVal Empty value used in initializing extents for this column
     * @param width    Width of this column (in bytes)
     */
-    EXPORT virtual int  expandAbbrevColumnExtent(
-                            FILE*    pFile,
-                            uint16_t dbRoot,
-                            i64      emptyVal,
-                            int      width );
+   EXPORT virtual const int     expandAbbrevColumnExtent(
+                             FILE*    pFile,
+                             uint16_t dbRoot,
+                             i64      emptyVal,
+                             int      width );
 
    /**
-    * @brief Add an extent to the specified Column OID and DBRoot.
-    * The extent must already exist in the extentmap prior to calling this fctn.
+    * @brief Add an extent to the column file associated with oid.
     *
-    * The partition, segment, and HWM of the column file where the
+    * The DBRoot, partition, segment, and HWM of the column file where the
     * extent is added is returned.  If needed, the applicable column segment
-    * file will be created.  This extendFile1 function should supplant other
+    * file will be created.  This extendFile function should supplant other
     * extendFile functions with Multiple-File-per-OID enhancement, "but" we
     * may want to rethink when we do Shared-Nothing.  When this function
     * returns, the file position will be located at the end of the file.
-    * For shared-everything DBRoot was an output argument, as BRM selected the
-    * the DBRoot.  For shared-nothing DBRoot is an input argument, as the
-    * application code must track/control the DBRoot selection.
-    * If this is the very first file for the specified DBRoot, then the
-    * partition and segment number must be specified, else the selected
-    * partition and segment numbers are returned.
     *
     * @param oid OID of the column to be extended
     * @param emptyVal Empty value to be used for oid
     * @param width Width of the column
-    * @param hwm The fbo of the column segment file where the new extent begins
-    * @param startLbid The starting LBID for the new extent
-    * @param allocSize Number of blocks allocated to the extent.
-    * @param dbRoot The DBRoot of the file with the new extent.
-    * @param partition The partnum of the file with the new extent.
-    * @param segment The segnum of the file with the new extent.
-    * @param segFile (out) Name of the segment file where extent was added.
-    * @param pFile (out) FILE ptr to the file where the extent is added.
-    * @param newFile (out) Indicates if a new file was created for the extent
-    * @param hdrs (in/out) Contents of headers, if file is compressed.
-    * @return returns NO_ERROR if success.
-    */
-    EXPORT int          extendFile(OID oid, i64 emptyVal,
-                            int          width,
-                            HWM          hwm,
-                            BRM::LBID_t  startLbid,
-                            int          allocSize,
-                            uint16_t     dbRoot,
-                            uint32_t     partition,
-                            uint16_t     segment,
-                            std::string& segFile,
-                            FILE*&       pFile,
-                            bool&        newFile,
-                            char*        hdrs);
-
-   /**
-    * @brief  For alter table add column; add an extent to a specific file
-    *
-    * @param oid OID of the column to be extended
-    * @param emptyVal Empty value to be used for oid
-    * @param width Width of the column
+    * @param isBulkLoad Is this extent being added during a bulk load.
+    *        If true, only the last block is initialized in the file,
+    *        else the entire extent will be initialized to disk.
     * @param allocSize (out) Number of blocks allocated to the extent.
-    * @param dbRoot The DBRoot of the file with the new extent.
-    * @param partition The partnum of the file with the new extent.
-    * @param segment The segnum of the file with the new extent.
+    * @param pFile (out) FILE ptr to the file where the extent is added.
+    * @param dbRoot (out) The DBRoot of the file with the new extent.
+    * @param partition (out) The partition num of the file with the new extent.
+    * @param segment (out) The segment number of the file with the new extent.
     * @param segFile (out) Name of the segment file where extent was added.
+    * @param hwm (out) The fbo of the column segment file where the new extent
+    *        begins.
     * @param startLbid (out) The starting LBID for the new extent
     * @param newFile (out) Indicates if a new file was created for the extent
     * @param hdrs (in/out) Contents of headers, if file is compressed.
-    */
-    EXPORT int          addExtentExactFile(OID oid, i64 emptyVal,
-                            int          width,
-                            int&         allocSize,
-                            uint16_t     dbRoot,
-                            uint32_t     partition,
-                            uint16_t     segment,
-                            std::string& segFile,
-                            BRM::LBID_t& startLbid,
-                            bool&        newFile,
-                            char*        hdrs);
-
-   /**
-    * @brief Pad the specified compressed extent with empty chunks
-    * @param oid OID of relevant column
-    * @param width Width in bytes of this column
-    * @param emptyVal Empty value to be employed in filling the chunks
-    * @param dbRoot DBRoot of the extent to be filled
-    * @param partition Partition of the extent to be filled
-    * @param segment Segment file number of the extent to be filled
-    * @param hwm New HWM blk setting for the segment file after extent is padded
-    * @param segFile (out) Name of updated segment file
-    * @param errTask (out) Task that failed if error occurs
     * @return returns NO_ERROR if success.
     */
-    EXPORT int          fillCompColumnExtentEmptyChunks(OID oid,
-                            int          colWidth,
-                            i64          emptyVal,
-                            uint16_t     dbRoot,
-                            uint32_t     partition,
-                            uint16_t     segment,
-                            HWM          hwm,
-                            std::string& segFile,
-                            std::string& errTask);
+   EXPORT const int      extendFile(const OID oid, const i64 emptyVal, const int width,
+                             bool         isBulkLoad,
+                             int&         allocSize,
+                             FILE*&       pFile,
+                             uint16_t&    dbRoot,
+                             uint32_t&    partition,
+                             uint16_t&    segment,
+                             std::string& segFile,
+                             HWM&         hwm,
+                             BRM::LBID_t& startLbid,
+                             bool&        newFile,
+                             char*        hdrs);
 
    /**
     * @brief Write the specified header info to compressed column file pFile.
@@ -252,7 +195,7 @@ public:
     * @param pFile Column file to be written to
     * @param hdr   Header info to be written
     */
-    EXPORT int          writeHeaders(FILE* pFile, const char* hdr) const;
+   EXPORT int     writeHeaders(FILE* pFile, const char* hdr) const;
 
    /**
     * @brief Write the specified header info to compressed column or
@@ -263,23 +206,32 @@ public:
     * @param pointerHdr Pointer header info to be written
     * @param ptrHdrSize Size (in bytes) of pointerHdr
     */
-    EXPORT int          writeHeaders(FILE* pFile,
-                            const char* controlHdr,
-                            const char* pointerHdr,
-                            uint64_t ptrHdrSize) const;
+   EXPORT int     writeHeaders(FILE* pFile,
+                               const char* controlHdr,
+                               const char* pointerHdr,
+                               uint64_t ptrHdrSize) const;
 
    /**
-    * @brief Get the Version Buffer filename for the specified fid (OID).
+    * @brief Get the filename for the specified fid (OID).
     *
     * This version of getFileName automatically uses 0 for the partition and
-    * segment numbers.  The applicable DBRoot is assigned based on the OID.
+    * segment numbers.  If fid is < 4, it is assumed the caller is looking
+    * for one of the version buffer files, and DBRoot will be based on the fid,
+    * else the DBRoots will be searched for the appropriate file.
     *
-    * @param fid (in) OID of the Version Buffer DB file of interest
+    * @param fid (in) OID of the DB file of interest
     * @param fileName (out) the name of the pertinent file that was found
     *
     * @return returns NO_ERROR if success; ERR_FILE_NOT_EXIST if file not found
     */
-    int                 getVBFileName( FID fid, char* fileName ) const;
+   const int      getFileName( const FID fid, char* fileName ) const 
+   { uint16_t dbRoot = 0;
+     if ( fid < 1000 ) { // special case for version buffer files
+        size_t rootCnt = Config::DBRootCount();
+        dbRoot = (fid % rootCnt) + 1;
+     }
+     return oid2FileName( fid, fileName, true, dbRoot,0,0 ); 
+   }
 
    /**
     * @brief Get the filename for the specified fid (OID). DBRoot, partition,
@@ -292,33 +244,21 @@ public:
     * @param partition (in) partition number of the file of interest
     * @param segment (in) segment number of the file of interest
     */
-    int                 getFileName( FID fid, char* fileName,
-                            uint16_t dbRoot,
-                            uint32_t partition,
-                            uint16_t segment ) const;
+   const int      getFileName( const FID fid, char* fileName,
+                     const uint16_t dbRoot,
+                     const uint32_t partition, const uint16_t segment ) const
+                  { return oid2FileName( fid, fileName, false, dbRoot, partition, segment ); }
+   const int      getDirName( const FID fid, char* dirName ) const
+                  { return oid2DirName( fid, dirName ); }
 
-    /**
-     * @brief Search for first DBRoot containing fid, and return assoc path
-     */
-    int                 getDirName( FID fid, char* dirName ) const;
-
-    /**
-     * @brief Construct directory path for the specified fid (OID), DBRoot, and
-     * partition number.  Directory does not have to exist, nor is it created.
-     */
-    int                 getDirName2( FID fid, uint16_t dbRoot,
-                            uint32_t partition,
-                            std::string& dirName) const;
-
-    /**
-     * @brief Get the file size
-     */
-    EXPORT long         getFileSize( FILE* pFile ) const;
-    EXPORT int          getFileSize2( FILE* pFile, long long& fileSize ) const;
-    EXPORT int          getFileSize3( FID fid, uint16_t dbRoot,
-                            uint32_t partition,
-                            uint16_t segment,
-                            long long& fileSize ) const;
+   /**
+    * @brief Get the file size
+    */
+   EXPORT const long     getFileSize( FILE* pFile ) const;
+   EXPORT int            getFileSize2( FILE* pFile, long long& fileSize ) const;
+   EXPORT const long     getFileSize( FID fid, const uint16_t dbRoot,
+      const uint32_t partition, const uint16_t segment ) const;
+   EXPORT const long     getFileSize( const char* fileName ) const;
 
    /**
     * @brief Initialize an extent in a column segment file
@@ -331,14 +271,14 @@ public:
     * @param bExpandExtent (in) -  Expand existing extent, or initialize new one
     * @param bAbbrevExtent (in) -  If adding new extent, is it abbreviated
     */
-    EXPORT int          initColumnExtent( FILE*    pFile,
-                            uint16_t dbRoot,
-                            int      nBlocks,
-                            i64      emptyVal,
-                            int      width,
-                            bool     bNewFile,
-                            bool     bExpandExtent,
-                            bool     bAbbrevExtent );
+   EXPORT const int initColumnExtent( FILE*    pFile,
+                                      uint16_t dbRoot,
+                                      int      nBlocks,
+                                      i64      emptyVal,
+                                      int      width,
+                                      bool     bNewFile,
+                                      bool     bExpandExtent,
+                                      bool     bAbbrevExtent );
 
    /**
     * @brief Initialize an extent in a dictionary store file
@@ -349,17 +289,17 @@ public:
     * @param blockHdrInitSize(in) - number of bytes in blockHdrInit
     * @param bExpandExtent (in) -  Expand existing extent, or initialize new one
     */
-    EXPORT int          initDctnryExtent( FILE*    pFile,
-                            uint16_t dbRoot,
-                            int      nBlocks,
-                            unsigned char* blockHdrInit,
-                            int      blockHdrInitSize,
-                            bool     bExpandExtent );
+   EXPORT const int initDctnryExtent( FILE*    pFile,
+                                      uint16_t dbRoot,
+                                      int      nBlocks,
+                                      unsigned char* blockHdrInit,
+                                      int      blockHdrInitSize,
+                                      bool     bExpandExtent );
 
    /**
     * @brief Check whether it is an directory
     */
-    EXPORT bool         isDir( const char* dirName ) const;
+   EXPORT const bool     isDir( const char* dirName ) const;
 
    /**
     * @brief See if there is room in the file system for specific number of blks
@@ -367,16 +307,16 @@ public:
     * @param nBlocks Number of 8192-byte blocks to be added
     * @return returns TRUE if file system has room for 'nBlocks', else FALSE
     */
-    EXPORT bool         isDiskSpaceAvail(const std::string& fileName,
-                            int nBlocks) const;
+   EXPORT bool           isDiskSpaceAvail(const std::string& fileName,
+                                   int nBlocks) const;
 
    /**
     * @brief Convert an oid to a full file name
     */
-    EXPORT int          oid2FileName( FID fid, char* fullFileName,
-                            bool bCreateDir, uint16_t dbRoot,
-                            uint32_t partition, uint16_t segment ) const;
-    EXPORT int          oid2DirName( FID fid, char* oidDirName ) const;
+   EXPORT const int      oid2FileName( const FID fid, char* fullFileName,
+      const bool bCreateDir, const uint16_t dbRoot,
+      const uint32_t partition, const uint16_t segment ) const;
+   EXPORT const int      oid2DirName( const FID fid, char* oidDirName ) const;
 
    /**
     * @brief Open a file using a filename.
@@ -385,9 +325,9 @@ public:
     * @param ioBuffSize Buffer size to be employed by setvbuf().
     * @return returns the FILE* of the opened file.
     */
-    EXPORT FILE*        openFile( const char* fileName,
-                            const char* mode = "r+b",
-                            int ioBuffSize = DEFAULT_BUFSIZ) const;
+   EXPORT FILE*          openFile( const char* fileName,
+                                   const char* mode = "r+b",
+                                   int ioBuffSize = DEFAULT_BUFSIZ) const;
 
    /**
     * @brief Open a file using an OID, dbroot, partition, and segment number.
@@ -400,19 +340,19 @@ public:
     * @param ioBuffSize Buffer size to be employed by setvbuf().
     * @return returns the FILE* of the opened file.
     */
-    EXPORT FILE*        openFile( FID fid,
-                            uint16_t       dbRoot,
-                            uint32_t       partition,
-                            uint16_t       segment,
-                            std::string&   segFile,
-                            const char*    mode = "r+b",
-                            int ioBuffSize = DEFAULT_BUFSIZ) const;
+   EXPORT FILE*          openFile( const FID fid,
+                                   const uint16_t dbRoot,
+                                   const uint32_t partition,
+                                   const uint16_t segment,
+                                   std::string&   segFile,
+                                   const char*    mode = "r+b",
+                                   int ioBuffSize = DEFAULT_BUFSIZ) const;
 
    /**
     * @brief Read to a buffer from a file at current location
     */
-    EXPORT int          readFile( FILE* pFile, unsigned char* readBuf, 
-                            int readSize ) const;
+   EXPORT const int      readFile( FILE* pFile, unsigned char* readBuf, 
+                            const int readSize ) const;
 
    /**
     * @brief Reads in 2 compression header blocks from a column segment file.
@@ -420,8 +360,8 @@ public:
     * @param pFile (in) FILE* of column segment file to be read.
     * @param hdrs (out) Contents of headers that are read.
     */
-    EXPORT int          readHeaders( FILE* pFile, char* hdrs ) const;
-    EXPORT int          readHeaders( FILE* pFile, char* hdr1, char* hdr2 )const;
+   EXPORT int            readHeaders( FILE* pFile, char* hdrs ) const;
+   EXPORT int            readHeaders( FILE* pFile, char* hdr1, char* hdr2 ) const;
 
    /**
     * @brief Reinitialize a partial extent in a column segment file
@@ -431,7 +371,7 @@ public:
     * @param emptyVal(in) - empty value to be used for column data values
     * width (in) - width of the applicable column
     */
-    EXPORT int          reInitPartialColumnExtent( FILE* pFile,
+   EXPORT const int reInitPartialColumnExtent( FILE* pFile,
                             long long startOffset,
                             int       nBlocks,
                             i64       emptyVal,
@@ -445,140 +385,82 @@ public:
     * @param blockHdrInit(in) - data used to initialize each block header
     * @param blockHdrInitSize(in) - number of bytes in blockHdrInit
     */
-    EXPORT int          reInitPartialDctnryExtent( FILE* pFile,
+   EXPORT const int reInitPartialDctnryExtent( FILE* pFile,
                             long long      startOffset,
                             int            nBlocks,
                             unsigned char* blockHdrInit,
                             int            blockHdrInitSize );
 
    /**
+    * @brief Remove a directory
+    */
+   const int      removeDir( const char* dir ) const { return ::rmdir( dir ) == 0 ? NO_ERROR : ERR_DIR_REMOVE; }
+
+   /**
     * @brief Set the file to specified location based on the offset
     */
-    EXPORT int          setFileOffset( FILE* pFile,
-                            long long offset,
-                            int origin = SEEK_SET  ) const;
-    EXPORT int          setFileOffsetBlock( FILE* pFile,
-                            i64 lbid,
-                            int origin = SEEK_SET ) const;
+   EXPORT const int      setFileOffset( FILE* pFile, const long long offset, const int origin = SEEK_SET  ) const;
+   EXPORT const int      setFileOffsetBlock( FILE* pFile, i64 lbid, const int origin = SEEK_SET ) const;
 
    /**
     * @brief Truncate the file to the specified file size
     */
-    EXPORT int          truncateFile( FILE* pFile,
-                            long long fileSize ) const;
+   EXPORT const int      truncateFile( FILE* pFile, const long long fileSize ) const;
 
    /**
     * @brief Write a buffer to a file at current location
     */
-    EXPORT int          writeFile( FILE* pFile,
-                            const unsigned char* buf, int bufSize ) const;
+   EXPORT const int      writeFile( FILE* pFile, const unsigned char* buf, const int bufSize ) const;
 
    /**
     * @brief set the flag to use the instance to access the brm wrapper class
     */ 
-    EXPORT virtual void        setTransId( const TxnID& transId);
-    TxnID               getTransId() const;
 
-    void                compressionType(int t);
-    int                 compressionType() const;
+   virtual void           setTransId( const TxnID& transId){ m_transId = transId; }
+   const TxnID    getTransId() const {return m_transId;}
+   char*          m_buffer;
 
-    EXPORT virtual int  flushFile(int rc, std::map<FID,FID> & oids);
+   void compressionType(int t) { m_compressionType = t; }
+   int compressionType() const { return m_compressionType; }
+
+   EXPORT virtual int flushFile(int rc, std::map<FID,FID> & oids) { return NO_ERROR; }
 
 protected:
-    EXPORT virtual int         updateColumnExtent(FILE* pFile, int nBlocks);
-    EXPORT virtual int         updateDctnryExtent(FILE* pFile, int nBlocks);
+   virtual int    updateColumnExtent(FILE* pFile, int nBlocks)
+                  { return NO_ERROR; }
 
-    int                 writeInitialCompColumnChunk( FILE* pFile,
-                            int      nBlocksAllocated,
-                            int      nRows,
-                            i64      emptyVal,
-                            int      width,
-                            char*    hdrs);
+   virtual int    updateDctnryExtent(FILE* pFile, int nBlocks)
+                  { return NO_ERROR; }
 
-    int                 m_compressionType;  // compresssion type
+   int            m_compressionType;  // compresssion type
 
 private:
    //not copyable
-    FileOp(const FileOp& rhs);
-    FileOp& operator=(const FileOp& rhs);
+   FileOp(const FileOp& rhs);
+   FileOp& operator=(const FileOp& rhs);
 
-    int                 createFile( const char* fileName, int fileSize, 
-                            i64 emptyVal, int width,
-                            uint16_t dbRoot );
+   const int      createFile( const char* fileName, const int fileSize, 
+                              const i64 emptyVal, const int width,
+                              const uint16_t dbRoot );
+   int            initAbbrevCompColumnExtent( FILE* pFile,
+                              uint16_t dbRoot,
+                              int      nBlocks,
+                              i64      emptyVal,
+                              int      width);
+   static void    initDbRootExtentMutexes();
+   static void    removeDbRootExtentMutexes();
 
-    int                 expandAbbrevColumnChunk( FILE* pFile,
-                            i64   emptyVal,
-                            int   colWidth,
-                            const compress::CompChunkPtr& chunkInPtr,
-                            compress::CompChunkPtr& chunkOutPt);
+   TxnID          m_transId;
 
-    int                 initAbbrevCompColumnExtent( FILE* pFile,
-                            uint16_t dbRoot,
-                            int      nBlocks,
-                            i64      emptyVal,
-                            int      width);
+   // protect creation of m_DbRootAddExtentMutexes
+   static boost::mutex               m_createDbRootMutexes;
 
-    static void         initDbRootExtentMutexes();
-    static void         removeDbRootExtentMutexes();
+   // Mutexes used to serialize extent creation within each DBRoot
+   static std::vector<boost::mutex*> m_DbRootAddExtentMutexes;
 
-    TxnID       m_transId;
-
-    // protect creation of m_DbRootAddExtentMutexes
-    static boost::mutex               m_createDbRootMutexes;
-
-    // Mutexes used to serialize extent creation within each DBRoot
-    static std::map<int,boost::mutex*> m_DbRootAddExtentMutexes;
-
-    // protect race condition in creating directories
-    static boost::mutex               m_mkdirMutex;
-
-    char*       m_buffer;             // buffer used with setvbuf()
+   // protect race condition in creating directories
+   static boost::mutex               m_mkdirMutex;
 };
-
-//------------------------------------------------------------------------------
-// Inline functions
-//------------------------------------------------------------------------------
-inline void FileOp::compressionType(int t)
-{
-    m_compressionType = t;
-}
-
-inline int FileOp::compressionType() const
-{
-    return m_compressionType;
-}
-
-inline int FileOp::createDir( const char* dirName ) const
-{
-    return createDir( dirName, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
-}
-
-inline int FileOp::getDirName( FID fid, char* dirName ) const
-{
-    return oid2DirName( fid, dirName );
-}
-
-inline int FileOp::getVBFileName( FID fid, char* fileName ) const 
-{
-    uint16_t dbRoot    = 0;
-    uint32_t partition = 0;
-    uint16_t segment   = 0;
-
-    return oid2FileName( fid, fileName, true, dbRoot, partition, segment ); 
-}
-
-inline int FileOp::getFileName( FID fid, char* fileName,
-    uint16_t dbRoot,
-    uint32_t partition,
-    uint16_t segment ) const
-{
-    return oid2FileName( fid, fileName, false, dbRoot, partition, segment );
-}
-
-inline TxnID FileOp::getTransId() const
-{
-    return m_transId;
-}
 
 } //end of namespace
 

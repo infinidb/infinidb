@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_udf.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: ha_calpont_udf.cpp 7396 2011-02-03 17:54:36Z rdempsey $
  */
 
 #ifdef _MSC_VER

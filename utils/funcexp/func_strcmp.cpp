@@ -36,9 +36,6 @@ using namespace rowgroup;
 #include "joblisttypes.h"
 using namespace joblist;
 
-#include "utils_utf8.h"
-using namespace funcexp;
-
 class to_lower
 {
 	public:
@@ -67,7 +64,7 @@ int64_t Func_strcmp::getIntVal(rowgroup::Row& row,
 	string str = fp[0]->data()->getStrVal(row, isNull);
 
 	string str1 = fp[1]->data()->getStrVal(row, isNull);
-	int ret = utf8::idb_strcoll(str.c_str(), str1.c_str());
+	int ret = strcoll(str.c_str(), str1.c_str());
 	// mysql's strcmp returns only -1, 0, and 1
 	return (ret < 0 ? -1 : (ret > 0 ? 1 : 0));
 }

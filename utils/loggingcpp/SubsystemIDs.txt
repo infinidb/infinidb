@@ -1,9 +1,9 @@
-# $Id: SubsystemIDs.txt 3022 2012-03-22 12:58:08Z pleblanc $
+# $Id: SubsystemIDs.txt 760 2009-02-09 14:24:25Z rdempsey $
 #
 # This file contains the mapping of numeric Subsystem IDs to actual software and 
 #  hardware subsystems. This file is intended as a simple mechanism to control the
-#  issue of subsystem IDs and is not consulted by the message logging source code.
-#  But it does match SubsystemID[] in messagelog.cpp.
+#  issue of subsystem IDs and is not consulted by the message logging code.
+#  But it does match SubsystemID[] in loggingid.h, which is referenced by code
 
 01 - ddljoblist 
 02 - ddlpackage 
@@ -36,5 +36,3 @@
 29 - masterdbrm
 30 - slavedbrm
 31 - messagequeue
-32 - writeengineserver
-33 - writeenginesplit

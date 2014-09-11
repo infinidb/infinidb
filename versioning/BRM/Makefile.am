@@ -23,17 +23,14 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 lib_LTLIBRARIES = libbrm.la
-libbrm_la_SOURCES = autoincrementmanager.cpp \
-blockresolutionmanager.cpp \
+libbrm_la_SOURCES = blockresolutionmanager.cpp \
 brmshmimpl.cpp \
 brmtypes.cpp \
 copylocks.cpp \
 dbrm.cpp \
 extentmap.cpp \
 lbidresourcegraph.cpp \
-logicalpartition.cpp \
 mastersegmenttable.cpp \
-oidserver.cpp \
 resourcenode.cpp \
 rgnode.cpp \
 rwlockmonitor.cpp \
@@ -41,7 +38,6 @@ sessionmanagerserver.cpp \
 shmkeys.cpp \
 slavedbrmnode.cpp \
 slavecomm.cpp \
-tablelockserver.cpp \
 tracer.cpp \
 transactionnode.cpp \
 undoable.cpp \
@@ -56,7 +52,6 @@ brmtypes.h \
 copylocks.h \
 dbrm.h \
 extentmap.h \
-logicalpartition.h \
 mastersegmenttable.h \
 sessionmanagerserver.h \
 shmkeys.h \
@@ -68,35 +63,35 @@ vss.h
 bin_PROGRAMS = controllernode workernode dbrmctl reset_locks rollback save_brm load_brm print_journal
 
 controllernode_SOURCES = masternode.cpp masterdbrmnode.cpp
-controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 controllernode_LDADD = libbrm.la
 
 workernode_SOURCES = slavenode.cpp
-workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 workernode_LDADD = libbrm.la
 
 dbrmctl_SOURCES = dbrmctl.cpp
-dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 dbrmctl_LDADD = libbrm.la
 
 reset_locks_SOURCES = reset_locks.cpp
-reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 reset_locks_LDADD = libbrm.la
 
 rollback_SOURCES = rollback.cpp
-rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 rollback_LDADD = libbrm.la
 
 save_brm_SOURCES = save_brm.cpp
-save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 save_brm_LDADD = libbrm.la
 
 load_brm_SOURCES = load_brm.cpp
-load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 load_brm_LDADD = libbrm.la
 
 print_journal_SOURCES = print_journal.cpp
-print_journal_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+print_journal_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 print_journal_LDADD = libbrm.la
 
 .PHONY: dbrm

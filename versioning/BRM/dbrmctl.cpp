@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: dbrmctl.cpp 1632 2012-08-01 16:54:48Z dhall $
+ * $Id: dbrmctl.cpp 1501 2012-02-23 02:03:15Z pleblanc $
  *
  ****************************************************************************/
 
@@ -47,7 +47,7 @@ void errMsg(int err)
 			cout << "OK.";
 			if (vflg)
 			{
-				if (dbrm.getSystemReady() > 0)
+				if (dbrm.isSystemReady())
 					cout << " (and the system is ready)";
 				else
 					cout << " (but the system is not ready)";
@@ -62,12 +62,6 @@ void errMsg(int err)
 			break;
 		case ERR_READONLY: 
 			cout << "DBRM is currently Read Only!" << endl; 
-			break;
-		case 20:
-			cout << "System is ready" <<endl;
-			break;
-		case 21:
-			cout << "System is not ready" <<endl;
 			break;
 		default:
 			cout << "Failure: an unexpected error (" << err << ")" << endl; 
@@ -115,20 +109,6 @@ void do_status()
 	errMsg(err);
 }
 
-void do_sysstatus()
-{
-	int err;
-
-	bool ready = dbrm.getSystemReady() > 0 ? true : false;
-	
-	if (ready)
-		err=20;
-	else
-		err = 21;
-		
-	errMsg(err);
-}
-
 }
 
 int main(int argc, char **argv)
@@ -171,8 +151,6 @@ int main(int argc, char **argv)
 		set_readonly(false);
 	else if (cmd == "reload")
 		do_reload();
-	else if (cmd == "sysstatus")
-		do_sysstatus();
 	else
 		usage(argv[0]);
 

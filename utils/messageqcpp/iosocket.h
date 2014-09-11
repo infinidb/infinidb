@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: iosocket.h 3234 2012-08-15 21:02:43Z dhall $
+*   $Id: iosocket.h 3014 2012-03-08 14:51:56Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -34,9 +34,6 @@
 #include <stdio.h>
 #else
 #include <netinet/in.h>
-#endif
-#if __FreeBSD__
-#include <sys/socket.h>
 #endif
 
 #include "socket.h"
@@ -98,11 +95,11 @@ public:
 
 	/** access the sockaddr member
 	 */
-	inline virtual const sockaddr sa() const;
+	inline virtual const sockaddr_in& sa() const;
 
 	/** modify the sockaddr member
 	 */
-	inline virtual void sa(const sockaddr* sa);
+	inline virtual void sa(const sockaddr_in& sa);
 
 	/** open the socket
 	 *
@@ -117,12 +114,12 @@ public:
 	/** test if the socket is open
 	 *
 	 */
-	inline virtual const bool isOpen() const;
+	inline virtual bool isOpen() const;
 
 	/** get the socket params
 	 *
 	 */
-	inline virtual const SocketParms socketParms() const;
+	inline virtual const SocketParms& socketParms() const;
 
 	/** set the socket params
 	 *
@@ -143,13 +140,10 @@ public:
 	/** syncProto() forwarder for inherited classes
 	 *
 	 */
-	EXPORT virtual void syncProto(bool use) { fSocket->syncProto(use); }
+	EXPORT virtual void syncProto_(bool use) { fSocket->syncProto(use); }
 
-	EXPORT virtual const int getConnectionNum() const;
+	EXPORT virtual int getConnectionNum() const;
 
-	// Debug 
-	EXPORT void     setSockID(uint32_t id) {sockID = id;}
-	EXPORT uint32_t getSockID() {return sockID;}
 	/*
 	 * allow test suite access to private data for OOB test
 	 */
@@ -159,48 +153,38 @@ protected:
 	/** connect() forwarder for inherited classes
 	 *
 	 */
-	virtual void connect(const struct sockaddr* serv_addr) { fSocket->connect(serv_addr); }
+	virtual void connect_(const struct sockaddr_in* serv_addr) { fSocket->connect(serv_addr); }
 
 	/** connectionTimeout() forwarder for inherited classes
 	 *
 	 */
-	virtual void connectionTimeout(const struct timespec* timeout) { fSocket->connectionTimeout(timeout); }
-
-	/**
-	 * @brief return the address as a string
-	 */
-	virtual const std::string addr2String() const { return fSocket->addr2String(); }
-
-	/**
-	 * @brief compare 2 addresses
-	 */
-	virtual const bool isSameAddr(const IOSocket* rhs) const { return fSocket->isSameAddr(rhs->fSocket); }
+	virtual void connectionTimeout_(const struct timespec* timeout) { fSocket->connectionTimeout(timeout); }
 
 private:
 	void doCopy(const IOSocket& rhs);
 
 	Socket* fSocket;
-	sockaddr fSa;
-	uint32_t sockID;	// For debug purposes
+	sockaddr_in fSa;
 };
 
-
-inline const sockaddr IOSocket::sa() const { return fSa; }
-inline void IOSocket::sa(const sockaddr* sa)
-	{ fSa = *sa;
+//RJD: moving read() to lib
+//inline const SBS IOSocket::read(const struct timespec* timeout, bool* isTimeOut) const { assert(fSocket); return fSocket->read(timeout, isTimeOut); }
+inline const sockaddr_in& IOSocket::sa() const { return fSa; }
+inline void IOSocket::sa(const sockaddr_in& sa)
+	{ fSa = sa;
 	if (fSocket)
 		fSocket->sa( sa ); }
-inline void IOSocket::open() { idbassert(fSocket); fSocket->open(); }
+inline void IOSocket::open() { assert(fSocket); fSocket->open(); }
 //RJD: changing close() to simply bail on null fSocket. I'm not really sure what's best here, but this is probably
 //   better that asserting...
 inline void IOSocket::close() { if (fSocket) fSocket->close(); }
-inline const bool IOSocket::isOpen() const { return (fSocket && fSocket->isOpen()); }
-inline void IOSocket::write(const ByteStream& msg) const { idbassert(fSocket); fSocket->write(msg); }
-inline void IOSocket::write_raw(const ByteStream& msg) const { idbassert(fSocket); fSocket->write_raw(msg); }
-inline const SocketParms IOSocket::socketParms() const { idbassert(fSocket); return fSocket->socketParms(); }
-inline void IOSocket::socketParms(const SocketParms& socketParms) { idbassert(fSocket); fSocket->socketParms(socketParms); }
+inline bool IOSocket::isOpen() const { return (fSocket && fSocket->isOpen()); }
+inline void IOSocket::write(const ByteStream& msg) const { assert(fSocket); fSocket->write(msg); }
+inline void IOSocket::write_raw(const ByteStream& msg) const { assert(fSocket); fSocket->write_raw(msg); }
+inline const SocketParms& IOSocket::socketParms() const { assert(fSocket); return fSocket->socketParms(); }
+inline void IOSocket::socketParms(const SocketParms& socketParms) { assert(fSocket); fSocket->socketParms(socketParms); }
 inline void IOSocket::setSocketImpl(Socket* socket) { delete fSocket; fSocket = socket; }
-inline const int IOSocket::getConnectionNum() const { return fSocket->getConnectionNum(); }
+inline int IOSocket::getConnectionNum() const { return fSocket->getConnectionNum(); }
 
 /**
  * stream an IOSocket rep to any ostream

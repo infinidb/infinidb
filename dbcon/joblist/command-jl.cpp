@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: command-jl.cpp 8267 2012-01-18 17:58:09Z xlou $
+// $Id: command-jl.cpp 8272 2012-01-19 16:28:34Z xlou $
 // C++ Implementation: command
 //
 // Description: 

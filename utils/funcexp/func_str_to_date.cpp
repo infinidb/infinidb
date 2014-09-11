@@ -34,31 +34,12 @@ using namespace execplan;
 
 #include "dataconvert.h"
 
-namespace
+namespace funcexp
 {
-using namespace funcexp;
 
-// convert the base-10 number at nptr to a log long, but scan no further than endptr. Set
-//  endptr on return to one-past the last consumed char
-//  endptr MUST always be a valid pointer into nptr on entry
-inline long long infinidb_strtoll10(const char *nptr, char **endptr, int *error)
+CalpontSystemCatalog::ColType Func_str_to_date::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
-	long long res;
-	char nnptr[80];
-	char* nendptr;
-
-	strncpy(nnptr, nptr, 80);
-	nnptr[79] = 0;
-	nnptr[(*endptr-nptr)] = 0;
-
-	*error = 0;
-	errno = 0;
-	res = strtoll(nnptr, &nendptr, 10);
-	if (errno == ERANGE)
-		*error = -1;
-
-	*endptr = const_cast<char*>(nptr) + (nendptr - nnptr);
-	return res;
+	return resultType;
 }
 
 int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTime)
@@ -355,41 +336,45 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 	if (week_number >= 0 && weekday)
 	{
 		int days;
-		uint jan1wday;
+		uint weekday_b;
 
-		/* make sure that V/v has X/x and U/u are with Y and not X/x */
-		if ( (strict_week_number &&
-				(strict_week_number_year < 0 || strict_week_number_year_type != sunday_first_n_first_week_non_iso)) ||
-			(!strict_week_number && strict_week_number_year >= 0) )
+		/*
+		%V,%v require %X,%x resprectively,
+		%U,%u should be used with %Y and not %X or %x
+		*/
+		if ((strict_week_number &&
+			(strict_week_number_year < 0 ||
+			strict_week_number_year_type != sunday_first_n_first_week_non_iso)) ||
+			(!strict_week_number && strict_week_number_year >= 0))
 			return -1;
 
-		/* Number of days up to 1/1 of this year */
-		days= calc_daynr((strict_week_number ? strict_week_number_year : dateTime.year), 1, 1);
-		/* Calc day of week for 1/1 */
-		jan1wday= calc_weekday(days, sunday_first_n_first_week_non_iso);
+		/* Number of days since year 0 till 1st Jan of this year */
+		days= calc_daynr((strict_week_number ? strict_week_number_year :
+                       dateTime.year), 1, 1);
+		/* Which day of week is 1st Jan of this year */
+		weekday_b= calc_weekday(days, sunday_first_n_first_week_non_iso);
 
-		/* add up number of days up to 1/1 of this year plus day of week for 1/1 plus this day */
+		/*
+		Below we are going to sum:
+		1) number of days since year 0 till 1st day of 1st week of this year
+		2) number of days between 1st week and our week
+		3) and position of our day in the week
+		*/
 		if (sunday_first_n_first_week_non_iso)
 		{
-			if (jan1wday != 0)
-				days += 7;
-			days -= jan1wday;
-			days += (week_number - 1) * 7;
-			days += weekday % 7;
+			days+= ((weekday_b == 0) ? 0 : 7) - weekday_b +
+				(week_number - 1) * 7 +
+				weekday % 7;
 		}
 		else
 		{
-			if (jan1wday > 3)
-				days += 7;
-			days -= jan1wday;
-			days += (week_number - 1) * 7;
-			days += weekday - 1;
+			days+= ((weekday_b <= 3) ? 0 : 7) - weekday_b +
+				(week_number - 1) * 7 +
+				(weekday - 1);
 		}
 
-		/* make sure we've got a sane day nr */
 		if (days <= 0 || days > 31)
 			return -1;
-
 		get_date_from_daynr(days,dateTime);
 	}
 
@@ -409,16 +394,6 @@ int extractTime (string valStr, string formatStr, dataconvert::DateTime & dateTi
 	}
 	
 	return 0;
-}
-
-}
-
-namespace funcexp
-{
-
-CalpontSystemCatalog::ColType Func_str_to_date::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
-{
-	return resultType;
 }
 
 dataconvert::DateTime getDateTime (rowgroup::Row& row,

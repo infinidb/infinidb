@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn.h 8536 2012-05-21 21:27:17Z zzhu $
+*   $Id: simplecolumn.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -58,10 +58,6 @@ public:
 	SimpleColumn();
 	SimpleColumn(const std::string& token, const u_int32_t sessionID = 0);
 	SimpleColumn(const std::string& schema, const std::string& table, const std::string& col, const u_int32_t sessionID = 0);
-	SimpleColumn(const std::string& schema, const std::string& table, 
-		           const std::string& col, 
-		           const bool isInfiniDB, 
-		           const u_int32_t sessionID = 0);
 	SimpleColumn(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
 	
 	/**
@@ -121,8 +117,6 @@ public:
 	inline void indexName(const std::string& indexName) {fIndexName = indexName;}
 	inline const std::string& viewName() const {return fViewName;}
 	inline void viewName(const std::string& viewName) {fViewName = viewName;}
-	inline const bool isInfiniDB() const { return fIsInfiniDB; }
-	inline void isInfiniDB(const bool isInfiniDB) { fIsInfiniDB = isInfiniDB; }
 	
   /** return a copy of this pointer
 	 *
@@ -175,9 +169,6 @@ public:
 	
   /** @brief check if this column is the same as the argument */
 	virtual bool sameColumn(const ReturnedColumn* rc) const;
-	
-	/** @brief return column type of this column (could be of any engine type) */
-	const CalpontSystemCatalog::ColType& colType() const { return fResultType; }
 
 private:
 	/**
@@ -188,12 +179,11 @@ private:
 	std::string fColumnName;	        /// column name
 	CalpontSystemCatalog::OID fOid;    /// column TCN number
 	std::string fTableAlias;           /// table alias
-	std::string fData;
+	std::string fData;	
 	/// index name. for oracle use. deprecated
 	std::string fIndexName;   
 	// if belong to view, view name is non-empty
 	std::string fViewName;
-	bool fIsInfiniDB;
 
 	/** @brief parse SimpleColumn text
 	 *  

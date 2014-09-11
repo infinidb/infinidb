@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand-jl.cpp 8829 2012-08-28 15:49:49Z pleblanc $
+// $Id: columncommand-jl.cpp 8840 2012-08-29 14:54:30Z pleblanc $
 // C++ Implementation: columncommand
 //
 // Description: 
@@ -33,8 +33,7 @@
 #include <sstream>
 using namespace std;
 
-#include "primitivestep.h"
-#include "tablecolumn.h"
+#include "jobstep.h"
 #include "bpp-jl.h"
 #include "columncommand-jl.h"
 #include "dbrm.h"
@@ -86,7 +85,7 @@ uint8_t name2ord(const string& name)
 namespace joblist
 {
 
-ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan, vector<BRM::LBID_t> lastLBID)
+ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan, BRM::LBID_t lastLBID)
 {
 	BRM::DBRM dbrm;
 	isScan = true;
@@ -103,11 +102,6 @@ ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan, vector<BRM::LBID_t> l
 	rpbShift = scan.rpbShift;
 	fIsDict = scan.fIsDict;
 	fLastLbid = lastLBID;
-
-	//cout << "CCJL inherited lastlbids: ";
-	//for (uint i = 0; i < lastLBID.size(); i++)
-	//	cout << lastLBID[i] << " ";
-	//cout << endl;
 
 // 	cout << "Init columncommand from scan with OID " << OID << endl;
 	/* I think modmask isn't necessary for scans */
@@ -131,10 +125,10 @@ ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan, vector<BRM::LBID_t> l
 ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan)
 {
 	BRM::DBRM dbrm;
+	uint16_t dbroot;
 	uint32_t partNum;
 	uint16_t segNum;
 	BRM::HWM_t lastHWM;
-	int err;
 	isScan = true;
 
 	/* grab necessary vars from scan */
@@ -155,23 +149,9 @@ ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan)
 	modMask = (1 << divShift) - 1;
 	fFcnOrd = name2ord(scan.udfName());
 
-	// PL - each dbroot will have a different HWM now; need to try to avoid needing this.
 	//get last lbid of this oid
-	ResourceManager rm;
-	numDBRoots = rm.getDBRootCount();
-
-	fLastLbid.resize(numDBRoots);
-	for (uint i = 0; i < numDBRoots; i++) {
-		err = dbrm.getLastHWM_DBroot((BRM::OID_t)OID, i+1, partNum, segNum, lastHWM);
-		if (err != 0)
-			dbrm.lookupLocal_DBroot((BRM::OID_t)OID, i+1, partNum, segNum, lastHWM, fLastLbid[i]);
-		else
-			fLastLbid[i] = 0;
-	}
-	//cout << "CCJL calculated lastlbids=";
-	//for (uint i = 0; i < fLastLbid.size(); i++)
-	//	cout << fLastLbid[i] << " ";
-	//cout << endl;
+	dbrm.getLastLocalHWM((BRM::OID_t)OID, dbroot, partNum, segNum, lastHWM);
+	dbrm.lookupLocal((BRM::OID_t)OID, partNum, segNum, lastHWM, fLastLbid);
 
 	// @Bug 2889.  Drop partition enhancement.  Read FilesPerColumnPartition and ExtentsPerSegmentFile for use in RID calculation.
 	fExtentRows = dbrm.getExtentRows();
@@ -189,6 +169,10 @@ ColumnCommandJL::ColumnCommandJL(const pColScanStep &scan)
 ColumnCommandJL::ColumnCommandJL(const pColStep &step)
 {
 	BRM::DBRM dbrm;
+	uint16_t dbroot;
+	uint32_t partNum;
+	uint16_t segNum;
+	BRM::HWM_t lastHWM;
 
 	isScan = false;
 
@@ -206,20 +190,10 @@ ColumnCommandJL::ColumnCommandJL(const pColStep &step)
 	colName = step.fName;
 	fFcnOrd = name2ord(step.udfName());
 	fIsDict = step.fIsDict;
-	ResourceManager rm;
-	numDBRoots = rm.getDBRootCount();
 	
 	// grab the last LBID for this column.  It's a _minor_ optimization for the block loader.
-	//dbrm.getLastLocalHWM((BRM::OID_t)OID, dbroot, partNum, segNum, lastHWM);
-	//dbrm.lookupLocal((BRM::OID_t)OID, partNum, segNum, lastHWM, fLastLbid);
-	/*
-	fLastLbid.resize(numDBRoots);
-	for (uint i = 0; i < numDBRoots; i++) {
-		dbrm.getLastLocalHWM2((BRM::OID_t)OID, i+1, partNum, segNum, lastHWM);
-		dbrm.lookupLocal((BRM::OID_t)OID, partNum, segNum, lastHWM, fLastLbid[i]);
-	}
-	*/
-
+	dbrm.getLastLocalHWM((BRM::OID_t)OID, dbroot, partNum, segNum, lastHWM);
+	dbrm.lookupLocal((BRM::OID_t)OID, partNum, segNum, lastHWM, fLastLbid);
 // 	cout << "Init columncommand from step with OID " << OID << " and width " << colType.colWidth << endl;
 
 	// @Bug 2889.  Drop partition enhancement.  Read FilesPerColumnPartition and ExtentsPerSegmentFile for use in RID calculation.
@@ -259,8 +233,7 @@ void ColumnCommandJL::createCommand(ByteStream &bs) const
 	bs << BOP;
 	bs << filterCount;
 	bs << fFcnOrd;
-	serializeInlineVector(bs, fLastLbid);
-	//bs << (uint64_t)fLastLbid;
+	bs << (uint64_t)fLastLbid;
 
 	CommandJL::createCommand(bs);
 
@@ -275,7 +248,7 @@ void ColumnCommandJL::runCommand(ByteStream &bs) const
 	bs << lbid;
 }
 
-void ColumnCommandJL::setLBID(uint64_t rid, uint dbRoot)
+void ColumnCommandJL::setLBID(uint64_t rid)
 {
 	uint64_t l_rid, fbo;
 
@@ -283,7 +256,7 @@ void ColumnCommandJL::setLBID(uint64_t rid, uint dbRoot)
 		lbid = rid;   	//it's not a rid here need to convert it to a rid
 		fbo = getFBO(lbid);
 		l_rid = fbo << rpbShift;
-		bpp->setLBIDForScan(l_rid, dbRoot);
+		bpp->setLBIDForScan(l_rid);
 	}
 	else {
 		uint extentIndex = 0;
@@ -296,28 +269,20 @@ void ColumnCommandJL::setLBID(uint64_t rid, uint dbRoot)
 		// now relative to partition 0 and one or more partitions may have been dropped.  Find the extent in the extents
 		// array rather than doing the math directly off of the fbo. 
 		// extentIndex = fbo >> divShift;
-
-		// partitionNum = "RID / rows per partition"
-		uint64_t partitionNum = rid / ( fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows );
-
-		// segmentNum = (RID % rows per partition) / rows per extent) % files per partition
-		//            = (extent # within its partition) % files per partition
-		uint64_t segmentNum =
-			(((rid % (fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows)) / fExtentRows))
-			% fFilesPerColumnPartition;
-
-		// stripeWithinPartition = (RID - rows up to the partition before this one) / ??
+                uint64_t partitionNum = rid / ( fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows );
+                uint64_t segmentNum = 
+			(((rid % (fFilesPerColumnPartition * fExtentsPerSegmentFile * fExtentRows)) / fExtentRows)) % fFilesPerColumnPartition;
 		uint64_t stripeWithinPartition = 
 			(rid - (partitionNum * fExtentsPerSegmentFile * fFilesPerColumnPartition * fExtentRows)) /
                         (fFilesPerColumnPartition * fExtentRows);
 		uint64_t blockOffset = stripeWithinPartition * colType.colWidth * 1024;
 		
 		bool found = false;
-
+		// cout << "rid=" << rid << "; partitionNum=" << partitionNum << "; segmentNum=" << segmentNum << "; stripeWithinPartition=" <<
+		//	stripeWithinPartition << "; OID=" << OID << endl;
 		for(uint i = 0; i < extents.size(); i++)
 		{
-			if(extents[i].dbRoot == dbRoot && (extents[i].partitionNum == partitionNum) &&
-					(extents[i].segmentNum == segmentNum) && (extents[i].blockOffset == blockOffset))
+			if((extents[i].partitionNum == partitionNum) && (extents[i].segmentNum == segmentNum) && (extents[i].blockOffset == blockOffset))
 			{
 				found = true;
 				extentIndex = i;	
@@ -330,10 +295,6 @@ void ColumnCommandJL::setLBID(uint64_t rid, uint dbRoot)
 
 		// Calculate the lbid.
 		lbid = extents[extentIndex].range.start + extentOffset;
-//		ostringstream os;
-//		os << "CCJL: rid=" << rid << "; dbroot=" << dbRoot << "; partitionNum=" << partitionNum << "; segmentNum=" << segmentNum << "; stripeWithinPartition=" <<
-//			stripeWithinPartition << "; OID=" << OID << " LBID=" << lbid;
-//		BRM::log(os.str());
 	}
 }
 
@@ -347,7 +308,7 @@ inline uint32_t ColumnCommandJL::getFBO(uint64_t lbid)
 		if (lbid >= (uint64_t) extents[i].range.start && lbid <= lastLBID)
 		{
 
-	        // @Bug 2889.  Change for drop partition.  Treat the FBO as if all of the partitions are still there as one or more partitions
+	            	// @Bug 2889.  Change for drop partition.  Treat the FBO as if all of the partitions are still there as one or more partitions 
 			// may have been dropped. Get the original index for this partition (i.e. what the index would be if all of the partitions 
 			// were still there).  The RIDs wind up being calculated off of this FBO for use in DML and DML needs calculates the partition
 			// number, segment number, etc. off of the RID and needs to remain the same when partitions are dropped.

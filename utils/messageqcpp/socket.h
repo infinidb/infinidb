@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: socket.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: socket.h 2436 2011-03-07 17:48:38Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -76,7 +76,7 @@ public:
 	/** bind to a port
 	 *
 	 */
-	virtual void bind(const struct sockaddr* serv_addr) = 0;
+	virtual void bind(const struct sockaddr_in* serv_addr) = 0;
 
 	/** listen for connections
 	 *
@@ -91,17 +91,17 @@ public:
 	/** connect to a server socket
 	 *
 	 */
-	virtual void connect(const sockaddr* serv_addr) = 0;
+	virtual void connect(const struct sockaddr_in* serv_addr) = 0;
 
 	/** test if this socket is open
 	 *
 	 */
-	virtual const bool isOpen() const = 0;
+	virtual bool isOpen() const = 0;
 
 	/** get the SocketParms
 	 *
 	 */
-	virtual const SocketParms socketParms() const = 0;
+	virtual const SocketParms& socketParms() const = 0;
 
 	/** set the SocketParms
 	 *
@@ -111,7 +111,7 @@ public:
 	/** set the sockaddr struct
 	 *
 	 */
-	virtual void sa(const sockaddr* sa) = 0;
+	virtual void sa(const sockaddr_in& sa) = 0;
 
 	/** dynamically allocate a copy of this object
 	 *
@@ -128,17 +128,7 @@ public:
 	 */
 	virtual void syncProto(bool use) = 0;
 
-	virtual const int getConnectionNum() const = 0;
-
-	/** return the address as a string
-	 *
-	 */
-	virtual const std::string addr2String() const = 0;
-
-	/** compare 2 addresses
-	 *
-	 */
-	virtual const bool isSameAddr(const Socket* rhs) const = 0;
+	virtual int getConnectionNum() const = 0;
 
 	/*
 	 * allow test suite access to private data for OOB test

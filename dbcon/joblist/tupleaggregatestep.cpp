@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleaggregatestep.cpp 9389 2013-04-09 15:53:35Z xlou $
+//  $Id: tupleaggregatestep.cpp 8808 2012-08-13 16:59:37Z zzhu $
 
 
 //#define NDEBUG
@@ -54,10 +54,8 @@ using namespace rowgroup;
 
 #include "jlf_common.h"
 #include "jobstep.h"
-#include "primitivestep.h"
 #include "subquerystep.h"
 #include "tuplehashjoin.h"
-#include "crossenginestep.h"
 #include "tupleaggregatestep.h"
 
 //#include "stopwatch.cpp"
@@ -160,7 +158,7 @@ namespace joblist
 TupleAggregateStep::TupleAggregateStep(
 	const JobStepAssociation& inputJobStepAssociation,
 	const JobStepAssociation& outputJobStepAssociation,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
+	execplan::CalpontSystemCatalog* syscat,
 	uint32_t sessionId,
 	uint32_t txnId,
 	uint32_t statementId,
@@ -211,7 +209,7 @@ TupleAggregateStep::~TupleAggregateStep()
 	for (uint i = 0; i < fNumOfThreads; i++)
 		rm->returnMemory(memUsage[i]);
 	for (uint i = 0; i < agg_mutex.size(); i++)
-		delete agg_mutex[i];
+                delete agg_mutex[i];
 }
 
 
@@ -355,10 +353,10 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 		// reset bucketDone[] to be false
 		//memset(bucketDone, 0, sizeof(bucketDone));
 		fill(&bucketDone[0], &bucketDone[fNumOfBuckets], false);
-		while (!done && !(die || fInputJobStepAssociation.status()))
+		while (!done)
 		{
 			done = true;
-			for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+			for (uint c = 0; c < fNumOfBuckets; c++)
 			{
 				if (!bucketDone[c] && agg_mutex[c]->try_lock())
 				{
@@ -674,7 +672,6 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 	TupleBPS* tbps = dynamic_cast<TupleBPS*>(step.get());
 	TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(step.get());
 	SubAdapterStep* sas = dynamic_cast<SubAdapterStep*>(step.get());
-	CrossEngineStep* ces = dynamic_cast<CrossEngineStep*>(step.get());
 	vector<RowGroup> rgs;      // 0-ProjRG, 1-UMRG, [2-PMRG -- if 2 phases]
 	vector<SP_ROWAGG_t> aggs;
 	SP_ROWAGG_UM_t aggUM;
@@ -714,7 +711,6 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 				jobInfo.returnedColVec[idx].second = AggregateColumn::CONSTANT;
 
 				ConstantColumn* cc = dynamic_cast<ConstantColumn*>(ac->constCol().get());
-				idbassert(cc != NULL);   // @bug5261
 				bool isNull = (ConstantColumn::NULLDATA == cc->type());
 				constAggDataVec.push_back(
 					ConstantAggData(cc->constval(), functionIdMap(ac->aggOp()), isNull));
@@ -863,37 +859,6 @@ SJSTEP TupleAggregateStep::prepAggregate(SJSTEP& step, JobInfo& jobInfo)
 		// set input side
 		sas->outputAssociation(sasJsa);
 	}
-	else if (ces != NULL)
-	{
-		// UM aggregation
-		// rowgroups   -- 0-proj, 1-um
-		// aggregators -- 0-um
-		rgs.push_back(ces->getDeliveredRowGroup());
-		if (distinctAgg == true)
-			prep1PhaseDistinctAggregate(jobInfo, rgs, aggs);
-		else
-			prep1PhaseAggregate(jobInfo, rgs, aggs);
-
-		// make sure connected by a RowGroupDL
-		JobStepAssociation dummyJsa(jobInfo.status);
-		JobStepAssociation cesJsa(jobInfo.status);
-		AnyDataListSPtr spdl(new AnyDataList());
-		RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
-		dl->OID(execplan::CNX_VTABLE_ID);
-		spdl->rowGroupDL(dl);
-		cesJsa.outAdd(spdl);
-
-		// create delivery step
-		aggUM = dynamic_pointer_cast<RowAggregationUM>(aggs[0]);
-		spjs.reset(new TupleAggregateStep(cesJsa, dummyJsa, jobInfo.csc,
-			step->sessionId(), step->txnId(), step->statementId(), aggUM, rgs[1], rgs[0], &jobInfo.rm));
-
-		// step id??
-		spjs->stepId(step->stepId()+1);
-
-		// set input side
-		ces->outputAssociation(cesJsa);
-	}
 
 	// add the aggregate on constants
 	if (constAggDataVec.size() > 0)
@@ -1033,7 +998,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 			emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 			cerr << "prep1PhaseAggregate: " << emsg.str()
 				 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-				 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+				 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 			if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 				 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 			cerr << endl;
@@ -1106,7 +1071,7 @@ void TupleAggregateStep::prep1PhaseAggregate(
 				string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NOT_GROUPBY_EXPRESSION, args);
 				cerr << "prep1PhaseAggregate: " << emsg << " oid="
 					 << (int) jobInfo.keyInfo->tupleKeyVec[key].fId << ", alias="
-					 << jobInfo.keyInfo->tupleKeyVec[key].fTable << ", view="
+					 << jobInfo.keyInfo->tupleKeyVec[key].fAlias << ", view="
 					 << jobInfo.keyInfo->tupleKeyVec[key].fView << ", function="
 					 << (int) aggOp << endl;
 				throw IDBExcept(emsg, ERR_NOT_GROUPBY_EXPRESSION);
@@ -1404,7 +1369,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep1PhaseDistinctAggregate: groupby " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -1438,7 +1403,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep1PhaseDistinctAggregate: distinct " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -1499,7 +1464,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[aggKey] << "' isn't in tuple.";
 				cerr << "prep1PhaseDistinctAggregate: aggregate " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[aggKey].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[aggKey].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fView;
 				cerr << endl;
@@ -1728,7 +1693,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 					emsg << "'" << jobInfo.keyInfo->tupleKeyToName[retKey] << "' isn't in tuple.";
 					cerr << "prep1PhaseDistinctAggregate: distinct " << emsg.str()
 						 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[retKey].fId
-						 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[retKey].fTable;
+						 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[retKey].fAlias;
 					if (jobInfo.keyInfo->tupleKeyVec[retKey].fView.length() > 0)
 						 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[retKey].fView;
 					cerr << endl;
@@ -1930,7 +1895,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 												errorMsg(ERR_NOT_GROUPBY_EXPRESSION, args);
 							cerr << "prep1PhaseDistinctAggregate: " << emsg << " oid="
 								 << (int) jobInfo.keyInfo->tupleKeyVec[retKey].fId << ", alias="
-								 << jobInfo.keyInfo->tupleKeyVec[retKey].fTable << ", view="
+								 << jobInfo.keyInfo->tupleKeyVec[retKey].fAlias << ", view="
 								 << jobInfo.keyInfo->tupleKeyVec[retKey].fView << ", function="
 								 << (int) aggOp << endl;
 							throw IDBExcept(emsg, ERR_NOT_GROUPBY_EXPRESSION);
@@ -2153,7 +2118,7 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(
 					break;
 				}
 			}
-			idbassert(j != (uint64_t) -1);
+			assert(j != (uint64_t) -1);
 
 			oidsAggSub = oidsAggGb;
 			keysAggSub = keysAggGb;
@@ -2381,7 +2346,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep2PhasesAggregate: groupby " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -2415,7 +2380,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep2PhasesAggregate: distinct " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -2456,7 +2421,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[aggKey] << "' isn't in tuple.";
 				cerr << "prep2PhasesAggregate: aggregate " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[aggKey].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[aggKey].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fView;
 				cerr << endl;
@@ -2736,7 +2701,7 @@ void TupleAggregateStep::prep2PhasesAggregate(
 										errorMsg(ERR_NOT_GROUPBY_EXPRESSION, args);
 					cerr << "prep2PhasesAggregate: " << emsg << " oid="
 						 << (int) jobInfo.keyInfo->tupleKeyVec[retKey].fId << ", alias="
-						 << jobInfo.keyInfo->tupleKeyVec[retKey].fTable << ", view="
+						 << jobInfo.keyInfo->tupleKeyVec[retKey].fAlias << ", view="
 						 << jobInfo.keyInfo->tupleKeyVec[retKey].fView << ", function="
 						 << (int) aggOp << endl;
 					throw IDBExcept(emsg, ERR_NOT_GROUPBY_EXPRESSION);
@@ -2918,7 +2883,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 			string emsg = IDBErrorInfo::instance()->errorMsg(ERR_NOT_GROUPBY_EXPRESSION, args);
 			cerr << "prep2PhasesDistinctAggregate: " << emsg << " oid="
 				 << (int) jobInfo.keyInfo->tupleKeyVec[rtcKey].fId << ", alias="
-				 << jobInfo.keyInfo->tupleKeyVec[rtcKey].fTable << ", view="
+				 << jobInfo.keyInfo->tupleKeyVec[rtcKey].fAlias << ", view="
 				 << jobInfo.keyInfo->tupleKeyVec[rtcKey].fView << endl;
 			throw IDBExcept(emsg, ERR_NOT_GROUPBY_EXPRESSION);
 		}
@@ -2996,7 +2961,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep2PhasesDistinctAggregate: group " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -3030,7 +2995,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[key] << "' isn't in tuple.";
 				cerr << "prep2PhasesDistinctAggregate: distinct " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[key].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[key].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[key].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[key].fView;
 				cerr << endl;
@@ -3073,7 +3038,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 				emsg << "'" << jobInfo.keyInfo->tupleKeyToName[aggKey] << "' isn't in tuple.";
 				cerr << "prep2PhasesDistinctAggregate: aggregate " << emsg.str()
 					 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[aggKey].fId
-					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fTable;
+					 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fAlias;
 				if (jobInfo.keyInfo->tupleKeyVec[aggKey].fView.length() > 0)
 					 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[aggKey].fView;
 				cerr << endl;
@@ -3319,7 +3284,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 					emsg << "'" << jobInfo.keyInfo->tupleKeyToName[retKey] << "' isn't in tuple.";
 					cerr << "prep2PhasesDistinctAggregate: distinct " << emsg.str()
 						 << " oid=" << (int) jobInfo.keyInfo->tupleKeyVec[retKey].fId
-						 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[retKey].fTable;
+						 << ", alias=" << jobInfo.keyInfo->tupleKeyVec[retKey].fAlias;
 					if (jobInfo.keyInfo->tupleKeyVec[retKey].fView.length() > 0)
 						 cerr << ", view=" << jobInfo.keyInfo->tupleKeyVec[retKey].fView;
 					cerr << endl;
@@ -3485,7 +3450,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 												errorMsg(ERR_NOT_GROUPBY_EXPRESSION, args);
 							cerr << "prep2PhasesDistinctAggregate: " << emsg << " oid="
 								 << (int) jobInfo.keyInfo->tupleKeyVec[retKey].fId << ", alias="
-								 << jobInfo.keyInfo->tupleKeyVec[retKey].fTable << ", view="
+								 << jobInfo.keyInfo->tupleKeyVec[retKey].fAlias << ", view="
 								 << jobInfo.keyInfo->tupleKeyVec[retKey].fView << ", function="
 								 << (int) aggOp << endl;
 							throw IDBExcept(emsg, ERR_NOT_GROUPBY_EXPRESSION);
@@ -3698,7 +3663,7 @@ void TupleAggregateStep::prep2PhasesDistinctAggregate(
 					break;
 				}
 			}
-			idbassert(j != (uint64_t) -1);
+			assert(j != (uint64_t) -1);
 
 			oidsAggSub = oidsAggGb;
 			keysAggSub = keysAggGb;
@@ -3913,7 +3878,7 @@ void TupleAggregateStep::prepExpressionOnAggregate(SP_ROWAGG_UM_t& aggUM, JobInf
 	{
 		CalpontSystemCatalog::OID oid = (*i)->oid();
 		uint key = getTupleKey(jobInfo, *i);
-		CalpontSystemCatalog::OID dictOid = joblist::isDictCol((*i)->colType());
+		CalpontSystemCatalog::OID dictOid = joblist::isDictCol(jobInfo.csc->colType(oid));
 		if (dictOid > 0)
 		{
 			oid = dictOid;
@@ -3950,22 +3915,20 @@ void TupleAggregateStep::addConstangAggregate(vector<ConstantAggData>& constAggD
 void TupleAggregateStep::aggregateRowGroups()
 {
 	shared_array<uint8_t> rgData;
-	bool more = true;
-	RowGroupDL *dlIn = NULL;
 
 	if (!fDoneAggregate)
 	{
 		if (fInputJobStepAssociation.outSize() == 0)
 			throw logic_error("No input data list for delivery.");
 
-		dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+		RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 		if (dlIn == NULL)
 			throw logic_error("Input is not RowGroup data list in delivery step.");
 
 		if (fInputIter < 0)
 			fInputIter = dlIn->getIterator();
 
-		more = dlIn->next(fInputIter, &rgData);
+		bool more = dlIn->next(fInputIter, &rgData);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
 		try
@@ -4075,11 +4038,6 @@ void TupleAggregateStep::aggregateRowGroups()
 
 		fDoneAggregate = true;
 	}
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o having
-	   drained the input.  Prevents the feeding JobStep from exiting & hangs the session.
-	*/
-	while (more) 
-		more = dlIn->next(fInputIter, &rgData);
 }
 
 
@@ -4103,9 +4061,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 	//buildBucket << "buildBucket" << (int)threadID;
 	//buildMap << "buildMap" << (int)threadID;
 
-	bool more = true;
-	RowGroupDL *dlIn = NULL;
-	
 	RowAggregationMultiDistinct *multiDist = NULL;
 
 	if (!fDoneAggregate)
@@ -4113,11 +4068,12 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		if (fInputJobStepAssociation.outSize() == 0)
 			throw logic_error("No input data list for delivery.");
 
-		dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+		RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 		if (dlIn == NULL)
 			throw logic_error("Input is not RowGroup data list in delivery step.");
 
 		vector<shared_array<uint8_t> > rgDatas;
+		bool more = true;
 
 		try
 		{
@@ -4271,7 +4227,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 				{
 					bool didWork = false;
 					done = true;
-					for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+					for (uint c = 0; c < fNumOfBuckets; c++)
 					{
 						if (!fEndOfResult && !bucketDone[c] && agg_mutex[c]->try_lock())
 						{
@@ -4293,7 +4249,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 						}
 					}
 					if (!didWork)
-						usleep(1000);   // avoid using all CPU during busy wait
+						usleep(500);   // avoid using all CPU during busy wait
 				}
 				rgDatas.clear();
 				rm->returnMemory(memUsage[threadID]);
@@ -4393,14 +4349,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
 	}
-
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o
-	   having drained the input.  Prevents the feeding JobStep from exiting & hangs the session. 
-	*/
-	mutex.lock();
-	while (more) 
-		more = dlIn->next(fInputIter, &rgData);
-	mutex.unlock();
 }
 
 
@@ -4586,7 +4534,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 							// for "group by without distinct" case
 							else
 							{
-								fAggregator->resultDataVec().insert(fAggregator->resultDataVec().end(),
+								fAggregator->resultDataVec().insert(fAggregator->resultDataVec().begin(),
 								                        fAggregators[i]->resultDataVec().begin(),
 								                        fAggregators[i]->resultDataVec().end());
 							}
@@ -4597,8 +4545,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 			}
 
 			bool done = true;
-			//@bug4459
-			while (fAggregator->nextRowGroup() && !die)
+			while (fAggregator->nextRowGroup())
 			{
 				done = false;
 				fAggregator->finalize();
@@ -4610,7 +4557,6 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 				{
 					if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
 						pruneAuxColumns();
-
 					if (dlp)
 					{
 						rgData.reset(new uint8_t[fRowGroupOut.getDataSize()]);
@@ -4691,14 +4637,11 @@ void TupleAggregateStep::pruneAuxColumns()
 	fRowGroupOut.getRow(0, &row1);
 	fRowGroupDelivered.initRow(&row2);
 	fRowGroupDelivered.getRow(0, &row2);
-	for (uint64_t i = 1; i < rowCount; i++)
+	for (uint64_t i = 0; i < rowCount; i++)
 	{
-		// skip the first row
+		memcpy(row2.getData(), row1.getData(), row2.getSize());
 		row1.nextRow();
 		row2.nextRow();
-
-		// bug4463, memmove for src, dest overlap
-		memmove(row2.getData(), row1.getData(), row2.getSize());
 	}
 }
 
@@ -4708,7 +4651,7 @@ void TupleAggregateStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl

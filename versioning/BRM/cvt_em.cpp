@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: cvt_em.cpp 1547 2012-04-04 18:19:01Z rdempsey $
+ * $Id: cvt_em.cpp 1266 2011-02-08 14:36:09Z rdempsey $
  *
  ****************************************************************************/
 
@@ -73,8 +73,8 @@ int ExtentMapConverter::doCvt(unsigned oldExtentSize, unsigned newExtentSize, co
 	}
 
 	div_t d = div((int)oldExtentSize, (int)newExtentSize);
-	idbassert(d.quot > 1);
-	idbassert(d.rem == 0);
+	assert(d.quot > 1);
+	assert(d.rem == 0);
 
 	const unsigned mult = d.quot;
 

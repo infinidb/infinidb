@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: ddlindexpopulator.h 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: ddlindexpopulator.h 7455 2011-02-18 12:59:55Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -130,7 +130,7 @@ public:
      * Fills in the values from the column result and calpont system catalog for
      * the WriteEngine::IdxStruct
      */
-    execplan::CalpontSystemCatalog::ColType makeIdxStruct(const execplan::ColumnResult* cr, size_t cols, boost::shared_ptr<execplan::CalpontSystemCatalog> csc );
+    execplan::CalpontSystemCatalog::ColType makeIdxStruct(const execplan::ColumnResult* cr, size_t cols, execplan::CalpontSystemCatalog* csc );
 	
     /** @brief add the column result data to the value list
      *

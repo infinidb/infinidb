@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: vbbm.cpp 1930 2013-06-30 23:31:33Z wweeks $
+ * $Id: vbbm.cpp 1748 2012-11-07 21:43:54Z pleblanc $
  *
  ****************************************************************************/
 
@@ -53,15 +53,12 @@ namespace bi=boost::interprocess;
 #include "configcpp.h"
 #include "exceptclasses.h"
 #include "hasher.h"
-#include "cacheutils.h"
 
 #define VBBM_DLLEXPORT
 #include "vbbm.h"
 #undef VBBM_DLLEXPORT
 
 #define VBBM_MAGIC_V1 0x7b27ec13
-#define VBBM_MAGIC_V2 0x1fb58c7a
-#define VBBM_CHUNK_SIZE 100
 
 using namespace std;
 
@@ -78,7 +75,6 @@ VBBMEntry::VBBMEntry()
 
 /*static*/
 boost::mutex VBBMImpl::fInstanceMutex;
-boost::mutex VBBM::mutex;
 
 /*static*/
 VBBMImpl* VBBMImpl::fInstance=0;
@@ -95,7 +91,7 @@ VBBMImpl* VBBMImpl::makeVBBMImpl(unsigned key, off_t size, bool readOnly)
 			BRMShmImpl newShm(key, size);
 			fInstance->swapout(newShm);
 		}
-		idbassert(key == fInstance->fVBBM.key());
+		assert(key == fInstance->fVBBM.key());
 		return fInstance;
 	}
 
@@ -117,7 +113,6 @@ VBBM::VBBM()
 	vbbmShminfo = NULL;
 	r_only = false;
 	fPVBBMImpl = 0;
-	currentFileSize = 0;
 }
 
 VBBM::~VBBM() 
@@ -126,31 +121,83 @@ VBBM::~VBBM()
 
 void VBBM::initShmseg(int nFiles) 
 {
-//	VBFileMetadata *newfiles;
+	VBFileMetadata *newfiles;
 	int *newBuckets;
 	VBBMEntry *newStorage;
 	int i; 
+	int64_t vbFilesize;
 	char *shmseg;
+	config::Config *conf;
+	string stmp, stmp2;
+	const char *ctmp;
+	int64_t ltmp;
+	OID_t *vbOIDs;
+	
+	conf = config::Config::makeConfig();
+	vbbm->nFiles = nFiles;
+	
+	try {
+		stmp = conf->getConfig("VersionBuffer", "VersionBufferFileSize");
+	}
+	catch(exception& e) {
+		log("VBBM: Missing a VersionBuffer/VersionBufferFileSize key in the config file");
+		throw invalid_argument("VBBM: Missing a VersionBuffer/VersionBufferFileSize key in the config file");
+	}
+	
+	ctmp = stmp.c_str();
+	ltmp = config::Config::fromText(ctmp);
 
+	// 32TB is the max file size ATM (2^32 blocks * 2^13 bytes/block)
+	if (ltmp > 35184372088832LL || ltmp < 1)
+	{
+		log("VBBM: Config error: VersionBuffer/VersionBufferFileSize must be between 0 and 32TB");
+		throw invalid_argument("VBBM: Config error: VersionBuffer/VersionBufferFileSize must be between 0 and 32TB");
+	}
+	else
+		vbFilesize = ltmp;
+	
+	// @bug 372
+	// Make sure this is done in 64 bits.
+	vbbm->vbTotalSize = (uint64_t)vbFilesize * (uint64_t)nFiles;
+	if (vbbm->vbTotalSize/BLOCK_SIZE < VBSTORAGE_INITIAL_SIZE/sizeof(VBBMEntry) ||
+	  (vbFilesize % BLOCK_SIZE) != 0) {
+		ostringstream ostr;
+		ostr << "VBBM: Config file error.  Total version buffer size must be at least "
+		  << VBSTORAGE_INITIAL_SIZE/sizeof(VBBMEntry) * BLOCK_SIZE << 
+		  " bytes, and " << "VersionBuffer/VersionBufferFileSize must be a multiple of "
+		  << BLOCK_SIZE;
+		log(ostr.str());
+		throw invalid_argument(ostr.str());
+	}
+
+	vbOIDs = new OID_t[vbbm->nFiles];
+	for (i = 0; i < vbbm->nFiles; i++)
+		vbOIDs[i] = i;
+	
+	vbbm->currentVBFileIndex = 0;
 	vbbm->vbCapacity = VBSTORAGE_INITIAL_SIZE/sizeof(VBBMEntry);
 	vbbm->vbCurrentSize = 0;
 	vbbm->vbLWM = 0;
 	vbbm->numHashBuckets = VBTABLE_INITIAL_SIZE/sizeof(int);
 	shmseg = reinterpret_cast<char*>(vbbm);
-//	newfiles = reinterpret_cast<VBFileMetadata*>
-//			(&shmseg[sizeof(VBShmsegHeader)]);
+	newfiles = reinterpret_cast<VBFileMetadata*>
+			(&shmseg[sizeof(VBShmsegHeader)]);
 	newBuckets = reinterpret_cast<int*>
 			(&shmseg[sizeof(VBShmsegHeader) + 
-			nFiles*sizeof(VBFileMetadata)]);
+			vbbm->nFiles*sizeof(VBFileMetadata)]);
 	newStorage = reinterpret_cast<VBBMEntry*>(&shmseg[sizeof(VBShmsegHeader) + 
-			nFiles*sizeof(VBFileMetadata) +
-			vbbm->numHashBuckets*sizeof(int)]);
-	setCurrentFileSize();
-	vbbm->nFiles = nFiles;
+			vbbm->nFiles*sizeof(VBFileMetadata) +
+			vbbm->numHashBuckets*sizeof(int)]);	
+	for (i = 0; i < vbbm->nFiles; i++) {
+		newfiles[i].OID = vbOIDs[i];
+		newfiles[i].filesize = vbFilesize;
+		newfiles[i].nextOffset = 0;
+	}
 	for (i = 0; i < vbbm->numHashBuckets; i++)
 		newBuckets[i] = -1;
 	for (i = 0; i < vbbm->vbCapacity; i++)
 		newStorage[i].lbid = -1;
+	delete [] vbOIDs;
 }	
 
 // ported from ExtentMap
@@ -198,7 +245,7 @@ void VBBM::lock(OPS op)
 		else {
 			currentVBBMShmkey = vbbmShminfo->tableShmkey;
 			fPVBBMImpl = VBBMImpl::makeVBBMImpl(currentVBBMShmkey, 0);
-			idbassert(fPVBBMImpl);
+			assert(fPVBBMImpl);
 			if (r_only)
 				fPVBBMImpl->makeReadOnly();
 			vbbm = fPVBBMImpl->get();
@@ -230,60 +277,67 @@ void VBBM::release(OPS op)
 }
 
 //assumes write lock is held
-// Right now, adding a file and growing are mutually exclusive ops.
-void VBBM::growVBBM(bool addAFile)
+void VBBM::growVBBM()
 {
 	int allocSize;
 	int nFiles = -1;
 	key_t newshmkey;
 	char *newshmseg;
+	config::Config *conf;
+	const char *ctmp;
+	int64_t ltmp;
 
 	if (vbbmShminfo->allocdSize == 0) {
-		if (addAFile)
-			nFiles = 1;
-		else
-			nFiles = 0;
-		allocSize = (sizeof(VBShmsegHeader) +
-			(nFiles*sizeof(VBFileMetadata)) +
-			VBSTORAGE_INITIAL_SIZE + VBTABLE_INITIAL_SIZE);
-	}
-	else {
-		if (!addAFile)
-			allocSize = vbbmShminfo->allocdSize + VBBM_INCREMENT;
-		else {
-			vbbm->nFiles++;
-			allocSize = vbbmShminfo->allocdSize + sizeof(VBFileMetadata);
+		string stmp;
+
+		conf = config::Config::makeConfig();
+		try {
+			stmp = conf->getConfig("VersionBuffer", "NumVersionBufferFiles");
 		}
+		catch(exception& e) {
+			cout << e.what() << endl;
+			throw;
+		}
+		ctmp = stmp.c_str();
+		ltmp = config::Config::fromText(ctmp);
+		if (ltmp > 1000 || ltmp < 1) {
+			log("VBBM::growVBBM(): Config file error: VersionBuffer/NumVersionBufferFiles must exist and be <= 1000.");
+			throw invalid_argument("VBBM::growVBBM(): Config file error: VersionBuffer/NumVersionBufferFiles must exist and be <= 1000.");
+		}
+		else
+			nFiles = static_cast<int>(ltmp);
+			allocSize = (sizeof(VBShmsegHeader) + 
+				(nFiles*sizeof(VBFileMetadata)) + 
+				VBSTORAGE_INITIAL_SIZE + VBTABLE_INITIAL_SIZE);
 	}
+	else
+		allocSize = vbbmShminfo->allocdSize + VBBM_INCREMENT;
 	
 	newshmkey = chooseShmkey();
-	if (fPVBBMImpl) {
+	if (fPVBBMImpl)
+	{
 		BRMShmImpl newShm(newshmkey, allocSize);
 		newshmseg = static_cast<char*>(newShm.fMapreg.get_address());
 		memset(newshmseg, 0, allocSize);
-		if (vbbm != NULL) {
+		if (vbbm != NULL)
+		{
 			VBShmsegHeader *tmp = reinterpret_cast<VBShmsegHeader*>(newshmseg);
-			tmp->vbCapacity = vbbm->vbCapacity;
-			tmp->numHashBuckets = vbbm->numHashBuckets;
-			if (!addAFile) {
-				tmp->vbCapacity += VBSTORAGE_INCREMENT/sizeof(VBBMEntry);
-				tmp->numHashBuckets += VBTABLE_INCREMENT/sizeof(int);
-			}
+			tmp->vbCapacity = vbbm->vbCapacity + VBSTORAGE_INCREMENT/sizeof(VBBMEntry);
+			tmp->numHashBuckets = vbbm->numHashBuckets + VBTABLE_INCREMENT/sizeof(int);
 			tmp->vbLWM = 0;
 			copyVBBM(tmp);
 		}
-
-		undoRecords.clear();
 		fPVBBMImpl->swapout(newShm);
 	}
-	else {
+	else
+	{
 		fPVBBMImpl = VBBMImpl::makeVBBMImpl(newshmkey, allocSize);
 		newshmseg = reinterpret_cast<char*>(fPVBBMImpl->get());
 		memset(newshmseg, 0, allocSize);
 	}
 
 	vbbm = fPVBBMImpl->get();
-	if (vbbmShminfo->allocdSize == 0)   // this means the shmseg was created by this call
+	if (nFiles != -1)
 		initShmseg(nFiles);
 	vbbmShminfo->tableShmkey = currentVBBMShmkey = newshmkey;
 	vbbmShminfo->allocdSize = allocSize;
@@ -312,7 +366,9 @@ void VBBM::copyVBBM(VBShmsegHeader *dest)
 	
 	// copy metadata
 	dest->nFiles = vbbm->nFiles;
+	dest->currentVBFileIndex = vbbm->currentVBFileIndex;
 	dest->vbCurrentSize = vbbm->vbCurrentSize;
+	dest->vbTotalSize = vbbm->vbTotalSize;
 	
 	newFiles = reinterpret_cast<VBFileMetadata*>(&cDest[sizeof(VBShmsegHeader)]);
 	newHashtable = reinterpret_cast<int*>(&cDest[sizeof(VBShmsegHeader) +
@@ -377,7 +433,7 @@ void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, u_int32_t vbFBO)
 			logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VBBM::insert(): vbOID must be the OID of a Version Buffer file");
 	}
-	if (vbFBO > (files[i].fileSize/BLOCK_SIZE) || vbFBO < 0) {
+	if (vbFBO > (files[i].filesize/BLOCK_SIZE) || vbFBO < 0) {
 		log("VBBM::insert(): vbFBO is out of bounds for that vbOID", 
 			logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VBBM::insert(): vbFBO is out of bounds for that vbOID");
@@ -460,107 +516,82 @@ int VBBM::lookup(LBID_t lbid, VER_t verID, OID_t &oid, u_int32_t &fbo) const
 }
 	
 //assumes write lock
-void VBBM::getBlocks(int num, OID_t vbOID, vector<VBRange>& freeRanges, VSS& vss, bool flushPMCache)
+void VBBM::getBlocks(int num, vector<VBRange>& freeRanges, VSS& vss)
 {
 	int blocksLeftInFile, blocksGathered = 0, i;
-	uint fileIndex;
-	uint32_t firstFBO, lastFBO;
+	OID_t vbOID;
+	u_int32_t vbFBO, lastFBO;
 	VBRange range;
 	vector<VBRange>::iterator it;
-	vector<LBID_t> flushList;
 	
 	freeRanges.clear();
-
-	fileIndex = addVBFileIfNotExists(vbOID);
-
-	/*
-	for (i = 0; i < vbbm->nFiles; i++) {
-		cout << "file " << i << " vbOID=" << files[i].OID << " size=" << files[i].fileSize
-				<< endl;
+	//assert( num < 500 );
+//#ifdef BRM_DEBUG
+	if (num < 1) {
+		log("VBBM::getBlocks(): num must be > 0", logging::LOG_TYPE_DEBUG);
+		throw invalid_argument("VBBM::getBlocks(): num must be > 0");
 	}
-	*/
-
-	if ((uint) num > files[fileIndex].fileSize/BLOCK_SIZE) {
-		cout << "num = " << num << " filesize = " << files[fileIndex].fileSize << endl;
+	if ((uint) num > vbbm->vbTotalSize) {
 		log("VBBM::getBlocks(): num is larger than the size of the version buffer",
-				logging::LOG_TYPE_DEBUG);
-		throw logging::VBBMBufferOverFlowExcept
-			("VBBM::getBlocks(): num is larger than the size of the version buffer");
+			logging::LOG_TYPE_DEBUG);
+		throw invalid_argument("VBBM::getBlocks(): num is larger than the size of the version buffer");
 	}
+//#endif
 
-	while ((vbbm->vbCurrentSize + num) > vbbm->vbCapacity) {
+	while ((vbbm->vbCurrentSize + num) > vbbm->vbCapacity &&
+			((VBSTORAGE_INCREMENT/sizeof(VBBMEntry) + vbbm->vbCapacity) <=
+			vbbm->vbTotalSize/BLOCK_SIZE)) {
 		growVBBM();
 		//cout << " requested num = " << num << " and Growing vbbm ... " << endl;
 	}
-
-	while (blocksGathered < num) {
-		blocksLeftInFile = (files[fileIndex].fileSize - files[fileIndex].nextOffset)/BLOCK_SIZE;
-		int blocksLeft = num - blocksGathered;
-
-		range.vbOID = files[fileIndex].OID;
-		range.vbFBO = files[fileIndex].nextOffset/BLOCK_SIZE;
-		range.size = (blocksLeftInFile >= blocksLeft ? blocksLeft : blocksLeftInFile);
-		makeUndoRecord(&files[fileIndex], sizeof(VBFileMetadata));
-		if (range.size == (uint) blocksLeftInFile)
-			files[fileIndex].nextOffset = 0;
-		else
-			files[fileIndex].nextOffset += range.size * BLOCK_SIZE;
-		blocksGathered += range.size;
+	
+	makeUndoRecord(vbbm, sizeof(VBShmsegHeader));
+	while (blocksGathered < num) {	
+		blocksLeftInFile = (files[vbbm->currentVBFileIndex].filesize - 
+				files[vbbm->currentVBFileIndex].nextOffset) / BLOCK_SIZE;
+		range.vbOID = files[vbbm->currentVBFileIndex].OID;
+		range.vbFBO = files[vbbm->currentVBFileIndex].nextOffset/BLOCK_SIZE;
+		//cout << "range.vbOID:range.vbFBO = " << range.vbOID << ":" << range.vbFBO << endl;
+		if (blocksLeftInFile >= num - blocksGathered) {
+			range.size = num - blocksGathered;
+			makeUndoRecord(&files[vbbm->currentVBFileIndex], sizeof(VBFileMetadata));
+			files[vbbm->currentVBFileIndex].nextOffset += 
+					(num - blocksGathered) * BLOCK_SIZE;	
+			blocksGathered = num;
+		}
+		else {
+			range.size = blocksLeftInFile;
+			vbbm->currentVBFileIndex = (vbbm->currentVBFileIndex + 1) %
+				vbbm->nFiles;
+			makeUndoRecord(&files[vbbm->currentVBFileIndex], sizeof(VBFileMetadata));
+			files[vbbm->currentVBFileIndex].nextOffset = 0;
+			blocksGathered += blocksLeftInFile;
+		}
 		freeRanges.push_back(range);
 	}
 
 	//age the returned blocks out of the VB
 	for (it = freeRanges.begin(); it != freeRanges.end(); it++) {
-		uint firstChunk, lastChunk;
-		
-		vbOID = it->vbOID;
-		firstFBO = it->vbFBO;
-		lastFBO = it->vbFBO + it->size - 1;
-		
-		/* Age out at least 100 blocks at a time to reduce the # of times we have to do it.
-		 * How to detect when it needs to be done and when it doesn't?
-		 *
-		 * Split VB space into 100-block chunks.  When a chunk boundary is crossed,
-		 * clear the whole chunk.
-		 */
-		
-		firstChunk = firstFBO/VBBM_CHUNK_SIZE;
-		lastChunk = lastFBO/VBBM_CHUNK_SIZE;
-		
-		// if the current range falls in the middle of a chunk and doesn't span chunks,
-		// there's nothing to do b/c the chunk is assumed to have been cleared already
-		if (((firstFBO % VBBM_CHUNK_SIZE) != 0) && (firstChunk == lastChunk))
-			continue;
-		
-		// round up to the next chunk boundaries
-		if ((firstFBO % VBBM_CHUNK_SIZE) != 0)   // this implies the range spans chunks
-			firstFBO = (firstChunk + 1) * VBBM_CHUNK_SIZE;  // the first FBO of the next chunk
-		lastFBO = ((lastChunk + 1) * VBBM_CHUNK_SIZE - 1);  // the last FBO of the last chunk
-
-		// don't go past the end of the file
-		if (lastFBO > files[fileIndex].fileSize/BLOCK_SIZE)
-			lastFBO = files[fileIndex].fileSize/BLOCK_SIZE;
-
-		// at this point [firstFBO, lastFBO] is the range to age out.
+		vbOID = (*it).vbOID;
+		vbFBO = (*it).vbFBO;
+		lastFBO = vbFBO + (*it).size - 1;
 		
 		// ugh, walk the whole vbbm looking for matches.
 		for (i = 0; i < vbbm->vbCapacity; i++)
 			if (storage[i].lbid != -1 && storage[i].vbOID == vbOID &&
-			  storage[i].vbFBO >= firstFBO && storage[i].vbFBO <= lastFBO) {
+			  storage[i].vbFBO >= vbFBO && storage[i].vbFBO <= lastFBO) {
 				if (vss.isEntryLocked(storage[i].lbid, storage[i].verID)) {
 					ostringstream msg;
 					msg << "VBBM::getBlocks(): version buffer overflow. Increase VersionBufferFileSize. Overflow occured in aged blocks. Requested NumBlocks:VbOid:vbFBO:lastFBO = "
-					<< num << ":" << vbOID <<":" << firstFBO << ":" << lastFBO <<" lbid locked is " << storage[i].lbid << endl;
+					<< num << ":" << vbOID <<":" << vbFBO << ":" << lastFBO <<" lbid locked is " << storage[i].lbid << endl;
 					log(msg.str(), logging::LOG_TYPE_CRITICAL);
 					freeRanges.clear();
 					throw logging::VBBMBufferOverFlowExcept(msg.str());
 				}
-				vss.removeEntry(storage[i].lbid, storage[i].verID, &flushList);
+				vss.removeEntry(storage[i].lbid, storage[i].verID);
 				removeEntry(storage[i].lbid, storage[i].verID);
 			}
 	}
-	if (flushPMCache && !flushList.empty())
-		cacheutils::flushPrimProcAllverBlocks(flushList);
 }
 
 //read lock
@@ -676,25 +707,33 @@ bool VBBM::hashEmpty() const
 void VBBM::clear()
 {
 	int allocSize;
-	int newshmkey;
 	int nFiles = -1;
+	int newshmkey;
 	char *newshmseg;
+	config::Config *conf;
+	const char *ctmp;
+	int64_t ltmp;
+	string stmp;
 
-	// save vars we need after the clear()
-	boost::scoped_array<VBFileMetadata> newFiles(new VBFileMetadata[vbbm->nFiles]);
-	memcpy(&newFiles[0], files, vbbm->nFiles * sizeof(VBFileMetadata));
-
-	setCurrentFileSize();
-	for (int i = 0; i < vbbm->nFiles; i++) {
-		newFiles[i].fileSize = currentFileSize;
-		newFiles[i].nextOffset = 0;
+	conf = config::Config::makeConfig();
+	try {
+		stmp = conf->getConfig("VersionBuffer", "NumVersionBufferFiles");
 	}
-	nFiles = vbbm->nFiles;
+	catch(exception& e) {
+		cout << e.what() << endl;
+		throw;
+	}
+	ctmp = stmp.c_str();
+	ltmp = config::Config::fromText(ctmp);
+	if (ltmp > 1000 || ltmp < 1)
+		throw invalid_argument("VBBM::growVBBM(): Config file error: VersionBuffer/NumVersionBufferFiles must exist and be <= 1000.");
+	else
+		nFiles = static_cast<int>(ltmp);
 
 	allocSize = (sizeof(VBShmsegHeader) + 
 		(nFiles*sizeof(VBFileMetadata)) + 
 		VBSTORAGE_INITIAL_SIZE + VBTABLE_INITIAL_SIZE);
-	//cout << "clear:: allocSize = " << allocSize << endl;
+	
 	newshmkey = chooseShmkey();
 	fPVBBMImpl->clear(newshmkey, allocSize);
 	vbbm = fPVBBMImpl->get();
@@ -702,7 +741,6 @@ void VBBM::clear()
 	initShmseg(nFiles);
 	vbbmShminfo->tableShmkey = currentVBBMShmkey = newshmkey;
 	vbbmShminfo->allocdSize = allocSize;
-
 	files = reinterpret_cast<VBFileMetadata*>
 			(&newshmseg[sizeof(VBShmsegHeader)]);
 	hashBuckets = reinterpret_cast<int*>
@@ -710,8 +748,7 @@ void VBBM::clear()
 			vbbm->nFiles*sizeof(VBFileMetadata)]);
 	storage = reinterpret_cast<VBBMEntry*>(&newshmseg[sizeof(VBShmsegHeader) + 
 			vbbm->nFiles*sizeof(VBFileMetadata) +
-			vbbm->numHashBuckets*sizeof(int)]);
-	memcpy(files, &newFiles[0], vbbm->nFiles * sizeof(VBFileMetadata));
+			vbbm->numHashBuckets*sizeof(int)]);	
 }
 
 //read lock
@@ -856,7 +893,7 @@ void VBBM::readData(int fd, u_int8_t *buf, off_t offset, int size)
 }	
 
 
-/* File Format (V1)
+/* File Format:
 
 		VBBM V1 magic (32-bits)
 		# of VBBM entries in capacity (32-bits)
@@ -869,80 +906,16 @@ void VBBM::readData(int fd, u_int8_t *buf, off_t offset, int size)
 		VBFileMetadata * nFiles
 */
 
-/* File Format (V2):
- *
- * 		Version 2 magic (int)
- * 		number of used VBBM entries (numEntries) (int)
- * 		current number of VB files (nFiles) (int)
- * 		VBFileMetadata * nFiles
- * 		struct VBBMEntry * numEntries
- */
-
-void VBBM::loadVersion1(ifstream &in)
-{
-	int vbbmEntries, i;
-	VBBMEntry entry;
-
-	clear();
-	in.read((char *) &vbbmEntries, 4);
-
-	for (i = 0; i < vbbmEntries; i++) {
-		in.read((char *)&entry, sizeof(entry));
-		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
-		confirmChanges();
-		addVBFileIfNotExists(entry.vbOID);
-	}
-
-	/* This will load the saved file data from 2.2, but it is not compatible with
-	 * 3.0+.  If enabled, take out the addVBFile..() call above
-	 */
-#if 0
-	int dummy, nFiles;
-
-	in.read((char *) &nFiles, 4);
-	cout << "got nfiles = " << nFiles << endl;
-	in.read((char *) &dummy, 4);   // an unused var in 3.0+
-	while (vbbm->nFiles < nFiles)
-		growVBBM(true);  // this allocates one file, doesn't grow the main storage
-	in.read((char *) files, sizeof(VBFileMetadata) * nFiles);
-	for (i = 0; i < nFiles; i++)
-		cout << "file " << i << ": oid=" << files[i].OID << " size=" << files[i].fileSize
-				<< " offset=" << files[i].nextOffset << endl;
-#endif
-
-}
-
-void VBBM::loadVersion2(ifstream &in)
-{
-	int vbbmEntries;
-	int nFiles;
-	int i;
-	VBBMEntry entry;
-
-	in.read((char *) &vbbmEntries, 4);
-	in.read((char *) &nFiles, 4);
-
-	// Need to make clear() truncate the files section
-	if (vbbm->nFiles > nFiles)
-		vbbm->nFiles = nFiles;
-
-	clear();
-
-	while (vbbm->nFiles < nFiles)
-		growVBBM(true);  // this allocates one file, doesn't grow the main storage
-	
-	in.read((char *) files, sizeof(VBFileMetadata) * nFiles);
-
-	for (i = 0; i < vbbmEntries; i++) {
-		in.read((char *)&entry, sizeof(entry));
-		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
-		confirmChanges();
-	}
-}
+struct Header {
+	int magic;
+	int entries;
+};
 
 void VBBM::load(string filename)
 {
-	int magic;
+	int i;
+	struct Header header;
+	struct VBBMEntry entry;
 	ifstream in;
 
  	in.open(filename.c_str(), ios_base::in | ios_base::binary);
@@ -952,24 +925,76 @@ void VBBM::load(string filename)
 	}
 
  	in.exceptions(ios_base::badbit | ios_base::failbit);
+	try {
+		in.read((char *)&header, sizeof(header));
+	}
+	catch (ios_base::failure &e) {
+		in.close();
+		throw;
+	}
 
- 	in.read((char *) &magic, 4);
- 	switch (magic) {
- 		case VBBM_MAGIC_V1:	loadVersion1(in); break;
- 		case VBBM_MAGIC_V2: loadVersion2(in); break;
- 		default:
- 			log("VBBM::load(): Bad magic.  Not a VBBM file?");
- 			throw runtime_error("VBBM::load(): Bad magic.  Not a VBBM file?");
- 	}
+	if (header.entries < 0) {
+		log("VBBM::load(): Bad size.  Not a VBBM file?");
+		throw runtime_error("VBBM::load(): Bad size.  Not a VBBM file?");
+	}
+
+	if (header.magic == VBBM_MAGIC_V1) {
+		for (i = 0; i < vbbm->vbCapacity; i++)
+			storage[i].lbid = -1;
+		for (i = 0; i < vbbm->numHashBuckets; i++)
+			hashBuckets[i] = -1;
+		vbbm->vbCurrentSize = 0;
+		vbbm->vbLWM = 0;
+
+		try {
+			for (i = 0; i < header.entries; i++) {
+				in.read((char *)&entry, sizeof(entry));
+				insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
+				confirmChanges();
+			}
+		}
+		catch (exception &e) {
+			in.close();
+			throw;
+		}
+	}
+	else  {
+		log("VBBM::load(): Bad magic.  Not a VBBM file?");
+		throw runtime_error("VBBM::load(): Bad magic.  Not a VBBM file?");
+	}
+
+	/* Try to load the data added for the v2.1 release.
+	 * It's not an error if it's not there (backward compat issue). */
+	try {
+		int l_nFiles;
+		int l_currentFile;
+		boost::scoped_array<VBFileMetadata> l_meta;
+
+		in.read((char *) &l_nFiles, sizeof(int));
+		in.read((char *) &l_currentFile, sizeof(int));
+		l_meta.reset(new VBFileMetadata[l_nFiles]);
+		in.read((char *) l_meta.get(), sizeof(VBFileMetadata) * l_nFiles);
+
+		// if no change was made to the VB file config, use the saved position data,
+		// otherwise don't.  The system "should be" offline and shut down
+		// cleanly if a change was made (safe to start at position 0,0).
+		if (l_nFiles == vbbm->nFiles && l_meta[0].filesize == files[0].filesize) {
+			vbbm->currentVBFileIndex = l_currentFile;
+			memcpy(files, l_meta.get(), l_nFiles * sizeof(VBFileMetadata));
+		}
+				
+	}
+	catch (exception &e) { }
+	in.close();
 }
 
 // read lock
 void VBBM::save(string filename)
 {
 	int i;
+	struct Header header;
 	ofstream out;
 	mode_t utmp;
-	int var;
 	
 	utmp = ::umask(0);
 	out.open(filename.c_str(), ios_base::trunc|ios_base::out|ios_base::binary);
@@ -980,71 +1005,111 @@ void VBBM::save(string filename)
 	}
 	out.exceptions(ios_base::badbit);
 	
-	var = VBBM_MAGIC_V2;
-	out.write((char *) &var, 4);
-	out.write((char *) &vbbm->vbCurrentSize, 4);
-	out.write((char *) &vbbm->nFiles, 4);
-	
-	out.write((char *) files, sizeof(VBFileMetadata) * vbbm->nFiles);
-	for (i = 0; i < vbbm->vbCapacity; i++)
-		if (storage[i].lbid != -1)
-			out.write((char *)&storage[i], sizeof(VBBMEntry));
-#if 0
-	cout << "saving... nfiles=" << vbbm->nFiles << "\n";
-	for (i = 0; i < vbbm->nFiles; i++) {
-		cout << "file " << i << " vboid=" << files[i].OID << " size=" << files[i].fileSize << endl;
-	}
-#endif
-
-}
-
-uint VBBM::addVBFileIfNotExists(OID_t vbOID)
-{
-	int i;
-
-	/* Check if vbOID exists,
-	 * 	add it if not, init to pos=0
-	 */
-
-	for (i = 0; i < vbbm->nFiles; i++)
-		if (files[i].OID == vbOID)
-			break;
-
-	if (i == vbbm->nFiles) {
-		setCurrentFileSize();
-		growVBBM(true);
-		files[i].OID = vbOID;
-		files[i].fileSize = currentFileSize;
-		files[i].nextOffset = 0;
-	}
-	return i;
-}
-
-void VBBM::setCurrentFileSize()
-{
-	config::Config *conf = config::Config::makeConfig();
-	string stmp;
-	int64_t ltmp;
-
-	currentFileSize = 2147483648ULL;   // 2 GB default
+	header.magic = VBBM_MAGIC_V1;
+	header.entries = vbbm->vbCurrentSize;
 
 	try {
-		stmp = conf->getConfig("VersionBuffer", "VersionBufferFileSize");
-	}
-	catch(exception& e) {
-		log("VBBM: Missing a VersionBuffer/VersionBufferFileSize key in the config file");
-		throw invalid_argument("VBBM: Missing a VersionBuffer/VersionBufferFileSize key in the config file");
-	}
+		out.write((char *)&header, sizeof(header));
 
-	ltmp = conf->fromText(stmp.c_str());
-
-	if (ltmp < 1) {
-		log("VBBM: Config error: VersionBuffer/VersionBufferFileSize must be positive");
-		throw invalid_argument("VBBM: Config error: VersionBuffer/VersionBufferFileSize must be positive");
+		for (i = 0; i < vbbm->vbCapacity; i++)
+			if (storage[i].lbid != -1)
+				out.write((char *)&storage[i], sizeof(VBBMEntry));
+		out.write((char *) &vbbm->nFiles, sizeof(int));
+		out.write((char *) &vbbm->currentVBFileIndex, sizeof(int));
+		out.write((char *) files, sizeof(VBFileMetadata) * vbbm->nFiles);
 	}
-	else
-		currentFileSize = ltmp;
+	catch (exception &e) {
+		out.close();
+		throw;
+	}
+	out.close();
 }
+
+	
+
+/*
+void VBBM::load(string filename)
+{
+	int i, fd, offset;
+	struct Header header;
+	struct VBBMEntry entry;
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0)
+		throw runtime_error("VBBM::load(): Failed to open the file");
+
+	try {
+		readData(fd, (u_int8_t *) &header, 0, sizeof(header));
+	}
+	catch (exception &e) {
+		close(fd);
+		throw;
+	}
+	if (header.magic != VBBM_MAGIC_V1) {
+		close(fd);
+		throw runtime_error("VBBM::load(): Bad magic.  Not a VBBM file?");
+	}
+	if (header.entries < 0) {
+		close(fd);
+		throw runtime_error("VBBM::load(): Bad size.  Not a VBBM file?");
+	}
+
+	for (i = 0; i < vbbm->vbCapacity; i++)
+		storage[i].lbid = -1;
+	for (i = 0; i < vbbm->numHashBuckets; i++)
+		hashBuckets[i] = -1;
+	vbbm->vbCurrentSize = 0;
+	vbbm->vbLWM = 0;
+
+	try {
+		for (i = 0, offset = sizeof(header); i < header.entries; 
+			i++, offset += sizeof(VBBMEntry)) {
+			readData(fd, (u_int8_t *) &entry, offset, sizeof(VBBMEntry));
+			insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
+			confirmChanges();
+		}
+	}
+	catch (exception &e) {
+		close(fd);
+		throw;
+	}
+
+	close(fd);
+}
+		
+
+// read lock
+void VBBM::save(string filename)
+{
+	int i, fd, offset;
+	struct Header header;
+	
+	fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if (fd < 0) {
+		cerr << "VBBM: filename is " << filename << endl;
+		throw runtime_error("VBBM::save(): Failed to open the file");
+	}
+
+	header.magic = VBBM_MAGIC_V1;
+	header.entries = vbbm->vbCurrentSize;
+
+	try {
+		writeData(fd, (u_int8_t *) &header, 0, sizeof(struct Header));
+		offset = sizeof(struct Header);
+
+		for (i = 0; i < vbbm->vbCapacity; i++)
+			if (storage[i].lbid != -1) {
+				writeData(fd, (u_int8_t *) &storage[i], offset, sizeof(VBBMEntry));
+				offset += sizeof(VBBMEntry);
+			}
+	}
+	catch (exception &e) {
+		close(fd);
+		throw;
+	}
+	close(fd);
+}
+*/
 
 #ifdef BRM_DEBUG
 // read lock

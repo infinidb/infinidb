@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.cpp 3763 2013-05-07 13:06:00Z dcathey $
+* $Id: dataconvert.cpp 3258 2012-09-07 19:58:09Z xlou $
 *
 *
 ****************************************************************************/
@@ -25,7 +25,7 @@
 #include <cmath>
 #include <errno.h>
 #include <limits>
-#include <ctime>
+#include <time.h>
 using namespace std;
 #include <boost/algorithm/string/case_conv.hpp>
 using namespace boost::algorithm;
@@ -44,10 +44,6 @@ using namespace execplan;
 #define DATACONVERT_DLLEXPORT
 #include "dataconvert.h"
 #undef DATACONVERT_DLLEXPORT
-
-#ifndef __linux__
-typedef u_long ulong;
-#endif
 
 using namespace logging;
 
@@ -97,7 +93,7 @@ bool from_string(T& t, const std::string& s, std::ios_base& (*f)(std::ios_base&)
 uint64_t pow10_(int32_t scale)
 {
 	if (scale <= 0) return 1;
-	idbassert(scale < 20);
+	assert(scale < 20);
 	uint64_t res = 1;
 	for (int32_t i = 0; i < scale; i++)
 		res *= 10;
@@ -472,543 +468,1803 @@ bool isDateTimeValid ( int hour, int minute, int second, int microSecond)
 		}
 	}
 	return valid;
+
 }
 
+int convertMonth (std::string month)
+{
+	int value = 0;
+	if ( from_string<int>( value, month, std::dec ) )
+	{
+		return value;
+	}
+	else
+	{
+		boost::to_lower(month);
+
+		if ( month == "jan" || month == "january" )
+		{
+			value = 1;
+		}
+		else if ( month == "feb" || month == "february" )
+		{
+			value = 2;
+		}
+		else if ( month == "mar" || month == "march" )
+		{
+			value = 3;
+		}
+		else if ( month == "apr" || month == "april" )
+		{
+			value = 4;
+		}
+		else if ( month == "may" )
+		{
+			value = 5;
+		}
+		else if ( month == "jun" || month == "june" )
+		{
+			value = 6;
+		}
+		else if ( month == "jul" || month == "july" )
+		{
+			value = 7;
+		}
+		else if ( month == "aug" || month == "august" )
+		{
+			value = 8;
+		}
+		else if ( month == "sep" || month == "september" )
+		{
+			value = 9;
+		}
+		else if ( month == "oct" || month == "october" )
+		{
+			value = 10;
+		}
+		else if ( month == "nov" || month == "november" )
+		{
+			value = 11;
+		}
+		else if ( month == "dec" || month == "december" )
+		{
+			value = 12;
+		}
+		else
+		{
+			value = 0;
+		}
+	}
+	return value;
+
+}
+
+void tokenTime (std::string data, std::vector<std::string>& dataList)
+{
+	dataList.clear();
+	typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+	boost::char_separator<char> sep( ",; ; -;/;.;:;_;|;+;-;{;};*;^;%;$;#;@;!;~;`");
+	tokenizer tokens(data, sep);
+	for (tokenizer::iterator tok_iter = tokens.begin(); tok_iter != tokens.end(); ++tok_iter)
+	{
+		dataList.push_back(*tok_iter);
+	}
+
+	switch ( dataList.size() )
+		{
+		case 1:
+		{
+			if ( !number_value ( data ) && strlen(data.c_str()) >= 9 && strlen(data.c_str()) <= 21 )
+			{
+				dataList.clear();
+				//result.result = NO_ERROR;
+				dataList.push_back(data.substr(0, 4)); //Year
+				int stop;
+				stop = data.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+				dataList.push_back(data.substr(4, stop-4)); //Month
+				dataList.push_back(data.substr(stop, 2)); //Day
+				switch ( data.length()-stop-2 )
+				{
+					case 1:
+					{
+						dataList.push_back(data.substr(stop + 2, 1)); //Hour
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back(data.substr(stop + 2, 2)); //Hour
+					}
+					break;
+					case 3:
+					{
+						dataList.push_back(data.substr(stop + 2, 2)); //Hour
+						dataList.push_back(data.substr(stop + 4, 1)); //Minute
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back(data.substr(stop + 2, 2)); //Hour
+						dataList.push_back(data.substr(stop + 4, 2)); //Minute
+					}
+					break;
+					case 5:
+					{
+						dataList.push_back(data.substr(stop + 2, 2)); //Hour
+						dataList.push_back(data.substr(stop + 4, 2)); //Minute
+						dataList.push_back(data.substr(stop + 6, 1)); //Second
+					}
+					break;
+					case 6:
+					{
+						dataList.push_back(data.substr(stop + 2, 2)); //Hour
+						dataList.push_back(data.substr(stop + 4, 2)); //Minute
+						dataList.push_back(data.substr(stop + 6, 2)); //Second
+					}
+					break;
+				}
+			}
+			else if ( number_value ( data ) && strlen(data.c_str()) >= 8  && strlen(data.c_str()) <= 14 )
+			{
+				dataList.clear();
+				//result.result = NO_ERROR;
+				dataList.push_back(data.substr(0, 4));
+				dataList.push_back(data.substr(4, 2));
+				dataList.push_back(data.substr(6, 2));
+				switch ( strlen(data.c_str()) )
+				{
+					case 9:
+					{
+						dataList.push_back(data.substr(8, 1));
+					}
+					break;
+					case 10:
+					{
+						dataList.push_back(data.substr(8, 2));
+					}
+					break;
+					case 11:
+					{
+						dataList.push_back(data.substr(8, 2));
+						dataList.push_back(data.substr(10, 1));
+					}
+					break;
+					case 12:
+					{
+						dataList.push_back(data.substr(8, 2));
+						dataList.push_back(data.substr(10, 2));
+					}
+					break;
+					case 13:
+					{
+						dataList.push_back(data.substr(8, 2));
+						dataList.push_back(data.substr(10, 2));
+						dataList.push_back(data.substr(12, 1));
+					}
+					break;
+					case 14:
+					{
+						dataList.push_back(data.substr(8, 2));
+						dataList.push_back(data.substr(10, 2));
+						dataList.push_back(data.substr(12, 2));
+					}
+					break;
+				}
+
+			}
+			else
+			{
+				dataList.clear();
+				throw QueryDataExcept("invalid date or time.", formatErr);
+			}
+		}
+		break;
+		case 2:
+		{
+			std::string fPart ( dataList[0] );
+			std::string sPart ( dataList[1] );
+			dataList.clear();
+			if ( number_value ( fPart )	&& number_value ( sPart ))
+			{
+				switch ( fPart.length() )
+				{
+					case 1:
+					case 2:
+					case 3:
+					case 4: //First part: YYYY
+					{
+						dataList.push_back ( fPart ); //Year
+						if ( sPart.length() >= 4 && sPart.length() <= 10 )
+						{
+							switch ( sPart.length() )
+							{
+								case 4:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+								}
+								break;
+								case 5:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 1)); //Hour
+								}
+								break;
+								case 6:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+								}
+								break;
+								case 7:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									dataList.push_back(sPart.substr(6, 1)); //Minute
+								}
+								break;
+								case 8:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									dataList.push_back(sPart.substr(6, 2)); //Minute
+								}
+								break;
+								case 9:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									dataList.push_back(sPart.substr(6, 2)); //Minute
+									dataList.push_back(sPart.substr(8, 1)); //Second
+								}
+								break;
+								case 10:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									dataList.push_back(sPart.substr(6, 2)); //Minute
+									dataList.push_back(sPart.substr(8, 2)); //Second
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+					}
+					break;
+					case 6: //First part: YYYYMM
+					{
+						dataList.push_back(fPart.substr(0, 4)); //Year
+						dataList.push_back(fPart.substr(4, 2)); //Month
+						if ( sPart.length() >= 1 && sPart.length() <= 8 )
+						{
+							switch ( sPart.length() )
+							{
+								case 1:
+								{
+									dataList.push_back(sPart.substr(0, 1)); //Day
+								}
+								break;
+								case 2:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+								}
+								break;
+								case 3:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 1)); //Hour
+								}
+								break;
+								case 4:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 2)); //Hour
+								}
+								break;
+								case 5:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 2)); //Hour
+									dataList.push_back(sPart.substr(4, 1)); //Minute
+								}
+								break;
+								case 6:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 2)); //Hour
+									dataList.push_back(sPart.substr(4, 2)); //Minute
+								}
+								break;
+								case 7:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 2)); //Hour
+									dataList.push_back(sPart.substr(4, 2)); //Minute
+									dataList.push_back(sPart.substr(6, 1)); //Second
+								}
+								break;
+								case 8:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Day
+									dataList.push_back(sPart.substr(2, 2)); //Hour
+									dataList.push_back(sPart.substr(4, 2)); //Minute
+									dataList.push_back(sPart.substr(6, 2)); //Second
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+					}
+					break;
+					case 8: //First part: YYYYMMDD
+					{
+						dataList.push_back(fPart.substr(0, 4)); //Year
+						dataList.push_back(fPart.substr(4, 2)); //Month
+						dataList.push_back(fPart.substr(6, 2)); //Day
+						if ( sPart.length() >= 1 && sPart.length() <= 6 )
+						{
+							switch ( sPart.length() )
+							{
+								case 1:
+								{
+									dataList.push_back(sPart.substr(0, 1)); //Hour
+								}
+								break;
+								case 2:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Hour
+								}
+								break;
+								case 3:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Hour
+									dataList.push_back(sPart.substr(2, 1)); //Minute
+								}
+								break;
+								case 4:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Hour
+									dataList.push_back(sPart.substr(2, 2)); //Minute
+								}
+								break;
+								case 5:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Hour
+									dataList.push_back(sPart.substr(2, 2)); //Minute
+									dataList.push_back(sPart.substr(4, 1)); //Second
+								}
+								break;
+								case 6:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Hour
+									dataList.push_back(sPart.substr(2, 2)); //Minute
+									dataList.push_back(sPart.substr(4, 2)); //Second
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+					}
+					break;
+					case 10: //First part: YYYYMMDDHH
+					{
+						dataList.push_back(fPart.substr(0, 4)); //Year
+						dataList.push_back(fPart.substr(4, 2)); //Month
+						dataList.push_back(fPart.substr(6, 2)); //Day
+						dataList.push_back(fPart.substr(8, 2)); //Hour
+						if ( sPart.length() >= 1 && sPart.length() <= 4 )
+						{
+							switch ( sPart.length() )
+							{
+								case 1:
+								{
+									dataList.push_back(sPart.substr(0, 1)); //Minute
+								}
+								break;
+								case 2:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Minute
+								}
+								break;
+								case 3:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Minute
+									dataList.push_back(sPart.substr(2, 1)); //Second
+								}
+								break;
+								case 4:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Minute
+									dataList.push_back(sPart.substr(2, 2)); //Second
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+					}
+					break;
+					case 12: //First part: YYYYMMDDHHMI
+					{
+						dataList.push_back(fPart.substr(0, 4)); //Year
+						dataList.push_back(fPart.substr(4, 2)); //Month
+						dataList.push_back(fPart.substr(6, 2)); //Day
+						dataList.push_back(fPart.substr(8, 2)); //Hour
+						dataList.push_back(fPart.substr(10, 2)); //Minute
+						if ( sPart.length() >= 1 && sPart.length() <= 2 )
+						{
+							switch ( sPart.length() )
+							{
+									case 1:
+								{
+									dataList.push_back(sPart.substr(0, 1)); //Second
+								}
+								break;
+								case 2:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Second
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+							}
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+							}
+					break;
+				}
+			}
+			else //Month is non-numerical
+			{
+				//result.result = NO_ERROR;
+				if ( number_value ( fPart ) ) //First part: YYYY
+				{
+					dataList.push_back(fPart); //Year
+					int sStop;
+					sStop = sPart.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+					dataList.push_back ( sPart.substr( 0, sStop ) );
+					if ( ( sPart.length() - sStop ) >= 1 && (( sPart.length() - sStop ) <= 8 ) )
+					{
+						switch ( sPart.length() - sStop )
+						{
+							case 1:
+							{
+								dataList.push_back(sPart.substr(sStop, 1)); //Day
+							}
+							break;
+							case 2:
+							{
+								dataList.push_back(sPart.substr(sStop, 2)); //Day
+							}
+							break;
+							case 3:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 1) ); //Hour
+							}
+							break;
+							case 4:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 2) ); //Hour
+							}
+							break;
+							case 5:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 2) ); //Hour
+								dataList.push_back( sPart.substr(sStop + 4, 1) ); //Minute
+							}
+							break;
+							case 6:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 2) ); //Hour
+								dataList.push_back( sPart.substr(sStop + 4, 2) ); //Minute
+							}
+							break;
+							case 7:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 2) ); //Hour
+								dataList.push_back( sPart.substr(sStop + 4, 2) ); //Minute
+								dataList.push_back( sPart.substr(sStop + 6, 1) ); //Second
+							}
+							break;
+							case 8:
+							{
+								dataList.push_back( sPart.substr(sStop, 2) ); //Day
+								dataList.push_back( sPart.substr(sStop + 2, 2) ); //Hour
+								dataList.push_back( sPart.substr(sStop + 4, 2) ); //Minute
+								dataList.push_back( sPart.substr(sStop + 6, 2) ); //Second
+							}
+							break;
+						}
+					}
+					else
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+				}
+			}
+		}
+		break;
+		case 3: //Three tokens
+		{
+			std::string fPart ( dataList[0] );
+			std::string sPart ( dataList[1] );
+			std::string tPart ( dataList[2] );
+			dataList.clear();
+			if ( number_value ( fPart ) && number_value ( sPart ) )
+			{
+				switch ( fPart.length() )
+				{
+					case 1:
+					case 2:
+					case 3:
+					case 4: //First part: YYYY
+					{
+						dataList.push_back ( fPart ); //Year
+						if ( sPart.length() >= 1 && sPart.length() <= 8 )
+						{
+							switch ( sPart.length() )
+							{
+								case 1:
+								case 2:
+								{
+									dataList.push_back(sPart); //Month
+									if ( strlen(tPart.c_str()) >=1 && strlen(tPart.c_str()) <= 6 )
+									{
+										switch ( strlen(tPart.c_str()) )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Day
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Day
+											}
+											break;
+											case 3:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Day
+												dataList.push_back(tPart.substr(2, 1)); //Hour
+											}
+											break;
+											case 4:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Day
+												dataList.push_back(tPart.substr(2, 2)); //Hour
+											}
+											break;
+											case 5:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Day
+												dataList.push_back(tPart.substr(2, 2)); //Hour
+												dataList.push_back(tPart.substr(4, 1)); //Minute
+											}
+											break;
+											case 6:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Day
+												dataList.push_back(tPart.substr(2, 2)); //Hour
+												dataList.push_back(tPart.substr(4, 2)); //Minute
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+								case 3:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 1)); //Day
+									if ( strlen(tPart.c_str()) >=1 && strlen(tPart.c_str()) <= 4 )
+									{
+										switch ( strlen(tPart.c_str()) )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Hour
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //hour
+											}
+											break;
+											case 3:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //hour
+												dataList.push_back(tPart.substr(2, 1)); //Minute
+											}
+											break;
+											case 4:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Hour
+												dataList.push_back(tPart.substr(2, 2)); //Minute
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+								case 4:
+									{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									if ( tPart.length() >=1 && tPart.length() <= 4 )
+									{
+										switch ( tPart.length() )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Hour
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //hour
+											}
+											break;
+											case 3:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //hour
+												dataList.push_back(tPart.substr(2, 1)); //Minute
+											}
+											break;
+											case 4:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Hour
+												dataList.push_back(tPart.substr(2, 2)); //Minute
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+								case 5:
+									{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 1)); //Hour
+									if ( strlen(tPart.c_str()) >=1 && strlen(tPart.c_str()) <= 2 )
+									{
+										switch ( strlen(tPart.c_str()) )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Minute
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Minute
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+								case 6:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									if ( strlen(tPart.c_str()) >=1 && strlen(tPart.c_str()) <= 2 )
+									{
+										switch ( tPart.length() )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Minute
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Minute
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+								case 8:
+								{
+									dataList.push_back(sPart.substr(0, 2)); //Month
+									dataList.push_back(sPart.substr(2, 2)); //Day
+									dataList.push_back(sPart.substr(4, 2)); //Hour
+									dataList.push_back(sPart.substr(6, 2)); //Minute
+									if ( tPart.length() >=1 && tPart.length() <= 2 )
+									{
+										switch ( tPart.length() )
+										{
+											case 1:
+											{
+												dataList.push_back(tPart.substr(0, 1)); //Second
+											}
+											break;
+											case 2:
+											{
+												dataList.push_back(tPart.substr(0, 2)); //Second
+											}
+											break;
+										}
+									}
+									else
+									{
+										dataList.clear();
+										throw QueryDataExcept("invalid date or time.", formatErr);
+									}
+								}
+								break;
+							}
+						}
+						else
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+					}
+					break;
+					case 5: // First part: YYYYMM
+					{
+						dataList.push_back ( fPart.substr( 0, 4 ) ); //Year
+						dataList.push_back ( fPart.substr( 4, 1 ) ); //Month
+					}
+					case 6: // First part: YYYYMM
+					{
+						dataList.push_back ( fPart.substr( 0, 4 ) ); //Year
+						dataList.push_back ( fPart.substr( 4, 2 ) ); //Month
+					}
+					if ( sPart.length() >= 1 && sPart.length() <= 6 )
+					{
+						switch ( sPart.length() )
+						{
+							case 1: //DD
+							{
+								dataList.push_back ( sPart.substr( 0, 1 ) ); //Day
+								if ( tPart.length() >= 1 && tPart.length() <= 4 )
+								{
+									switch ( tPart.length() )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Hour
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+										}
+										break;
+										case 3:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+											dataList.push_back ( tPart.substr( 2, 1 ) ); // Minute
+										}
+										break;
+										case 4:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+											dataList.push_back ( tPart.substr( 2, 2 ) ); // Minute
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+							case 2:	//DD
+							{
+								dataList.push_back ( sPart.substr( 0, 2 ) ); //Day
+								if ( tPart.length() >= 1 && tPart.length() <= 4 )
+								{
+									switch ( tPart.length() )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Hour
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+										}
+										break;
+										case 3:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+											dataList.push_back ( tPart.substr( 2, 1 ) ); // Minute
+										}
+										break;
+										case 4:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Hour
+											dataList.push_back ( tPart.substr( 2, 2 ) ); // Minute
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+							case 3: //DDMI
+							{
+								dataList.push_back ( sPart.substr( 0, 2 ) ); //Day
+								dataList.push_back ( sPart.substr( 2, 1 ) ); //Hour
+								if ( strlen(tPart.c_str()) >= 1 && strlen(tPart.c_str()) <= 2 )
+								{
+									switch ( tPart.length() )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Minute
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Minute
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+							case 4: //DDMI
+							{
+								dataList.push_back ( sPart.substr( 0, 2 ) ); //Day
+								dataList.push_back ( sPart.substr( 2, 2 ) ); //Hour
+								if ( strlen(tPart.c_str()) >= 1 && strlen(tPart.c_str()) <= 2 )
+								{
+									switch ( tPart.length() )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Minute
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Minute
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+							case 5:
+							{
+								dataList.push_back ( sPart.substr( 0, 2 ) ); //Day
+								dataList.push_back ( sPart.substr( 2, 2 ) ); //Hour
+								dataList.push_back ( sPart.substr( 4, 1 ) ); //Minute
+								if ( strlen(tPart.c_str()) >= 1 && strlen(tPart.c_str()) <= 2 )
+								{
+									switch ( strlen(tPart.c_str()) )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Second
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Second
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+							case 6:
+							{
+								dataList.push_back ( sPart.substr( 0, 2 ) ); //Day
+								dataList.push_back ( sPart.substr( 2, 2 ) ); //Hour
+								dataList.push_back ( sPart.substr( 4, 2 ) ); //Minute
+								if ( strlen(tPart.c_str()) >= 1 && strlen(tPart.c_str()) <= 2 )
+								{
+									switch ( tPart.length() )
+									{
+										case 1:
+										{
+											dataList.push_back ( tPart.substr( 0, 1 ) ); // Second
+										}
+										break;
+										case 2:
+										{
+											dataList.push_back ( tPart.substr( 0, 2 ) ); // Second
+										}
+										break;
+									}
+								}
+								else
+								{
+									dataList.clear();
+									throw QueryDataExcept("invalid date or time.", formatErr);
+								}
+							}
+							break;
+						}
+					}
+					else
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+				break;
+				}
+			}
+			else // Month is non-numeracal, three tokens
+			{
+				if ( number_value( fPart ) )
+				{
+					dataList.push_back ( fPart ); //Year
+					int monthEnd = sPart.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+					dataList.push_back ( sPart.substr ( 0, monthEnd ));
+					if ( (int)sPart.length() > monthEnd )
+					{
+						switch ( sPart.length() - monthEnd )
+						{
+							case 1:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 1 ));	//Day
+							}
+							break;
+							case 2:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 2 ));	//Day
+							}
+							break;
+							case 3:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 2 ));	//Day
+								dataList.push_back ( sPart.substr ( monthEnd+2, 1 )); //Hour
+							}
+							break;
+							case 4:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 2 ));	//Day
+								dataList.push_back ( sPart.substr ( monthEnd+2, 2 )); //Hour
+							}
+							break;
+							case 5:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 2 ));	//Day
+								dataList.push_back ( sPart.substr ( monthEnd+2, 2 )); //Hour
+								dataList.push_back ( sPart.substr ( monthEnd+4, 1 )); //Minute
+							}
+							break;
+							case 6:
+							{
+								dataList.push_back ( sPart.substr ( monthEnd, 2 ));	//Day
+								dataList.push_back ( sPart.substr ( monthEnd+2, 2 )); //Hour
+								dataList.push_back ( sPart.substr ( monthEnd+4, 2 )); //Minute
+							}
+							break;
+							default:
+							{
+								dataList.clear();
+								throw QueryDataExcept("invalid date or time.", formatErr);
+							}
+							break;
+						}
+					}
+					switch ( strlen(tPart.c_str()) ) //Third part
+					{
+						case 1:
+						{
+							dataList.push_back ( tPart.substr ( 0, 1 ));
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+						}
+						break;
+						case 3:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 1 ));
+						}
+						break;
+						case 4:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 2 ));
+						}
+						break;
+						case 5:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 2 ));
+							dataList.push_back ( tPart.substr ( 4, 1 ));
+						}
+						break;
+						case 6:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 2 ));
+							dataList.push_back ( tPart.substr ( 4, 2 ));
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+					}
+				}
+				else // First part includes month
+				{
+					//result.result = NO_ERROR;
+					int monthStart = fPart.find_first_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+					int monthEnd = fPart.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+					dataList.push_back ( fPart.substr ( 0, monthStart ) ); //Year
+					dataList.push_back ( fPart.substr ( monthStart, monthEnd-monthStart ) ); //Month
+					switch ( fPart.length() - monthEnd )
+					{
+						case 0:
+						break;
+						case 1:
+						{
+							dataList.push_back ( fPart.substr ( monthEnd, 1 ));
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( fPart.substr ( monthEnd, 2 ));
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+					}
+					switch ( sPart.length() ) //Numerical
+					{
+						case 1:
+						{
+							dataList.push_back ( sPart.substr ( 0, 1 ));
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( sPart.substr ( 0, 2 ));
+						}
+						break;
+						case 4:
+						{
+							dataList.push_back ( sPart.substr ( 0, 2 ));
+							dataList.push_back ( sPart.substr ( 2, 2 ));
+						}
+						break;
+						case 6:
+						{
+							dataList.push_back ( sPart.substr ( 0, 2 ));
+							dataList.push_back ( sPart.substr ( 2, 2 ));
+							dataList.push_back ( sPart.substr ( 4, 2 ));
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+
+					}
+					switch ( strlen(tPart.c_str()) ) //numerical
+					{
+						case 1:
+						{
+							dataList.push_back ( tPart.substr ( 0, 1 ));
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+						}
+						break;
+						case 4:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 2 ));
+						}
+						break;
+						case 6:
+						{
+							dataList.push_back ( tPart.substr ( 0, 2 ));
+							dataList.push_back ( tPart.substr ( 2, 2 ));
+							dataList.push_back ( tPart.substr ( 4, 2 ));
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+					}
+				}
+			}
+		} //end of second outer case
+		break;
+		case 4: //Four tokens
+		{
+			std::string fPart ( dataList[0] );
+			std::string sPart ( dataList[1] );
+			std::string tPart ( dataList[2] );
+			std::string fourPart ( dataList[3] );
+			dataList.clear();
+
+			if ( number_value( fPart )  &&  !number_value( sPart ))
+			{
+				//result.result = NO_ERROR;
+				dataList.push_back(fPart); //Year
+				string::size_type monthEnd =
+					sPart.find_last_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") + 1;
+				dataList.push_back(sPart.substr(0, monthEnd));
+
+				//TODO: what are we trying to accomplish here?
+				if (sPart.length() > monthEnd)
+				{
+					switch (sPart.length() - monthEnd)
+					{
+					case 1:
+						dataList.push_back(sPart.substr(monthEnd, 1));
+						break;
+					case 2:
+						dataList.push_back(sPart.substr(monthEnd, 2));
+						break;
+					case 4:
+						dataList.push_back(sPart.substr(monthEnd, 2));
+						dataList.push_back(sPart.substr(monthEnd + 2, 2));
+						break;
+					default:
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+						break;
+					}
+				}
+
+				switch ( tPart.length() ) //numerical
+				{
+					case 1:
+					{
+						dataList.push_back ( tPart.substr ( 0, 1 ));
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( tPart.substr ( 0, 2 ));
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( tPart.substr ( 0, 2 ));
+						dataList.push_back ( tPart.substr ( 2, 2 ));
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fourPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 1 ));
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 2 ));
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 2 ));
+						dataList.push_back ( fourPart.substr ( 2, 2 ));
+					}
+					break;
+					case 6:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 2 ));
+						dataList.push_back ( fourPart.substr ( 2, 2 ));
+						dataList.push_back ( fourPart.substr ( 4, 2 ));
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+			}
+			else if ( !number_value( fPart ) )//Month is non-numerical in first token
+			{
+				//result.result = NO_ERROR;
+				int monthStart = fPart.find_first_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+				int monthEnd = fPart.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+				dataList.push_back ( fPart.substr ( 0, monthStart )); //Year
+				dataList.push_back ( fPart.substr ( monthStart, monthEnd - monthStart )); //Month
+				if ( (fPart.length() - monthEnd)  > 0 )
+				{
+					switch ( fPart.length() - monthEnd )
+					{
+						case 1:
+						{
+							dataList.push_back ( fPart.substr ( monthEnd, 1 ));
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( fPart.substr ( monthEnd, 2 ));
+						}
+						break;
+						case 4:
+						{
+							dataList.push_back ( fPart.substr ( monthEnd, 2 ));
+							dataList.push_back ( fPart.substr ( monthEnd+2, 2 ));
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+					}
+				}
+				switch ( sPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( sPart.substr ( 0, 1 ));
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( sPart.substr ( 0, 2 ));
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( sPart.substr ( 0, 2 ));
+						dataList.push_back ( sPart.substr ( 2, 2 ));
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( tPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( tPart.substr ( 0, 1 ));
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( tPart.substr ( 0, 2 ));
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( tPart.substr ( 0, 2 ));
+						dataList.push_back ( tPart.substr ( 2, 2 ));
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fourPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 1 ));
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 2 ));
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fourPart.substr ( 0, 2 ));
+						dataList.push_back ( fourPart.substr ( 2, 2 ));
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+			}
+			else // all numerical
+			{
+				if ( fPart.length() < 5 )
+				{
+					dataList.push_back ( fPart );	//Year
+				}
+				else
+				{
+					dataList.push_back ( fPart.substr( 0, 4 ) ); //Year
+					switch ( fPart.length() - 4 )
+					{
+						case 1:
+						{
+							dataList.push_back ( fPart.substr( 4, 1 ) );  //Month
+						}
+						break;
+						case 2:
+						{
+							dataList.push_back ( fPart.substr( 4, 2 ) );  //Month
+						}
+						break;
+						case 3:
+						{
+							dataList.push_back ( fPart.substr( 4, 2 ) );  //Month
+							dataList.push_back ( fPart.substr( 6, 1 ) );  // Day
+						}
+						break;
+						case 4:
+						{
+							dataList.push_back ( fPart.substr( 4, 2 ) );  //Month
+							dataList.push_back ( fPart.substr( 6, 2 ) );  // Day
+						}
+						break;
+						default:
+						{
+							dataList.clear();
+							throw QueryDataExcept("invalid date or time.", formatErr);
+						}
+						break;
+					}
+
+				}
+				switch ( sPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( sPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( sPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( sPart.substr( 0, 2 ) );
+						dataList.push_back ( sPart.substr( 2, 2 ) );
+					}
+					break;
+					case 6:
+					{
+						dataList.push_back ( sPart.substr( 0, 2 ) );
+						dataList.push_back ( sPart.substr( 2, 2 ) );
+						dataList.push_back ( sPart.substr( 4, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( tPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( tPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+						dataList.push_back ( tPart.substr( 2, 2 ) );
+					}
+					break;
+					case 6:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+						dataList.push_back ( tPart.substr( 2, 2 ) );
+						dataList.push_back ( tPart.substr( 4, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fourPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fourPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+						dataList.push_back ( fourPart.substr( 2, 2 ) );
+					}
+					break;
+					case 6:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+						dataList.push_back ( fourPart.substr( 2, 2 ) );
+						dataList.push_back ( fourPart.substr( 4, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+			}
+		}
+		case 5: //Five tokens
+		case 6: //Six tokens
+		{
+			std::string fPart ( dataList[0] );
+			std::string sPart ( dataList[1] );
+			std::string tPart ( dataList[2] );
+			std::string fourPart ( dataList[3] );
+			std::string fivePart ( dataList[4] );
+			int size = dataList.size();
+			std::string sixPart;
+			if ( size == 6)
+			{
+				sixPart = dataList[5];
+			}
+			dataList.clear();
+
+			if ( number_value( fPart )  &&  number_value( sPart )) //All numerical
+			{
+				if ( fPart.length() < 5 )
+				{
+					dataList.push_back ( fPart );
+				}
+				else
+				{
+					dataList.push_back ( fPart.substr ( 0, 4 ));
+					dataList.push_back ( fPart.substr ( 4, fPart.length()-4 ));
+				}
+
+				switch ( sPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( sPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( sPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( sPart.substr( 0, 2 ) );
+						dataList.push_back ( sPart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( tPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( tPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+						dataList.push_back ( tPart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fourPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fourPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+						dataList.push_back ( fourPart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fivePart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fivePart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fivePart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fivePart.substr( 0, 2 ) );
+						dataList.push_back ( fivePart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				if ( size == 6 )
+				{
+					dataList.push_back ( sixPart );
+				}
+			}
+			else if ( number_value( fPart ) ) //Non-numerical month is on the second part
+			{
+				dataList.push_back ( fPart ); //Year
+				int monthEnd = sPart.find_last_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ) + 1;
+				dataList.push_back ( sPart.substr ( 0, monthEnd )); //Month
+				if ( (sPart.length() - monthEnd)  > 0 )
+				{
+					dataList.push_back ( sPart.substr( monthEnd, sPart.length() - monthEnd ));
+				}
+				switch ( tPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( tPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( tPart.substr( 0, 2 ) );
+						dataList.push_back ( tPart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fourPart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fourPart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fourPart.substr( 0, 2 ) );
+						dataList.push_back ( fourPart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				switch ( fivePart.length() )
+				{
+					case 1:
+					{
+						dataList.push_back ( fivePart.substr( 0, 1 ) );
+					}
+					break;
+					case 2:
+					{
+						dataList.push_back ( fivePart.substr( 0, 2 ) );
+					}
+					break;
+					case 4:
+					{
+						dataList.push_back ( fivePart.substr( 0, 2 ) );
+						dataList.push_back ( fivePart.substr( 2, 2 ) );
+					}
+					break;
+					default:
+					{
+						dataList.clear();
+						throw QueryDataExcept("invalid date or time.", formatErr);
+					}
+					break;
+				}
+				if ( size == 6 )
+				{
+					dataList.push_back ( sixPart );
+				}
+			}
+			else // non-numerical month is in the first part
+			{
+				//result.result = NO_ERROR;
+				int monthStart = fPart.find_first_of ( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+				dataList.push_back ( fPart.substr ( 0, monthStart )); //Year
+				dataList.push_back ( fPart.substr ( monthStart, fPart.length() - monthStart )); //Month
+				dataList.push_back ( sPart );
+				dataList.push_back ( tPart );
+				dataList.push_back ( fourPart );
+				dataList.push_back ( fivePart );
+				if ( size == 6 )
+				{
+					dataList.push_back ( sixPart );
+				}
+			}
+		}
+		break;
+	} //end of outest case
+	return;
+}
 
 } // namespace anon
 
 namespace dataconvert
 {
-
-// various code from my_time.h, my_time.c, m_ctype.h, and ctype-latin1.c
-// to get a faster str_to_datetime
-
-typedef enum mysql_timestamp_type
-{
-	MYSQL_TIMESTAMP_NONE,        // String wasn't a timestamp
-	MYSQL_TIMESTAMP_DATE,        // DATE string (YY MM and DD parts ok)
-	MYSQL_TIMESTAMP_DATETIME,    // Full timestamp
-	MYSQL_TIMESTAMP_ERROR
-} mysql_timestamp_type;
-
-typedef unsigned char uchar;
-typedef bool my_bool;
-
-const uint MAX_DATE_PARTS = 8;
-static unsigned char internal_format_positions[]=
-{0, 1, 2, 3, 4, 5, 6, 255};
-
-const unsigned YY_PART_YEAR = 70;
-uchar days_in_month[]= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 0};
-
-#define ULL(A) A ## ULL
-
-uint64_t log_10_int[20]=
-{
-  1, 10, 100, 1000, 10000UL, 100000UL, 1000000UL, 10000000UL,
-  ULL(100000000), ULL(1000000000), ULL(10000000000), ULL(100000000000),
-  ULL(1000000000000), ULL(10000000000000), ULL(100000000000000),
-  ULL(1000000000000000), ULL(10000000000000000), ULL(100000000000000000),
-  ULL(1000000000000000000), ULL(10000000000000000000)
-};
-
-// Pulled this over from ctype-latin1.c for implementing the my_isdigit,
-// my_isspace, etc. provides some performance gain over calling std functions
-// in ctype.h.   Leading '0' left but commented out from mysql impl as
-// the original #defines always jumped right over it anyway
-static uchar ctype_latin1[] = {
-   // 0,
-   32, 32, 32, 32, 32, 32, 32, 32, 32, 40, 40, 40, 40, 40, 32, 32,
-   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-   72, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
-  132,132,132,132,132,132,132,132,132,132, 16, 16, 16, 16, 16, 16,
-   16,129,129,129,129,129,129,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, 16, 16, 16, 16, 16,
-   16,130,130,130,130,130,130,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2, 16, 16, 16, 16, 32,
-   16,  0, 16,  2, 16, 16, 16, 16, 16, 16,  1, 16,  1,  0,  1,  0,
-    0, 16, 16, 16, 16, 16, 16, 16, 16, 16,  2, 16,  2,  0,  2,  1,
-   72, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
-   16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-    1,  1,  1,  1,  1,  1,  1, 16,  1,  1,  1,  1,  1,  1,  1,  2,
-    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-    2,  2,  2,  2,  2,  2,  2, 16,  2,  2,  2,  2,  2,  2,  2,  2
-};
-
-#define	_MY_NMR	04	/* Numeral (digit) */
-#define	_MY_SPC	010	/* Spacing character */
-#define	_MY_PNT	020	/* Punctuation */
-
-#define	my_isdigit(c)  (ctype_latin1[(uchar) (c)] & _MY_NMR)
-#define	my_isspace(c)  (ctype_latin1[(uchar) (c)] & _MY_SPC)
-#define	my_ispunct(c)  (ctype_latin1[(uchar) (c)] & _MY_PNT)
-
-/* Flags to str_to_datetime */
-#define TIME_FUZZY_DATE		1
-#define TIME_DATETIME_ONLY	2
-/* Must be same as MODE_NO_ZERO_IN_DATE */
-#define TIME_NO_ZERO_IN_DATE    (65536L*2*2*2*2*2*2*2)
-/* Must be same as MODE_NO_ZERO_DATE */
-#define TIME_NO_ZERO_DATE	(TIME_NO_ZERO_IN_DATE*2)
-#define TIME_INVALID_DATES	(TIME_NO_ZERO_DATE*2)
-
-#define DBUG_RETURN return
-#define set_if_bigger(a,b)  do { if ((a) < (b)) (a)=(b); } while(0)
-
-// Need to use an alternate data structure (as opposed to Date/DateTime
-// because mysql implementations expect to assign to fields and then
-// do error checking and thus field lengths cannot be constrained as
-// they are in the native IDB structs
-typedef struct st_mysql_time
-{
-  unsigned int  year, month, day, hour, minute, second;
-  unsigned long second_part;
-
-  st_mysql_time() :
-	  year(0),
-	  month(0),
-	  day(0),
-	  hour(0),
-	  minute(0),
-	  second(0),
-	  second_part(0)
-  	  {}
-} MYSQL_TIME;
-
-uint calc_days_in_year(uint year)
-{
-  return ((year & 3) == 0 && (year%100 || (year%400 == 0 && year)) ?
-          366 : 365);
-}
-
-my_bool check_date(const MYSQL_TIME *ltime, my_bool not_zero_date,
-                   ulong flags, int *was_cut)
-{
-  if (not_zero_date)
-  {
-    if ((((flags & TIME_NO_ZERO_IN_DATE) || !(flags & TIME_FUZZY_DATE)) &&
-         (ltime->month == 0 || ltime->day == 0)) ||
-        (!(flags & TIME_INVALID_DATES) &&
-         ltime->month && ltime->day > days_in_month[ltime->month-1] &&
-         (ltime->month != 2 || calc_days_in_year(ltime->year) != 366 ||
-          ltime->day != 29)))
-    {
-      *was_cut= 2;
-      return true;
-    }
-  }
-  else if (flags & TIME_NO_ZERO_DATE)
-  {
-    /*
-      We don't set *was_cut here to signal that the problem was a zero date
-      and not an invalid date
-    */
-    return true;
-  }
-  return false;
-}
-
-/*
-  Convert a timestamp string to a MYSQL_TIME value.
-
-  SYNOPSIS
-    str_to_datetime()
-    str                 String to parse
-    length              Length of string
-    l_time              Date is stored here
-    flags               Bitmap of following items
-                        TIME_FUZZY_DATE    Set if we should allow partial dates
-                        TIME_DATETIME_ONLY Set if we only allow full datetimes.
-                        TIME_NO_ZERO_IN_DATE	Don't allow partial dates
-                        TIME_NO_ZERO_DATE	Don't allow 0000-00-00 date
-                        TIME_INVALID_DATES	Allow 2000-02-31
-    was_cut             0	Value OK
-			1   If value was cut during conversion (i.e. extraneous trailing text found)
-			2	check_date(date,flags) considers date invalid
-
-  DESCRIPTION
-    At least the following formats are recogniced (based on number of digits)
-    YYMMDD, YYYYMMDD, YYMMDDHHMMSS, YYYYMMDDHHMMSS
-    YY-MM-DD, YYYY-MM-DD, YY-MM-DD HH.MM.SS
-    YYYYMMDDTHHMMSS  where T is a the character T (ISO8601)
-    Also dates where all parts are zero are allowed
-
-    The second part may have an optional .###### fraction part.
-
-  NOTES
-   This function should work with a format position vector as long as the
-   following things holds:
-   - All date are kept together and all time parts are kept together
-   - Date and time parts must be separated by blank
-   - Second fractions must come after second part and be separated
-     by a '.'.  (The second fractions are optional)
-   - AM/PM must come after second fractions (or after seconds if no fractions)
-   - Year must always been specified.
-   - If time is before date, then we will use datetime format only if
-     the argument consist of two parts, separated by space.
-     Otherwise we will assume the argument is a date.
-   - The hour part must be specified in hour-minute-second order.
-
-  RETURN VALUES
-    MYSQL_TIMESTAMP_NONE        String wasn't a timestamp, like
-                                [DD [HH:[MM:[SS]]]].fraction.
-                                l_time is not changed.
-    MYSQL_TIMESTAMP_DATE        DATE string (YY MM and DD parts ok)
-    MYSQL_TIMESTAMP_DATETIME    Full timestamp
-    MYSQL_TIMESTAMP_ERROR       Timestamp with wrong values.
-                                All elements in l_time is set to 0
-*/
-
-mysql_timestamp_type
-str_to_datetime(const char *str, uint length, MYSQL_TIME* l_time,
-                uint flags, int *was_cut)
-{
-  uint field_length, year_length=0, digits, i, number_of_fields;
-  uint date[MAX_DATE_PARTS], date_len[MAX_DATE_PARTS];
-  uint add_hours= 0, start_loop;
-  ulong not_zero_date, allow_space;
-  bool is_internal_format;
-  const char *pos, *last_field_pos=0;
-  const char *end=str+length;
-  const unsigned char *format_position;
-  bool found_delimitier= 0, found_space= 0;
-  uint frac_pos, frac_len;
-  mysql_timestamp_type time_type=MYSQL_TIMESTAMP_ERROR;
-  // DBUG_ENTER("str_to_datetime");
-  // DBUG_PRINT("ENTER",("str: %.*s",length,str));
-
-
-  // LINT_INIT(field_length);
-  // LINT_INIT(last_field_pos);
-
-  *was_cut= 0;
-
-  /* Skip space at start */
-  for (; str != end && my_isspace(*str) ; str++)
-    ;
-  if (str == end || ! my_isdigit(*str))
-  {
-    *was_cut= 1;
-    return MYSQL_TIMESTAMP_NONE;
-  }
-
-  is_internal_format= 0;
-  /* This has to be changed if want to activate different timestamp formats */
-  format_position= internal_format_positions;
-
-  /*
-    Calculate number of digits in first part.
-    If length= 8 or >= 14 then year is of format YYYY.
-    (YYYY-MM-DD,  YYYYMMDD, YYYYYMMDDHHMMSS)
-  */
-  for (pos=str;
-	   pos != end && (my_isdigit(*pos) || *pos == 'T');
-       pos++)
-    ;
-
-  digits= (uint) (pos-str);
-  start_loop= 0;                                /* Start of scan loop */
-  date_len[format_position[0]]= 0;              /* Length of year field */
-  if (pos == end || *pos == '.')
-  {
-    /* Found date in internal format (only numbers like YYYYMMDD) */
-    year_length= (digits == 4 || digits == 8 || digits >= 14) ? 4 : 2;
-    field_length= year_length;
-    is_internal_format= 1;
-    format_position= internal_format_positions;
-  }
-  else
-  {
-    if (format_position[0] >= 3)                /* If year is after HHMMDD */
-    {
-      /*
-        If year is not in first part then we have to determinate if we got
-        a date field or a datetime field.
-        We do this by checking if there is two numbers separated by
-        space in the input.
-      */
-      while (pos < end && !my_isspace(*pos))
-        pos++;
-      while (pos < end && !my_isdigit(*pos))
-        pos++;
-      if (pos == end)
-      {
-        if (flags & TIME_DATETIME_ONLY)
-        {
-          *was_cut= 1;
-          DBUG_RETURN(MYSQL_TIMESTAMP_NONE);   /* Can't be a full datetime */
-        }
-        /* Date field.  Set hour, minutes and seconds to 0 */
-        date[0]= date[1]= date[2]= date[3]= date[4]= 0;
-        start_loop= 5;                         /* Start with first date part */
-      }
-    }
-
-    field_length= format_position[0] == 0 ? 4 : 2;
-  }
-
-  /*
-    Only allow space in the first "part" of the datetime field and:
-    - after days, part seconds
-    - before and after AM/PM (handled by code later)
-
-    2003-03-03 20:00:20 AM
-    20:00:20.000000 AM 03-03-2000
-  */
-  i= max((uint) format_position[0], (uint) format_position[1]);
-  set_if_bigger(i, (uint) format_position[2]);
-  allow_space= ((1 << i) | (1 << format_position[6]));
-  allow_space&= (1 | 2 | 4 | 8);
-
-  not_zero_date= 0;
-  for (i = start_loop;
-       i < MAX_DATE_PARTS-1 && str != end &&
-         my_isdigit(*str);
-       i++)
-  {
-    const char *start= str;
-    ulong tmp_value= (uint) (unsigned char) (*str++ - '0');
-
-    /*
-      Internal format means no delimiters; every field has a fixed
-      width. Otherwise, we scan until we find a delimiter and discard
-      leading zeroes -- except for the microsecond part, where leading
-      zeroes are significant, and where we never process more than six
-      digits.
-    */
-    bool     scan_until_delim= !is_internal_format &&
-                                  ((i != format_position[6]));
-
-    while (str != end && my_isdigit(str[0]) &&
-           (scan_until_delim || --field_length))
-    {
-      tmp_value=tmp_value*10 + (ulong) (unsigned char) (*str - '0');
-      str++;
-    }
-    date_len[i]= (uint) (str - start);
-    if (tmp_value > 999999)                     /* Impossible date part */
-    {
-      *was_cut= 1;
-      DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
-    }
-    date[i]=tmp_value;
-    not_zero_date|= tmp_value;
-
-    /* Length of next field */
-    field_length= format_position[i+1] == 0 ? 4 : 2;
-
-    if ((last_field_pos= str) == end)
-    {
-      i++;                                      /* Register last found part */
-      break;
-    }
-    /* Allow a 'T' after day to allow CCYYMMDDT type of fields */
-    if (i == format_position[2] && *str == 'T')
-    {
-      str++;                                    /* ISO8601:  CCYYMMDDThhmmss */
-      continue;
-    }
-    if (i == format_position[5])                /* Seconds */
-    {
-      if (*str == '.')                          /* Followed by part seconds */
-      {
-        str++;
-        field_length= 6;                        /* 6 digits */
-      }
-      continue;
-    }
-    while (str != end &&
-           (my_ispunct(*str) ||
-            my_isspace(*str)))
-    {
-      if (my_isspace(*str))
-      {
-        if (!(allow_space & (1 << i)))
-        {
-          *was_cut= 1;
-          DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
-        }
-        found_space= 1;
-      }
-      str++;
-      found_delimitier= 1;                      /* Should be a 'normal' date */
-    }
-    /* Check if next position is AM/PM */
-    if (i == format_position[6])                /* Seconds, time for AM/PM */
-    {
-      i++;                                      /* Skip AM/PM part */
-      if (format_position[7] != 255)            /* If using AM/PM */
-      {
-        if (str+2 <= end && (str[1] == 'M' || str[1] == 'm'))
-        {
-          if (str[0] == 'p' || str[0] == 'P')
-            add_hours= 12;
-          else if (str[0] != 'a' || str[0] != 'A')
-            continue;                           /* Not AM/PM */
-          str+= 2;                              /* Skip AM/PM */
-          /* Skip space after AM/PM */
-          while (str != end && my_isspace(*str))
-            str++;
-        }
-      }
-    }
-    last_field_pos= str;
-  }
-  if (found_delimitier && !found_space && (flags & TIME_DATETIME_ONLY))
-  {
-    *was_cut= 1;
-    DBUG_RETURN(MYSQL_TIMESTAMP_NONE);          /* Can't be a datetime */
-  }
-
-  str= last_field_pos;
-
-  number_of_fields= i - start_loop;
-  while (i < MAX_DATE_PARTS)
-  {
-    date_len[i]= 0;
-    date[i++]= 0;
-  }
-
-  if (!is_internal_format)
-  {
-    year_length= date_len[(uint) format_position[0]];
-    if (!year_length)                           /* Year must be specified */
-    {
-      *was_cut= 1;
-      DBUG_RETURN(MYSQL_TIMESTAMP_NONE);
-    }
-
-    l_time->year=               date[(uint) format_position[0]];
-    l_time->month=              date[(uint) format_position[1]];
-    l_time->day=                date[(uint) format_position[2]];
-    l_time->hour=               date[(uint) format_position[3]];
-    l_time->minute=             date[(uint) format_position[4]];
-    l_time->second=             date[(uint) format_position[5]];
-
-    frac_pos= (uint) format_position[6];
-    frac_len= date_len[frac_pos];
-    if (frac_len < 6)
-      date[frac_pos]*= (uint) log_10_int[6 - frac_len];
-    l_time->second_part= date[frac_pos];
-
-    if (format_position[7] != (uchar) 255)
-    {
-      if (l_time->hour > 12)
-      {
-        *was_cut= 1;
-        goto err;
-      }
-      l_time->hour= l_time->hour%12 + add_hours;
-    }
-  }
-  else
-  {
-    l_time->year=       date[0];
-    l_time->month=      date[1];
-    l_time->day=        date[2];
-    l_time->hour=       date[3];
-    l_time->minute=     date[4];
-    l_time->second=     date[5];
-    if (date_len[6] < 6)
-      date[6]*= (uint) log_10_int[6 - date_len[6]];
-    l_time->second_part=date[6];
-  }
-  // in mysql code but unused
-  // l_time->neg= 0;
-
-  if (year_length == 2 && not_zero_date)
-    l_time->year+= (l_time->year < YY_PART_YEAR ? 2000 : 1900);
-
-  if (number_of_fields < 3 ||
-      l_time->year > 9999 || l_time->month > 12 ||
-      l_time->day > 31 || l_time->hour > 23 ||
-      l_time->minute > 59 || l_time->second > 59)
-  {
-    /* Only give warning for a zero date if there is some garbage after */
-    if (!not_zero_date)                         /* If zero date */
-    {
-      for (; str != end ; str++)
-      {
-        if (!my_isspace(*str))
-        {
-          not_zero_date= 1;                     /* Give warning */
-          break;
-        }
-      }
-    }
-    *was_cut= (not_zero_date == 1);
-    goto err;
-  }
-
-  if (check_date(l_time, not_zero_date != 0, flags, was_cut))
-    goto err;
-
-  // use return value for this
-  time_type= (number_of_fields <= 3 ?
-                      MYSQL_TIMESTAMP_DATE : MYSQL_TIMESTAMP_DATETIME);
-
-  for (; str != end ; str++)
-  {
-    if (!my_isspace(*str))
-    {
-      *was_cut= 1;
-      break;
-    }
-  }
-
-  DBUG_RETURN(time_type);
-
-err:
-  memset(l_time, 0, sizeof(*l_time));
-  DBUG_RETURN(MYSQL_TIMESTAMP_ERROR);
-}
-
-bool stringToDateStruct( const string& data, Date& date )
-{
-	MYSQL_TIME mtime;
-	int		   was_cut = 0;
-	mysql_timestamp_type ttype = str_to_datetime(data.c_str(), strlen(data.c_str()),&mtime,TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE, &was_cut);
-	if (ttype == MYSQL_TIMESTAMP_ERROR || ttype == MYSQL_TIMESTAMP_NONE || was_cut)
-		return false;
-
-	date.year = mtime.year;
-	date.month = mtime.month;
-	date.day = mtime.day;
-	return true;
-}
-
-bool stringToDatetimeStruct(const string& data, DateTime& dtime, bool* date)
-{
-	MYSQL_TIME mtime;
-	int		   was_cut = 0;
-	mysql_timestamp_type ttype = str_to_datetime(data.c_str(), strlen(data.c_str()),&mtime,TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE, &was_cut);
-
-	if (ttype == MYSQL_TIMESTAMP_ERROR || ttype == MYSQL_TIMESTAMP_NONE || was_cut)
-		return false;
-	else if (ttype == MYSQL_TIMESTAMP_DATE)
-	{
-		if (date)
-			*date = true;
-
-		dtime.hour = 0;
-		dtime.minute = 0;
-		dtime.second = 0;
-		dtime.msecond = 0;
-	}
-	else
-	{
-		dtime.hour = mtime.hour;
-		dtime.minute = mtime.minute;
-		dtime.second = mtime.second;
-		dtime.msecond = mtime.second_part;
-	}
-	dtime.year = mtime.year;
-	dtime.month = mtime.month;
-	dtime.day = mtime.day;
-
-	return true;
-}
 
 boost::any
 	DataConvert::convertColumnData( execplan::CalpontSystemCatalog::ColType colType,
@@ -1189,15 +2445,35 @@ boost::any
 					value = d;
 					break;
 				}
-
-				Date aDay;
-				if (stringToDateStruct(data, aDay))
+				std::vector<std::string> dataList;
+				tokenTime ( data, dataList );
+				int size, inYear, inMonth, inDay;
+				size = dataList.size();
+				if ( size > 0 && size <= 7 )
 				{
-					value = (*(reinterpret_cast<uint32_t *> (&aDay)));
+					if (!from_string<int>( inYear, dataList[0], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+					inMonth = convertMonth ( dataList[1] );
+					if (!from_string<int>( inDay, dataList[2], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+					if ( isDateValid ( inDay, inMonth, inYear))
+					{
+						Date aDay;
+						aDay.year = inYear;
+						aDay.month = inMonth;
+						aDay.day = inDay;
+						value = *(reinterpret_cast<uint32_t *> (&aDay));
+					}
+					else
+					{
+						throw QueryDataExcept("Invalid date", formatErr);
+					}
 				}
 				else
 				{
-					throw QueryDataExcept("Invalid date", formatErr);
+					throw QueryDataExcept("Invalid date format", formatErr);
 				}
 			}
 			break;
@@ -1210,13 +2486,78 @@ boost::any
 					value = d;
 					break;
 				}
-
-				DateTime aDatetime;
-				if (stringToDatetimeStruct(data, aDatetime, 0))
+				std::vector<std::string> dataList;
+				tokenTime ( data, dataList);
+				int size = dataList.size();
+				if ( size >= 3 && size <= 7 )
 				{
-					value = *(reinterpret_cast<uint64_t*>(&aDatetime));
+					int inYear, inMonth, inDay, inHour, inMinute, inSecond, inMicrosecond;
+					if (!from_string<int>( inYear, dataList[0], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+					inMonth = convertMonth ( dataList[1] );
+					if (!from_string<int>( inDay, dataList[2], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+					if ( size < 4 ) //only year-month-day
+					{
+						inHour = 0;
+						inMinute = 0;
+						inSecond = 0;
+						inMicrosecond = 0;
+					}
+					else
+					{
+						if (!from_string<int>( inHour, dataList[3], std::dec ))
+							throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+						if ( size > 4 )
+						{
+							if (!from_string<int>( inMinute, dataList[4], std::dec ))
+								throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+						}
+						else
+						{
+							inMinute = 0;
+						}
+
+						if ( size > 5 )
+						{
+							if (!from_string<int>( inSecond, dataList[5], std::dec ))
+								throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+						}
+						else
+						{
+							inSecond = 0;
+						}
+
+						if ( size > 6 )
+						{
+							if (!from_string<int>( inMicrosecond, dataList[6], std::dec ))
+								throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+						}
+						else
+						{
+							inMicrosecond = 0;
+						}
+					}
+
+					if ( isDateValid ( inDay, inMonth, inYear) && isDateTimeValid( inHour, inMinute, inSecond, inMicrosecond ) )
+					{
+						DateTime aDatetime;
+						aDatetime.year = inYear;
+						aDatetime.month = inMonth;
+						aDatetime.day = inDay;
+						aDatetime.hour = inHour;
+						aDatetime.minute = inMinute;
+						aDatetime.second = inSecond;
+						aDatetime.msecond = inMicrosecond;
+						value = *(reinterpret_cast<uint64_t*>(&aDatetime));
+					}
+					else
+					{
+						throw QueryDataExcept("Invalid datetime", formatErr);
+					}
 				}
-				else
+				else //invalid data
 				{
 					throw QueryDataExcept("Invalid datetime", formatErr);
 				}
@@ -1228,22 +2569,22 @@ boost::any
 			break;
 			case execplan::CalpontSystemCatalog::VARBINARY:
 {
-//const char* p = dataOrig.data();
-//cerr << "dataOrig: ";
-//for (size_t i = 0; i < dataOrig.size(); i++, p++)
-//{
-//	if (isprint(*p)) cerr << *p << ' ';
-//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
-//}
-//cerr << endl;
-//p = data.data();
-//cerr << "data: ";
-//for (size_t i = 0; i < data.size(); i++, p++)
-//{
-//	if (isprint(*p)) cerr << *p << ' ';
-//	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
-//}
-//cerr << endl;
+const char* p = dataOrig.data();
+cerr << "dataOrig: ";
+for (size_t i = 0; i < dataOrig.size(); i++, p++)
+{
+	if (isprint(*p)) cerr << *p << ' ';
+	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
+}
+cerr << endl;
+p = data.data();
+cerr << "data: ";
+for (size_t i = 0; i < data.size(); i++, p++)
+{
+	if (isprint(*p)) cerr << *p << ' ';
+	else {unsigned u = *p; u &= 0xff; cerr << "0x" << hex << u << dec << ' ';}
+}
+cerr << endl;
 				value = data;
 }
 			break;
@@ -1254,6 +2595,13 @@ boost::any
 	}
 	else									//null
 	{
+		//Check whether this column has DEFAULT constraint
+		if ( colType.constraintType == execplan::CalpontSystemCatalog::DEFAULT_CONSTRAINT )
+		{
+			value = colType.defaultValue;
+		}
+		else
+		{
 			switch (type)
 			{
 				case execplan::CalpontSystemCatalog::BIT:
@@ -1414,6 +2762,7 @@ boost::any
 				break;
 
 			}
+		}
 
 	}
 
@@ -1498,12 +2847,6 @@ uint64_t DataConvert::convertColumnDatetime(
 		return value;
 	}
 
-	if ( dataOrgLen < 10)
-	{
-		status = -1;
-		return value;
-	}
-
 	int inYear, inMonth, inDay, inHour, inMinute, inSecond, inMicrosecond;
 	memcpy( fld, p, 4);
 	fld[4] = '\0';
@@ -1569,11 +2912,8 @@ uint64_t DataConvert::convertColumnDatetime(
 
 				if (len > 20)
 				{
-					unsigned int microFldLen = len - 20;
-					if (microFldLen > (sizeof(fld)-1))
-						microFldLen = sizeof(fld) - 1;
-					memcpy( fld, p+20, microFldLen);
-					fld[microFldLen] = '\0';
+					memcpy( fld, p+20, len - 20);
+					fld[len - 20] = '\0';
 					inMicrosecond = strtol(fld, 0, 10);
 				}
 			}
@@ -1604,46 +2944,72 @@ uint64_t DataConvert::convertColumnDatetime(
 
 std::string DataConvert::dateToString( int  datevalue )
 {
-	// @bug 4703 abandon multiple ostringstream's for conversion
-	Date d(datevalue);
-	const int DATETOSTRING_LEN=12; // YYYY-MM-DD\0
-	char buf[DATETOSTRING_LEN];
+	ostringstream year, month, day;
 
-	sprintf(buf,"%04d-%02d-%02d",d.year,d.month,d.day);
-	return buf;
+	datevalue >>= 6;
+	day << setw(2) << setfill('0') << (unsigned)(datevalue & 0x3f);
+	datevalue >>= 6;
+	month << setw(2) << setfill('0') << (unsigned)(datevalue & 0xf);
+	datevalue >>= 4;
+	year << setw(4) << setfill('0') << (unsigned)(datevalue & 0xffff);
+
+	return year.str()+ "-" + month.str() + "-" + day.str();
 }
 
 std::string DataConvert::datetimeToString( long long  datetimevalue )
 {
-	// @bug 4703 abandon multiple ostringstream's for conversion
-	DateTime dt(datetimevalue);
-	const int DATETIMETOSTRING_LEN=21; // YYYY-MM-DD HH:MM:SS\0
-	char buf[DATETIMETOSTRING_LEN];
-
-	sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d",dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second);
-	return buf;
+	ostringstream year, month, day, hour, minute, second;
+	//@bug 481
+	//@Bug 3415. Don't display microseconds.
+	datetimevalue >>= 20;
+	second << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	minute << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	hour << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	day << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	month << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0xf);
+	datetimevalue >>= 4;
+	year << setw(4) << setfill('0') << (unsigned)(datetimevalue & 0xffff);
+	return year.str()+ "-" + month.str() + "-" + day.str() + " " + hour.str()
+		+ ":" + minute.str() + ":" + second.str();
 }
 
 std::string DataConvert::dateToString1( int  datevalue )
 {
-	// @bug 4703 abandon multiple ostringstream's for conversion
-	Date d(datevalue);
-	const int DATETOSTRING1_LEN=10; // YYYYMMDD\0
-	char buf[DATETOSTRING1_LEN];
+	ostringstream year, month, day;
 
-	sprintf(buf,"%04d%02d%02d",d.year,d.month,d.day);
-	return buf;
+	datevalue >>= 6;
+	day << setw(2) << setfill('0') << (unsigned)(datevalue & 0x3f);
+	datevalue >>= 6;
+	month << setw(2) << setfill('0') << (unsigned)(datevalue & 0xf);
+	datevalue >>= 4;
+	year << setw(4) << setfill('0') << (unsigned)(datevalue & 0xffff);
+
+	return year.str() + month.str() + day.str();
 }
 
 std::string DataConvert::datetimeToString1( long long  datetimevalue )
 {
-	// @bug 4703 abandon multiple ostringstream's for conversion
-	DateTime dt(datetimevalue);
-	const int DATETIMETOSTRING1_LEN=22; // YYYYMMDDHHMMSSmmmmmm\0
-	char buf[DATETIMETOSTRING1_LEN];
-
-	sprintf(buf,"%04d%02d%02d%02d%02d%02d%06d",dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second,dt.msecond);
-	return buf;
+	ostringstream year, month, day, hour, minute, second, microsec;
+	//@bug 481
+	microsec << setw(6) << setfill('0') << (unsigned)( datetimevalue & 0xfffff);
+	datetimevalue >>= 20;
+	second << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	minute << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	hour << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	day << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0x3f);
+	datetimevalue >>= 6;
+	month << setw(2) << setfill('0') << (unsigned)(datetimevalue & 0xf);
+	datetimevalue >>= 4;
+	year << setw(4) << setfill('0') << (unsigned)(datetimevalue & 0xffff);
+	return year.str()+ month.str() + day.str() + hour.str()
+		+ minute.str() + second.str() + microsec.str();
 }
 
 bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog::ColType colType)
@@ -1789,32 +3155,204 @@ bool DataConvert::isNullData(ColumnResult* cr, int rownum, CalpontSystemCatalog:
 	}
 }
 
-int64_t DataConvert::dateToInt(const string& date)
+int64_t DataConvert::dateToInt(std::string date)
 {
 	return stringToDate(date);
 }
 
-int64_t DataConvert::datetimeToInt(const string& datetime)
+int64_t DataConvert::datetimeToInt(std::string datetime)
 {
 	return stringToDatetime(datetime);
 }
 
-int64_t DataConvert::stringToDate(const string& data)
+int64_t DataConvert::stringToDate(string data)
 {
-	Date aDay;
-	if( stringToDateStruct( data, aDay ) )
-		return (*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0;
-	else
+	try {
+		std::vector<std::string> dataList;
+		tokenTime ( data, dataList );
+		int inYear = 0,
+			inMonth = 0,
+			inDay = 0,
+			inHour = 0,
+			inMinute = 0,
+			inSecond = 0,
+			inMicrosecond = 0;
+		int size = dataList.size();
+		int64_t value;
+
+		if (size == 0)
+			return 0;
+		
+		if ( size > 0 && size <= 6 )
+		{
+			if (!from_string<int>( inYear, dataList[0], std::dec ))
+				throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+			inMonth = convertMonth ( dataList[1] );
+			if (!from_string<int>( inDay, dataList[2], std::dec ))
+				throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+			if (size > 3)
+			{
+				if (!from_string<int>( inHour, dataList[3], std::dec ))
+					throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				if ( size > 4 )
+				{
+					if (!from_string<int>( inMinute, dataList[4], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inMinute = 0;
+				}
+
+				if ( size > 5 )
+				{
+					if (!from_string<int>( inSecond, dataList[5], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inSecond = 0;
+				}
+
+				if ( size > 6 )
+				{
+					if (!from_string<int>( inMicrosecond, dataList[6], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inMicrosecond = 0;
+				}
+
+			}
+			if ( isDateValid ( inDay, inMonth, inYear) && isDateTimeValid( inHour, inMinute, inSecond, inMicrosecond ))
+			{
+				Date aDay;
+				aDay.year = inYear;
+				aDay.month = inMonth;
+				aDay.day = inDay;
+				value = (*(reinterpret_cast<uint32_t *> (&aDay))) & 0xFFFFFFC0;
+			}
+			else
+			{
+				throw QueryDataExcept("Invalid date", formatErr);
+			}
+		}
+		else
+		{
+			throw QueryDataExcept("Invalid date format", formatErr);
+		}
+		return value;
+	} catch (...)
+	{
 		return -1;
+	}
 }
 
-int64_t DataConvert::stringToDatetime(const string& data, bool* date)
+int64_t DataConvert::stringToDatetime(string data, bool* date)
 {
-	DateTime dtime;
-	if( stringToDatetimeStruct( data, dtime, date ) )
-		return *(reinterpret_cast<uint64_t*>(&dtime));
-	else
+	bool isDate = false;
+	try {
+		std::vector<std::string> dataList;
+		tokenTime ( data, dataList);
+		int size = dataList.size();
+		int64_t value;
+
+		if ( size >= 3 && size <= 7 )
+		{
+			int inYear, inMonth, inDay, inHour, inMinute, inSecond, inMicrosecond;
+			if (!from_string<int>( inYear, dataList[0], std::dec ))
+				throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+
+			inMonth = convertMonth ( dataList[1] );
+			if (!from_string<int>( inDay, dataList[2], std::dec ))
+				throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+			if ( size < 4 ) //only year-month-day
+			{
+				inHour = 0;
+				inMinute = 0;
+				inSecond = 0;
+				inMicrosecond = 0;
+				isDate = true;
+			}
+			else
+			{
+				if (!from_string<int>( inHour, dataList[3], std::dec ))
+					throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				if ( size > 4 )
+				{
+					if (!from_string<int>( inMinute, dataList[4], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inMinute = 0;
+				}
+
+				if ( size > 5 )
+				{
+					if (!from_string<int>( inSecond, dataList[5], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inSecond = 0;
+				}
+
+				if ( size > 6 )
+				{
+					if (dataList[6].length() > 6)
+						dataList[6] = dataList[6].substr(0,6);
+
+					if (!from_string<int>( inMicrosecond, dataList[6], std::dec ))
+						throw QueryDataExcept("range, valid value or conversion error on INT type.", formatErr);
+				}
+				else
+				{
+					inMicrosecond = 0;
+				}
+			}
+
+			if (isDateTimeValid( inHour, inMinute, inSecond, inMicrosecond))
+			{
+				DateTime aDatetime;
+				aDatetime.hour = inHour;
+				aDatetime.minute = inMinute;
+				aDatetime.second = inSecond;
+				aDatetime.msecond = inMicrosecond;
+				// @bug 3584. functions like time() produces only time part of a datetime.
+				if (isDateValid ( inDay, inMonth, inYear) || (inDay == 0 && inMonth == 0 && inYear == 0))
+				{
+					aDatetime.year = inYear;
+					aDatetime.month = inMonth;
+					aDatetime.day = inDay;
+				}
+				else
+				{
+					throw QueryDataExcept("Invalid datetime", formatErr);
+				}
+				value = *(reinterpret_cast<uint64_t*>(&aDatetime));
+			}
+
+			else
+			{
+				throw QueryDataExcept("Invalid datetime", formatErr);
+			}
+		}
+		else //invalid data
+		{
+			throw QueryDataExcept("Invalid datetime", formatErr);
+		}
+		if (date)
+			*date = isDate;
+
+		return value;
+	} catch (...)
+	{
 		return -1;
+	}
 }
 
 int64_t DataConvert::intToDate(int64_t data)
@@ -2018,7 +3556,7 @@ int64_t DataConvert::intToDatetime(int64_t data, bool* date)
 	return *(reinterpret_cast<uint64_t*>(&adaytime));
 }
 
-int64_t DataConvert::stringToTime(const string& data)
+int64_t DataConvert::stringToTime(string data)
 {
 	// MySQL supported time value format 'D HHH:MM:SS.fraction'
 	// -34 <= D <= 34
@@ -2089,9 +3627,10 @@ int64_t DataConvert::stringToTime(const string& data)
 
 CalpontSystemCatalog::ColType DataConvert::convertUnionColType(vector<CalpontSystemCatalog::ColType>& types)
 {
-	idbassert(types.size());
+	CalpontSystemCatalog::ColType unionedType;
+	if (types.size() > 0)
+		unionedType = types[0];
 
-	CalpontSystemCatalog::ColType unionedType = types[0];
 	for (uint64_t i = 1; i < types.size(); i++)
 	{
 		// limited support for VARBINARY, no implicit conversion.

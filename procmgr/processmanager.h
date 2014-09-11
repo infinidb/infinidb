@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: processmanager.h 2051 2012-11-29 21:09:31Z dhill $
+* $Id: processmanager.h 1594 2012-02-08 22:49:48Z dhill $
 *
 ******************************************************************************************/
 
@@ -12,23 +12,6 @@
 #include "liboamcpp.h"
 #include "threadpool.h"
 #include "socketclosed.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <net/if_arp.h>
-#include <sys/ioctl.h>
-#include <linux/sockios.h>
-#include <errno.h>
-#include <netinet/in.h>
-#if defined(__GLIBC__) && __GLIBC__ >=2 && __GLIBC_MINOR__ >= 1
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#else
-#include <sys/types.h>
-#include <netinet/if_ether.h>
-#endif
 
 #include <signal.h>
 #include <stdlib.h>
@@ -59,7 +42,7 @@ namespace processmanager{
 
 	void startSystemThread(oam::DeviceNetworkList devicenetworklist);
 	void startModuleThread(std::string moduleName);
-	void processMSG(messageqcpp::IOSocket* fIos);
+	void processMSG(messageqcpp::IOSocket fIos);
 	void sendUpgradeRequest();
 
 	/** @brief Timeset for Milleseconds
@@ -80,6 +63,8 @@ namespace processmanager{
 
 	const int MAX_ARGUMENTS = 10;
 	const std::string DEFAULT_LOG_FILE = "/var/log/Calpont/ProcessManager.log";
+	const std::string DBBackupDir = "/usr/local/Calpont/etc/backup/";
+	const std::string DBDir = "/usr/local/Calpont/etc/";
 
 
    /**
@@ -280,11 +265,6 @@ public:
     int disableModule(std::string target, bool manualFlag);
 
      /**
-     *@brief recycle Processes
-     */
-	void recycleProcess(std::string module);
-
-     /**
      *@brief Enable a specified module
      */
     int enableModule(std::string target, int state);
@@ -349,7 +329,7 @@ public:
     /**
      *@brief set the state of the specified process
      */
-	int setProcessState (std::string moduleName, std::string processName, uint16_t state, pid_t PID);
+	int setProcessState (std::string moduleName, std::string processName, uint16_t state, uint16_t PID);
 
     /**
      *@brief updatelog on a specific module
@@ -384,7 +364,7 @@ public:
     /**
      *@brief Restart a Process Type
      */
-	int restartProcessType(std::string processName, bool manualFlag = true);
+	int restartProcessType(std::string processName);
 
     /**
      *@brief ReInit a Process Type
@@ -394,7 +374,7 @@ public:
     /**
      *@brief Add Module
      */
-	int addModule(oam::DeviceNetworkList devicenetworklist, std::string password, bool manualFlag = true);
+	int addModule(oam::DeviceNetworkList devicenetworklist, std::string password);
 
     /**
      *@brief Reconfigure Module
@@ -404,7 +384,19 @@ public:
     /**
      *@brief Remove Module
      */
-	int removeModule(oam::DeviceNetworkList devicenetworklist, bool manualFlag = true);
+	int removeModule(oam::DeviceNetworkList devicenetworklist);
+
+    /**
+     *@brief Update Exports
+     */
+
+	bool updateExports(std::string IPAddress);
+
+
+    /**
+     *@brief setup User Module fstab mount files
+     */
+	bool setUMfstab(std::string moduleName, std::string userTempName);
 
     /**
      *@brief Check for simplex module run-type and start mate processes if needed
@@ -444,7 +436,7 @@ public:
 	/*
 	* Updates the Calpont.xml file for DDL/DMLProc IPs during PM switchover
 	*/
-	int setPMProcIPs( std::string moduleName, std::string processName = oam::UnassignedName);
+	int setPMProcIPs( std::string moduleName );
 
 	/*
 	* OAM Parent Module change-over
@@ -479,7 +471,7 @@ public:
 
 	/** @brief remount the dbroot disk
 		*/
-//	int remountDbroots(std::string option);
+	int remountDbroots(std::string option);
 
     /**
      *@brief Send Msg to Process Monitor
@@ -499,19 +491,6 @@ public:
 	/** @brief stop by process type
 		*/
 	void stopProcessTypes(bool manualFlag = true);
-
-	/** @brief unmount a dbroot
-		*/
-	int unmountDBRoot(std::string dbrootID);
-
-	/** @brief mount a dbroot
-		*/
-	int mountDBRoot(std::string dbrootID);
-
-	/** @brief distribute fstab update message
-		*/
-	int updateFstab(std::string moduleName, std::string entry);
-
 
 private:
 

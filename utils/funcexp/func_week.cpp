@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_week.cpp 3278 2012-09-13 13:17:18Z bwilkinson $
+* $Id: func_week.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -52,6 +52,10 @@ int64_t Func_week::getIntVal(rowgroup::Row& row,
 	uint32_t year = 0, 
 	         month = 0, 
 	         day = 0, 
+	         hour = 0, 
+	         min = 0, 
+	         sec = 0, 
+	         msec = 0, 
 	         lyear = 0;
 
 	int64_t val = 0;
@@ -73,6 +77,10 @@ int64_t Func_week::getIntVal(rowgroup::Row& row,
 			year = (uint32_t)((val >> 48) & 0xffff);
 			month = (uint32_t)((val >> 44) & 0xf);
 			day = (uint32_t)((val >> 38) & 0x3f);
+			hour = (uint32_t)((val >> 32) & 0x3f);
+			min = (uint32_t)((val >> 26) & 0x3f);
+			sec = (uint32_t)((val >> 20) & 0x3f);
+			msec = (uint32_t)((val & 0xfffff));
 			break;
 		case CalpontSystemCatalog::CHAR:
 		case CalpontSystemCatalog::VARCHAR:

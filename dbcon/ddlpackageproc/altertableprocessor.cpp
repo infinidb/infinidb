@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: altertableprocessor.cpp 9178 2013-01-04 20:15:58Z pleblanc $
+//   $Id: altertableprocessor.cpp 9059 2012-11-07 15:36:33Z chao $
 
 /** @file */
 
@@ -28,6 +28,7 @@
 using namespace boost::algorithm;
 
 #include "messagelog.h"
+#include "ddlindexpopulator.h"
 #include "sqllogger.h"
 #include "cacheutils.h"
 using namespace cacheutils;
@@ -38,13 +39,7 @@ using namespace execplan;
 using namespace ddlpackage;
 using namespace logging;
 using namespace BRM;
-#include "we_messages.h"
-#include "we_ddlcommandclient.h"
 using namespace WriteEngine;
-#include "oamcache.h"
-using namespace oam;
-#include "bytestream.h"
-using namespace messageqcpp;
 
 //TODO: this should be in a common header somewhere
 struct extentInfo
@@ -138,23 +133,6 @@ bool typesAreSame(const CalpontSystemCatalog::ColType& colType, const ColumnType
 	}
 	return false;
 }
-
-
-bool comptypesAreCompat(int oldCtype, int newCtype)
-{
-	switch (oldCtype)
-	{
-	case 1:
-	case 2:
-		return (newCtype == 1 || newCtype == 2);
-
-	default:
-		break;
-	}
-
-	return (oldCtype == newCtype);
-}
-
 }
 
 namespace ddlpackageprocessor
@@ -170,7 +148,6 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	txnID.valid= fTxnid.valid;
 	result.result = NO_ERROR;
 	std::string err;
-	uint64_t tableLockId = 0;
 	DETAIL_INFO(alterTableStmt);
 	int rc = 0;
 	rc = fDbrm.isReadWrite();
@@ -185,18 +162,14 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 		fSessionManager.rolledback(txnID);
 		return result;
 	}
+
 	//@Bug 4538. Log the sql statement before grabbing tablelock
 	SQLLogger logger(alterTableStmt.fSql, fDDLLoggingId, alterTableStmt.fSessionID, txnID.id);
-	
 	VERBOSE_INFO("Getting current txnID");
-	OamCache * oamcache = OamCache::makeOamCache();
-	std::vector<int> moduleIds = oamcache->getModuleIds();
-	uint64_t uniqueId = fDbrm.getUnique64();
-	fWEClient->addQueue(uniqueId);
 	try
 	{
 		//check table lock
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID);
+		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(alterTableStmt.fSessionID);
 		CalpontSystemCatalog::TableName tableName;
@@ -205,76 +178,67 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 		execplan::CalpontSystemCatalog::ROPair roPair;
 		roPair = systemCatalogPtr->tableRID(tableName);
 
-		u_int32_t  processID = ::getpid();
-		int32_t   txnid = txnID.id;
-		int32_t sessionId = alterTableStmt.fSessionID;
+		u_int32_t  processID = 0;
 		std::string  processName("DDLProc");
+		int rc = 0;
 		int i = 0;
-				
-		std::vector<uint> pms;
-		for (unsigned i=0; i < moduleIds.size(); i++)
-		{
-			pms.push_back((uint)moduleIds[i]);
-		}
-				
-		try {
-			tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-		}
-		catch (std::exception&)
-		{
-			throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-		}
-			
-		if ( tableLockId  == 0 )
-		{
-			int waitPeriod = 10;
-			int sleepTime = 100; // sleep 100 milliseconds between checks
-			int numTries = 10;  // try 10 times per second
-			waitPeriod = Config::getWaitPeriod();
-			numTries = 	waitPeriod * 10;
-			struct timespec rm_ts;
+		rc = fSessionManager.setTableLock(roPair.objnum, alterTableStmt.fSessionID, processID, processName, true);
 
-			rm_ts.tv_sec = sleepTime/1000;
-			rm_ts.tv_nsec = sleepTime%1000 *1000000;
+		if ( rc == BRM::ERR_TABLE_LOCKED_ALREADY )
+		{
+			int waitPeriod = 10 * 1000;
+			waitPeriod = Config::getWaitPeriod() * 1000;
+			//retry until time out (microsecond)
 
-			for (; i < numTries; i++)
+			for (; i < waitPeriod; i+=100)
 			{
-#ifdef _MSC_VER
-				Sleep(rm_ts.tv_sec * 1000);
-#else
-				struct timespec abs_ts;
-				do
-				{
-					abs_ts.tv_sec = rm_ts.tv_sec;
-					abs_ts.tv_nsec = rm_ts.tv_nsec;
-				}
-				while(nanosleep(&abs_ts,&rm_ts) < 0);
-#endif
-				try {
-					processID = ::getpid();
-					txnid = txnID.id;
-					sessionId = alterTableStmt.fSessionID;;
-					processName = "DDLProc";
-					tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-				}
-				catch (std::exception&)
-				{
-					throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-				}
+				usleep(100);
 
-				if (tableLockId > 0)
+				rc = fSessionManager.setTableLock(roPair.objnum, alterTableStmt.fSessionID, processID, processName, true);
+
+				if (rc == 0)
 					break;
 			}
-			if (i >= numTries) //error out
+
+			if (i >= waitPeriod) //error out
 			{
-				logging::Message::Args args;
-				args.add(processName);
-				args.add((uint64_t)processID);
-				args.add(sessionId);
-				throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_TABLE_LOCKED,args));
-			}			
-		}
+				bool  lockStatus;
+				ostringstream oss;
+				uint32_t sid;
+				rc = fSessionManager.getTableLockInfo( roPair.objnum, processID, processName, lockStatus, sid);	
+				if ( lockStatus )
+				{
+					oss << " table " << (alterTableStmt.fTableName)->fSchema << "." << (alterTableStmt.fTableName)->fName << " is still locked by " << processName << " with ProcessID " << processID;
+					if ((processName == "DMLProc") && (processID > 0))
+					{
+						oss << " due to active bulkrollback.";
+					}
+					oss << endl;
+				}
 		
+				logging::Message::Args args;
+				logging::Message message(9);
+				args.add(oss.str());
+				message.format(args);
+
+				result.result = ALTER_ERROR;
+				result.message = message;
+				fSessionManager.rolledback(txnID);
+				return result;
+			}
+
+		}
+		else if ( rc  == BRM::ERR_FAILURE)
+		{
+				logging::Message::Args args;
+				logging::Message message(1);
+				args.add("Alter table Failed due to BRM failure");
+				result.result = ALTER_ERROR;
+				result.message = message;
+				fSessionManager.rolledback(txnID);
+				return result;
+		}
+
 		ddlpackage::AlterTableActionList actionList = alterTableStmt.fActions;
 		AlterTableActionList::const_iterator action_iterator = actionList.begin();
 
@@ -299,7 +263,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 	  				columnDefPtr = addColumns.fColumns[0];
 				}
 
-				addColumn (alterTableStmt.fSessionID, txnID.id, result, columnDefPtr, *(alterTableStmt.fTableName), uniqueId);
+				addColumn (alterTableStmt.fSessionID, txnID.id, result, columnDefPtr, *(alterTableStmt.fTableName));
 				if (result.result != NO_ERROR)
 				{
 					err = "AlterTable: add column failed";
@@ -310,7 +274,7 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 			else if (s.find(AlterActionString[6]) != string::npos)
 			{
 				//Drop Column Default
-				dropColumnDefault (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumnDefault*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				dropColumnDefault (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumnDefault*> (*action_iterator)), *(alterTableStmt.fTableName));
 				if (result.result != NO_ERROR)
 				{
 					err = "AlterTable: drop column default failed";
@@ -320,26 +284,26 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 			else if (s.find(AlterActionString[3]) != string::npos)
 			{
 				//Drop Columns
-				dropColumns (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumns*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				dropColumns (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumns*> (*action_iterator)), *(alterTableStmt.fTableName));
 			}
 			else if (s.find(AlterActionString[2]) != string::npos)
 			{
 				//Drop a column
-				dropColumn (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumn*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				dropColumn (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaDropColumn*> (*action_iterator)), *(alterTableStmt.fTableName));
 
 			}
-#if 0
+
 			else if (s.find(AlterActionString[4]) != string::npos)
 			{
 				//Add Table Constraint
 				addTableConstraint (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaAddTableConstraint*> (*action_iterator)), *(alterTableStmt.fTableName));
 
 			}
-#endif
+
 			else if (s.find(AlterActionString[5]) != string::npos)
 			{
 				//Set Column Default
-				setColumnDefault (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaSetColumnDefault*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				setColumnDefault (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaSetColumnDefault*> (*action_iterator)), *(alterTableStmt.fTableName));
 
 			}
 
@@ -355,14 +319,14 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 			else if (s.find(AlterActionString[8]) != string::npos)
 			{
 				//Rename Table
-				renameTable (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaRenameTable*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				renameTable (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaRenameTable*> (*action_iterator)), *(alterTableStmt.fTableName));
 
 	   		}
 
 			else if (s.find(AlterActionString[10]) != string::npos)
 			{
 				//Rename a Column
-				renameColumn (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaRenameColumn*> (*action_iterator)), *(alterTableStmt.fTableName), uniqueId);
+				renameColumn (alterTableStmt.fSessionID, txnID.id, result, *(dynamic_cast<AtaRenameColumn*> (*action_iterator)), *(alterTableStmt.fTableName));
 
 			}
 			else
@@ -379,155 +343,78 @@ AlterTableProcessor::DDLResult AlterTableProcessor::processPackage(ddlpackage::A
 		logging::logDDL(alterTableStmt.fSessionID, txnID.id, alterTableStmt.fSql, alterTableStmt.fOwner);
 
 		DETAIL_INFO("Commiting transaction");
-		commitTransaction(uniqueId, txnID);
+		fWriteEngine.commit(txnID.id);
 		fSessionManager.committed(txnID);
+		deleteLogFile();
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
-		rollBackAlter(ex.what(), txnID, alterTableStmt.fSessionID, result, uniqueId);
+		rollBackAlter(ex.what(), txnID, alterTableStmt.fSessionID, result);
 	}
 	catch (...)
 	{
-		rollBackAlter("encountered unknown exception. ", txnID, alterTableStmt.fSessionID, result, uniqueId);
+		rollBackAlter("encountered unknown exception. ", txnID, alterTableStmt.fSessionID, result);
 	}
-	
-	//release table lock
-	try {
-		bool lockReleased = true;
-		lockReleased = fDbrm.releaseTableLock(tableLockId);
-		//cout << "table lock " << tableLockId << " is released" << endl;
-	}
-	catch (std::exception&)
-	{
-		if (result.result == NO_ERROR)
-		{
-			logging::Message::Args args;
-			logging::Message message(1);
-			args.add("Table lock is not released due to ");
-			args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			args.add("");
-			args.add("");
-			message.format(args);
-			result.result = ALTER_ERROR;
-			result.message = message;
-		}
-	}
-	fWEClient->removeQueue(uniqueId);
 	return result;
 
 }
 
 void AlterTableProcessor::rollBackAlter(const string& error, BRM::TxnID txnID,
-										int sessionId, DDLResult& result, u_int64_t uniqueId)
+										int sessionId, DDLResult& result)
 {
-	DETAIL_INFO("Rolling back transaction");
-	cerr << "AltertableProcessor::processPackage: " << error << endl;
+		DETAIL_INFO("Rolling back transaction");
+		cerr << "AltertableProcessor::processPackage: " << error << endl;
 
-	logging::Message::Args args;
-	logging::Message message(1);
-	args.add("Alter table Failed: ");
-	args.add(error);
-	args.add("");
-	args.add("");
-	message.format(args);
+		logging::Message::Args args;
+		logging::Message message(1);
+		args.add("Alter table Failed: ");
+		args.add(error);
+		args.add("");
+		args.add("");
+		message.format(args);
 
-	rollBackTransaction( uniqueId, txnID, sessionId);
-	fSessionManager.rolledback(txnID);
+		// special handling to alter table primary key case. if not null violation, transaction
+		// already rollbacked in validation call. here we commit.
+		if (result.result == PK_NOTNULL_ERROR)
+		{
+			fWriteEngine.commit(txnID.id);
+			fSessionManager.committed(txnID);
+		}
+		else
+		{
+			fWriteEngine.rollbackTran(txnID.id, sessionId);
+		if (result.result == CREATE_ERROR)
+		{
+			rollBackFiles(txnID);
+		}
+		fSessionManager.rolledback(txnID);
+   	}
    	result.result = ALTER_ERROR;
-	result.message = message;
+		result.message = message;
 }
 
-void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
-		ddlpackage::ColumnDef* columnDefPtr, ddlpackage::QualifiedName& inTableName, const uint64_t uniqueId)
+void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::ColumnDef* columnDefPtr, ddlpackage::QualifiedName& inTableName)
 {
 	std::string err("AlterTableProcessor::addColumn ");
 	SUMMARY_INFO(err);
-	// Allocate an object ID for the column we are about to create, non systables only
+	// Allocate an object ID for the column we are about to create
 	VERBOSE_INFO("Allocating object ID for a column");
-	ByteStream bs;
-	ByteStream::byte tmp8;
-	int rc = 0;
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	bool isDict = false;
-	
-	//@Bug 4111. Check whether the column exists in calpont systable
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	systemCatalogPtr->identity(CalpontSystemCatalog::FE);
-	CalpontSystemCatalog::TableColName tableColName;
-	tableColName.schema = inTableName.fSchema;
-	tableColName.table = inTableName.fName;
-	tableColName.column = columnDefPtr->fName;
-	CalpontSystemCatalog::OID columnOid;
+	ColumnList columns;
+	getColumnsForTable(sessionID, inTableName.fSchema, inTableName.fName, columns);
+	ColumnList::const_iterator column_iterator;
+	column_iterator = columns.begin();
+	if (inTableName.fSchema != CALPONT_SCHEMA)
+	{
 	try {
-		columnOid = systemCatalogPtr->lookupOID(tableColName);
+		execplan::ObjectIDManager fObjectIDManager;
+		fStartingColOID = fObjectIDManager.allocOID();
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		result.result = ALTER_ERROR;
 		err += ex.what();
 		throw std::runtime_error(err);
 	}
-	catch (...)
-	{
-		result.result = ALTER_ERROR;
-		err += "Unknown exception caught";
-		throw std::runtime_error(err);
-	}
-	
-	if (columnOid > 0) //Column exists already
-	{
-		err =err + "Internal add column error for " + tableColName.schema + "." + tableColName.table + "." + tableColName.column
-			+ ". Column exists already. Your table is probably out-of-sync";
-		
-		throw std::runtime_error(err);
-	}
-	
-	if ((columnDefPtr->fType->fType == CalpontSystemCatalog::CHAR && columnDefPtr->fType->fLength > 8) ||
-				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARCHAR && columnDefPtr->fType->fLength > 7) ||
-				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARBINARY && columnDefPtr->fType->fLength > 7))
-	{
-		isDict = true;
-	}
-	//Find out where systables are
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot ");
-			
-	int pmNum = 1;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	//Will create files on each PM as needed.
-	//BUG931
-	//In order to fill up the new column with data an existing column is selected as reference
-	ColumnList columns;
-	getColumnsForTable(sessionID, inTableName.fSchema, inTableName.fName, columns);
-	ColumnList::const_iterator column_iterator;
-	column_iterator = columns.begin();
-
-	if (inTableName.fSchema != CALPONT_SCHEMA)
-	{
-		try {
-			execplan::ObjectIDManager fObjectIDManager;
-			if (isDict)
-			{
-					fStartingColOID = fObjectIDManager.allocOIDs(2);
-			}
-			else
-				fStartingColOID = fObjectIDManager.allocOIDs(1);
-		}
-		catch (std::exception& ex)
-		{
-			result.result = ALTER_ERROR;
-			err += ex.what();
-			throw std::runtime_error(err);
-		}
-		//cout << "new oid is " << fStartingColOID << endl;
 	}
 	else
 	{
@@ -559,13 +446,15 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 
 	fColumnNum = 1;
 	//Find the position for the last column
+	CalpontSystemCatalog* systemCatalogPtr =
+		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	//@Bug 1358
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	CalpontSystemCatalog::TableName tableName;
 	tableName.schema = inTableName.fSchema;
 	tableName.table = inTableName.fName;
-	std::set<BRM::LogicalPartition> outOfSerPar;
+	std::vector<uint32_t> outOfSerPar;
 	CalpontSystemCatalog::ROPair ropair;
-	bool autoincrement = false;
 	try
 	{
 		ropair = systemCatalogPtr->tableRID(tableName);
@@ -574,136 +463,177 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 			err = "No such table: " + tableName.table;
 			throw std::runtime_error(err);
 		}
-		
 		int totalColumns = systemCatalogPtr->colNumbers(tableName);
 		ColumnDefList aColumnList;
 		aColumnList.push_back(columnDefPtr);
 		bool alterFlag = true;
-		
+
 		if (inTableName.fSchema != CALPONT_SCHEMA)
 		{
-			VERBOSE_INFO("Writing meta data to SYSCOL"); //send to WES to process
-			bs.restart();
-			bs << (ByteStream::byte) WE_SVR_WRITE_SYSCOLUMN;
-			bs << uniqueId;
-			bs << sessionID;
-			bs << (uint32_t) txnID;
-			bs << inTableName.fSchema;
-			bs << inTableName.fName;
-			bs << (uint32_t) fStartingColOID;
-			if (isDict)
-				bs << (uint32_t) (fStartingColOID+1);
-			else
-				bs << (uint32_t) 0;
-				
-			bs << (u_int8_t) alterFlag;
-			bs << (uint32_t) totalColumns;
-			columnDefPtr->serialize(bs);
-			//send to WES to process
-			try {
-				fWEClient->write(bs, (uint)pmNum);
-				while (1)
-				{
-					bsIn.reset(new ByteStream());
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-						break;
-					}			
-					else {
-						*bsIn >> tmp8;
-						rc = tmp8;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-						}
-						break;
-					}
-				}			
-			}
-			catch (runtime_error& ex) //write error
-			{		
-				rc = NETWORK_ERROR;
-				errorMsg = ex.what();
-			}
-			catch (...)
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = " Unknown exception caught while updating SYSTABLE.";
-			}
-		
-			if (rc != 0)
-			throw std::runtime_error(errorMsg);		
-			
+		VERBOSE_INFO("Writing meta data to SYSCOL");
+		writeSysColumnMetaData(sessionID, txnID, result, aColumnList, inTableName, totalColumns, alterFlag);
+		}
+		else
+			cerr << "updating calpontsys...skipping writeSysColumnMetaData()" << endl;
+
+		if ((columnDefPtr->fConstraints).size() != 0)
+		{
+			VERBOSE_INFO("Writing column constraint meta data to SYSCONSTRAINT");
+			//writeColumnSysConstraintMetaData(sessionID, txnID, result,aColumnList, inTableName);
+
+			VERBOSE_INFO("Writing column constraint meta data to SYSCONSTRAINTCOL");
+			//writeColumnSysConstraintColMetaData(sessionID, txnID, result,aColumnList, inTableName);
 		}
 
 		if ((columnDefPtr->fType->fAutoincrement).compare("y") == 0)
 		{
 			//update systable autoincrement column
-			bs.restart();
-			bs << (ByteStream::byte) WE_SVR_UPDATE_SYSTABLE_AUTO;
-			bs << uniqueId;
-			bs << sessionID;
-			bs << (uint32_t) txnID;
-			bs << inTableName.fSchema;
-			bs << inTableName.fName;
-			bs << (uint32_t) 1;
-			
-			//send to WES to process
-			try {
-				fWEClient->write(bs, (uint)pmNum);
-				while (1)
-				{
-					bsIn.reset(new ByteStream());
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-						break;
-					}			
-					else {
-						*bsIn >> tmp8;
-						rc = tmp8;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-						}
-						break;
-					}
-				}			
-			}
-			catch (runtime_error& ex) //write error
-			{		
-				rc = NETWORK_ERROR;
-				errorMsg = ex.what();
-			}
-			catch (...)
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = " Unknown exception caught while updating SYSTABLE.";
-			}
-		
-			if (rc != 0)
-			throw std::runtime_error(errorMsg);	
+			//This gives us the rid in systable that we want to update
+			WriteEngine::DctnryStructList dctnryStructList;
+			WriteEngine::DctnryValueList dctnryValueList;
+			WriteEngine::DctColTupleList dctRowList;
+			WriteEngine::DctnryTuple dctColList;
 
-			//start a sequence in controller 
-			fDbrm.startAISequence(fStartingColOID, columnDefPtr->fType->fNextvalue, columnDefPtr->fType->fLength);
+			config::Config* cf = config::Config::makeConfig();
+			unsigned filesPerColumnPartition = 32;
+			unsigned extentsPerSegmentFile = 4;
+			unsigned dbrootCnt = 2;
+			unsigned extentRows = 0x800000;
+			string fpc = cf->getConfig("ExtentMap", "FilesPerColumnPartition");
+			if (fpc.length() != 0)
+				filesPerColumnPartition = cf->uFromText(fpc);
+			string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
+			if (epsf.length() != 0)
+				extentsPerSegmentFile = cf->uFromText(epsf);
+			string dbct = cf->getConfig("SystemConfig", "DBRootCount");
+			if (dbct.length() != 0)
+				dbrootCnt = cf->uFromText(dbct);
+
+			DBRM brm;
+			extentRows = brm.getExtentRows();
+			unsigned dbRoot = 0;
+			unsigned partition = 0;
+			unsigned segment = 0;
+			uint16_t startDBRoot;
+			uint32_t partitionNum;
+
+			// now we have to prepare the various structures for the WE to update the column. 
+			
+			std::vector<WriteEngine::RID> ridList;
+			ridList.push_back(ropair.rid);
+			WriteEngine::ColValueList colValuesList;
+			WriteEngine::ColTupleList aColList;
+			WriteEngine::ColStructList colStructs;
+			std::vector<void *> colOldValuesList;
+			boost::any datavalue;
+			datavalue = 1;
+
+			WriteEngine::ColTuple colTuple;
+
+			//Build colStructs for SYSTABLE
+			tableName.schema = CALPONT_SCHEMA;
+			tableName.table = SYSTABLE_TABLE;
+			DDLColumn column;
+			findColumnData (sessionID, tableName, AUTOINC_COL, column);
+			WriteEngine::ColStruct colStruct;
+			WriteEngine::DctnryStruct dctnryStruct;
+			colStruct.dataOid = column.oid;
+			colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+			colStruct.tokenFlag = false;
+		
+			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+			colTuple.data = datavalue;
+			
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+
+			colStructs.push_back(colStruct);
+			dctnryStructList.push_back(dctnryStruct);
+			aColList.push_back(colTuple);
+			colValuesList.push_back(aColList);
+			std::vector<WriteEngine::ColStructList> colExtentsStruct;
+			std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+			std::vector<WriteEngine::RIDList> ridLists;
+			ridLists.push_back(ridList);
+
+			WriteEngine::DctnryTuple dctnryTuple;
+			dctColList = dctnryTuple;
+			dctRowList.push_back(dctColList);
+			dctnryValueList.push_back(dctRowList);
+
+			//In this case, there's only 1 row, so only one one extent, but keep it generic...
+			std::vector<extentInfo> extentsinfo;
+			extentInfo aExtentinfo;
+
+			brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+			convertRidToColumn(ropair.rid, dbRoot, partition, segment, filesPerColumnPartition,
+				extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+			aExtentinfo.dbRoot = dbRoot;
+			aExtentinfo.partition = partition;
+			aExtentinfo.segment = segment;
+
+			extentsinfo.push_back(aExtentinfo);
+
+			//build colExtentsStruct
+			for (unsigned i=0; i < extentsinfo.size(); i++)
+			{
+				for (unsigned j=0; j < colStructs.size(); j++)
+				{
+					colStructs[j].fColPartition = extentsinfo[i].partition;
+					colStructs[j].fColSegment = extentsinfo[i].segment;
+					colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+					dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+					dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+					dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
+				}
+				colExtentsStruct.push_back(colStructs);
+				dctnryExtentsStruct.push_back(dctnryStructList);
+			}
+
+			// call the write engine to update the row
+			//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+			if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+				ridLists, dctnryExtentsStruct, dctnryValueList))
+			{
+				// build the logging message
+				err = "WE: Update failed on: " + tableName.table;
+				throw std::runtime_error(err);
+			}
+
+			ridList.clear();
+			colStructs.clear();
+			dctnryStructList.clear();
+			aColList.clear();
+			colValuesList.clear();
+			ridLists.clear();
+			dctRowList.clear();
+			dctnryValueList.clear();
+			extentsinfo.clear();
+			colExtentsStruct.clear();
+			dctnryExtentsStruct.clear();
+			colOldValuesList.clear();
 		}
 		
-		//@Bug 4176. save oids to a log file for cleanup after fail over.
+		
+		
+		VERBOSE_INFO("Creating column file");
+		//@Bug 4176 save oids to a log file for DDL cleanup after fail over.
 		std::vector <CalpontSystemCatalog::OID> oidList;
-		if (isDict)
+		oidList.push_back(fStartingColOID);
+		for (uint j=0; j < fDictionaryOIDList.size(); j++)
 		{
-			oidList.push_back(fStartingColOID);
-			oidList.push_back(fStartingColOID+1);
-		}
-		else
-			oidList.push_back(fStartingColOID);
+			oidList.push_back(fDictionaryOIDList[j].dictOID);
+		}	
+		createOpenLogFile( ropair.objnum, tableName );
+		writeLogFile ( tableName, oidList );
 		
-		
-		createWriteDropLogFile( ropair.objnum, uniqueId, oidList );
-		
+		uint16_t dbroot = 0;
+   		uint32_t partitionNum;
+		//BUG931
+		//In order to fill up the new column with data an existing column is selected as reference
+
 		//@Bug 1358,1427 Always use the first column in the table, not the first one in columnlist to prevent random result
 		//@Bug 4182. Use widest column as reference column
 		
@@ -722,9 +652,10 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 				//If there is atleast one existing column then use that as a reference to initialize the new column rows.
 				//get dbroot information
 
-				//fDbrm.getStartExtent((*column_iterator).oid, dbroot, partitionNum, true);
+				fDbrm.getStartExtent((*column_iterator).oid, dbroot, partitionNum, true);
 
-				rc = fDbrm.getOutOfServicePartitions(column_iterator->oid, outOfSerPar);
+				std::vector<struct BRM::EMEntry> extents;
+				int rc = fDbrm.getOutOfServicePartitions((*column_iterator).oid, outOfSerPar);
 
 				if (rc != 0)
 				{
@@ -734,143 +665,69 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 					oss << "getOutOfServicePartitions failed  due to " << errorMsg;
 					throw std::runtime_error(oss.str());
 				}
-				
-			
-				int dataType1;
-				dataType1 = convertDataType(columnDefPtr->fType->fType);
-				if (dataType1 == CalpontSystemCatalog::DECIMAL) //Bug 4107
-				{
-					convertDecimal(columnDefPtr);
-				}
-				
-				WriteEngine::ColDataType dataType =
-						static_cast<WriteEngine::ColDataType>(convertDataType(columnDefPtr->fType->fType));
-				WriteEngine::ColDataType refColDataType =
-						static_cast<WriteEngine::ColDataType>(convertDataType(column_iterator->colType.colDataType));
-			
-				if ((columnDefPtr->fType->fAutoincrement).compare("y") == 0)
-				{
-					autoincrement = true;
-				}
-				//send to all WES to add the new column
-				bs.restart();
-				bs << (ByteStream::byte) WE_SVR_FILL_COLUMN;
-				bs << uniqueId;
-				bs << (uint32_t) txnID;
-				bs << (uint32_t) fStartingColOID;
-				if (isDict)
-					bs << (uint32_t) (fStartingColOID+1);
-				else
-					bs << (uint32_t) 0;
-				//new column info
-				bs << (ByteStream::byte) dataType;
-				bs << (ByteStream::byte) autoincrement;
-				bs << (uint32_t) columnDefPtr->fType->fLength;
-				std::string tmpStr("");
-				if (columnDefPtr->fDefaultValue)
-				{
-					tmpStr = columnDefPtr->fDefaultValue->fValue;
-				}
-				
-				bs << tmpStr;
-				bs << (ByteStream::byte) columnDefPtr->fType->fCompressiontype;
-				//ref column info
-				bs << (uint32_t) column_iterator->oid;
-				bs << (ByteStream::byte) refColDataType;
-				bs << (uint32_t) column_iterator->colType.colWidth;
-				bs << (ByteStream::byte) column_iterator->colType.compressionType;
-				//cout << "sending command fillcolumn " << endl;	 
-					uint msgRecived = 0;
-					fWEClient->write_to_all(bs);
-					bsIn.reset(new ByteStream());
-					while (1)
-					{
-						if (msgRecived == fPMCount)
-							break;
-						fWEClient->read(uniqueId, bsIn);
-						if ( bsIn->length() == 0 ) //read error
-						{
-							rc = NETWORK_ERROR;
-							break;
-						}			
-						else {
-							*bsIn >> tmp8;
-							*bsIn >> errorMsg;
-							rc = tmp8;
-							//cout << "Got error code from WES " << rc << endl;
-							if (rc != 0) 				
-								break;	
-							else
-								msgRecived++;						
-						}
-					}				
-					if (rc != 0) //delete the newly created files before erroring out
-					{					
-						bs.restart();
-						bs << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
-						bs << uniqueId;
-						bs << (uint32_t) oidList.size();
-						for (uint i=0; i < oidList.size(); i++)
-						{
-							bs << (uint32_t) oidList[i];
-						}
-						
-						uint msgRecived = 0;
-						try {
-							fWEClient->write_to_all(bs);
-							bsIn.reset(new ByteStream());
-							ByteStream::byte tmp8;
-							while (1)
-							{
-								if (msgRecived == fWEClient->getPmCount())
-									break;
-								fWEClient->read(uniqueId, bsIn);
-								if ( bsIn->length() == 0 ) //read error
-								{
-									rc = NETWORK_ERROR;
-									errorMsg = "Lost connection to Write Engine Server while dropping column files";
-									break;
-								}			
-								else {
-									*bsIn >> tmp8;
-									rc = tmp8;
-									if (rc != 0) {
-										*bsIn >> errorMsg;
-										break;
-									}
-									else
-										msgRecived++;						
-								}
-							}
-						}
-						catch (runtime_error& ex) //write error
-						{		
-							rc = NETWORK_ERROR;
-							errorMsg = ex.what();
-						}
-						catch (...)
-						{
-							rc = NETWORK_ERROR;
-							errorMsg = " Unknown exception caught while dropping column files.";
-						}
 
-						if ( rc == 0 ) {
-							fWEClient->removeQueue(uniqueId);
-							deleteLogFile(DROPTABLE_LOG, ropair.objnum, uniqueId);
-							fWEClient->addQueue(uniqueId);
+				createColumnFiles(txnID, result,aColumnList, dbroot, partitionNum);
+				//Check column width to decide whether Dictionary files need to be created
+				if ((columnDefPtr->fType->fType == CalpontSystemCatalog::CHAR && columnDefPtr->fType->fLength > 8) ||
+				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARCHAR && columnDefPtr->fType->fLength > 7) ||
+				 (columnDefPtr->fType->fType == CalpontSystemCatalog::VARBINARY && columnDefPtr->fType->fLength > 7))
+				{
+					createDictionaryFiles(txnID, result, dbroot);
+				}
+				long long nextVal = 0; 
+				fillColumnWithDefaultVal(txnID, result, aColumnList, *column_iterator, dbroot, nextVal);
+				if (nextVal != 0)
+				{
+					//validate next values
+					bool validValue = true;
+					switch (columnDefPtr->fType->fType)
+					{
+						case ddlpackage::DDL_BIGINT:
+						{
+							if (nextVal > MAX_BIGINT)
+								validValue = false;
 						}
-							
-						throw std::runtime_error(errorMsg);
+						break;
+						case ddlpackage::DDL_INT:
+						case ddlpackage::DDL_INTEGER:
+						case ddlpackage::DDL_MEDINT:
+						{
+							if (nextVal > MAX_INT)
+								validValue = false;
+						}
+						break;
+						case ddlpackage::DDL_SMALLINT:
+						{
+							if (nextVal > MAX_SMALLINT)
+								validValue = false;
+						}
+						break;
+						case ddlpackage::DDL_TINYINT:
+						{
+							if (nextVal > MAX_TINYINT)
+								validValue = false;
+						}
+						break;
 					}
-						
-					//Update nextVal
-					break;
+					if (!validValue)
+					{
+						result.result = CREATE_ERROR;
+						throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT));
+					}
+					std::map<uint32_t, long long> nextValMap;
+					nextValMap[ropair.objnum] = nextVal;
+					rc = fWriteEngine.updateNextValue (nextValMap, sessionID);
+					nextValMap.clear();
+					nextValMap[ropair.objnum] = nextVal;
+				}
+				break;
 			}
-				//Update nextVal
 			column_iterator++;
 		}
+		//VERBOSE_INFO("Creating index files");
+		//createIndexFiles(txnID, result);
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		if (result.result != CREATE_ERROR)
 			result.result = ALTER_ERROR;
@@ -879,356 +736,322 @@ void AlterTableProcessor::addColumn (u_int32_t sessionID, execplan::CalpontSyste
 	}
 	catch (...)
 	{
-		result.result = ALTER_ERROR;
+		result.result = CREATE_ERROR;
 		err += "Unknown exception caught";
 		throw std::runtime_error(err);
 	}
-	
-	//update SYSCOLUMN of the new next value
-	if (autoincrement)
-	{
-		DBRM aDbrm;
-		aDbrm.getAILock(fStartingColOID);	
-		uint64_t nextValInController;
-		bool validNextVal = aDbrm.getAIValue(fStartingColOID, &nextValInController);	
-		if (validNextVal)
-		{
-			WE_DDLCommandClient ddlClient;
-			uint8_t rc = ddlClient.UpdateSyscolumnNextval(fStartingColOID, nextValInController,sessionID);
-			aDbrm.releaseAILock(fStartingColOID);
-			if (rc!=0)
-				throw std::runtime_error("Update SYSCAT next value failed");
-		}
-		else
-		{
-			aDbrm.releaseAILock(fStartingColOID);
-			throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_EXCEED_LIMIT));
-		}
-		aDbrm.releaseAILock(fStartingColOID);
-	}
 	std::vector <CalpontSystemCatalog::OID> oidList;
-	oidList.push_back(fStartingColOID);
-	if (outOfSerPar.size() > 0)
-		rc = fDbrm.markPartitionForDeletion(oidList, outOfSerPar, errorMsg);
-		
-	if (rc != 0)
+	for (unsigned i = 0; i < outOfSerPar.size(); i++)
 	{
-		ostringstream oss;
-		oss << "Mark partition for deletition failed  due to " << errorMsg;
-		throw std::runtime_error(oss.str());
+		oidList.push_back(fStartingColOID);
+		int rc = fDbrm.markPartitionForDeletion(oidList, outOfSerPar[i]);
+		if (rc != 0)
+		{
+				string errorMsg;
+				BRM::errString(rc, errorMsg);
+				ostringstream oss;
+				oss << "Mark partition for deletition failed  due to " << errorMsg;
+				throw std::runtime_error(oss.str());
+		}
 	}
-	fWEClient->removeQueue(uniqueId);
-	deleteLogFile(DROPTABLE_LOG, ropair.objnum, uniqueId);
-	fWEClient->addQueue(uniqueId);
 }
 
-void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
-			ddlpackage::AtaDropColumn& ataDropColumn, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+void AlterTableProcessor::rollBackFiles(BRM::TxnID txnID)
+{
+	fWriteEngine.dropColumn(txnID.id, fStartingColOID);
+	std::string err;
+
+	try {
+		execplan::ObjectIDManager fObjectIDManager;
+ 		fObjectIDManager.returnOIDs(fStartingColOID, fStartingColOID);
+ 	}
+ 	catch (exception& ex)
+ 	{
+		err += ex.what();
+		throw std::runtime_error(err);
+ 	}
+ 	catch (...)
+ 		{}
+
+		IndexOIDList::const_iterator idxoid_iter = fIndexOIDList.begin();
+		while (idxoid_iter != fIndexOIDList.end())
+		{
+			IndexOID idxOID = *idxoid_iter;
+			(void)0;
+
+			++idxoid_iter;
+		}
+		DictionaryOIDList::const_iterator dictoid_iter = fDictionaryOIDList.begin();
+		while (dictoid_iter != fDictionaryOIDList.end())
+		{
+			DictOID dictOID = *dictoid_iter;
+  			fWriteEngine.dropDctnry(txnID.id, dictOID.dictOID, dictOID.treeOID, dictOID.listOID);
+			//fObjectIDManager.returnOIDs(dictOID.dictOID, dictOID.treeOID);
+
+			++dictoid_iter;
+		}
+}
+
+void AlterTableProcessor::dropColumn (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaDropColumn& ataDropColumn, ddlpackage::QualifiedName& fTableName)
 {
 	// 1. Get the OIDs for the column
 	// 2. Get the OIDs for the dictionary
-	// 3. Remove the column from SYSCOLUMN
-	// 4. update systable if the dropped column is autoincrement column 
-	// 5. update column position for affected columns
-	// 6. Remove the files
-
+	// 3. Get the OIDs for the indexes
+	// 4. Remove the column from SYSCOLUMN
+	// 5. update systable if the dropped column is autoincrement column 
+	// 6. update column position for affected columns
+	// 7. Remove the index column from SYSINDEXCOL
+	// 8. Remove the constraint columns from SYSCONSTRAINTCOL
+	// 9. Remove the column file
+	// 10. Remove the index files
+	// 11. Remove the dictionary files
+	// 12.Return the OIDs
 	SUMMARY_INFO("AlterTableProcessor::dropColumn");
 	VERBOSE_INFO("Finding object IDs for the column");
 	CalpontSystemCatalog::TableColName tableColName;
-	CalpontSystemCatalog::TableName tableName;
-	tableName.schema = fTableName.fSchema;
-	tableName.table = fTableName.fName;
 	tableColName.schema = fTableName.fSchema;
 	tableColName.table = fTableName.fName;
 	tableColName.column = ataDropColumn.fColumnName;
 	execplan::CalpontSystemCatalog::DictOIDList dictOIDList;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+	CalpontSystemCatalog::TableName tableName;
+	tableName.schema = fTableName.fSchema;
+	tableName.table = fTableName.fName;
+	CalpontSystemCatalog::ROPair tableRO;
+	CalpontSystemCatalog* systemCatalogPtr =
 	CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	//@Bug 1358
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	std::string err;
-	execplan::CalpontSystemCatalog::ROPair roPair;
 	CalpontSystemCatalog::OID oid;
 	CalpontSystemCatalog::ColType colType;
-	try {
-		roPair = systemCatalogPtr->tableRID( tableName );
-	
+	try
+	{
+		tableRO = systemCatalogPtr->tableRID(tableName);
+		execplan::CalpontSystemCatalog::ROPair colRO = systemCatalogPtr->columnRID(tableColName);
+		if (colRO.objnum < 0)
+		{
+			err = "Column not found:" + tableColName.table + "." + tableColName.column;
+			throw std::runtime_error(err);
+		}
 		oid = systemCatalogPtr->lookupOID(tableColName);
 		colType = systemCatalogPtr->colType(oid);
-	}
-	catch (std::exception& ex)
-	{
-		throw std::runtime_error(ex.what());
-	}
-	int colPos = colType.colPosition;	
-	ByteStream bytestream;
-	bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSCOLUMN_ROW;
-	bytestream << uniqueId;
-	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
-	bytestream << fTableName.fSchema;
-	bytestream << fTableName.fName;
-	bytestream << ataDropColumn.fColumnName;
-	
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	ByteStream::byte rc = 0;
-	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot ");
-	
-	int pmNum = 1;
-		
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	try
-	{			
-		fWEClient->write(bytestream, (uint)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column sending WE_SVR_DELETE_SYSCOLUMN_ROW to pm " << pmNum << endl;
-#endif	
-		while (1)
+		int colPos = colType.colPosition;
+		ddlpackage::QualifiedName columnInfo;
+		columnInfo.fSchema = fTableName.fSchema;
+		columnInfo.fName = ataDropColumn.fColumnName;
+		columnInfo.fCatalog = fTableName.fName;
+
+		VERBOSE_INFO("Removing the SYSCOLUM meta data");
+		removeColSysColMetaData(sessionID, txnID, result, columnInfo);
+		//Update SYSTABLE 
+		if (colType.autoincrement)
 		{
-			bsIn.reset(new ByteStream());
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
+			config::Config* cf = config::Config::makeConfig();
+			unsigned filesPerColumnPartition = 32;
+			unsigned extentsPerSegmentFile = 4;
+			unsigned dbrootCnt = 2;
+			unsigned extentRows = 0x800000;
+			string fpc = cf->getConfig("ExtentMap", "FilesPerColumnPartition");
+			if (fpc.length() != 0)
+				filesPerColumnPartition = cf->uFromText(fpc);
+			string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
+			if (epsf.length() != 0)
+				extentsPerSegmentFile = cf->uFromText(epsf);
+			string dbct = cf->getConfig("SystemConfig", "DBRootCount");
+			if (dbct.length() != 0)
+				dbrootCnt = cf->uFromText(dbct);
+
+			DBRM brm;
+			extentRows = brm.getExtentRows();
+			unsigned dbRoot = 0;
+			unsigned partition = 0;
+			unsigned segment = 0;
+			uint16_t startDBRoot;
+			uint32_t partitionNum;
+			
+			DDLColumn column;
+			tableName.schema = CALPONT_SCHEMA;
+			tableName.table = SYSTABLE_TABLE;
+			findColumnData (sessionID, tableName, AUTOINC_COL, column); //AUTOINC_COL column
+			WriteEngine::ColValueList colValuesList;
+			WriteEngine::ColTupleList aColList;
+			WriteEngine::ColStructList colStructs;
+			std::vector<void *> colOldValuesList;
+			WriteEngine::DctnryStructList dctnryStructList;
+			WriteEngine::DctnryValueList dctnryValueList;
+			WriteEngine::DctColTupleList dctRowList;
+			WriteEngine::DctnryTuple dctColList;
+			WriteEngine::ColStruct colStruct;
+			WriteEngine::DctnryStruct dctnryStruct;
+			WriteEngine::ColTuple colTuple;
+			colStruct.dataOid = column.oid;
+			colStruct.colWidth = column.colType.colWidth;
+			colStruct.tokenFlag = false;
+			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+			colTuple.data = 0;
+				
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+			colStructs.push_back(colStruct);
+			dctnryStructList.push_back(dctnryStruct);
+			aColList.push_back(colTuple);
+			colValuesList.push_back(aColList);
+			
+			std::vector<WriteEngine::ColStructList> colExtentsStruct;
+			std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+			std::vector<WriteEngine::RID> ridList;
+			ridList.push_back(tableRO.rid);
+			std::vector<WriteEngine::RIDList> ridLists;
+			ridLists.push_back(ridList);
+
+			WriteEngine::DctnryTuple dctnryTuple;
+			dctnryTuple.isNull = true;
+			dctColList = dctnryTuple;
+			dctRowList.push_back(dctColList);
+			dctnryValueList.push_back(dctRowList);
+			std::vector<extentInfo> extentsinfo;
+			extentInfo aExtentinfo;
+
+			brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+			convertRidToColumn(tableRO.rid, dbRoot, partition, segment, filesPerColumnPartition,
+				extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+			aExtentinfo.dbRoot = dbRoot;
+			aExtentinfo.partition = partition;
+			aExtentinfo.segment = segment;
+
+			extentsinfo.push_back(aExtentinfo);
+
+			//build colExtentsStruct
+			for (unsigned i=0; i < extentsinfo.size(); i++)
 			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-				break;
-			}			
-			else {
-				*bsIn >> rc;
-				*bsIn >> errorMsg;
-				break;
-			}
-		}
-	}
-	catch (runtime_error& ex) //write error
-	{
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got exception" << ex.what() << endl;
-#endif			
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
-	}
-	catch (...)
-	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while updating SYSTABLE.";
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got unknown exception" << endl;
-#endif
-	}
-		
-	if (rc != 0)
-		throw std::runtime_error(errorMsg);
-		
-	//Update SYSTABLE 
-	if (colType.autoincrement)
-	{
-		bytestream.restart();
-		bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLE_AUTO;
-		bytestream << uniqueId;
-		bytestream << sessionID;
-		bytestream << (u_int32_t)txnID;
-		bytestream << fTableName.fSchema;
-		bytestream << fTableName.fName;
-		bytestream << (u_int32_t) 0; //autoincrement off
-		
-		try {		
-			fWEClient->write(bytestream, (uint)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column sending WE_SVR_UPDATE_SYSTABLE_AUTO to pm " << pmNum << endl;
-#endif	
-			while (1)
-			{
-				bsIn.reset(new ByteStream());
-				fWEClient->read(uniqueId, bsIn);
-				if ( bsIn->length() == 0 ) //read error
+				for (unsigned j=0; j < colStructs.size(); j++)
 				{
-					rc = NETWORK_ERROR;
-					errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-					break;
-				}			
-				else {
-					*bsIn >> rc;
-					*bsIn >> errorMsg;
-					break;
+					colStructs[j].fColPartition = extentsinfo[i].partition;
+					colStructs[j].fColSegment = extentsinfo[i].segment;
+					colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+					dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+					dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+					dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
 				}
+				colExtentsStruct.push_back(colStructs);
+				dctnryExtentsStruct.push_back(dctnryStructList);
 			}
-		}
-		catch (runtime_error& ex) //write error
-		{
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got exception" << ex.what() << endl;
-#endif			
-			rc = NETWORK_ERROR;
-			errorMsg = ex.what();
-		}
-		catch (...)
-		{
-			rc = NETWORK_ERROR;
-			errorMsg = " Unknown exception caught while updating SYSTABLE.";
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got unknown exception" << endl;
-#endif
+
+			// call the write engine to update the row
+			//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+			if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+				ridLists, dctnryExtentsStruct, dctnryValueList))
+			{
+				// build the logging message
+				err = "WE: Update failed on: " + tableName.table;
+				throw std::runtime_error(err);
+			}
+
+			//WE loves vectors!
+			ridList.clear();
+			colStructs.clear();
+			dctnryStructList.clear();
+			aColList.clear();
+			colValuesList.clear();
+			ridLists.clear();
+			dctRowList.clear();
+			dctnryValueList.clear();
+			extentsinfo.clear();
+			colExtentsStruct.clear();
+			dctnryExtentsStruct.clear();
+			colOldValuesList.clear();
 		}
 		
-		if (rc != 0)
-			throw std::runtime_error(errorMsg);		
-	}
-
-	//Update column position
-	bytestream.restart();
-	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSCOLUMN_COLPOS;
-	bytestream << uniqueId;
-	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
-	bytestream << fTableName.fSchema;
-	bytestream << fTableName.fName;
-	bytestream << (u_int32_t) colPos;
-	try {		
-		fWEClient->write(bytestream, (uint)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column sending WE_SVR_UPDATE_SYSTABLE_AUTO to pm " << pmNum << endl;
-#endif	
-		while (1)
+		VERBOSE_INFO("Updating the SYSCOLUM column position");
+		WriteEngine::RIDList ridList;
+		WriteEngine::ColValueList colValuesList;
+		WriteEngine::ColValueList colOldValuesList;
+		CalpontSystemCatalog::TableName tableName;
+		tableName.table = fTableName.fName;
+		tableName.schema = fTableName.fSchema;
+		CalpontSystemCatalog::RIDList rids = systemCatalogPtr->columnRIDs(tableName);
+		CalpontSystemCatalog::RIDList::const_iterator rid_iter = rids.begin();
+		boost::any value;
+		WriteEngine::ColTupleList colTuples;
+		CalpontSystemCatalog::ColType columnType;
+		
+		while (rid_iter != rids.end())
 		{
-			bsIn.reset(new ByteStream());
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
+			//look up colType
+			colRO = *rid_iter;
+			columnType = systemCatalogPtr->colType(colRO.objnum);
+			if (columnType.colPosition < colPos)
 			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-				break;
-			}			
-			else {
-				*bsIn >> rc;
-				*bsIn >> errorMsg;
-				break;
+				++rid_iter;
+				continue;
+			}
+			ridList.push_back(colRO.rid);
+			value = columnType.colPosition - 1;
+			WriteEngine::ColTuple colTuple;
+			colTuple.data = value;
+			colTuples.push_back(colTuple);
+			++rid_iter;
+		}
+		colValuesList.push_back(colTuples);
+
+		if (colTuples.size() > 0)
+		{
+			updateSyscolumns(txnID, result, ridList,colValuesList, colOldValuesList);
+			if (result.result != NO_ERROR)
+			{
+				DETAIL_INFO("updateSyscolumns failed");
+				return;
 			}
 		}
 	}
-	catch (runtime_error& ex) //write error
+	catch (exception& ex)
 	{
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got exception" << ex.what() << endl;
-#endif			
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
+		err = ex.what();
+		throw std::runtime_error(err);
 	}
 	catch (...)
 	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while updating SYSTABLE.";
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got unknown exception" << endl;
-#endif
+		err = "dropColumn:Unknown exception caught";
+		throw std::runtime_error(err);
 	}
-		
-	if (rc != 0)
-		throw std::runtime_error(errorMsg);		
-
-	//commit the transaction.
-	BRM::TxnID aTxnID;
-	aTxnID.id= txnID;
-	aTxnID.valid= true;
-	commitTransaction(uniqueId, aTxnID);
-	
-	VERBOSE_INFO("Removing column files");
-	//Drop files
+	fWriteEngine.commit(txnID);
+	CalpontSystemCatalog::RIDList tableColRidList; 
+    execplan::CalpontSystemCatalog::ROPair roPair; 
+	roPair.objnum = oid; 
+	tableColRidList.push_back(roPair); 
+	//@Bug 4176 save oids to a log file for DDL cleanup after fail over.
 	std::vector <CalpontSystemCatalog::OID> oidList;
-	bytestream.restart();
-	bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
-	bytestream << uniqueId;
-	if (colType.ddn.dictOID > 3000)  //@bug 4847. need to take care varchar(8)
-	{
-		bytestream << (uint32_t) 2;
-		bytestream << (uint32_t) oid;
-		bytestream << (uint32_t) colType.ddn.dictOID;
-		oidList.push_back(oid);
-		oidList.push_back( colType.ddn.dictOID);
-	}
-	else
-	{
-		bytestream << (uint32_t) 1;
-		bytestream << (uint32_t) oid;
-		oidList.push_back(oid);
-	}
-	//Save the oids to a file
-	uint msgRecived = 0;
+	oidList.push_back(oid);
+	oidList.push_back(colType.ddn.dictOID);	
 	bool fileDropped = true;
 	try {
-		createWriteDropLogFile( roPair.objnum, uniqueId, oidList );
-		//@Bug 4811. Need to send to all PMs
-		fWEClient->write_to_all(bytestream);
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column sending WE_SVR_UPDATE_SYSTABLE_AUTO to pm " << pmNum << endl;
-#endif	
-		bsIn.reset(new ByteStream());
-		ByteStream::byte tmp8;
-		while (1)
+		createOpenLogFile( tableRO.objnum, tableName );
+		writeLogFile ( tableName, oidList );
+		
+		removeColumnFiles(txnID, result, tableColRidList);
+
+		if (colType.ddn.dictOID > 3000) //@bug 4847. need to take care varchar(8)
 		{
-			if (msgRecived == fWEClient->getPmCount())
-				break;
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while dropping column files";
-				break;
-			}			
-			else {
-				*bsIn >> tmp8;
-				rc = tmp8;
-				if (rc != 0) {
-					*bsIn >> errorMsg;
-					fileDropped = false;
-					break;
-				}
-				else
-					msgRecived++;						
-			}
+			VERBOSE_INFO("Removing dictionary files");
+			dictOIDList.push_back(colType.ddn);
+			removeDictionaryFiles(txnID, result, dictOIDList);
 		}
-	}
-	catch (runtime_error& ex) //write error
-	{
-#ifdef IDB_DDL_DEBUG
-cout << "Alter table drop column got exception" << ex.what() << endl;
-#endif			
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
 	}
 	catch (...)
 	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while dropping column files.";
-#ifdef IDB_DDL_DEBUG
-cout << "create table got unknown exception" << endl;
-#endif
-	}							
-	//@Bug 3860
-	rc = cacheutils::dropPrimProcFdCache();
-	//Flush primProc cache
-	rc = cacheutils::flushOIDsFromCache( oidList );
-	//Delete extents from extent map
-	rc = fDbrm.deleteOIDs(oidList);
-	if (fileDropped)
-	{
-		fWEClient->removeQueue(uniqueId);
-		deleteLogFile(DROPTABLE_LOG, roPair.objnum, uniqueId);
-		fWEClient->addQueue(uniqueId);
+		fileDropped = false;
 	}
+
+	//@Bug 3860
+	cacheutils::dropPrimProcFdCache();
+	returnOIDs(tableColRidList, dictOIDList);
+	if (fileDropped)
+		deleteLogFile();
 }
 
 
-void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
-		ddlpackage::AtaDropColumns& ataDropColumns, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaDropColumns& ataDropColumns, ddlpackage::QualifiedName& fTableName)
 {
 	SUMMARY_INFO("AlterTableProcessor::dropColumns");
 	ddlpackage::ColumnNameList colList = ataDropColumns.fColumns;
@@ -1243,7 +1066,7 @@ void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSys
 
 		ataDropColumn.fColumnName = *col_iter;
 
-		dropColumn (sessionID,txnID, result,ataDropColumn,fTableName,uniqueId);
+		dropColumn (sessionID,txnID, result,ataDropColumn,fTableName);
 
 		if (result.result != NO_ERROR)
 		{
@@ -1253,7 +1076,7 @@ void AlterTableProcessor::dropColumns (u_int32_t sessionID, execplan::CalpontSys
 		col_iter++;
 		}
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		err = ex.what();
 		throw std::runtime_error(err);
@@ -1281,7 +1104,7 @@ void AlterTableProcessor::addTableConstraint (u_int32_t sessionID, execplan::Cal
 		VERBOSE_INFO("Writing table constraint meta data to SYSCONSTRAINTCOL");
 		//writeTableSysConstraintColMetaData(sessionID, txnID, result,constrainList, fTableName, alterFlag);
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		err = ex.what();
 		throw std::runtime_error(err);
@@ -1293,160 +1116,184 @@ void AlterTableProcessor::addTableConstraint (u_int32_t sessionID, execplan::Cal
 	}
 }
 
-void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
-		ddlpackage::AtaSetColumnDefault& ataSetColumnDefault, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+void AlterTableProcessor::setColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaSetColumnDefault& ataSetColumnDefault, ddlpackage::QualifiedName& fTableName)
 {
+	/*TODO: oracle use MODIFY, our parser use ALTER(need to verify) */
+	/*Steps to set column default:
+	  1. Find RID of this column in SYSCOLUMN
+	  2. Find OID of column DefaultValue in SYSCOLUMN
+	  3. Call Write Engine to update the new default value */
 	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
-	/*Steps:
-	1. Update SYSCOLUMN for default value change
-	*/
-	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
-	ByteStream bs;
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	ByteStream::byte rc = 0;
-	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot");
-	
-	int pmNum = 1;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	
-	string err;
-
-			
-	//Update SYSCOLUMN
-	bs.restart();
-	bs << (ByteStream::byte) WE_SVR_UPDATE_SYSCOLUMN_DEFAULTVAL;
-	bs << uniqueId;
-	bs << sessionID;
-	bs << (uint32_t) txnID;
-	bs << fTableName.fSchema;
-	bs << fTableName.fName;
-	bs << ataSetColumnDefault.fColumnName;
-	string defaultValue("");
-	if (ataSetColumnDefault.fDefaultValue)
-		defaultValue = ataSetColumnDefault.fDefaultValue->fValue;
-			 
-	bs << defaultValue;
-		
-	//send to WES to process
-	try {
-		fWEClient->write(bs, (uint)pmNum);
-		while (1)
+	CalpontSystemCatalog* systemCatalogPtr =
+		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	//@Bug 1358
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	CalpontSystemCatalog::TableColName tableColName;
+	CalpontSystemCatalog::TableName tableName;
+	tableColName.schema = fTableName.fSchema;
+	tableColName.table = fTableName.fName;
+	tableColName.column = ataSetColumnDefault.fColumnName;
+	std::string err;
+	try
+	{
+		CalpontSystemCatalog::ROPair roPair = systemCatalogPtr->columnRID(tableColName);
+		if (roPair.objnum < 0)
 		{
-			bsIn.reset(new ByteStream());
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-				break;
-			}			
-			else {
-				*bsIn >> rc;
-				if (rc != 0) {
-					*bsIn >> errorMsg;
-				}
-				break;
-			}
-		}			
+			ostringstream oss;
+			oss << "No such column: " << tableColName;
+			throw std::runtime_error(oss.str().c_str());
+		}
+		std::vector<WriteEngine::RID> ridList;
+		ridList.push_back(roPair.rid);
+		WriteEngine::ColValueList colValuesList;
+		WriteEngine::ColTupleList aColList;
+		WriteEngine::ColStructList colStructs;
+		std::vector<void *> colOldValuesList;
+		WriteEngine::ColTuple colTuple;
+		//Build colStructs for SYSCOLUM
+		tableName.schema = CALPONT_SCHEMA;
+		tableName.table = SYSCOLUMN_TABLE;
+		DDLColumn column;
+		findColumnData (sessionID, tableName, DEFAULTVAL_COL, column);
+		WriteEngine::ColStruct colStruct;
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.tokenFlag = false;
+		colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+		colStructs.push_back(colStruct);
+		boost::any datavalue;
+		if (ataSetColumnDefault.fDefaultValue->fNull)
+		{
+			datavalue = getNullValueForType(column.colType);
+		}
+		else
+		{
+			datavalue = ataSetColumnDefault.fDefaultValue->fValue;
+		}
+
+		if (column.colType.colWidth > 8) //token
+		{
+			colTuple.data = tokenizeData(txnID, result, column.colType,datavalue);
+		}
+		else
+		{
+			colTuple.data = datavalue;
+		}
+		aColList.push_back(colTuple);
+		colValuesList.push_back(aColList);
+		WriteEngine::DctnryStructList dctnryStructList;
+		WriteEngine::DctnryValueList dctnryValueList;
+		std::vector<WriteEngine::ColStructList> colExtentsStruct;
+		colExtentsStruct.push_back(colStructs);
+		std::vector<WriteEngine::RIDList> ridLists;
+		ridLists.push_back(ridList);
+		std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+		dctnryExtentsStruct.push_back(dctnryStructList);
+
+		// call the write engine to update the row
+		if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList, ridLists, dctnryExtentsStruct, dctnryValueList))
+		{
+			err = "WE: Update failed on: " + tableColName.table;
+			throw std::runtime_error(err);
+		}
 	}
-	catch (runtime_error& ex) //write error
-	{		
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
+	catch (exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
 	}
 	catch (...)
 	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while updating SYSTABLE.";
+		err = "setColumnDefault:Unknown exception caught";
+		throw std::runtime_error(err);
 	}
-		
-	if (rc != 0)
-		throw std::runtime_error(errorMsg);	
+
 }
-void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, 
-		ddlpackage::AtaDropColumnDefault& ataDropColumnDefault, ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+void AlterTableProcessor::dropColumnDefault (u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaDropColumnDefault& ataDropColumnDefault, ddlpackage::QualifiedName& fTableName)
 {
-		SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
-	/*Steps:
-	1. Update SYSCOLUMN for default value change
-	*/
-	SUMMARY_INFO("AlterTableProcessor::setColumnDefault");
-	ByteStream bs;
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	ByteStream::byte rc = 0;
-	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot");
-	
-	int pmNum = 1;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	
-	string err;
-
-			
-	//Update SYSCOLUMN
-	bs.restart();
-	bs << (ByteStream::byte) WE_SVR_UPDATE_SYSCOLUMN_DEFAULTVAL;
-	bs << uniqueId;
-	bs << sessionID;
-	bs << (uint32_t) txnID;
-	bs << fTableName.fSchema;
-	bs << fTableName.fName;
-	bs << ataDropColumnDefault.fColumnName;
-	string defaultValue("");		 
-	bs << defaultValue;
-		
-	//send to WES to process
-	try {
-		fWEClient->write(bs, (uint)pmNum);
-		while (1)
+	/*Steps to drop column default:
+	  1. Find RID of this column in SYSCOLUMN
+	  2. Find OID of column DefaultValue in SYSCOLUMN
+	  3. Call Write Engine to update the default value to null */
+	SUMMARY_INFO("AlterTableProcessor::dropColumnDefault");
+	CalpontSystemCatalog* systemCatalogPtr =
+		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	//@Bug 1358
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	CalpontSystemCatalog::TableColName tableColName;
+	CalpontSystemCatalog::TableName tableName;
+	tableColName.schema = fTableName.fSchema;
+	tableColName.table = fTableName.fName;
+	tableColName.column = ataDropColumnDefault.fColumnName;
+	std::string err;
+	try
+	{
+		CalpontSystemCatalog::ROPair roPair = systemCatalogPtr->columnRID(tableColName);
+		if (roPair.objnum < 0)
 		{
-			bsIn.reset(new ByteStream());
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-				break;
-			}			
-			else {
-				*bsIn >> rc;
-				if (rc != 0) {
-					*bsIn >> errorMsg;
-				}
-				break;
-			}
-		}			
+			ostringstream oss;
+			oss << "No such column: " << tableColName;
+			throw std::runtime_error(oss.str().c_str());
+		}
+		std::vector<WriteEngine::RID> ridList;
+		ridList.push_back(roPair.rid);
+		CalpontSystemCatalog::OID oid = systemCatalogPtr->lookupOID(tableColName);
+		CalpontSystemCatalog::ColType colType;
+		colType = systemCatalogPtr->colType(oid);
+		WriteEngine::ColValueList colValuesList;
+		WriteEngine::ColTupleList aColList;
+		WriteEngine::ColStructList colStructs;
+		std::vector<void *> colOldValuesList;
+		boost::any datavalue;
+		datavalue = getNullValueForType(colType);
+
+		WriteEngine::ColTuple colTuple;
+		colTuple.data = datavalue;
+		aColList.push_back(colTuple);
+		colValuesList.push_back(aColList);
+		//Build colStructs for SYSCOLUM
+		tableName.schema = CALPONT_SCHEMA;
+		tableName.table = SYSCOLUMN_TABLE;
+		DDLColumn column;
+		findColumnData (sessionID, tableName, DEFAULTVAL_COL, column);
+		WriteEngine::ColStruct colStruct;
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.tokenFlag = false;
+		colStruct.tokenFlag = column.colType.colWidth > 8 ? true : false;
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+		colStructs.push_back(colStruct);
+		WriteEngine::DctnryStructList dctnryStructList;
+		WriteEngine::DctnryValueList dctnryValueList;
+		std::vector<WriteEngine::ColStructList> colExtentsStruct;
+		colExtentsStruct.push_back(colStructs);
+		std::vector<WriteEngine::RIDList> ridLists;
+		ridLists.push_back(ridList);
+		std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+		dctnryExtentsStruct.push_back(dctnryStructList);
+		// call the write engine to update the row
+		if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList, ridLists, dctnryExtentsStruct, dctnryValueList))
+		{
+			// build the logging message
+			err = "Update failed on: " + tableColName.table;
+			throw std::runtime_error(err);
+		}
 	}
-	catch (runtime_error& ex) //write error
-	{		
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
+	catch (exception& ex)
+	{
+		err = ex.what();
+		throw std::runtime_error(err);
 	}
 	catch (...)
 	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while updating SYSTABLE.";
+		err = "dropColumnDefault:Unknown exception caught";
+		throw std::runtime_error(err);
 	}
-		
-	if (rc != 0)
-		throw std::runtime_error(errorMsg);	
 }
 
 #if 0
@@ -1462,7 +1309,7 @@ void AlterTableProcessor::dropTableConstraint (u_int32_t sessionID, execplan::Ca
 	ddlpackage::QualifiedName sysCatalogTableName;
 	sysCatalogTableName.fSchema = CALPONT_SCHEMA;
 	sysCatalogTableName.fName  = SYSCONSTRAINT_TABLE;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	//@Bug 1358
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
@@ -1515,7 +1362,7 @@ void AlterTableProcessor::dropTableConstraint (u_int32_t sessionID, execplan::Ca
 			}
 		}
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		err = ex.what();
 		throw std::runtime_error(err);
@@ -1529,131 +1376,370 @@ void AlterTableProcessor::dropTableConstraint (u_int32_t sessionID, execplan::Ca
 }
 #endif
 
-void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaRenameTable& ataRenameTable, 
-			ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+void AlterTableProcessor::renameTable (uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result, ddlpackage::AtaRenameTable& ataRenameTable, ddlpackage::QualifiedName& fTableName)
 {
 	/*Steps:
 	1. Update SYSTABLE (table name)
 	2. Update SYSCOLUMN (table name)
 	*/
 	SUMMARY_INFO("AlterTableProcessor::renameTable");
-	
-	//@Bug 4599. Check whether the new table exists in infinidb
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	execplan::CalpontSystemCatalog::TableName tableName;
-	tableName.schema = fTableName.fSchema;
-	tableName.table = ataRenameTable.fQualifiedName->fName;
-	execplan::CalpontSystemCatalog::ROPair roPair;
-	roPair.objnum = 0;
+	CalpontSystemCatalog::ROPair ropair;
+	CalpontSystemCatalog::RIDList roList;
+	CalpontSystemCatalog::TableName tableName;
+	CalpontSystemCatalog* systemCatalogPtr;
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	//@Bug 1358
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+	VERBOSE_INFO("Updating table meta data to SYSTABLE");
+	ddlpackage::QualifiedName newTableName;
+	newTableName.fSchema  = ataRenameTable.fQualifiedName->fSchema;
+	newTableName.fName = ataRenameTable.fQualifiedName->fName;
+	CalpontSystemCatalog::TableName oldTableName;
+	std::string newName= ataRenameTable.fQualifiedName->fName;
+	boost::algorithm::to_lower(newName);
+	std::string value;
+	oldTableName.schema = fTableName.fSchema;
+	oldTableName.table = fTableName.fName;
+	std::string err;
+	WriteEngine::DctnryStructList dctnryStructList;
+	WriteEngine::DctnryValueList dctnryValueList;
+	WriteEngine::DctColTupleList dctRowList;
+	WriteEngine::DctnryTuple dctColList;
+
+	config::Config* cf = config::Config::makeConfig();
+	unsigned filesPerColumnPartition = 32;
+	unsigned extentsPerSegmentFile = 4;
+	unsigned dbrootCnt = 2;
+	unsigned extentRows = 0x800000;
+	string fpc = cf->getConfig("ExtentMap", "FilesPerColumnPartition");
+	if (fpc.length() != 0)
+		filesPerColumnPartition = cf->uFromText(fpc);
+	string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
+	if (epsf.length() != 0)
+		extentsPerSegmentFile = cf->uFromText(epsf);
+	string dbct = cf->getConfig("SystemConfig", "DBRootCount");
+	if (dbct.length() != 0)
+		dbrootCnt = cf->uFromText(dbct);
+
+	DBRM brm;
+	extentRows = brm.getExtentRows();
+	unsigned dbRoot = 0;
+	unsigned partition = 0;
+	unsigned segment = 0;
+	uint16_t startDBRoot;
+	uint32_t partitionNum;
+
 	try
 	{
-		roPair = systemCatalogPtr->tableRID(tableName);
-	}
-	catch (...)
-	{
-		roPair.objnum = 0;
-	}
-	
-	if (roPair.objnum >= 3000)
-		throw std::runtime_error("The new tablename is already in use.");
-	
-	ByteStream bytestream;
-	bytestream << (ByteStream::byte)WE_SVR_UPDATE_SYSTABLES_TABLENAME;
-	bytestream << uniqueId;
-	bytestream << sessionID;
-	bytestream << (u_int32_t)txnID;
-	bytestream << fTableName.fSchema;
-	bytestream << fTableName.fName;
-	bytestream << ataRenameTable.fQualifiedName->fName;
-	
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	ByteStream::byte rc = 0;
-	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);   
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot");
-	
-	int pmNum = 1;
-		
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	try
-	{		
-		fWEClient->write(bytestream, (uint)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "Rename table sending WE_SVR_UPDATE_SYSTABLE_TABLENAME to pm " << pmNum << endl;
-#endif	
-		while (1)
+		//This gives us the rid in systable that we want to update
+		ropair = systemCatalogPtr->tableRID(oldTableName);
+		if (ropair.objnum < 0)
 		{
-			bsIn.reset(new ByteStream());
-			fWEClient->read(uniqueId, bsIn);
-			if ( bsIn->length() == 0 ) //read error
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-				break;
-			}			
-			else {
-				*bsIn >> rc;
-				*bsIn >> errorMsg;
-				break;
-			}
+			err = "No such table: " + tableName.table;
+			throw std::runtime_error(err);
 		}
+		// now we have to prepare the various structures for the WE to update the column. This is immensely
+		//  complicated.
+		std::vector<WriteEngine::RID> ridList;
+		ridList.push_back(ropair.rid);
+		WriteEngine::ColValueList colValuesList;
+		WriteEngine::ColTupleList aColList;
+		WriteEngine::ColStructList colStructs;
+		std::vector<void *> colOldValuesList;
+		boost::any datavalue;
+		datavalue = ataRenameTable.fQualifiedName->fName;
+
+		WriteEngine::ColTuple colTuple;
+
+		//Build colStructs for SYSTABLE
+		tableName.schema = CALPONT_SCHEMA;
+		tableName.table = SYSTABLE_TABLE;
+		DDLColumn column;
+		findColumnData (sessionID, tableName, TABLENAME_COL, column);
+		WriteEngine::ColStruct colStruct;
+		WriteEngine::DctnryStruct dctnryStruct;
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.tokenFlag = false;
+		if ( (column.colType.colDataType == execplan::CalpontSystemCatalog::CHAR
+				&& column.colType.colWidth > 8)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
+				&& column.colType.precision > 18) )//token
+		{
+			colStruct.colWidth = 8;
+			colStruct.tokenFlag = true;
+		}
+		else
+		{
+			colStruct.colWidth = column.colType.colWidth;
+		}
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		if (colStruct.tokenFlag)
+			colTuple.data = tokenizeData(txnID, result, column.colType, datavalue);
+		else
+			colTuple.data = datavalue;
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+
+		if (colStruct.tokenFlag)
+		{
+			dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+		else
+		{
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+
+		colStructs.push_back(colStruct);
+		dctnryStructList.push_back(dctnryStruct);
+		aColList.push_back(colTuple);
+		colValuesList.push_back(aColList);
+		std::vector<WriteEngine::ColStructList> colExtentsStruct;
+		std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+		std::vector<WriteEngine::RIDList> ridLists;
+		ridLists.push_back(ridList);
+
+		WriteEngine::DctnryTuple dctnryTuple;
+		memcpy(dctnryTuple.sigValue, ataRenameTable.fQualifiedName->fName.c_str(), ataRenameTable.fQualifiedName->fName.length());
+		dctnryTuple.sigSize = ataRenameTable.fQualifiedName->fName.length();
+		dctnryTuple.isNull = false;
+		dctColList = dctnryTuple;
+		dctRowList.push_back(dctColList);
+		dctnryValueList.push_back(dctRowList);
+
+		//In this case, there's only 1 row, so only one one extent, but keep it generic...
+		std::vector<extentInfo> extentsinfo;
+		extentInfo aExtentinfo;
+
+		brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+		convertRidToColumn(ropair.rid, dbRoot, partition, segment, filesPerColumnPartition,
+			extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+		aExtentinfo.dbRoot = dbRoot;
+		aExtentinfo.partition = partition;
+		aExtentinfo.segment = segment;
+
+		extentsinfo.push_back(aExtentinfo);
+
+		//build colExtentsStruct
+		for (unsigned i=0; i < extentsinfo.size(); i++)
+		{
+			for (unsigned j=0; j < colStructs.size(); j++)
+			{
+				colStructs[j].fColPartition = extentsinfo[i].partition;
+				colStructs[j].fColSegment = extentsinfo[i].segment;
+				colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+				dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+				dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+				dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
+			}
+			colExtentsStruct.push_back(colStructs);
+			dctnryExtentsStruct.push_back(dctnryStructList);
+		}
+
+		// call the write engine to update the row
+		//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+		if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+			ridLists, dctnryExtentsStruct, dctnryValueList))
+		{
+			// build the logging message
+			err = "WE: Update failed on: " + tableName.table;
+			throw std::runtime_error(err);
+		}
+
+		//WE loves vectors!
+		ridList.clear();
+		colStructs.clear();
+		dctnryStructList.clear();
+		aColList.clear();
+		colValuesList.clear();
+		ridLists.clear();
+		dctRowList.clear();
+		dctnryValueList.clear();
+		extentsinfo.clear();
+		colExtentsStruct.clear();
+		dctnryExtentsStruct.clear();
+		colOldValuesList.clear();
+
+		//This gives us the rids in syscolumn that we want to update
+		roList = systemCatalogPtr->columnRIDs(oldTableName);
+		// now we have to prepare the various structures for the WE to update the column. This is immensely
+		//  complicated.
+		for (unsigned int i = 0; i < roList.size(); i++)
+		{
+			ridList.push_back(roList[i].rid);
+		}
+
+		//Build colStructs for SYSTABLE
+		tableName.schema = CALPONT_SCHEMA;
+		tableName.table = SYSCOLUMN_TABLE;
+		findColumnData(sessionID, tableName, TABLENAME_COL, column);
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.tokenFlag = false;
+		if ( (column.colType.colDataType == execplan::CalpontSystemCatalog::CHAR
+				&& column.colType.colWidth > 8)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
+				&& column.colType.precision > 18) )//token
+		{
+			colStruct.colWidth = 8;
+			colStruct.tokenFlag = true;
+		}
+		else
+		{
+			colStruct.colWidth = column.colType.colWidth;
+		}
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		if (colStruct.tokenFlag)
+			colTuple.data = tokenizeData(txnID, result, column.colType, datavalue);
+		else
+			colTuple.data = datavalue;
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+
+		if (colStruct.tokenFlag)
+		{
+			dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+		else
+		{
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+
+		colStructs.push_back(colStruct);
+		dctnryStructList.push_back(dctnryStruct);
+		for (unsigned int i = 0; i < roList.size(); i++)
+		{
+			aColList.push_back(colTuple);
+		}
+		colValuesList.push_back(aColList);
+		ridLists.push_back(ridList);
+
+		//It's the same string for each column, so we just need one dictionary struct
+		memset(&dctnryTuple, 0, sizeof(dctnryTuple));
+		memcpy(dctnryTuple.sigValue, ataRenameTable.fQualifiedName->fName.c_str(), ataRenameTable.fQualifiedName->fName.length());
+		dctnryTuple.sigSize = ataRenameTable.fQualifiedName->fName.length();
+		dctnryTuple.isNull = false;
+		dctColList = dctnryTuple;
+		dctRowList.push_back(dctColList);
+		dctnryValueList.push_back(dctRowList);
+
+		//We need a list of unique extents, and we need to keep them in order. We look at the previous entry
+		// in the vector (if any) and, if this one is different, push it.
+		// TODO: is this right?
+
+		brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+		for (unsigned int i = 0; i < roList.size(); i++)
+		{
+			convertRidToColumn(roList[i].rid, dbRoot, partition, segment, filesPerColumnPartition,
+				extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+			aExtentinfo.dbRoot = dbRoot;
+			aExtentinfo.partition = partition;
+			aExtentinfo.segment = segment;
+
+			if (extentsinfo.empty())
+				extentsinfo.push_back(aExtentinfo);
+			else if (extentsinfo.back() != aExtentinfo)
+				extentsinfo.push_back(aExtentinfo);
+		}
+
+		//build colExtentsStruct
+		for (unsigned i=0; i < extentsinfo.size(); i++)
+		{
+			for (unsigned j=0; j < colStructs.size(); j++)
+			{
+				colStructs[j].fColPartition = extentsinfo[i].partition;
+				colStructs[j].fColSegment = extentsinfo[i].segment;
+				colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+				dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+				dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+				dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
+			}
+			colExtentsStruct.push_back(colStructs);
+			dctnryExtentsStruct.push_back(dctnryStructList);
+		}
+
+		// call the write engine to update the row
+		//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+		if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+			ridLists, dctnryExtentsStruct, dctnryValueList))
+		{
+			// build the logging message
+			err = "WE: Update failed on: " + tableName.table;
+			throw std::runtime_error(err);
+		}
+
+		ridList.clear();
+		colStructs.clear();
+		dctnryStructList.clear();
+		aColList.clear();
+		colValuesList.clear();
+		ridLists.clear();
+		dctRowList.clear();
+		dctnryValueList.clear();
+		extentsinfo.clear();
+		colExtentsStruct.clear();
+		dctnryExtentsStruct.clear();
+
 	}
-	catch (runtime_error& ex) //write error
+	catch (exception& ex)
 	{
-#ifdef IDB_DDL_DEBUG
-cout << "create table got exception" << ex.what() << endl;
-#endif			
-		rc = NETWORK_ERROR;
-		errorMsg = ex.what();
+		err = ex.what();
+		throw std::runtime_error(err);
 	}
 	catch (...)
 	{
-		rc = NETWORK_ERROR;
-		errorMsg = " Unknown exception caught while updating SYSTABLE.";
-#ifdef IDB_DDL_DEBUG
-cout << "create table got unknown exception" << endl;
-#endif
+		err = "renameTable:Unknown exception caught";
+		throw std::runtime_error(err);
 	}
-		
-	if (rc != 0)
-		throw std::runtime_error(errorMsg);
 }
 
 void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
-	DDLResult& result, ddlpackage::AtaRenameColumn& ataRenameColumn, 
-	ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId)
+	DDLResult& result, ddlpackage::AtaRenameColumn& ataRenameColumn, ddlpackage::QualifiedName& fTableName)
 {
 	/*Steps:
-	1. Update SYSCOLUMN for name, autoincrement, nextval change
+	1. Update SYSCOLUMN for name change
 	2. Update SYSTABLE if column is autoincrement column
 	*/
 	SUMMARY_INFO("AlterTableProcessor::renameColumn");
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-		CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-		
-	ByteStream bs;
-	std::string errorMsg;
-	u_int16_t  dbRoot;
-	BRM::OID_t sysOid = 1001;
-	ByteStream::byte rc = 0;
-	//Find out where systable is
-	rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
-	if (rc != 0)
-		throw std::runtime_error("Error while calling getSysCatDBRoot");
-	
-	int pmNum = 1;
-	OamCache * oamcache = OamCache::makeOamCache();
-	boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-	pmNum = (*dbRootPMMap)[dbRoot];
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	
+
+	config::Config* cf = config::Config::makeConfig();
+	unsigned filesPerColumnPartition = 32;
+	unsigned extentsPerSegmentFile = 4;
+	unsigned dbrootCnt = 2;
+	unsigned extentRows = 0x800000;
+	string fpc = cf->getConfig("ExtentMap", "FilesPerColumnPartition");
+	if (fpc.length() != 0)
+		filesPerColumnPartition = cf->uFromText(fpc);
+	string epsf = cf->getConfig("ExtentMap", "ExtentsPerSegmentFile");
+	if (epsf.length() != 0)
+		extentsPerSegmentFile = cf->uFromText(epsf);
+	string dbct = cf->getConfig("SystemConfig", "DBRootCount");
+	if (dbct.length() != 0)
+		dbrootCnt = cf->uFromText(dbct);
+
+	DBRM brm;
+	extentRows = brm.getExtentRows();
+	unsigned dbRoot = 0;
+	unsigned partition = 0;
+	unsigned segment = 0;
+	uint16_t startDBRoot;
+	uint32_t partitionNum;
 
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::TableColName tableColName;
@@ -1662,6 +1748,9 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 	tableColName.column = ataRenameColumn.fName;
 	CalpontSystemCatalog::ROPair ropair;
 
+	CalpontSystemCatalog* systemCatalogPtr;
+	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	string err;
 
 	try
@@ -1676,7 +1765,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 			oss << "No such table: " << tableName;
 			throw std::runtime_error(oss.str().c_str());
 		}
-		
+		CalpontSystemCatalog::RID ridTable = ropair.rid;
 		ropair = systemCatalogPtr->columnRID(tableColName);
 		if (ropair.objnum < 0)
 		{
@@ -1694,7 +1783,7 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		}
 		
 		//@Bug 3746 Check whether the change is about the compression type
-		if (!comptypesAreCompat(colType.compressionType, (*ataRenameColumn.fNewType).fCompressiontype))
+		if (colType.compressionType != (*ataRenameColumn.fNewType).fCompressiontype)
 		{
 			ostringstream oss;
 			oss << "The compression type of an existing column cannot be changed.";
@@ -1705,137 +1794,284 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		if (((tblInfo.tablewithautoincr == 1) && (colType.autoincrement) && (ataRenameColumn.fNewType->fAutoincrement.compare("n") == 0)) || 
 			((tblInfo.tablewithautoincr == 0) && (ataRenameColumn.fNewType->fAutoincrement.compare("y") == 0)))
 		{
-			//update systable autoincrement column
-			bs.restart();
-			bs << (ByteStream::byte) WE_SVR_UPDATE_SYSTABLE_AUTO;
-			bs << uniqueId;
-			bs << sessionID;
-			bs << (uint32_t) txnID;
-			bs << fTableName.fSchema;
-			bs << fTableName.fName;
-			if (ataRenameColumn.fNewType->fAutoincrement.compare("y") == 0)
-				bs << (uint32_t) 1;
-			else
-				bs << (uint32_t) 0;
-			
-			//send to WES to process
-			try {
-				fWEClient->write(bs, (uint)pmNum);
-				while (1)
-				{
-					bsIn.reset(new ByteStream());
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-						break;
-					}			
-					else {
-						*bsIn >> rc;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-						}
-						break;
-					}
-				}			
-			}
-			catch (runtime_error& ex) //write error
-			{		
-				rc = NETWORK_ERROR;
-				errorMsg = ex.what();
-			}
-			catch (...)
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = " Unknown exception caught while updating SYSTABLE.";
-			}
-		
-			if (rc != 0)
-			throw std::runtime_error(errorMsg);	
+			tableName.schema = CALPONT_SCHEMA;
+			tableName.table = SYSTABLE_TABLE;
+			DDLColumn column;
+			findColumnData (sessionID, tableName, AUTOINC_COL, column); //AUTOINC_COL column
+			WriteEngine::ColValueList colValuesList;
+			WriteEngine::ColTupleList aColList;
+			WriteEngine::ColStructList colStructs;
+			std::vector<void *> colOldValuesList;
+			WriteEngine::DctnryStructList dctnryStructList;
+			WriteEngine::DctnryValueList dctnryValueList;
+			WriteEngine::DctColTupleList dctRowList;
+			WriteEngine::DctnryTuple dctColList;
+			WriteEngine::ColStruct colStruct;
+			WriteEngine::DctnryStruct dctnryStruct;
+			WriteEngine::ColTuple colTuple;
+			colStruct.dataOid = column.oid;
+			colStruct.colWidth = column.colType.colWidth;
+			colStruct.tokenFlag = false;
+			colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
 
-			//change a sequence in controller 
 			if (ataRenameColumn.fNewType->fAutoincrement.compare("y") == 0)
-			{
-				fDbrm.startAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue, ataRenameColumn.fNewType->fLength);	
-				//Reset it incase there is a sequence already
-				fDbrm.resetAISequence(ropair.objnum, ataRenameColumn.fNewType->fNextvalue);
-			}
+				colTuple.data = 1;
+			else
+				colTuple.data = 0;
+				
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+			colStructs.push_back(colStruct);
+			dctnryStructList.push_back(dctnryStruct);
+			aColList.push_back(colTuple);
+			colValuesList.push_back(aColList);
 			
-		}	
+			std::vector<WriteEngine::ColStructList> colExtentsStruct;
+			std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+			std::vector<WriteEngine::RID> ridList;
+			ridList.push_back(ridTable);
+			std::vector<WriteEngine::RIDList> ridLists;
+			ridLists.push_back(ridList);
+
+			WriteEngine::DctnryTuple dctnryTuple;
+			dctnryTuple.isNull = true;
+			dctColList = dctnryTuple;
+			dctRowList.push_back(dctColList);
+			dctnryValueList.push_back(dctRowList);
+			std::vector<extentInfo> extentsinfo;
+			extentInfo aExtentinfo;
+
+			brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+			convertRidToColumn(ridTable, dbRoot, partition, segment, filesPerColumnPartition,
+				extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+			aExtentinfo.dbRoot = dbRoot;
+			aExtentinfo.partition = partition;
+			aExtentinfo.segment = segment;
+
+			extentsinfo.push_back(aExtentinfo);
+
+			//build colExtentsStruct
+			for (unsigned i=0; i < extentsinfo.size(); i++)
+			{
+				for (unsigned j=0; j < colStructs.size(); j++)
+				{
+					colStructs[j].fColPartition = extentsinfo[i].partition;
+					colStructs[j].fColSegment = extentsinfo[i].segment;
+					colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+					dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+					dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+					dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
+				}
+				colExtentsStruct.push_back(colStructs);
+				dctnryExtentsStruct.push_back(dctnryStructList);
+			}
+
+			// call the write engine to update the row
+			//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+			if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+				ridLists, dctnryExtentsStruct, dctnryValueList))
+			{
+				// build the logging message
+				err = "WE: Update failed on: " + tableName.table;
+				throw std::runtime_error(err);
+			}
+
+			//WE loves vectors!
+			ridList.clear();
+			colStructs.clear();
+			dctnryStructList.clear();
+			aColList.clear();
+			colValuesList.clear();
+			ridLists.clear();
+			dctRowList.clear();
+			dctnryValueList.clear();
+			extentsinfo.clear();
+			colExtentsStruct.clear();
+			dctnryExtentsStruct.clear();
+			colOldValuesList.clear();			
+		}			
+		
+		// now we have to prepare the various structures for the WE to update the column. This is immensely
+		//  complicated.
+		std::vector<WriteEngine::RID> ridList;
+		ridList.push_back(ropair.rid);
+		WriteEngine::ColValueList colValuesList;
+		WriteEngine::ColTupleList aColList;
+		WriteEngine::ColStructList colStructs;
+		std::vector<void *> colOldValuesList;
+		WriteEngine::DctnryStructList dctnryStructList;
+		WriteEngine::DctnryValueList dctnryValueList;
+		WriteEngine::DctColTupleList dctRowList;
+		WriteEngine::DctnryTuple dctColList;
+		boost::any datavalue;
+		datavalue = ataRenameColumn.fNewName;
+
+		WriteEngine::ColTuple colTuple;
+
+		//Build colStructs for SYSCOLUMN
+		tableName.schema = CALPONT_SCHEMA;
+		tableName.table = SYSCOLUMN_TABLE;
+		DDLColumn column;
+		findColumnData (sessionID, tableName, COLNAME_COL, column); //COLNAME_COL column
+		DDLColumn column1;
+		findColumnData (sessionID, tableName, AUTOINC_COL, column1); //AUTOINC_COL column
+		DDLColumn column2;
+		findColumnData (sessionID, tableName, NEXTVALUE_COL, column2); //NEXTVALUE_COL column
+		WriteEngine::ColStruct colStruct;
+		WriteEngine::DctnryStruct dctnryStruct;
+		colStruct.dataOid = column.oid;
+		colStruct.colWidth = column.colType.colWidth > 8 ? 8 : column.colType.colWidth;
+		colStruct.tokenFlag = false;
+		if ( (column.colType.colDataType == execplan::CalpontSystemCatalog::CHAR
+				&& column.colType.colWidth > 8)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY
+				&& column.colType.colWidth > 7)
+			|| (column.colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL
+				&& column.colType.precision > 18) )//token
+		{
+			colStruct.colWidth = 8;
+			colStruct.tokenFlag = true;
+		}
 		else
 		{
-			fDbrm.resetAISequence(ropair.objnum, 0);
+			colStruct.colWidth = column.colType.colWidth;
 		}
-		
-		//Update SYSCOLUMN
-		bs.restart();
-		bs << (ByteStream::byte) WE_SVR_UPDATE_SYSCOLUMN_RENAMECOLUMN;
-		bs << uniqueId;
-		bs << sessionID;
-		bs << (uint32_t) txnID;
-		bs << fTableName.fSchema;
-		bs << fTableName.fName;
-		bs << ataRenameColumn.fName;	
-		bs << ataRenameColumn.fNewName;	
-		bs << ataRenameColumn.fNewType->fAutoincrement;
-		bs << (uint64_t) ataRenameColumn.fNewType->fNextvalue;
-		uint32_t nullable = 1;
-		string defaultValue("");
-		if (ataRenameColumn.fConstraints.size() > 0)
+
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column.colType.colDataType);
+
+		if (colStruct.tokenFlag)
+			colTuple.data = tokenizeData(txnID, result, column.colType, datavalue);
+		else
+			colTuple.data = datavalue;
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column.colType.colDataType;
+
+		if (colStruct.tokenFlag)
 		{
-			for (uint j=0; j < ataRenameColumn.fConstraints.size(); j++)
+			dctnryStruct.dctnryOid = column.colType.ddn.dictOID;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+		else
+		{
+			dctnryStruct.dctnryOid = 0;
+			dctnryStruct.columnOid = colStruct.dataOid;
+		}
+
+		colStructs.push_back(colStruct);
+		dctnryStructList.push_back(dctnryStruct);
+		aColList.push_back(colTuple);
+		colValuesList.push_back(aColList);
+		//Build AUTOINC_COL structure
+		WriteEngine::ColTupleList aColList1;
+		colStruct.dataOid = column1.oid;
+		colStruct.colWidth = column1.colType.colWidth > 8 ? 8 : column1.colType.colWidth;
+		colStruct.tokenFlag = false;
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column1.colType.colDataType);
+
+		colTuple.data = ataRenameColumn.fNewType->fAutoincrement;
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column1.colType.colDataType;
+
+		dctnryStruct.dctnryOid = 0;
+		dctnryStruct.columnOid = colStruct.dataOid;
+
+		colStructs.push_back(colStruct);
+		dctnryStructList.push_back(dctnryStruct);
+		aColList1.push_back(colTuple);
+		colValuesList.push_back(aColList1);
+		
+		//Build NEXTVALUE_COL structure
+		WriteEngine::ColTupleList aColList2;
+		colStruct.dataOid = column2.oid;
+		colStruct.colWidth = column2.colType.colWidth > 8 ? 8 : column2.colType.colWidth;
+		colStruct.tokenFlag = false;
+		colStruct.colDataType = static_cast<WriteEngine::ColDataType>(column2.colType.colDataType);
+
+		colTuple.data = ataRenameColumn.fNewType->fNextvalue;
+
+		colStruct.colDataType = (WriteEngine::ColDataType)column2.colType.colDataType;
+
+		dctnryStruct.dctnryOid = 0;
+		dctnryStruct.columnOid = colStruct.dataOid;
+
+		colStructs.push_back(colStruct);
+		dctnryStructList.push_back(dctnryStruct);
+		aColList2.push_back(colTuple);
+		colValuesList.push_back(aColList2);
+		
+		std::vector<WriteEngine::ColStructList> colExtentsStruct;
+		std::vector<WriteEngine::DctnryStructList> dctnryExtentsStruct;
+		std::vector<WriteEngine::RIDList> ridLists;
+		ridLists.push_back(ridList);
+
+		WriteEngine::DctnryTuple dctnryTuple;
+		boost::to_lower(ataRenameColumn.fNewName);
+		memcpy(dctnryTuple.sigValue, ataRenameColumn.fNewName.c_str(), ataRenameColumn.fNewName.length());
+		dctnryTuple.sigSize = ataRenameColumn.fNewName.length();
+		dctnryTuple.isNull = false;
+		dctColList = dctnryTuple;
+		dctRowList.push_back(dctColList);
+		dctnryValueList.push_back(dctRowList);
+
+		//In this case, there's only 1 row, so only one one extent, but keep it generic...
+		std::vector<extentInfo> extentsinfo;
+		extentInfo aExtentinfo;
+
+		brm.getStartExtent(column.oid, startDBRoot, partitionNum);
+		convertRidToColumn(ropair.rid, dbRoot, partition, segment, filesPerColumnPartition,
+			extentsPerSegmentFile, extentRows, startDBRoot, dbrootCnt);
+
+		aExtentinfo.dbRoot = dbRoot;
+		aExtentinfo.partition = partition;
+		aExtentinfo.segment = segment;
+
+		extentsinfo.push_back(aExtentinfo);
+
+		//build colExtentsStruct
+		for (unsigned i=0; i < extentsinfo.size(); i++)
+		{
+			for (unsigned j=0; j < colStructs.size(); j++)
 			{
-				if (ataRenameColumn.fConstraints[j]->fConstraintType == DDL_NOT_NULL)
-				{
-					nullable = 0;
-					break;
-				}
+				colStructs[j].fColPartition = extentsinfo[i].partition;
+				colStructs[j].fColSegment = extentsinfo[i].segment;
+				colStructs[j].fColDbRoot = extentsinfo[i].dbRoot;
+				dctnryStructList[j].fColPartition = extentsinfo[i].partition;
+				dctnryStructList[j].fColSegment = extentsinfo[i].segment;
+				dctnryStructList[j].fColDbRoot = extentsinfo[i].dbRoot;
 			}
+			colExtentsStruct.push_back(colStructs);
+			dctnryExtentsStruct.push_back(dctnryStructList);
 		}
-		bs << nullable;
-		if (ataRenameColumn.fDefaultValue)
-			defaultValue = ataRenameColumn.fDefaultValue->fValue;
-			 
-		bs << defaultValue;
-		
-		//send to WES to process
-		try {
-			fWEClient->write(bs, (uint)pmNum);
-			while (1)
-			{
-				bsIn.reset(new ByteStream());
-				fWEClient->read(uniqueId, bsIn);
-				if ( bsIn->length() == 0 ) //read error
-				{
-					rc = NETWORK_ERROR;
-					errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-					break;
-				}			
-				else {
-					*bsIn >> rc;
-					if (rc != 0) {
-						*bsIn >> errorMsg;
-					}
-					break;
-				}
-			}			
-		}
-		catch (runtime_error& ex) //write error
-		{		
-			rc = NETWORK_ERROR;
-			errorMsg = ex.what();
-		}
-		catch (...)
+
+		// call the write engine to update the row
+		//fWriteEngine.setDebugLevel(WriteEngine::DEBUG_3);
+		if (NO_ERROR != fWriteEngine.updateColumnRec(txnID, colExtentsStruct, colValuesList, colOldValuesList,
+			ridLists, dctnryExtentsStruct, dctnryValueList))
 		{
-			rc = NETWORK_ERROR;
-			errorMsg = " Unknown exception caught while updating SYSTABLE.";
+			// build the logging message
+			err = "WE: Update failed on: " + tableName.table;
+			throw std::runtime_error(err);
 		}
-		
-		if (rc != 0)
-			throw std::runtime_error(errorMsg);	
+
+			//WE loves vectors!
+			ridList.clear();
+			colStructs.clear();
+			dctnryStructList.clear();
+			aColList.clear();
+			colValuesList.clear();
+			ridLists.clear();
+			dctRowList.clear();
+			dctnryValueList.clear();
+			extentsinfo.clear();
+			colExtentsStruct.clear();
+			dctnryExtentsStruct.clear();
+			colOldValuesList.clear();
+
 	}
-	catch (std::exception& ex)
+	catch (exception& ex)
 	{
 		err = ex.what();
 		throw std::runtime_error(err);
@@ -1845,7 +2081,6 @@ void AlterTableProcessor::renameColumn(uint32_t sessionID, execplan::CalpontSyst
 		err = "renameColumn:Unknown exception caught";
 		throw std::runtime_error(err);
 	}
-		
 }
 
 }

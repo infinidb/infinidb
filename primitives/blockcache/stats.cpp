@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: stats.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+* $Id: stats.cpp 1581 2011-02-03 17:55:28Z rdempsey $
 */
 
 #include <ctime>
@@ -40,7 +40,6 @@ using namespace boost;
 
 #include "stats.h"
 #include "messagelog.h"
-#include "exceptclasses.h"
 
 using namespace BRM;
 
@@ -252,7 +251,7 @@ void Stats::touchedLBID(uint64_t lbid, pthread_t thdid, uint32_t session)
 	{
 		traceFileMap[session] = TraceFileInfo(session);
 		iter = traceFileMap.find(session);
-		idbassert(iter != traceFileMap.end());
+		assert(iter != traceFileMap.end());
 	}
 	iter->second.log(lbid2oid(lbid), lbid, thdid);
 }
@@ -267,7 +266,7 @@ void Stats::markEvent(const uint64_t lbid, const pthread_t thdid, const uint32_t
 	{
 		traceFileMap[session] = TraceFileInfo(session, fName);
 		iter = traceFileMap.find(session);
-		idbassert(iter != traceFileMap.end());
+		assert(iter != traceFileMap.end());
 	}
 	iter->second.log(lbid2oid(lbid), lbid, thdid, event);
 }

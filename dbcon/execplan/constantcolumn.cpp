@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantcolumn.cpp 9261 2013-02-06 20:59:01Z xlou $
+*   $Id: constantcolumn.cpp 7991 2011-10-04 17:10:24Z xlou $
 *
 *
 ***********************************************************************/
@@ -141,17 +141,6 @@ ConstantColumn::ConstantColumn( const ConstantColumn& rhs):
     fAlias = rhs.alias();
     fResult = rhs.fResult;
     fResultType = rhs.fResultType;
-
-	if (fRegex.get() != NULL)
-	{
-		fRegex.reset(new CNX_Regex());
-#ifdef _MSC_VER
-		*fRegex = dataconvert::DataConvert::constructRegexp(fResult.strVal);
-#else
-		string str = dataconvert::DataConvert::constructRegexp(fResult.strVal);
-		regcomp(fRegex.get(), str.c_str(), REG_NOSUB | REG_EXTENDED);
-#endif
-	}
 }
 
 ConstantColumn::ConstantColumn(const int64_t val, TYPE type) :
@@ -173,12 +162,7 @@ ConstantColumn::ConstantColumn(const int64_t val, TYPE type) :
 }
 
 ConstantColumn::~ConstantColumn()
-{
-#ifndef _MSC_VER
-	if (fRegex.get() != NULL)
-		regfree(fRegex.get());
-#endif
-}
+{}
 
 const string ConstantColumn::toString() const
 {
@@ -297,12 +281,7 @@ void ConstantColumn::constructRegex()
 {
 	//fRegex = new regex_t();
 	fRegex.reset(new CNX_Regex());
-#ifdef _MSC_VER
 	*fRegex = dataconvert::DataConvert::constructRegexp(fResult.strVal);
-#else
-	string str = dataconvert::DataConvert::constructRegexp(fResult.strVal);
-	regcomp(fRegex.get(), str.c_str(), REG_NOSUB | REG_EXTENDED);
-#endif
 }
 
 }

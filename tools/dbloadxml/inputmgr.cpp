@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: inputmgr.cpp 2011 2012-10-30 14:16:20Z dcathey $
+* $Id: inputmgr.cpp 2013 2012-10-30 14:17:58Z dcathey $
 *
 *******************************************************************************/
 
@@ -32,7 +32,6 @@
 
 using namespace std;
 using namespace WriteEngine;
-using namespace execplan;
 
 namespace bulkloadxml
 {
@@ -60,23 +59,23 @@ void InputMgr::printUsage()
 {   //@bug 391
     cerr << "Usage: " << "colxml [options] dbName"  << endl << endl;
     cerr << "Options: "  << endl;
-    cerr << "   -d Delimiter (default '|')\n";
-    cerr << "   -e Maximum allowable errors (per table)\n";
+    cerr << "   -d delimiter (default '|')\n";
+    cerr << "   -e max error rows (numeric)\n";
     cerr << "   -h Print this message\n";
     cerr << "   -j Job id (numeric)\n";
-    cerr << "   -l Load file name\n";
+    cerr << "   -l load file name\n";
     cerr << "   -n \"name in quotes\"\n";
-    cerr << "   -p Path for XML job description file that is generated\n";
-    cerr << "   -s \"Description in quotes\"\n";
-    cerr << "   -t Table name\n" ;
-    cerr << "   -u User\n";
-    cerr << "   -r Number of read buffers\n";
-    cerr << "   -c Application read buffer size (in bytes)\n";
-    cerr << "   -w I/O library buffer size (in bytes), used to read files\n";
+    cerr << "   -p path for XML job description file that is generated\n";
+    cerr << "   -s \"description in quotes\"\n";
+    cerr << "   -t table name\n" ;
+    cerr << "   -u user\n";
+    cerr << "   -r Number of read buffers (numeric)\n";
+    cerr << "   -c Read buffer size (numeric)\n";
+    cerr << "   -w Write buffer size (numeric)\n";
     cerr << "   -x Extension of file name (default \".tbl\")\n";
     cerr << "   -E EnclosedByChar (if data has enclosed values)\n";
     cerr << "   -C EscapeChar\n";
-    cerr << "   -b Debug level (1-3)\n\n";
+    cerr << "   -b debug level (1-3)\n\n";
     cerr << "   dbName - Required parm specifying the name of the database;"<<
             endl << "            all others are optional\n\n" ;
     cerr << "Example:\n\t" << "colxml -t lineitem -j 123 tpch\n";
@@ -152,7 +151,7 @@ bool InputMgr::input(int argc, char **argv)
             case 'C':
             {
                 char l_option[4];
-                snprintf(l_option,sizeof(l_option),"-%c",ch);
+                sprintf(l_option,"-%c",ch);
                 ParmList::iterator p = fParms.find(l_option);
                 if ( fParms.end() != p  )
                     p->second = optarg;
@@ -203,16 +202,16 @@ bool InputMgr::input(int argc, char **argv)
 //------------------------------------------------------------------------------
 bool  InputMgr::loadCatalogTables()
 {
-    boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatPtr =
+    execplan::CalpontSystemCatalog* systemCatPtr =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
         BULK_SYSCAT_SESSION_ID);
     systemCatPtr->identity(execplan::CalpontSystemCatalog::EC);
-    const vector< pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> > tables 
-            = systemCatPtr->getTables( fSchema );
-    for (vector<pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> >::const_iterator it = tables.begin();
+    const vector<string> tables = systemCatPtr->getTables( fSchema );
+    for (vector<string>::const_iterator it = tables.begin();
          it != tables.end(); ++it)
     {
-        fTables.push_back((*it).second);
+        fTables.push_back(execplan::CalpontSystemCatalog::TableName(
+            fSchema, *it));
     }
 
     return (! fTables.empty());

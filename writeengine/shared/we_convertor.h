@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_convertor.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_convertor.h 2873 2011-02-08 14:35:57Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -33,6 +33,8 @@
 #include <iostream>
 #include <fstream>
 
+#include <dm.h>
+
 #include "we_obj.h"
 #include "we_config.h"
 
@@ -45,32 +47,41 @@
 /** Namespace WriteEngine */
 namespace WriteEngine
 {
+const char DATE_TIME_FORMAT[] = "%04d-%02d-%02d %02d:%02d:%02d";
 
 /** Class Convertor */
 class Convertor 
 {
 public:
    /**
-    * @brief Default Constructor
+    * @brief Constructor
     */
-    Convertor(){}
+   Convertor(){}
 
    /**
-    * @brief Destructor
+    * @brief Default Destructor
     */
-    ~Convertor(){}
+   ~Convertor(){}
 
    /**
-    * @brief Get date/time string based on current date and time
+    * @brief Get time string 
     */
-    EXPORT static const std::string   getTimeStr();
+   EXPORT static const std::string   getTimeStr();
 
    /**
-    * @brief Convert specified integer value to a string
-    *
-    * @param val Integer value to be converted to a string
+    * @brief Convert float value to a string 
     */
-    EXPORT static const std::string   int2Str(int val);
+   EXPORT static const std::string   float2Str(const float val);
+
+   /**
+    * @brief Convert int value to a string
+    */
+   EXPORT static const std::string   int2Str(const int val);
+
+   /**
+    * @brief Convert unsigned 64 bit integer to a string
+    */
+   EXPORT static const std::string   i64ToStr(const i64 val);
 
    /**
     * @brief Convert an oid to a full file name (with partition and segment
@@ -78,57 +89,33 @@ public:
     *        dictionary store db files.  If dealing with a version buffer file,
     *        a partition and segment number of 0 should be used.
     */
-    EXPORT static int oid2FileName(FID fid, char* fullFileName,
-        char dbDirName[][MAX_DB_DIR_NAME_SIZE],
-        uint32_t partition, uint16_t segment);
+   EXPORT static const int oid2FileName(const FID fid, char* fullFileName,
+      char dbDirName[][MAX_DB_DIR_NAME_SIZE],
+      const uint32_t partition, const uint16_t segment);
 
    /**
-    * @brief Convert specified errno to associated error msg string
-    *
-    * @param errNum System errno to be converted.
-    * @param errString Error msg string associated with the specified errno.
+    * @brief Convert errno to associated error msg string
     */
-    EXPORT static void mapErrnoToString(int errNum, std::string& errString);
+   EXPORT static void mapErrnoToString(int errNum, std::string& errString);
 
    /**
-    * @brief Convert specified ColDataType to internal storage type (ColType)
+    * @brief Convert interface column type to a internal column type
     *
     * @param dataType Interface data-type
     * @param internalType Internal data-type used for storing
     */
-    //BUG931
-    EXPORT static void convertColType(ColDataType dataType,
-        ColType& internalType, bool isToken=false);
+   //BUG931
+   EXPORT static void convertColType(ColDataType dataType,ColType& internalType,bool isToken=false);
 
    /**
-    * @brief Convert interface column type to a internal column type.
-    * curStruct is interpreted as a ColStruct.
+    * @brief Convert interface column type to a internal column type
     */
-    EXPORT static void convertColType(ColStruct* curStruct);
+   EXPORT static void convertColType(void* curStruct, const FuncType curType = FUNC_WRITE_ENGINE);
 
-   /*
+   /***********************************************************
     * @brief Get the correct width for a row
     */
-    EXPORT static int getCorrectRowWidth( ColDataType dataType, int width );
-
-   /*
-    * @brief Convert a Decimal string to it's equivalent integer value.
-    *        errno can be checked upon return to see if input value was
-    *        out of range (ERANGE).
-    *
-    * field      decimal string to be converted
-    * fieldLengh length of "field" in bytes
-    * scale      decimal scale to be applied to value
-    */
-    EXPORT static long long convertDecimalString ( const char* field,
-        int         fieldLength,
-        int         scale );
-
-private:
-
-   struct dmFilePathArgs_t;
-   static int dmOid2FPath(i32 oid, i32 partition, i32 segment,
-       dmFilePathArgs_t* pArgs);
+   EXPORT static int getCorrectRowWidth( const ColDataType dataType, const int width );
 
 };
 

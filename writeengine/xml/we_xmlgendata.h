@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: we_xmlgendata.h 3720 2012-04-04 18:18:49Z rdempsey $
+ *   $Id: we_xmlgendata.h 2968 2011-05-13 19:01:26Z rdempsey $
  *
  ***********************************************************************/
 /** @file */
@@ -42,7 +42,7 @@ namespace WriteEngine
  *
  *  This class represents common code refactored out of inputmgr.h, under
  *  tools/dbloadxml.  It was moved to writeengine/xml so that this common
- *  code could be used by both colxml and cpimport.bin.
+ *  code could be used by both colxml and cpimport.
  */
 class XMLGenData
 {

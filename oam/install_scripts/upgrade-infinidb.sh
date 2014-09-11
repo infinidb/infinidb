@@ -25,36 +25,31 @@ if [ "x$1" != xdoupgrade ]; then
 fi
 
 prefix=/usr/local
-installdir=$prefix/Calpont
-pwprompt=
+pwprompt=" "
 for arg in "$@"; do
 	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
 		prefix="`echo $arg | awk -F= '{print $2}'`"
-		installdir=$prefix/Calpont
 	elif [ `expr -- "$arg" : '--password='` -eq 11 ]; then
 		password="`echo $arg | awk -F= '{print $2}'`"
 		pwprompt="--password=$password"
-	elif [ `expr -- "$arg" : '--installdir='` -eq 13 ]; then
-		installdir="`echo $arg | awk -F= '{print $2}'`"
-		prefix=`dirname $installdir`
 	fi
 done
 
-test -f $installdir/post/functions && . $installdir/post/functions
+test -f $prefix/Calpont/post/functions && . $prefix/Calpont/post/functions
 
 mt=`module_type`
 mid=`module_id`
 
 # for CE version
-if [ -z "$mt" ]; then
+if [ "$mt" = "" ]; then
 	mt=pm
 fi
-if [ -z "$mid" ]; then
+if [ "$mid" = "" ]; then
 	mid=1
 fi
 
-has_um=`$installdir/bin/getConfig SystemModuleConfig ModuleCount2`
-if [ -z "$has_um" ]; then
+has_um=`$prefix/Calpont/bin/getConfig SystemModuleConfig ModuleCount2`
+if [ "x$has_um" = x ]; then
 	has_um=0
 fi
 
@@ -69,8 +64,8 @@ if [ $has_um -eq 0 -o "x$mt" = xum ]; then
 	# See if compressiontype column is in SYSCOLUMN
 	#---------------------------------------------------------------------------
 	echo "checking calpontsys for compressiontype..." >>/tmp/upgrade-status.log.$$
-	$installdir/mysql/bin/mysql \
-		--defaults-file=$installdir/mysql/my.cnf \
+	$prefix/Calpont/mysql/bin/mysql \
+		--defaults-file=$prefix/Calpont/mysql/my.cnf \
 		--user=root $pwprompt \
 		--execute='describe syscolumn;' \
 		calpontsys | grep compressiontype >>/tmp/upgrade-status.log.$$ 2>&1
@@ -85,8 +80,8 @@ if [ $has_um -eq 0 -o "x$mt" = xum ]; then
 alter table syscolumn add compressiontype int comment 'schema sync only';
 EOD
 		cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 
@@ -99,8 +94,8 @@ select calonlinealter('alter table syscolumn add (compressiontype int)') as xxx;
 update syscolumn set compressiontype=0 where compressiontype is null;
 EOD
 			cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-			$installdir/mysql/bin/mysql \
-				--defaults-file=$installdir/mysql/my.cnf \
+			$prefix/Calpont/mysql/bin/mysql \
+				--defaults-file=$prefix/Calpont/mysql/my.cnf \
 				--user=root $pwprompt \
 				calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 	
@@ -111,8 +106,8 @@ EOD
 		# Verify that compressiontype was successfully added to SYSCOLUMN
 		#
 		rm -f /tmp/idb_upgrade.sql
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			--execute='describe syscolumn;' \
 			calpontsys | grep compressiontype >/tmp/upgrade-status-1.log 2>&1
@@ -124,7 +119,7 @@ EOD
 		fi
 		cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
 		rm -f /tmp/upgrade-status-1.log
-		if [ -z "$cnt" ]; then
+		if [ "x$cnt" = x ]; then
 			cnt=0
 		fi
 		if [ $cnt -ne 1 ]; then
@@ -136,7 +131,7 @@ EOD
 		# Verify that compressiontype (OID 1041) was successfully added to BRM
 		#
 		if [ $has_um -eq 0 ]; then
-			$installdir/bin/editem -o1041 1>/tmp/upgrade-status-1.log 2>/dev/null
+			$prefix/Calpont/bin/editem -o1041 1>/tmp/upgrade-status-1.log 2>/dev/null
 			rc=$?
 			cat /tmp/upgrade-status-1.log >>/tmp/upgrade-status.log.$$
 			if [ $rc -ne 0 ]; then
@@ -145,7 +140,7 @@ EOD
 			fi
 			cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
 			rm -f /tmp/upgrade-status-1.log
-			if [ -z "$cnt" ]; then
+			if [ "x$cnt" = x ]; then
 				cnt=0
 			fi
 			if [ $cnt -lt 2 ]; then
@@ -159,8 +154,8 @@ EOD
 	# See if autoincrement column is in SYSTABLE
 	#---------------------------------------------------------------------------
 	echo "checking calpontsys for autoincrement..." >>/tmp/upgrade-status.log.$$
-	$installdir/mysql/bin/mysql \
-		--defaults-file=$installdir/mysql/my.cnf \
+	$prefix/Calpont/mysql/bin/mysql \
+		--defaults-file=$prefix/Calpont/mysql/my.cnf \
 		--user=root $pwprompt \
 		--execute='describe systable;' \
 		calpontsys | grep autoincrement >>/tmp/upgrade-status.log.$$ 2>&1
@@ -175,8 +170,8 @@ EOD
 alter table systable add autoincrement int comment 'schema sync only';
 EOD
 		cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 
@@ -189,8 +184,8 @@ select calonlinealter('alter table systable add (autoincrement int)') as xxx;
 update systable set autoincrement=0 where autoincrement is null;
 EOD
 			cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-			$installdir/mysql/bin/mysql \
-				--defaults-file=$installdir/mysql/my.cnf \
+			$prefix/Calpont/mysql/bin/mysql \
+				--defaults-file=$prefix/Calpont/mysql/my.cnf \
 				--user=root $pwprompt \
 				calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 	
@@ -201,8 +196,8 @@ EOD
 		#Verify that autoincrement was successfully added to SYSTABLE
 		#
 		rm -f /tmp/idb_upgrade.sql
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			--execute='describe systable;' \
 			calpontsys | grep autoincrement >/tmp/upgrade-status-1.log 2>&1
@@ -214,7 +209,7 @@ EOD
 		fi
 		cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
 		rm -f /tmp/upgrade-status-1.log
-		if [ -z "$cnt" ]; then
+		if [ "x$cnt" = x ]; then
 			cnt=0
 		fi
 		if [ $cnt -ne 1 ]; then
@@ -226,7 +221,7 @@ EOD
 		# Verify that autoincrement (OID 1011) was successfully added to BRM
 		#
 		if [ $has_um -eq 0 ]; then
-			$installdir/bin/editem -o1011 1>/tmp/upgrade-status-1.log 2>/dev/null
+			$prefix/Calpont/bin/editem -o1011 1>/tmp/upgrade-status-1.log 2>/dev/null
 			rc=$?
 			cat /tmp/upgrade-status-1.log >>/tmp/upgrade-status.log.$$
 			if [ $rc -ne 0 ]; then
@@ -249,8 +244,8 @@ EOD
 	# See if nextvalue column is in SYSCOLUMN
 	#---------------------------------------------------------------------------
 	echo "checking calpontsys for nextvalue..." >>/tmp/upgrade-status.log.$$
-	$installdir/mysql/bin/mysql \
-		--defaults-file=$installdir/mysql/my.cnf \
+	$prefix/Calpont/mysql/bin/mysql \
+		--defaults-file=$prefix/Calpont/mysql/my.cnf \
 		--user=root $pwprompt \
 		--execute='describe syscolumn;' \
 		calpontsys | grep nextvalue >>/tmp/upgrade-status.log.$$ 2>&1
@@ -266,8 +261,8 @@ EOD
 alter table syscolumn add nextvalue bigint comment 'schema sync only';
 EOD
 		cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 
@@ -281,8 +276,8 @@ update syscolumn set nextvalue=1 where nextvalue is null;
 update syscolumn set autoincrement='n' where autoincrement is null;
 EOD
 			cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-			$installdir/mysql/bin/mysql \
-				--defaults-file=$installdir/mysql/my.cnf \
+			$prefix/Calpont/mysql/bin/mysql \
+				--defaults-file=$prefix/Calpont/mysql/my.cnf \
 				--user=root $pwprompt \
 				calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 	
@@ -293,8 +288,8 @@ EOD
 		# Verify that nextvalue was successfully added to SYSCOLUMN
 		#
 		rm -f /tmp/idb_upgrade.sql
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
+		$prefix/Calpont/mysql/bin/mysql \
+			--defaults-file=$prefix/Calpont/mysql/my.cnf \
 			--user=root $pwprompt \
 			--execute='describe syscolumn;' \
 			calpontsys | grep nextvalue >/tmp/upgrade-status-1.log 2>&1
@@ -306,7 +301,7 @@ EOD
 		fi
 		cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
 		rm -f /tmp/upgrade-status-1.log
-		if [ -z "$cnt" ]; then
+		if [ "x$cnt" = x ]; then
 			cnt=0
 		fi
 		if [ $cnt -ne 1 ]; then
@@ -318,7 +313,7 @@ EOD
 		# Verify that nextvalue (OID 1042) was successfully added to BRM
 		#
 		if [ $has_um -eq 0 ]; then
-			$installdir/bin/editem -o1042 1>/tmp/upgrade-status-1.log 2>/dev/null
+			$prefix/Calpont/bin/editem -o1042 1>/tmp/upgrade-status-1.log 2>/dev/null
 			rc=$?
 			cat /tmp/upgrade-status-1.log >>/tmp/upgrade-status.log.$$
 			if [ $rc -ne 0 ]; then
@@ -337,108 +332,86 @@ EOD
 		fi
 	fi
 
-	#---------------------------------------------------------------------------
-	# See if systable schema and tablename columns are varchar(128).
-	#---------------------------------------------------------------------------
-	recreate=0
-	echo "checking calpontsys.systable schema and tablename for varchar(128)..." >>/tmp/upgrade-status.log.$$
-	colCount=` \
-	$installdir/mysql/bin/mysql \
-		--defaults-file=$installdir/mysql/my.cnf \
-		--user=root $pwprompt \
-		--execute='describe systable;' \
-		calpontsys | egrep "schema|tablename" | grep "varchar(128)" | wc -l`
-	if [ $colCount -ne 2 ]; then
-		recreate=1
-		echo "calpontsys needs upgrade to expand systable schema and tablename" >>/tmp/upgrade-status.log.$$
-	fi
-	
-	#---------------------------------------------------------------------------
-	# See if syscolumn schema, tablename, and columname columns are varchar(128).
-	#---------------------------------------------------------------------------
-	if [ $recreate -eq 0 ]; then
-		echo "checking calpontsys.syscolumn schema, tablename, columnname for varchar(128)..." >>/tmp/upgrade-status.log.$$
-		colCount=` \
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			--execute='describe syscolumn;' \
-			calpontsys | egrep "schema|tablename|columnname" | grep "varchar(128)" | wc -l`
-		if [ $colCount -ne 3 ]; then
-			recreate=1
-			echo "calpontsys needs upgrade to expand syscolumn schema, tablename, and columnname" >>/tmp/upgrade-status.log.$$
-		fi
-	fi
+        #---------------------------------------------------------------------------
+        # See if systable schema and tablename columns are varchar(128).
+        #---------------------------------------------------------------------------
+        recreate=0
+        echo "checking calpontsys.systable schema and tablename for varchar(128)..." >>/tmp/upgrade-status.log.$$
+        colCount=` \
+        $prefix/Calpont/mysql/bin/mysql \
+                --defaults-file=$prefix/Calpont/mysql/my.cnf \
+                --user=root $pwprompt \
+                --execute='describe systable;' \
+                calpontsys | egrep "schema|tablename" | grep "varchar(128)" | wc -l`
+        if [ $colCount -ne 2 ]; then
+                recreate=1
+                echo "calpontsys needs upgrade to expand systable schema and tablename" >>/tmp/upgrade-status.log.$$
+        fi
 
-	#---------------------------------------------------------------------------
-	# See if defaultvalue column in SYSCOLUMN is varchar(64)
-	#---------------------------------------------------------------------------
-	if [ $recreate -eq 0 ]; then
-		echo "checking calpontsys for defaultvalue varchar(64)..." >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			--execute='describe syscolumn;' \
-			calpontsys | grep defaultvalue | grep 'varchar(64)' >>/tmp/upgrade-status.log.$$ 2>&1
-		if [ $? -ne 0 ]; then
-			recreate=1
-			echo "calpontsys needs upgrade to change defaultvalue" >>/tmp/upgrade-status.log.$$
-		fi
-	fi
+        #---------------------------------------------------------------------------
+        # See if syscolumn schema, tablename, and columname columns are varchar(128).
+        #---------------------------------------------------------------------------
+        if [ $recreate -eq 0 ]; then
+                echo "checking calpontsys.syscolumn schema, tablename, columnname for varchar(128)..." >>/tmp/upgrade-status.log.$$
+                colCount=` \
+                $prefix/Calpont/mysql/bin/mysql \
+                        --defaults-file=$prefix/Calpont/mysql/my.cnf \
+                        --user=root $pwprompt \
+                        --execute='describe syscolumn;' \
+                        calpontsys | egrep "schema|tablename|columnname" | grep "varchar(128)" | wc -l`
+                if [ $colCount -ne 3 ]; then
+                        recreate=1
+                        echo "calpontsys needs upgrade to expand syscolumn schema, tablename, and columnname" >>/tmp/upgrade-status.log.$$
+                fi
+        fi
 
-	#
-	# Change defaultvalue column to varchar(64) if applicable
-	#
-	if [ $recreate -ne 0 ]; then
-		cat >/tmp/idb_upgrade.sql <<EOD
+        #
+        # Change defaultvalue column to varchar(64) if applicable
+        #
+        if [ $recreate -ne 0 ]; then
+                cat >/tmp/idb_upgrade.sql <<EOD
 drop table if exists systable restrict;
 drop table if exists syscolumn restrict;
 EOD
-		cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
+                cat /tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$
+                $prefix/Calpont/mysql/bin/mysql \
+                        --defaults-file=$prefix/Calpont/mysql/my.cnf \
+                        --user=root $pwprompt \
+                        calpontsys </tmp/idb_upgrade.sql >>/tmp/upgrade-status.log.$$ 2>&1
 
-		checkForError
+                checkForError
 
-		echo "create systable and syscolumn with schema sync only" >>/tmp/upgrade-status.log.$$
-		cat $installdir/mysql/syscatalog_mysql.sql >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			calpontsys <$installdir/mysql/syscatalog_mysql.sql >>/tmp/upgrade-status.log.$$ 2>&1
+                echo "create systable and syscolumn with schema sync only" >>/tmp/upgrade-status.log.$$
+                cat $prefix/Calpont/mysql/syscatalog_mysql.sql >>/tmp/upgrade-status.log.$$
+                $prefix/Calpont/mysql/bin/mysql \
+                        --defaults-file=$prefix/Calpont/mysql/my.cnf \
+                        --user=root $pwprompt \
+                        calpontsys <$prefix/Calpont/mysql/syscatalog_mysql.sql >>/tmp/upgrade-status.log.$$ 2>&1
 
-		checkForError
+                checkForError
 
-		#
-		# Verify column widths:
-		# varchar(64) for syscolumn.defaultvalue
-		# varchar(128) for systable (schema, tablename) and syscolumn (schema, tablename, and columnname).
-		#
-		rm -f /tmp/idb_upgrade.sql
-		echo "verify column widths" >>/tmp/upgrade-status.log.$$
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			--execute='describe syscolumn;' \
-			calpontsys | grep defaultvalue | grep 'varchar(64)' >/tmp/upgrade-status-1.log 2>&1
-		$installdir/mysql/bin/mysql \
-			--defaults-file=$installdir/mysql/my.cnf \
-			--user=root $pwprompt \
-			--execute='describe systable; describe syscolumn;' \
-			calpontsys | egrep "schema|tablename|columnname" | grep 'varchar(128)' >>/tmp/upgrade-status-1.log 2>&1
-		cat /tmp/upgrade-status-1.log >>/tmp/upgrade-status.log.$$
-		cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
-		rm -f /tmp/upgrade-status-1.log
-		if [ -z "$cnt" ]; then
-			cnt=0
-		fi
-		if [ $cnt -ne 6 ]; then
-			echo "FAILED width of schema, tablename, columnname, defaultvalue verification!"
-			exit 1
-		fi
-	fi
+                #
+                # Verify column widths:
+                # varchar(128) for systable (schema, tablename) and syscolumn (schema, tablename, and columnname).
+                #
+                rm -f /tmp/idb_upgrade.sql
+                echo "verify column widths" >>/tmp/upgrade-status.log.$$
+                $prefix/Calpont/mysql/bin/mysql \
+                        --defaults-file=$prefix/Calpont/mysql/my.cnf \
+                        --user=root $pwprompt \
+                        --execute='describe systable; describe syscolumn;' \
+                        calpontsys | egrep "schema|tablename|columnname" | grep 'varchar(128)' >/tmp/upgrade-status-1.log 2>&1
+                cat /tmp/upgrade-status-1.log >>/tmp/upgrade-status.log.$$
+                cnt=`wc -l /tmp/upgrade-status-1.log | awk '{print $1}'`
+                rm -f /tmp/upgrade-status-1.log
+                if [ -z "$cnt" ]; then
+                        cnt=0
+                fi
+                if [ $cnt -ne 5 ]; then
+                        echo "FAILED width of schema, tablename, columnname verification!"
+                        exit 1
+                fi
+        fi
 fi
 
 echo "OK"

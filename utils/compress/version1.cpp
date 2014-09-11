@@ -34,14 +34,13 @@ namespace bi=boost::interprocess;
 
 #include <boost/thread.hpp>
 
-#include "installdir.h"
+#ifdef _MSC_VER
+#include "idbregistry.h"
+#endif
+
 #include "shmkeys.h"
-#include <config.h>
-#include <exceptclasses.h>
 
 #include "version1.h"
-
-#define OAM_FORKS_DECOMSVR
 
 /*
 	Protocol definition:
@@ -73,38 +72,30 @@ namespace
 {
 short DSPort = 9199;
 
-void log(const string &s) 
-{
-	logging::MessageLog logger((logging::LoggingID()));
-	logging::Message message;
-	logging::Message::Args args;
-
-	args.add(s);
-	message.format(args);
-	logger.logErrorMessage(message);
-}
-
 struct ScopedCleaner
 {
 #ifdef _MSC_VER
-	ScopedCleaner() : ctlsock(INVALID_SOCKET),
+	ScopedCleaner() : fd(-1), ctlsock(-1),
 		cpipeh(INVALID_HANDLE_VALUE),
 		upipeh(INVALID_HANDLE_VALUE)
 		{ }
 
 	~ScopedCleaner()	
 	{
+		if (fd >= 0)
+			close(fd);
 		if (cpipeh != INVALID_HANDLE_VALUE)
 			CloseHandle(cpipeh);
 		if (upipeh != INVALID_HANDLE_VALUE)
 			CloseHandle(upipeh);
-		if (ctlsock != INVALID_SOCKET) { 
+		if (ctlsock >= 0) { 
 			shutdown(ctlsock, SHUT_RDWR);
 			closesocket(ctlsock);
 		}
 	}
 
-	SOCKET ctlsock;
+	int fd;
+	int ctlsock;
 	HANDLE cpipeh;
 	HANDLE upipeh;
 #else
@@ -175,18 +166,15 @@ void initCtlShm()
 		Ctlshmregion.swap(region);
 	}
 	const string pname("DecomSvr");
-	string srvrpath(startup::StartUp::installDir());
+	string srvrpath("/usr/local/Calpont");
 	srvrpath += "/bin/" + pname;
-#ifndef OAM_FORKS_DECOMSVR
 #ifndef _MSC_VER
 	int rc;
 
 	rc = fork();
-	idbassert_s(rc >= 0, "couldn't fork DecomSvr");
-//	if (rc < 0)
-//		throw runtime_error("couldn't fork DecomSvr");
-//	else if (rc == 0)
-	if (rc == 0)
+	if (rc < 0)
+		throw runtime_error("couldn't fork DecomSvr");
+	else if (rc == 0)
 	{
 		for (int fd = 0; fd < sysconf(_SC_OPEN_MAX); fd++)
 			close(fd);
@@ -194,24 +182,21 @@ void initCtlShm()
 		open("/dev/null", O_WRONLY);
 		open("/dev/null", O_WRONLY);
 		execl(srvrpath.c_str(), pname.c_str(), (char*)NULL);
-		idbassert_s(0, "couldn't exec DecomSvr");
-		//throw runtime_error("couldn't exec DecomSvr");
+		throw runtime_error("couldn't exec DecomSvr");
 	}
 #else
+	srvrpath = IDBreadRegistry("");
+	srvrpath += "\\bin\\" + pname;
 	srvrpath += ".exe";
 	PROCESS_INFORMATION pInfo;
 	ZeroMemory(&pInfo, sizeof(pInfo));
 	STARTUPINFO sInfo;
 	ZeroMemory(&sInfo, sizeof(sInfo));
 
-	idbassert_s(CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) != 0,
-				"couldn't exec DecomSvr");
-	//if (CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
-	//	throw runtime_error("couldn't exec DecomSvr");
+	if (CreateProcess(0, (LPSTR)srvrpath.c_str(), 0, 0, false, 0, 0, 0, &sInfo, &pInfo) == 0)
+		throw runtime_error("couldn't exec DecomSvr");
 	CloseHandle(pInfo.hProcess);
 
-	sleep(5);
-#endif
 #endif
 
 	char* p = getenv("IDB_DECOMSVR_PORT");
@@ -222,39 +207,9 @@ void initCtlShm()
 			DSPort = 9199;
 	}
 
+	sleep(5);
+
 	Ctlshmptr = tmpptr;
-}
-
-void sendn(int fd, const char* p, size_t wanted)
-{
-	size_t needed = wanted;
-	size_t sofar = 0;
-	ssize_t rrc = -1;
-	pollfd fds[1];
-	int en = 0;
-
-	fds[0].fd = fd;
-	fds[0].events = POLLOUT;
-
-	while (wanted > sofar)
-	{
-		fds[0].revents = 0;
-		poll(fds, 1, -1);
-		errno = 0;
-		rrc = send(fd, (p + sofar), needed, 0);
-		en = errno;
-		if (rrc < 0)
-		{
-			if (en == EAGAIN || en == EINTR || en == 512)
-				continue;
-			ostringstream oss;
-			oss << "send() returned " << rrc << " (" << strerror(en) << ")";
-			idbassert_s(0, oss.str());
-			//throw runtime_error(oss.str());
-		}
-		needed -= rrc;
-		sofar += rrc;
-	}
 }
 
 }
@@ -264,115 +219,6 @@ namespace compress
 
 namespace v1
 {
-#ifndef _MSC_VER
-void readn(int fd, void* buf, const size_t wanted)
-{
-	size_t needed = wanted;
-	size_t sofar = 0;
-	char* p = reinterpret_cast<char*>(buf);
-	ssize_t rrc = -1;
-	pollfd fds[1];
-	int en = 0;
-	int prc = 0;
-	ostringstream oss;
-	unsigned zerocount=0;
-
-	fds[0].fd = fd;
-	fds[0].events = POLLIN;
-
-	while (wanted > sofar)
-	{
-		fds[0].revents = 0;
-		errno = 0;
-		prc = poll(fds, 1, -1);
-		en = errno;
-		if (prc <= 0)
-		{
-			if (en == EAGAIN || en == EINTR || en == 512)
-				continue;
-			oss << "compress::v1::readn: poll() returned " << prc << " (" << strerror(en) << ")";
-			idbassert_s(0, oss.str());
-		}
-		//revents == POLLHUP if DecomSvr dies in the middle of writing
-		if (fds[0].revents != POLLIN)
-		{
-			oss << "compress::v1::readn: revents for fd " << fds[0].fd << " was " << fds[0].revents;
-			idbassert_s(0, oss.str());
-		}
-		errno = 0;
-		rrc = read(fd, (p + sofar), needed);
-		en = errno;
-		if (rrc < 0)
-		{
-			if (en == EAGAIN || en == EINTR || en == 512)
-				continue;
-			oss << "compress::v1::readn(): read() returned " << rrc << " (" << strerror(en) << ")";
-			//this throws logging::IDBExcept()
-			idbassert_s(0, oss.str());
-		}
-		if (rrc == 0)
-		{
-			ostringstream os;
-			zerocount++;
-			if (zerocount >= 10)
-			{
-				os << "compress::v1::readn(): too many zero-length reads!";
-				idbassert_s(0, oss.str());
-			}
-			logging::MessageLog logger((logging::LoggingID()));
-			logging::Message message;
-			logging::Message::Args args;
-			os << "compress::v1::readn(): zero-length read on fd " << fd;
-			args.add(os.str());
-			message.format(args);
-			logger.logWarningMessage(message);
-			sleep(1);
-		}
-		else
-			zerocount = 0;
-		needed -= rrc;
-		sofar += rrc;
-	}
-}
-
-size_t writen(int fd, const void *data, size_t nbytes)
-{
-	size_t nleft;
-	ssize_t nwritten;
-	const char *bufp = (const char *) data;
-	nleft = nbytes;
-
-	while (nleft > 0)
-	{
-		// the O_NONBLOCK flag is not set, this is a blocking I/O.
-  		if ((nwritten = ::write(fd, bufp, nleft)) < 0)
-		{
-			if (errno == EINTR)
-				nwritten = 0;
-			else {
-				// save the error no first
-				int e = errno;
-				string errorMsg = "v1::writen() error: ";
-		 		boost::scoped_array<char> buf(new char[80]);
-#if STRERROR_R_CHAR_P
-				const char* p;
-		 		if ((p = strerror_r(e, buf.get(), 80)) != 0)
-					errorMsg += p;
-#else
-				int p;
-				if ((p = strerror_r(e, buf.get(), 80)) == 0)
-					errorMsg += buf.get();
-#endif
-				idbassert_s(0, errorMsg);
-				//throw runtime_error(errorMsg);
-			}
-		}
-		nleft -= nwritten;
-		bufp += nwritten;
-	}
-	return nbytes;
-}
-#endif
 
 bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t* ol)
 {
@@ -382,6 +228,7 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	string s;
 	string cpipe;
 	string upipe;
+	ssize_t wrc;
 	int thdid = 0;
 	ScopedCleaner cleaner;
 	int fd = -1;
@@ -406,17 +253,15 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	HANDLE cpipeh;
 	cpipeh = CreateNamedPipe(cpipe.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT,
 		1, 0, 8192, 0, 0);
-	idbassert_s(cpipeh != INVALID_HANDLE_VALUE, "while creating cdata fifo");
-	//if (cpipeh == INVALID_HANDLE_VALUE)
-	//	throw runtime_error("while creating cdata fifo");
+	if (cpipeh == INVALID_HANDLE_VALUE)
+		throw runtime_error("while creating cdata fifo");
 	cleaner.cpipeh = cpipeh;
 
 	HANDLE upipeh;
 	upipeh = CreateNamedPipe(upipe.c_str(), PIPE_ACCESS_INBOUND, PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT,
 		1, 8192, 0, 0, 0);
-	idbassert_s(upipeh != INVALID_HANDLE_VALUE, "while creating udata fifo");
-	//if (upipeh == INVALID_HANDLE_VALUE)
-	//	throw runtime_error("while creating udata fifo");
+	if (upipeh == INVALID_HANDLE_VALUE)
+		throw runtime_error("while creating udata fifo");
 	cleaner.upipeh = upipeh;
 #else
 	oss << "/tmp/cdatafifo" << thdid;
@@ -426,23 +271,16 @@ bool decompress(const char* in, const uint32_t inLen, unsigned char* out, size_t
 	cleaner.cpipename = cpipe;
 	cleaner.upipename = upipe;
 	unlink(cpipe.c_str());
-	idbassert_s(mknod(cpipe.c_str(), S_IFIFO|0666, 0) == 0, "while creating cdata fifo");
-	//if (mknod(cpipe.c_str(), S_IFIFO|0666, 0) != 0)
-	//	throw runtime_error("while creating cdata fifo");
+	if (mknod(cpipe.c_str(), S_IFIFO|0666, 0) != 0)
+		throw runtime_error("while creating cdata fifo");
 	unlink(upipe.c_str());
-	idbassert_s(mknod(upipe.c_str(), S_IFIFO|0666, 0) == 0, "while creating udata fifo");
-	//if (mknod(upipe.c_str(), S_IFIFO|0666, 0) != 0)
-	//	throw runtime_error("while creating udata fifo");
+	if (mknod(upipe.c_str(), S_IFIFO|0666, 0) != 0)
+		throw runtime_error("while creating udata fifo");
 #endif
 	int rc = -1;
 	fd = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-#ifdef _MSC_VER
-	idbassert_s(fd != INVALID_SOCKET, 
-		string("socket create error: ") + strerror(errno));
-#else
-	idbassert_s(fd >= 0,
-		string("socket create error: ") + strerror(errno));
-#endif
+	if (fd < 0)
+		throw runtime_error(string("socket create error: ") + strerror(errno));
 	cleaner.ctlsock = fd;
 	struct sockaddr_in serv_addr;
 	struct in_addr la;
@@ -466,85 +304,80 @@ again:
 		if (errno == ECONNREFUSED)
 #endif
 		{
-			idbassert_s(++tries < MaxTries, string("socket connect error: ") + strerror(errno));
-			//if (++tries >= MaxTries)
-			//	throw runtime_error(string("socket connect error: ") + strerror(errno));
+			if (++tries >= MaxTries)
+				throw runtime_error(string("socket connect error: ") + strerror(errno));
 			cfLock.unlock();
 			sleep(2);
 			goto again;
 		}
-		idbassert_s(0, string("socket connect error: ") + strerror(errno));
-		//throw runtime_error(string("socket connect error: ") + strerror(errno));
+		throw runtime_error(string("socket connect error: ") + strerror(errno));
 	}
 
 	u32 = s.length();
 
-	sendn(fd, reinterpret_cast<const char*>(&u32), 4);
+	wrc = send(fd, reinterpret_cast<const char*>(&u32), 4, 0);
 
-	sendn(fd, s.c_str(), u32);
+	if (wrc != 4)
+		throw runtime_error("while writing fifo len to the DS");
+
+	wrc = send(fd, s.c_str(), u32, 0);
+
+	if (wrc != u32)
+		throw runtime_error("while writing fifo name to the DS");
 
 	shutdown(fd, SHUT_RDWR);
 #ifdef _MSC_VER
 	closesocket(fd);
-	cleaner.ctlsock = INVALID_SOCKET;
 #else
 	close(fd);
-	cleaner.ctlsock = -1;
 #endif
+	cleaner.ctlsock = -1;
 
 	cfLock.unlock();
 #ifdef _MSC_VER
 	BOOL dwrc;
 
 	dwrc = ConnectNamedPipe(cpipeh, 0);
-	idbassert_s(!(dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED), "connecting to cpipe");
-	//if (dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED)
-	//	throw runtime_error("connecting to cpipe");
+	if (dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED)
+		throw runtime_error("connecting to cpipe");
 
 	u64 = static_cast<uint64_t>(inLen);
-	idbassert_s(u64 < 8 * 1024 * 1024, "preposterous inLen!");
-	//if (!(u64 < 8 * 1024 * 1024))
-	//	throw runtime_error("preposterous inLen!");
+	if (!(u64 < 8 * 1024 * 1024))
+		throw runtime_error("preposterous inLen!");
 
 	DWORD nwrite;
 	dwrc = WriteFile(cpipeh, &u64, 8, &nwrite, 0);
-	idbassert_s(dwrc != 0 && nwrite == 8, "while writing to cpipe");
-	//if (!(dwrc != 0 && nwrite == 8))
-	//	throw runtime_error("while writing to cpipe");
+	if (!(dwrc != 0 && nwrite == 8))
+		throw runtime_error("while writing to cpipe");
 
 	dwrc = WriteFile(cpipeh, in, u64, &nwrite, 0);
-	idbassert_s(dwrc != 0 && nwrite == u64, "while writing to cpipe");
-	//if (!(dwrc != 0 && nwrite == u64))
-	//	throw runtime_error("while writing to cpipe");
+	if (!(dwrc != 0 && nwrite == u64))
+		throw runtime_error("while writing to cpipe");
 
 	FlushFileBuffers(cpipeh);
 	CloseHandle(cpipeh);
 	cleaner.cpipeh = INVALID_HANDLE_VALUE;
 #else
-	ssize_t wrc;
 	fd = open(cpipe.c_str(), O_WRONLY);
-	idbassert_s(fd >= 0, "while opening data fifo for write");
-	//if (fd < 0)
-	//	throw runtime_error("while opening data fifo for write");
+	if (fd < 0)
+		throw runtime_error("while opening data fifo for write");
 
 	cleaner.fd = fd;
 
 	u64 = static_cast<uint64_t>(inLen);
 	errno = 0;
-	wrc = writen(fd, &u64, 8);
+	wrc = write(fd, &u64, 8);
 	int err = errno;
-	idbassert_s(wrc == 8, string("while writing compressed len to the DS: ") + strerror(err));
-//	if (wrc != 8)
-//	{
-//		ostringstream oss;
-//		oss << "while writing compressed len to the DS: " << strerror(err);
-//		throw runtime_error(oss.str());
-//	}
+	if (wrc != 8)
+	{
+		ostringstream oss;
+		oss << "while writing compressed len to the DS: " << strerror(err);
+		throw runtime_error(oss.str());
+	}
 
-	wrc = writen(fd, in, u64);
-	idbassert_s(wrc == static_cast<ssize_t>(u64), "while writing compressed data to the DS");
-//	if (wrc != static_cast<ssize_t>(u64))
-//		throw runtime_error("while writing compressed data to the DS");
+	wrc = write(fd, in, u64);
+	if (wrc != static_cast<ssize_t>(u64))
+		throw runtime_error("while writing compressed data to the DS");
 
 	close(fd);
 	cleaner.fd = -1;
@@ -552,33 +385,29 @@ again:
 
 #ifdef _MSC_VER
 	dwrc = ConnectNamedPipe(upipeh, 0);
-	idbassert_s(!(dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED), "connecting to upipe");
-	//if (dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED)
-	//	throw runtime_error("connecting to upipe");
+	if (dwrc == 0 && GetLastError() != ERROR_PIPE_CONNECTED)
+		throw runtime_error("connecting to upipe");
 
 	DWORD nread;
 	dwrc = ReadFile(upipeh, &u64, 8, &nread, 0);
-	idbassert_s(dwrc != 0 && nread == 8, "while reading from upipe");
-	//if (!(dwrc != 0 && nread == 8))
-	//	throw runtime_error("while reading from upipe");
+	if (!(dwrc != 0 && nread == 8))
+		throw runtime_error("while reading from upipe");
 
 	dwrc = ReadFile(upipeh, out, u64, &nread, 0);
-	idbassert_s(dwrc != 0 && nread == u64, "while reading from upipe");
-	//if (!(dwrc != 0 && nread == u64))
-	//	throw runtime_error("while reading from upipe");
+	if (!(dwrc != 0 && nread == u64))
+		throw runtime_error("while reading from upipe");
 
 	CloseHandle(upipeh);
 	cleaner.upipeh = INVALID_HANDLE_VALUE;
 #else
 	fd = open(upipe.c_str(), O_RDONLY);
-	idbassert_s(fd >= 0, "while opening data fifo for read");
-//	if (fd < 0)
-//		throw runtime_error("while opening data fifo for read");
+	if (fd < 0)
+		throw runtime_error("while opening data fifo for read");
 
 	cleaner.fd = fd;
 
-	readn(fd, &u64, 8);
-	readn(fd, out, u64);
+	read(fd, &u64, 8);
+	read(fd, out, u64);
 
 	close(fd);
 	cleaner.fd = -1;

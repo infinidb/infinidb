@@ -1,5 +1,5 @@
 /* Copyright 2000-2008 MySQL AB, 2008 Sun Microsystems, Inc.
- 
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; version 2 of the License.
@@ -1701,9 +1701,6 @@ JOIN::exec()
 			  /* && select_lex == &thd->lex->select_lex && (!conds || !conds->with_subselect)*/
 			  && !(select_lex && select_lex->master_unit() && select_lex->master_unit()->item) // not a subselect unit
 			  && !(select_lex && select_lex->first_inner_unit()) // not a query with subselect 
-                          // @bug5083. zero_result_cause was not set properly for outer join on derived
-                          // table process phase.
-                          && !(thd->derived_tables_processing)
 			 )
 		{
 			// @bug 1818. Make MySQL redo this query and return empty result set without going
@@ -1766,8 +1763,7 @@ JOIN::exec()
 			thd->infinidb_vtable.vtable_state = THD::INFINIDB_REDO_QUERY;
 			DBUG_VOID_RETURN;
 		}
-		// @InfiniDB. Cross engine support
-		else if (/*hasNonCalpont && hasCalpont*/false)
+		else if (hasNonCalpont && hasCalpont)
 		{
 			const char* emsg = "IDB-7001: Non InfiniDB table(s) on the FROM clause.";
 			thd->infinidb_vtable.vtable_state = THD::INFINIDB_ERROR;
@@ -9595,7 +9591,7 @@ static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
                                      item->name, table->s,
                                      item->collation.collation);
     else
-      new_field= item->make_string_field(table, thd); //@InfiniDB
+      new_field= item->make_string_field(table);
     new_field->set_derivation(item->collation.derivation);
     break;
   case DECIMAL_RESULT:
@@ -16885,7 +16881,7 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
 
 	// InfiniDB skip WHERE clause and after. the print functions are
 	// Called just for post process vtable creation. 
-	if (query_type == QT_INFINIDB_NO_QUOTE  || query_type == QT_INFINIDB_DERIVED)
+	if (query_type == QT_INFINIDB_NO_QUOTE)
 		return;
   // Where
   //printf("before where: %s\n\n", str->ptr());

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colopcompress.cpp 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_colopcompress.cpp 2962 2011-05-09 14:46:13Z chao $
 
 
 /** @file */
@@ -109,14 +109,17 @@ int ColumnOpCompress0::saveBlock(FILE* pFile, const unsigned char* writeBuf, con
 
 ColumnOpCompress1::ColumnOpCompress1(Log* logger)
 {
-	m_compressionType = 1;
-   m_chunkManager = new ChunkManager();
+   m_compressionType = 1;
+   fIsInsert = false;
+   
+   fChunkManager = new ChunkManager();
+   DbFileOp::chunkManager(fChunkManager);
    if (logger)
    {
 		setDebugLevel( logger->getDebugLevel() );
 		setLogger    ( logger );
    }
-   m_chunkManager->fileOp(this);
+   fChunkManager->fileOp(this);
 }
 
 /**
@@ -124,17 +127,29 @@ ColumnOpCompress1::ColumnOpCompress1(Log* logger)
  */
 ColumnOpCompress1::~ColumnOpCompress1()
 {
-	if (m_chunkManager)
+	if (!fIsInsert)
+		delete fChunkManager;
+}
+
+void ColumnOpCompress1::chunkManager(ChunkManager* cm)
+{
+	if (fChunkManager != cm)
 	{
-		delete m_chunkManager;
+		delete fChunkManager;
+		fChunkManager = cm;
+		fIsInsert = true;
+		fChunkManager->fileOp(this);
 	}
+	
+	DbFileOp::chunkManager(cm);
+	
 }
 
 FILE* ColumnOpCompress1::openFile(
    const Column& column, const uint16_t dbRoot, const uint32_t partition, const uint16_t segment,
    std::string& segFile, const char* mode, const int ioBuffSize) const
 {
-   return m_chunkManager->getFilePtr(column, dbRoot, partition, segment, segFile, mode, ioBuffSize);
+   return fChunkManager->getFilePtr(column, dbRoot, partition, segment, segFile, mode, ioBuffSize);
 }
 
 
@@ -156,27 +171,27 @@ int ColumnOpCompress1::blocksInFile(FILE* pFile) const
 
 int ColumnOpCompress1::readBlock(FILE* pFile, unsigned char* readBuf, const i64 fbo)
 {
-   return m_chunkManager->readBlock(pFile, readBuf, fbo);
+   return fChunkManager->readBlock(pFile, readBuf, fbo);
 }
 
 
 int ColumnOpCompress1::saveBlock(FILE* pFile, const unsigned char* writeBuf, const i64 fbo)
 {
-   return m_chunkManager->saveBlock(pFile, writeBuf, fbo);
+   return fChunkManager->saveBlock(pFile, writeBuf, fbo);
 }
 
 
 int ColumnOpCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 {
-   return m_chunkManager->flushChunks(rc, columnOids);
+   return fChunkManager->flushChunks(rc, columnOids);
 }
 
 
-int ColumnOpCompress1::expandAbbrevColumnExtent(
+const int ColumnOpCompress1::expandAbbrevColumnExtent(
    FILE* pFile, uint16_t dbRoot, i64 emptyVal, int width)
 {
    // update the uncompressed initial chunk to full chunk
-   RETURN_ON_ERROR(m_chunkManager->expandAbbrevColumnExtent(pFile, emptyVal, width));
+   RETURN_ON_ERROR(fChunkManager->expandAbbrevColumnExtent(pFile, emptyVal, width));
 
    // let the base to physically expand extent.
    return FileOp::expandAbbrevColumnExtent(pFile, dbRoot, emptyVal, width);
@@ -185,7 +200,7 @@ int ColumnOpCompress1::expandAbbrevColumnExtent(
 
 int ColumnOpCompress1::updateColumnExtent(FILE* pFile, int nBlocks)
 {
-   return m_chunkManager->updateColumnExtent(pFile, nBlocks);
+   return fChunkManager->updateColumnExtent(pFile, nBlocks);
 }
 
 

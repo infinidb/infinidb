@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: tdriver-bru.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: tdriver-bru.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -698,7 +698,7 @@ void *BucketReUseDriver::scanThread(void* arg)
 
 	string dummy;
 	bool scan = false;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> c =
+	execplan::CalpontSystemCatalog *c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 	execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 	BucketReuseControlEntry* entry = BucketReuseManager::instance()->userRegister(
@@ -751,7 +751,7 @@ void *BucketReUseDriver::reuseThread(void* arg)
 
 	string dummy;
 	bool scan = true;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> c =
+	execplan::CalpontSystemCatalog *c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 	execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 	BucketReuseControlEntry* entry = BucketReuseManager::instance()->userRegister(
@@ -817,7 +817,7 @@ void *BucketReUseDriver::raceThread(void* arg)
 	BucketReuseControlEntry* entry = NULL;
 	{
 		boost::mutex::scoped_lock lock(BucketReuseManager::instance()->getMutex());
-		boost::shared_ptr<execplan::CalpontSystemCatalog> c =
+		execplan::CalpontSystemCatalog *c =
 						execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0x80000000);
 		execplan::CalpontSystemCatalog::TableColName tcn = c->colName(a->oid);
 		entry = BucketReuseManager::instance()->userRegister(

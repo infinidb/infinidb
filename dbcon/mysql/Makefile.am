@@ -28,7 +28,7 @@ libcalmysql_la_LDFLAGS = -version-info 1:0:0 $(idb_common_ldflags) $(idb_common_
 libcalmysql_la_CPPFLAGS = -I/usr/include/libxml2 -I../../mysql/include -I../../mysql/sql -I../../mysql/regex -DMYSQL_DYNAMIC_PLUGIN $(AM_CPPFLAGS)
 include_HEADERS = 
 
-dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql calsetuserpriority.sql calremoveuserpriority.sql calshowprocesslist.sql
+dist_mysql_DATA = syscatalog_mysql.sql dumpcat_mysql.sql
 dist_mysql_SCRIPTS = install_calpont_mysql.sh mysql-Calpont dumpcat.pl
 
 test:

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleannexstep.cpp 9662 2013-07-01 20:34:26Z pleblanc $
+//  $Id: tupleannexstep.cpp 7829 2011-06-30 20:09:00Z xlou $
 
 
 //#define NDEBUG
@@ -70,8 +70,7 @@ TupleAnnexStep::TupleAnnexStep(
 	uint32_t sessionId,
 	uint32_t txnId,
 	uint32_t verId,
-	uint32_t statementId,
-	const JobInfo& jobInfo) :
+	uint32_t statementId) :
 		fSessionId(sessionId),
 		fTxnId(txnId),
 		fVerId(verId),
@@ -86,8 +85,7 @@ TupleAnnexStep::TupleAnnexStep(
 		fDistinct(false),
 		fOrderBy(NULL),
 		fConstant(NULL),
-		fFeInstance(funcexp::FuncExp::instance()),
-		fJobList(jobInfo.jobListPtr)
+		fFeInstance(funcexp::FuncExp::instance())
 {
 	fExtendedInfo = "TXS: ";
 }
@@ -170,12 +168,12 @@ void TupleAnnexStep::run()
 	if (fOutputDL == NULL)
 		throw logic_error("Output is not a RowGroup data list.");
 
+	fRunner.reset(new boost::thread(Runner(this)));
+
 	if (fDelivery == true)
 	{
 		fOutputIterator = fOutputDL->getIterator();
 	}
-
-	fRunner.reset(new boost::thread(Runner(this)));
 }
 
 
@@ -208,8 +206,7 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		}
 		else
 		{
-			while (more)
-				more = fOutputDL->next(fOutputIterator, &rgDataOut);
+			if (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 			fEndOfResult = true;
 		}
 	}
@@ -256,27 +253,26 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 void TupleAnnexStep::execute()
 {
 	if (fOrderBy)
-		executeWithOrderBy();
+		executeWithOrderByLimit();
 	else if (fDistinct)
-		executeNoOrderByWithDistinct();
+		executeNoOrderByLimitWithDistinct();
 	else
-		executeNoOrderBy();
+		executeNoOrderByLimit();
 }
 
 
-void TupleAnnexStep::executeNoOrderBy()
+void TupleAnnexStep::executeNoOrderByLimit()
 {
 	shared_array<uint8_t> rgDataIn;
 	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	bool hitLimit = false;
 
 	try
 	{
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
+		while (more && (0 == fInputJobStepAssociation.status()) && !die)
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
@@ -285,11 +281,9 @@ void TupleAnnexStep::executeNoOrderBy()
 			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
 			fRowGroupOut.setData(rgDataOut.get());
 			fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-			fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
 			fRowGroupOut.getRow(0, &fRowOut);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
-					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 			{
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
@@ -297,20 +291,13 @@ void TupleAnnexStep::executeNoOrderBy()
 					memcpy(fRowOut.getData(), fRowIn.getData(), fRowOut.getSize());
 
 				fRowGroupOut.incRowCount();
-				if (++fRowsReturned < fLimit)
-				{
-					fRowOut.nextRow();
-					fRowIn.nextRow();
-				}
-				else
-				{
-					hitLimit = true;
-					fJobList->abortOnLimit((JobStep*) this);
-				}
+				fRowOut.nextRow();
+				fRowIn.nextRow();
 			}
 
 			if (fRowGroupOut.getRowCount() > 0)
 			{
+				fRowsReturned += fRowGroupOut.getRowCount();
 				fOutputDL->insert(rgDataOut);
 			}
 
@@ -345,7 +332,7 @@ void TupleAnnexStep::executeNoOrderBy()
 }
 
 
-void TupleAnnexStep::executeNoOrderByWithDistinct()
+void TupleAnnexStep::executeNoOrderByLimitWithDistinct()
 {
 	uint64_t keyLength = fRowOut.getSize() - 2;
 	utils::TupleHasher   hasher(keyLength);
@@ -357,7 +344,6 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 	shared_array<uint8_t> rgDataIn;
 	shared_array<uint8_t> rgDataOut;
 	bool more = false;
-	bool hitLimit = false;
 
 	rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(8192)]);
 	fRowGroupOut.setData(rgDataOut.get());
@@ -369,13 +355,12 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 		more = fInputDL->next(fInputIterator, &rgDataIn);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
-		while (more && (0 == fInputJobStepAssociation.status()) && !die && !hitLimit)
+		while (more && (0 == fInputJobStepAssociation.status()) && !die)
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0; i < fRowGroupIn.getRowCount() &&
-					(0 == fInputJobStepAssociation.status()) && !die && !hitLimit; ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 			{
 				if (fConstant)
 					fConstant->fillInConstants(fRowIn, fRowOut);
@@ -389,15 +374,7 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 					distinctMap->insert(make_pair(fRowOut.getData()+2, fRowOut.getData()));
 
 					fRowGroupOut.incRowCount();
-					if (++fRowsReturned < fLimit)
-					{
-						fRowOut.nextRow();
-					}
-					else
-					{
-						hitLimit = true;
-						fJobList->abortOnLimit((JobStep*) this);
-					}
+					fRowOut.nextRow();
 
 					if (fRowGroupOut.getRowCount() >= 8192)
 					{
@@ -420,6 +397,7 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 		{
 			rgDataOut = *i;
 			fRowGroupOut.setData(rgDataOut.get());
+			fRowsReturned += fRowGroupOut.getRowCount();
 			fOutputDL->insert(rgDataOut);
 		}
 	}
@@ -450,7 +428,7 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 }
 
 
-void TupleAnnexStep::executeWithOrderBy()
+void TupleAnnexStep::executeWithOrderByLimit()
 {
 	shared_array<uint8_t> rgDataIn;
 	shared_array<uint8_t> rgDataOut;
@@ -466,9 +444,7 @@ void TupleAnnexStep::executeWithOrderBy()
 			fRowGroupIn.setData(rgDataIn.get());
 			fRowGroupIn.getRow(0, &fRowIn);
 
-			for (uint64_t i = 0;
-				 i < fRowGroupIn.getRowCount() && (0 == fInputJobStepAssociation.status()) && !die;
-				 ++i)
+			for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
 			{
 				fOrderBy->processRow(fRowIn);
 				fRowIn.nextRow();
@@ -497,7 +473,6 @@ void TupleAnnexStep::executeWithOrderBy()
 					rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
 					fRowGroupOut.setData(rgDataOut.get());
 					fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-					fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
 					fRowGroupOut.getRow(0, &fRowOut);
 
 					for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
@@ -588,7 +563,7 @@ void TupleAnnexStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl

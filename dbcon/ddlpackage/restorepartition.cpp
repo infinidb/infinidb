@@ -36,12 +36,7 @@ RestorePartitionStatement::RestorePartitionStatement(QualifiedName *qualifiedNam
 
 ostream& RestorePartitionStatement::put(ostream& os) const
 {
-	os << "Mark partition out of service: " << *fTableName;
-	os << " partitions: ";
-	set<BRM::LogicalPartition>::const_iterator it;
-	for (it=fPartitions.begin(); it!=fPartitions.end(); ++it)
-                os << (*it) << "  ";
-	os << endl;
+	os << "Mark partition out of service: " << *fTableName << " partition " << fPartition << endl;
 	return os;
 }
 

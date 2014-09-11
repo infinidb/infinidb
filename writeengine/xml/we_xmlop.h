@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmlop.h 4200 2012-09-24 15:28:27Z dcathey $
+* $Id: we_xmlop.h 2972 2011-05-17 20:50:24Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -30,11 +30,11 @@
 /** Namespace WriteEngine */
 namespace WriteEngine
 {
-   // Size of buffer used to parse non-string node content or attribute
+   // Size of buffer used to parse node content or attribute
    const int XML_NODE_BUF_SIZE = 256;
 
 /** @brief Class wrapper around XML2  API.  Used by XmlGenProc to save Job XML
- *  file for input into cpimport.bin.
+ *  file for input into cpimport.
  *
  */
 class XMLOp
@@ -64,27 +64,16 @@ protected:
     virtual ~XMLOp();
 
     /**
-     * @brief Get node attribute for non-strings
+     * @brief Get node attribute
      */
     bool getNodeAttribute( xmlNode* pNode, const char* pTag,
                            void* pVal, XML_DTYPE dataType ) const;
 
     /**
-     * @brief Get node attribute for strings
-     */
-    bool getNodeAttributeStr( xmlNode* pNode, const char* pTag,
-                           std::string& strVal ) const;
-
-    /**
-     * @brief Get node content for non-strings
+     * @brief Get node content
      */
     bool getNodeContent( const xmlNode* pNode, void* pVal,
                          XML_DTYPE dataType );
-
-    /**
-     * @brief Get node content for strings
-     */
-    bool getNodeContentStr( const xmlNode* pNode, std::string& strVal);
 
     /**
      * @brief Check whether it is certain tag

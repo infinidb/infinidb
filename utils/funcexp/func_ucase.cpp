@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_ucase.cpp 3716 2013-04-18 16:35:52Z bpaul $
+* $Id: func_ucase.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -52,6 +51,7 @@ CalpontSystemCatalog::ColType Func_ucase::operationType(FunctionParm& fp, Calpon
 	return fp[0]->data()->resultType();
 }
 
+
 std::string Func_ucase::getStrVal(rowgroup::Row& row,
 						FunctionParm& fp,
 						bool& isNull,
@@ -65,17 +65,21 @@ std::string Func_ucase::getStrVal(rowgroup::Row& row,
 	if (isNull)
 		return "";
 
-	size_t strwclen = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+	size_t strwclen = mbstowcs(0, tstr.c_str(), 0) + 1;
 	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-	strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
+	strwclen = mbstowcs(wcbuf, tstr.c_str(), strwclen);
 	wstring wstr(wcbuf, strwclen);
 
-	for (uint i = 0; i < strwclen; i++)
-		wstr[i] = std::towupper(wstr[i]);
+	wstring retValue;
 
-	size_t strmblen = utf8::idb_wcstombs(0, wstr.c_str(), 0) + 1;
+    for (std::wstring::iterator i = wstr.begin(); i != wstr.end(); ++i)
+	{
+		retValue = retValue + (wchar_t) std::towupper(*i); 
+	}
+
+	size_t strmblen = wcstombs(0, retValue.c_str(), 0) + 1;
 	char* outbuf = (char*)alloca(strmblen * sizeof(char));
-	strmblen = utf8::idb_wcstombs(outbuf, wstr.c_str(), strmblen);
+	strmblen = wcstombs(outbuf, retValue.c_str(), strmblen);
 	return string(outbuf, strmblen);
 }							
 

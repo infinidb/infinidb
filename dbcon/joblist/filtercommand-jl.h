@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: filtercommand-jl.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: filtercommand-jl.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -39,7 +39,7 @@ class FilterCommandJL : public CommandJL
 		FilterCommandJL(const FilterStep&);
 		virtual ~FilterCommandJL();
 
-		void setLBID(uint64_t rid, uint dbroot);
+		void setLBID(uint64_t rid);
 		uint8_t getTableColumnType();
 		CommandType getCommandType();
 		std::string toString();

@@ -129,8 +129,7 @@ include_HEADERS = \
 	funcexp.h \
 	funcexpwrapper.h \
 	functor.h \
-	functor_export.h \
-	utils_utf8.h
+	functor_export.h
 
 test:
 

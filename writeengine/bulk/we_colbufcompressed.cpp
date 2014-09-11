@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufcompressed.cpp 4380 2012-12-06 13:29:54Z rdempsey $
+ * $Id: we_colbufcompressed.cpp 4441 2013-01-11 13:10:46Z rdempsey $
  *
  ****************************************************************************/
 
@@ -106,12 +106,11 @@ int ColumnBufferCompressed::setDbFile(FILE* f, HWM startHwm, const char* hdrs)
 }
 
 //------------------------------------------------------------------------------
-// Reinitialize to-be-compressed column buffer (to empty chunk) prior to
-// importing the first chunk of the next extent.  Returns startFileOffset
-// which indicates file offset (in bytes) where next extent will be starting.
+// Reinitialize column buffer (to empty chunk) prior to importing the first
+// chunk of the next extent.  Returns startFileOffset which indicates file
+// offset (in bytes) where next extent will be starting.
 //------------------------------------------------------------------------------
-int ColumnBufferCompressed::resetToBeCompressedColBuf(
-    long long& startFileOffset )
+int ColumnBufferCompressed::resetColBuf( long long& startFileOffset )
 {
     // Don't load chunk, once we go to next extent
     fPreLoadHWMChunk = false;
@@ -245,7 +244,7 @@ int ColumnBufferCompressed::writeToFile(int startOffset, int writeSize)
         // iterate thru all the bytes to be compresssed and written from fBuffer
         while (writeSizeX > 0)
         {
-            idbassert( (fNumBytes <= fToBeCompressedCapacity) ); // DMC-temp debug
+            assert( (fNumBytes <= fToBeCompressedCapacity) ); // DMC-temp debug
 
             size_t writeSizeOut = 0;
             if ((fNumBytes + writeSizeX) > fToBeCompressedCapacity)
@@ -386,9 +385,9 @@ int ColumnBufferCompressed::compressAndFlush( bool bFinishingFile )
 #endif
 
 #ifdef _MSC_VER
-    __int64 fileOffset = _ftelli64(fFile);
+    __int64 fileOffset    = _ftelli64(fFile);
 #else
-    off_t   fileOffset = ftello(fFile);
+    off_t long fileOffset = ftello(fFile);
 #endif
     size_t nitems =  fwrite(compressedOutBuf, outputLen, 1, fFile);
     if (nitems != 1)

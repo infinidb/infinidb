@@ -65,8 +65,8 @@ namespace WriteEngine
     * Dictionary related structure
     ************************************************************************/
     struct Token {
-        i64     op       :  10;   // ordinal position within a block
-        i64     fbo      :  36;   // file block number
+        i64     op       :  10;   // file block number
+        i64     fbo      :  36;   // ordinal position
         i64     spare    :  18;   // spare
         Token()                   // constructor, set to null value
         {

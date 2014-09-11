@@ -15,11 +15,10 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dbfileop.cpp 4004 2012-07-10 14:45:44Z rdempsey $
+//  $Id: we_dbfileop.cpp 2948 2011-04-06 20:36:53Z pleblanc $
 
 /** @file */
 
-#include <unistd.h>
 #include <stdio.h>
 #include <cstring>
 using namespace std;
@@ -33,6 +32,10 @@ using namespace std;
 #include "we_stats.h"
 
 using namespace BRM;
+
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 namespace WriteEngine
 {
@@ -282,20 +285,15 @@ int DbFileOp::writeDBFile( CommBlock& cb, const unsigned char* writeBuf,
             return NO_ERROR;
         }
     }
-	if (BRMWrapper::getUseVb())
-	{
-		RETURN_ON_ERROR( writeVB( cb.file.pFile, cb.file.oid, lbid ) ); 
-	}
+
+    RETURN_ON_ERROR( writeVB( cb.file.pFile, cb.file.oid, lbid ) ); 
     ret = writeDBFile( cb.file.pFile, writeBuf, lbid, numOfBlock );
-	if (BRMWrapper::getUseVb())
-	{
-		LBIDRange_v ranges;
-		LBIDRange range;
-		range.start = lbid;
-		range.size = 1;
-		ranges.push_back(range);
-		BRMWrapper::getInstance()->writeVBEnd(getTransId(), ranges);
-	}
+    LBIDRange_v ranges;
+    LBIDRange range;
+    range.start = lbid;
+    range.size = 1;
+    ranges.push_back(range);
+    BRMWrapper::getInstance()->writeVBEnd(getTransId(), ranges);
 
     return ret;
 }

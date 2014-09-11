@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmonitor.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: sessionmonitor.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -31,11 +31,6 @@
 #include <exception>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/sync/interprocess_semaphore.hpp>
-
 #include "calpontsystemcatalog.h"
 #include "sessionmanager.h"
 #include "shmkeys.h"
@@ -130,9 +125,6 @@ class SessionMonitor {
 		struct SessionManagerData_struct {
 			int txnCount;
 			CalpontSystemCatalog::SCN verID;
-			CalpontSystemCatalog::SCN syscatVerID;
-			int systemstate;
-			boost::interprocess::interprocess_semaphore sems[2];
 			SIDTIDEntry_t activeTxns[];
 		};
 		typedef SessionManagerData_struct SessionManagerData_t;

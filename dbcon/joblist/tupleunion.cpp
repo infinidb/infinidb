@@ -16,18 +16,15 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tupleunion.cpp 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: tupleunion.cpp 8073 2011-10-27 16:08:46Z zzhu $
  *
  ****************************************************************************/
 
-#include <string>
+#include "tupleunion.h"
+#include <hasher.h>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
-
-#include "dataconvert.h"
-#include "hasher.h"
-#include "resourcemanager.h"
-#include "tupleunion.h"
+#include <dataconvert.h>
 
 using namespace std;
 using namespace std::tr1;

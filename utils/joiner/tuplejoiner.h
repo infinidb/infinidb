@@ -48,7 +48,6 @@
 #include "joblisttypes.h"
 #include "funcexpwrapper.h"
 #include "stlpoolallocator.h"
-#include "hasher.h"
 
 namespace joiner
 {
@@ -89,10 +88,10 @@ class TupleJoiner
 {
 public:
 	struct hasher {
-		inline size_t operator()(int64_t val) const
+		std::size_t operator()(int64_t val) const
 		{ return static_cast<std::size_t>(val); }
-		inline size_t operator()(const TypelessData &e) const
-		{ return utils::Hasher()((char *) e.data, e.len); }
+		std::size_t operator()(const TypelessData &) const;
+		std::size_t operator()(const std::string &) const;
 	};
 
 	/* ctor to use for numeric join */

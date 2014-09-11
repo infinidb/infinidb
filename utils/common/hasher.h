@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: hasher.h 3340 2012-10-16 20:51:34Z pleblanc $
+ * $Id: hasher.h 3341 2012-10-16 20:53:46Z pleblanc $
  *
  *****************************************************************************/
 
@@ -69,11 +69,6 @@ inline uint64_t rotl64(uint64_t x, int8_t r)
 
 class Hasher {
 public:
-	inline uint32_t operator()(const std::string &s) const
-	{
-		return operator()(s.data(), s.length());
-	}
-
 	inline uint32_t operator()(const char *data, uint64_t len) const
 	{
 		const int nblocks = len / 4;

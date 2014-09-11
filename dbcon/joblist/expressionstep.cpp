@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: expressionstep.cpp 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: expressionstep.cpp 8326 2012-02-15 18:58:10Z xlou $
 
 
 //#define NDEBUG
@@ -86,9 +86,6 @@ ExpressionStep::ExpressionStep(const ExpressionStep& rhs) :
 	fOids(rhs.oids()),
 	fAliases(rhs.aliases()),
 	fViews(rhs.views()),
-	fSchemas(rhs.schemas()),
-	fTableKeys(rhs.tableKeys()),
-	fColumnKeys(rhs.columnKeys()),
 	fVarBinOK(rhs.fVarBinOK),
 	fSelectFilter(rhs.fSelectFilter),
 	fAssociatedJoinId(rhs.fAssociatedJoinId)
@@ -137,7 +134,7 @@ void ExpressionStep::expressionFilter(const Filter* filter, JobInfo& jobInfo)
 {
 	Filter *f = filter->clone();
 	fExpressionFilter = new ParseTree(f); 
-	idbassert(fExpressionFilter != NULL);
+	assert(fExpressionFilter != NULL);
 	if (fExpressionFilter == NULL)
 	{
 		std::ostringstream errmsg;
@@ -166,7 +163,7 @@ void ExpressionStep::expressionFilter(const Filter* filter, JobInfo& jobInfo)
 void ExpressionStep::expressionFilter(const ParseTree* filter, JobInfo& jobInfo)
 {
 	fExpressionFilter = new ParseTree(); 
-	idbassert(fExpressionFilter != NULL);
+	assert(fExpressionFilter != NULL);
 	if (fExpressionFilter == NULL)
 	{
 		std::ostringstream errmsg;
@@ -224,7 +221,7 @@ void ExpressionStep::addColumn(ReturnedColumn* rc, JobInfo& jobInfo)
 	{
 		const ConstantColumn* cc = dynamic_cast<const ConstantColumn*>(rc);
 
-		idbassert(cc != NULL);
+		assert(cc != NULL);
 		if (cc == NULL)
 		{
 			std::ostringstream errmsg;
@@ -245,36 +242,25 @@ void ExpressionStep::populateColumnInfo(SimpleColumn* sc, JobInfo& jobInfo)
 	CalpontSystemCatalog::OID tblOid = joblist::tableOid(sc, jobInfo.csc);
 	string alias = extractTableAlias(sc);
 	string view = sc->viewName();
-	string schema = sc->schemaName();
 	fTableOids.push_back(tblOid);
 	CalpontSystemCatalog::ColType ct;
-	if (schema.empty())
+	if (sc->schemaName().empty())
 	{
 		sc->oid(tblOid+1+sc->colPosition());
 		ct = sc->resultType();
 	}
-	else if (sc->isInfiniDB() == false)
-	{
-		ct = sc->colType();
-	}
 	else
 	{
-		ct = sc->colType();
-//XXX use this before connector sets colType in sc correctly.
 		ct = jobInfo.csc->colType(sc->oid());
-//X
 		if (ct.scale == 0)       // keep passed original ct for decimal type
 			sc->resultType(ct);  // update from mysql type to calpont type
 	}
 	fOids.push_back(sc->oid());
 	fAliases.push_back(alias);
 	fViews.push_back(view);
-	fSchemas.push_back(schema);
-	fTableKeys.push_back(makeTableKey(jobInfo, sc));
 	fColumns.push_back(sc);
 
 	TupleInfo ti(setTupleInfo(ct, sc->oid(), jobInfo, tblOid, sc, alias));
-	fColumnKeys.push_back(ti.key);
 	// @bug 2990, MySQL date/datetime type is different from IDB type
 	if (ti.dtype == CalpontSystemCatalog::DATE || ti.dtype == CalpontSystemCatalog::DATETIME)
 	{
@@ -297,15 +283,11 @@ void ExpressionStep::populateColumnInfo(SimpleColumn* sc, JobInfo& jobInfo)
 		ti = setTupleInfo(ct, dictOid, jobInfo, tblOid, sc, alias);
 		jobInfo.keyInfo->dictKeyMap[tupleKey] = ti.key;
 	}
-
 }
 
 
 void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& jobInfo)
 {
-	if (jobInfo.trace)
-		cout << "Input indices of Expression:" << (int64_t) fExpressionId << endl;
-
 	for (vector<ReturnedColumn*>::iterator it = fColumns.begin(); it != fColumns.end(); ++it)
 	{
 		SimpleColumn* sc = dynamic_cast<SimpleColumn*>(*it);
@@ -313,28 +295,20 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 		if (sc != NULL)
 		{
 			CalpontSystemCatalog::OID oid = sc->oid();
-			CalpontSystemCatalog::OID dictOid = 0;
 			CalpontSystemCatalog::ColType ct;
-			uint key = fColumnKeys[distance(fColumns.begin(), it)];
 			if (sc->schemaName().empty())
 			{
 				ct = sc->resultType();
 			}
-			else if (sc->isInfiniDB() == false)
-			{
-				ct = sc->colType();
-			}
 			else
 			{
 				ct = jobInfo.csc->colType(oid);
-				dictOid = joblist::isDictCol(ct);
+				CalpontSystemCatalog::OID dictOid = joblist::isDictCol(ct);
 				if (dictOid > 0)
-					key = jobInfo.keyInfo->dictKeyMap[key];
+					oid = dictOid;
 			}
-			sc->inputIndex(indexMap[key]);
-
-			if (jobInfo.trace)
-				cout << "OID:" << (dictOid ? dictOid : oid) << "(" << sc->tableAlias() << "):";
+			sc->inputIndex(indexMap[getTupleKey(
+				jobInfo, oid, extractTableAlias(sc), sc->viewName())]);
 		}
 		else
 		{
@@ -354,13 +328,22 @@ void ExpressionStep::updateInputIndex(map<uint, uint>& indexMap, const JobInfo& 
 			{
 				fc->inputIndex(indexMap[getExpTupleKey(jobInfo, fc->expressionId())]);
 			}
-
-			if (jobInfo.trace)
-				cout << "EID:" << (*it)->expressionId();
 		}
+	}
 
-		if (jobInfo.trace)
+	if (jobInfo.trace)
+	{
+		cout << "Input indices of Expression:" << (int64_t) fExpressionId << endl;
+		for (vector<ReturnedColumn*>::iterator it = fColumns.begin(); it != fColumns.end(); ++it)
+		{
+			SimpleColumn* sc = dynamic_cast<SimpleColumn*>(*it);
+			if (sc != NULL)
+				cout << "OID:" << sc->oid() << "(" << sc->tableAlias() << "):";
+			else
+				cout << "EID:" << (*it)->expressionId();
+
 			cout << (*it)->inputIndex() << endl;
+		}
 	}
 }
 

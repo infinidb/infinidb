@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: cacheutils.cpp 3518 2013-01-31 19:13:17Z pleblanc $
+// $Id: cacheutils.cpp 2794 2011-07-22 16:15:53Z chao $
 
 #include <unistd.h>
 
@@ -116,7 +116,7 @@ int sendToAll(const ByteStream& outBs)
 	// added code here to flush any running primprocs that may be active
 	// TODO: we really only need to flush each unique PrimProc, but we can't tell from the
 	//  config file which those are, so use the same logic as joblist::DistributedEngineComm
-	Config* cf = Config::makeConfig();
+	const Config* cf = Config::makeConfig();
 
 	const string section = "PrimitiveServers";
 	int cnt = static_cast<int>(Config::fromText(cf->getConfig(section, "Count")));
@@ -215,29 +215,44 @@ int flushPrimProcBlocks(const BRM::BlockList_t& list)
 }
 
 
-int flushPrimProcAllverBlocks(const vector<LBID_t> &list)
+int flushPrimProcAllverBlocks(const BRM::BlockList_t& list)
 {
-    if (list.empty()) return 0;
+	if (list.empty()) return 0;
 
-    ByteStream bs(sizeof(ISMPacketHeader) + sizeof(uint32_t) + (sizeof(LBID_t) * list.size()));
-    ISMPacketHeader *hdr;
-    int rc;
+	mutex::scoped_lock lk(CacheOpsMutex);
 
-    hdr = (ISMPacketHeader *) bs.getInputPtr();
-    hdr->Command = FLUSH_ALL_VERSION;
-    bs.advanceInputPtr(sizeof(ISMPacketHeader));
-    bs << (uint32_t) list.size();
-    bs.append((uint8_t *) &list[0], sizeof(LBID_t) * list.size());
+#if defined(__LP64__) || defined(_WIN64)
+	if (list.size() > numeric_limits<uint32_t>::max()) return -1;
+#endif
 
-    try {
-		mutex::scoped_lock lk(CacheOpsMutex);
-        rc = sendToAll(bs);
-        return rc;
-    }
-   catch (...)
-    {
-    }
-    return -1;
+	try
+	{
+		const size_t msgsize = sizeof(ISMPacketHeader) + sizeof(uint32_t) + sizeof(LbidAtVer) * list.size();
+		scoped_array<ByteStream::byte> msgbuf(new ByteStream::byte[msgsize]);
+		memset(msgbuf.get(), 0, sizeof(ISMPacketHeader));
+		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(msgbuf.get());
+		hdrp->Command = FLUSH_ALL_VERSION;
+		uint32_t* cntp = reinterpret_cast<uint32_t*>(msgbuf.get() + sizeof(ISMPacketHeader));
+		*cntp = static_cast<uint32_t>(list.size());
+		LbidAtVer* itemp = reinterpret_cast<LbidAtVer*>(msgbuf.get() + sizeof(ISMPacketHeader) + sizeof(uint32_t));
+		BlockList_t::const_iterator iter = list.begin();
+		BlockList_t::const_iterator end = list.end();
+		while (iter != end)
+		{
+			itemp->LBID = static_cast<uint64_t>(iter->first);
+			itemp->Ver = static_cast<uint32_t>(iter->second);
+			++itemp;
+			++iter;
+		}
+
+		ByteStream bs(msgbuf.get(), msgsize);
+		int rc = sendToAll(bs);
+		return rc;
+	}
+	catch (...)
+	{
+	}
+	return -1;
 }
 
 int flushOIDsFromCache(const vector<BRM::OID_t> &oids)
@@ -265,12 +280,11 @@ int flushOIDsFromCache(const vector<BRM::OID_t> &oids)
 	return sendToAll(bs);
 }
 
-int flushPartition(const std::vector<BRM::OID_t> &oids, set<BRM::LogicalPartition>& partitionNums)
+int flushPartition(const std::vector<BRM::OID_t> &oids, uint32_t partitionNum)
 {
 	/* Message format:
 	 * 		ISMPacketHeader
-	 * 		uint32_t - partition count
-	 * 		LogicalPartition * - partitionNum
+	 * 		uint32_t - partitionNum
 	 * 		uint32_t - OID count
 	 * 		uint32_t * - OID array
 	 */
@@ -279,12 +293,15 @@ int flushPartition(const std::vector<BRM::OID_t> &oids, set<BRM::LogicalPartitio
 
 	ByteStream bs;
 	ISMPacketHeader ism;
+	uint i;
 
 	memset(&ism, 0, sizeof(ISMPacketHeader));
 	ism.Command = CACHE_FLUSH_PARTITION;
 	bs.load((uint8_t *) &ism, sizeof(ISMPacketHeader));
-	serializeSet<BRM::LogicalPartition>(bs, partitionNums);
-	serializeInlineVector<BRM::OID_t>(bs, oids);
+	bs << partitionNum;
+	bs << (uint32_t) oids.size();
+	for (i = 0; i < oids.size(); i++)
+		bs << (uint32_t) oids[i];
 
 	lk.lock();
 	return sendToAll(bs);
@@ -293,16 +310,17 @@ int flushPartition(const std::vector<BRM::OID_t> &oids, set<BRM::LogicalPartitio
 
 int dropPrimProcFdCache()
 {
-	const int msgsize = sizeof(ISMPacketHeader);
-	uint8_t msgbuf[msgsize];
-	memset(msgbuf, 0, sizeof(ISMPacketHeader));
-	ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
-	hdrp->Command = CACHE_DROP_FDS;
-	ByteStream bs(msgbuf, msgsize);
-	
+	mutex::scoped_lock lk(CacheOpsMutex);
+
 	try
 	{
-		mutex::scoped_lock lk(CacheOpsMutex);
+		const int msgsize = sizeof(ISMPacketHeader);
+		ByteStream::byte msgbuf[msgsize];
+		memset(msgbuf, 0, sizeof(ISMPacketHeader));
+		ISMPacketHeader* hdrp = reinterpret_cast<ISMPacketHeader*>(&msgbuf[0]);
+		hdrp->Command = CACHE_DROP_FDS;
+
+		ByteStream bs(msgbuf, msgsize);
 		int rc = sendToAll(bs);
 		return rc;
 	}

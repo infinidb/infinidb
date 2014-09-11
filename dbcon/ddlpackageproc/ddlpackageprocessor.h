@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: ddlpackageprocessor.h 9038 2012-10-29 22:13:24Z zzhu $
+ *   $Id: ddlpackageprocessor.h 8373 2012-03-05 21:49:25Z chao $
  *
  *
  ***********************************************************************/
@@ -44,14 +44,12 @@
 #include "writeengine.h"
 #include "columnresult.h"
 #include "brmtypes.h"
-#include "we_clients.h"
-#include "liboamcpp.h"
 #if defined(_MSC_VER) && defined(DDLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
-//#define IDB_DDL_DEBUG
+
 namespace ddlpackageprocessor
 {
 
@@ -84,8 +82,7 @@ public:
     /** @brief Result code
      */
     enum ResultCode { NO_ERROR, CREATE_ERROR,  ALTER_ERROR, DROP_ERROR, TRUNC_ERROR,
-                      TOKENIZATION_ERROR, NOT_ACCEPTING_PACKAGES, PK_NOTNULL_ERROR, WARNING, USER_ERROR, NETWORK_ERROR, PARTITION_WARNING,
-                      WARN_NO_PARTITION};
+                      TOKENIZATION_ERROR, NOT_ACCEPTING_PACKAGES, PK_NOTNULL_ERROR, WARNING, USER_ERROR };
 
     enum DebugLevel {                          /** @brief Debug level type enumeration */
         NONE                    = 0,           /** @brief No debug info */
@@ -94,17 +91,6 @@ public:
         VERBOSE                 = 3,           /** @brief Detailed debug info */
     };
 
-	enum LogFileType { DROPTABLE_LOG, DROPPART_LOG, TRUNCATE_LOG};
-	typedef std::vector<execplan::CalpontSystemCatalog::OID> OidList;
-	typedef std::set<BRM::LogicalPartition> PartitionNums;
-	struct LogInfo 
-	{
-		LogFileType fileType;
-		OidList oids;
-		PartitionNums partitionNums;
-	};
-	typedef std::map<execplan::CalpontSystemCatalog::OID, LogInfo> TableLogInfo;
-	
     /** @brief the result of dml operations
      */
     struct DDLResult
@@ -217,7 +203,7 @@ public:
         NJLSysDataVector::const_iterator begin() {return sysDataVec.begin();}
         NJLSysDataVector::const_iterator end() {return sysDataVec.end();}
         void push_back(execplan::ColumnResult* cr) {sysDataVec.push_back(cr);}
-        unsigned int size() {return static_cast<unsigned int>(sysDataVec.size());}
+        unsigned int size() {return sysDataVec.size();}
 		int findColumn(const execplan::CalpontSystemCatalog::OID& columnOID) 
 	{
 		for(uint i = 0; i < sysDataVec.size(); i++) {
@@ -232,11 +218,7 @@ public:
 
     /** @brief constructor
       */
-    DDLPackageProcessor() : fStartingColOID(0), fDDLLoggingId(23), fDebugLevel( NONE )
-	{
-		fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC);
-		fPMCount = fWEClient->getPmCount();
-	}
+    DDLPackageProcessor() : fStartingColOID(0), fDDLLoggingId(23), fDebugLevel( NONE ) {}
 
     /** @brief destructor
       */
@@ -280,9 +262,7 @@ public:
      *  @param oidList the list of OIDs for
      *  which the files should be removed
      */
-    EXPORT void removeFiles(const uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
-	
-	EXPORT void createFiles(execplan::CalpontSystemCatalog::TableName aTableName, const int useDBRoot, const uint64_t uniqueId, const uint32_t numOids);
+    EXPORT void removeFiles(execplan::CalpontSystemCatalog::SCN txnID, std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
 	
 	/**  @brief remove the physical files for the specified partition
      *
@@ -290,9 +270,7 @@ public:
      *  which the files should be removed
 	 *  @param partition number
      */
-    EXPORT void removePartitionFiles(std::vector<execplan::CalpontSystemCatalog::OID>& oidList, 
-    	                               const PartitionNums& partitions,
-    	                               uint64_t uniqueId);
+    EXPORT void removePartitionFiles(std::vector<execplan::CalpontSystemCatalog::OID>& oidList, const uint32_t partition);
 
 	/**  @brief remove the extents from extent map
      *
@@ -301,7 +279,8 @@ public:
      *  @param oidList the list of OIDs for
      *  which the extents should be removed
      */
-    EXPORT void removeExtents(std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
+    EXPORT void removeExtents(execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+                           std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
 
 
 	 /**  @brief create and open log file to log a table information
@@ -309,8 +288,7 @@ public:
      *  @param tableOid the oid of the table
 	 *  @param tableName the shcema, table name 
      */
-    EXPORT void createWriteDropLogFile(execplan::CalpontSystemCatalog::OID tableOid,  
-		uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
+    EXPORT void createOpenLogFile(execplan::CalpontSystemCatalog::OID tableOid, execplan::CalpontSystemCatalog::TableName tableName);
 
 	/**  @brief create and open log file to log a table partition information
      *
@@ -318,30 +296,25 @@ public:
 	 *  @param tableName the shcema, table name 
 	 *  @param partition the partition number to be dropped
      */
-    EXPORT void createWritePartitionLogFile(execplan::CalpontSystemCatalog::OID tableOid, 
-    	                                     const PartitionNums& partitionNums, 
-											 std::vector<execplan::CalpontSystemCatalog::OID>& oidList,
-											 uint64_t uniqueId);
-
-    EXPORT void createOpenTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid, execplan::CalpontSystemCatalog::TableName tableName);
-											
+    EXPORT void createOpenPartitionLogFile(execplan::CalpontSystemCatalog::OID tableOid, execplan::CalpontSystemCatalog::TableName tableName, const uint32_t partition);
 	/**  @brief create and open log file to log a truncae table information
      *
      *  @param tableOid the oid of the table
 	 *  @param tableName the shcema, table name 
      */
-    EXPORT void createWriteTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid, uint64_t uniqueId, std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
+    EXPORT void createOpenTruncateTableLogFile(execplan::CalpontSystemCatalog::OID tableOid, execplan::CalpontSystemCatalog::TableName tableName);
 	
+	 /**  @brief write table information to the log file
+     *
+     *  @param tableName the shcema, table name 
+	 *  @param oidList the list of OIDs to be removed
+     */
+    EXPORT void writeLogFile(execplan::CalpontSystemCatalog::TableName tableName, std::vector<execplan::CalpontSystemCatalog::OID>& oidList);
 
 	/**  @brief delete log file
      * 
      */
-    EXPORT void deleteLogFile(LogFileType fileType, execplan::CalpontSystemCatalog::OID tableOid, uint64_t uniqueId);
-	
-	/**  @brief fetch log file infomation
-     * 
-     */
-    EXPORT void fetchLogFile(TableLogInfo & tableLogInfos, uint64_t uniqueId);
+    EXPORT void deleteLogFile();
 
 	BRM::TxnID fTxnid;
 	
@@ -352,7 +325,7 @@ protected:
      * @param table the table name
      * @param colList will contain the list of columns on return
      */
-    EXPORT void getColumnsForTable( uint32_t sessionID, std::string schema,std::string table,
+    EXPORT void getColumnsForTable( u_int32_t sessionID, std::string schema,std::string table,
                             ColumnList& colList );
 
     /** @brief convert parsed ddl data type to a system catalog data type
@@ -426,7 +399,7 @@ protected:
      * @param result the result of the operation
      * @param tableDef the table definition
      */
-    void writeSysTableMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void writeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                ddlpackage::TableDef& tableDef, uint32_t tableWithAutoi=0);
 
     /** @brief write the table columns meta data to the SYSCOLUMN table
@@ -436,7 +409,7 @@ protected:
      * @param tableDefCols the table columns definition
      * @param qualifiedName the name of catalog, schema, object names
      */
-    void writeSysColumnMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void writeSysColumnMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                 ddlpackage::ColumnDefList& tableDefCols,
                                 ddlpackage::QualifiedName& qualifiedName, int colpos, bool alterFlag=false );
 
@@ -491,7 +464,7 @@ protected:
      * @param consDef the table constraint
      * @param indexName name of the index
      */
-    void writeSysIndexMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void writeSysIndexMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                ddlpackage::QualifiedName& qualifiedName,
                                ddlpackage::DDL_CONSTRAINTS type,
                                std::string& indexName, bool multicol, bool alterFlag=false);
@@ -504,7 +477,7 @@ protected:
      * @param constraintCols the list of columns in this index
      * @param indexName name of the index
      */
-    void writeSysIndexColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void writeSysIndexColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                   ddlpackage::QualifiedName& qualifiedName,
                                   ddlpackage::ColumnNameList& constraintCols,
                                   std::string& indexName, bool alterFlag=false);
@@ -515,7 +488,7 @@ protected:
       * @param result the result of the operation
       * @param tableName the qualified name of the table
       */
-    void removeSysIndexMetaDataForTable(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+    void removeSysIndexMetaDataForTable(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
                                         DDLResult& result, ddlpackage::QualifiedName& tableName);
 
     /** @brief remove all index columns for the supplied table from the SYSINDEXCOL table
@@ -524,7 +497,7 @@ protected:
       * @param result the result of the operation
       * @param tableName the qualified name of the table
       */
-    void removeSysIndexColMetaDataForTable(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+    void removeSysIndexColMetaDataForTable(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
                                            DDLResult& result, ddlpackage::QualifiedName& tableName);
 
     /** @brief remove an index from the SYSINDEX table
@@ -533,7 +506,7 @@ protected:
       * @param result the result of the operation
       * @param indexName the qualified name of the index
       */
-    void removeSysIndexMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysIndexMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                 ddlpackage::QualifiedName& indexName);
 
     /** @brief remove index columns from the SYSINDEXCOL table
@@ -542,7 +515,7 @@ protected:
       * @param result the result of the operation
       * @param indexName the qualified name of the index
       */
-    void removeSysIndexColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysIndexColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                    ddlpackage::QualifiedName& indexName);
 
     /** @brief remove the table meta data from the SYSTABLE table
@@ -551,7 +524,7 @@ protected:
       * @param result the result of the operation
       * @param tableName the qualified name of the table to remove
       */
-    void removeSysTableMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysTableMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                 ddlpackage::QualifiedName& tableName);
 
     /** @brief remove the column meta data from the SYSCOLUMN table
@@ -561,7 +534,7 @@ protected:
       * @param tableName the qualified name of the table whose columns 
       * are to be removed
       */
-    void removeSysColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                               ddlpackage::QualifiedName& tableName);
 
     /** @brief remove the column meta data from the SYSCOLUMN table
@@ -571,7 +544,7 @@ protected:
       * @param columnInfo the qualified name of the column 
       * to be removed
       */
-    void removeColSysColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeColSysColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                               ddlpackage::QualifiedName& columnInfo);
                               
     /**  @brief remove the constraint meta data from the SYSCONSTRAINT table
@@ -581,7 +554,7 @@ protected:
       * @param tableName the qualified name of the table whose constraints
       * are to be removed
       */
-    void removeSysContraintMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysContraintMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                     ddlpackage::QualifiedName& tableName);
      
     /**  @brief remove the constraint meta data from the SYSCONSTRAINT table
@@ -590,7 +563,7 @@ protected:
       * @param result the result of the operation
       * @param indexName the index name to be removed
       */                                
-    void removeSysIndexMetaDataForIndex(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+    void removeSysIndexMetaDataForIndex(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
         DDLResult& result,
         execplan::CalpontSystemCatalog::IndexNameList& indexNameList);                                
 
@@ -601,7 +574,7 @@ protected:
       * @param tableName the qualified name of the table whose column constraints
       * are to be removed
       */
-    void removeSysConstraintColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeSysConstraintColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                         ddlpackage::QualifiedName& tableName);
       /**  @brief remove the column constraint meta data from the SYSCONSTRAINT table
       *
@@ -610,7 +583,7 @@ protected:
       * @param constrintNames the names of the constraints
       * are to be removed
       */                                    
-    void removeSysContraintMetaDataForConstraint(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
+    void removeSysContraintMetaDataForConstraint(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
         DDLResult& result,
         execplan::CalpontSystemCatalog::IndexNameList& constrintNames);                                    
     /**  @brief remove the column constraint meta data from the SYSCONSTRAINTCOL table
@@ -620,7 +593,7 @@ protected:
       * @param columnInfo the qualified name of the column whose constraints
       * are to be removed
       */
-    void removeColSysConstraintColMetaData(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+    void removeColSysConstraintColMetaData(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                                         ddlpackage::QualifiedName& columnInfo);
 
     /** @brief create the physical dictionary files
@@ -639,6 +612,18 @@ protected:
     void createColumnFiles(execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                            ddlpackage::ColumnDefList& tableDefCols, const int useDBRoot, const uint32_t partitionNum=0);
 
+    //BUG931
+    /** @brief Fill the column data file with default/null value
+     *
+     * @param txnID Transaction Id
+     * @param result Result of the operation
+     * @param tableDefCols The list of new column definitions
+     * @param refColumn The reference column to be used to locate exising rows.
+     */
+    void fillColumnWithDefaultVal( execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+                                   ddlpackage::ColumnDefList& tableDefCols, DDLColumn refColumn,
+                                   const uint16_t dbRoot, long long & nextVal);
+
     /** @brief create the physical index files
      *
      * @param txnID the transaction id
@@ -646,6 +631,15 @@ protected:
      */
     void createIndexFiles(execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result);
 
+    /**  @brief remove the physical column files
+     *
+     *  @param txnID the transaction id
+     *  @param result the result of the operation
+     *  @param ridList the list of OIDs for
+     *  which the column file should be removed
+     */
+    void removeColumnFiles(execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
+                           execplan::CalpontSystemCatalog::RIDList& ridList);
     /**  @brief update the SYSCOLUMN table
      *
      *  @param txnID the transaction id
@@ -668,6 +662,15 @@ protected:
     void removeIndexFiles(execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                           execplan::CalpontSystemCatalog::IndexOIDList& idxOIDList);
 
+    /** @brief remove the physical dictionary files
+     *
+     * @param result the result of the operation
+     * @param dictOIDList the list of OIDs for
+     * which the dictionary files should be removed
+     */
+    void removeDictionaryFiles(execplan::CalpontSystemCatalog::SCN txnID,
+                               DDLResult& result,
+                               execplan::CalpontSystemCatalog::DictOIDList& dictOIDList);
 
     /** @brief return the OIDs used by the database objects
      *
@@ -695,7 +698,7 @@ protected:
       * @param colName the name of the column to find in the table
       * @param sysCol on success the returned sysCol object
       */
-    void findColumnData(uint32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
+    void findColumnData(u_int32_t sessionID, execplan::CalpontSystemCatalog::TableName& systableName,
                         const std::string& colName, DDLColumn& sysCol );
 
     /** @brief remove the supplied row from the supplied system catalog table
@@ -704,7 +707,7 @@ protected:
       * @param sysCatalogTableName the qualified name of the system catalog table
       * @param rid the id of the row to remove
       */
-    void removeRowFromSysCatalog(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void removeRowFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                  ddlpackage::QualifiedName& sysCatalogTableName, WriteEngine::RID& rid);
     
     /** @brief validate reference constraint for altering existing table
@@ -715,7 +718,7 @@ protected:
       * @param refIndexName the index name of the referenced primary key constraint
       * @return true if violation
       */    
-    bool referenceConstraintViolation(uint32_t sessionID, 
+    bool referenceConstraintViolation(u_int32_t sessionID, 
                                       DDLResult& result,
                                       execplan::CalpontSystemCatalog::TableColName tcn, 
                                       execplan::CalpontSystemCatalog::IndexName refIndexName);
@@ -728,7 +731,7 @@ protected:
       * @param constraintCols the columns associated with the primary key
       * @return true if violation
       */
-    bool PKConstraintViolation(uint32_t sessionID, 
+    bool PKConstraintViolation(u_int32_t sessionID, 
                                DDLResult& result,
                                ddlpackage::QualifiedName& qualifiedName,
                                ddlpackage::ColumnNameList& constraintCols);
@@ -740,7 +743,7 @@ protected:
       * @param checkConstraint the constraint text string
       * @return true if violation
       */                           
-    bool checkConstraintViolation(uint32_t sessionID, 
+    bool checkConstraintViolation(u_int32_t sessionID, 
                                                    DDLResult& result,
                                                    ddlpackage::QualifiedName& qualifiedName,
                                                    std::string& checkConstraint);
@@ -752,18 +755,17 @@ protected:
       * @param sysCatalogTableName the qualified name of the system catalog table
       * @param colRidList the list of row ids to remove
       */
-    void removeRowsFromSysCatalog(uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
+    void removeRowsFromSysCatalog(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const DDLResult& result,
                                   ddlpackage::QualifiedName& sysCatalogTableName,
                                   execplan::CalpontSystemCatalog::RIDList& colRidList);
 
+    std::string getFileName(uint32_t oid);
 
     WriteEngine::WriteEngineWrapper fWriteEngine;
 	
 	BRM::DBRM fDbrm;
    
     execplan::SessionManager fSessionManager;
-	uint fPMCount;
-	WriteEngine::WEClients* fWEClient;
 
 
     IndexOIDList fIndexOIDList;
@@ -802,11 +804,10 @@ protected:
 							unsigned  extentsPerSegmentFile, unsigned extentRows, 
 							unsigned startDBRoot, unsigned dbrootCnt);
 							
-	int rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID);
-	int commitTransaction(uint64_t uniqueId, BRM::TxnID txnID);
-	void convertDecimal (ddlpackage::ColumnDef* colDefPtr);
-					   
+						   
 private:
+    void executePlan(u_int32_t sessionID, execplan::CalpontSelectExecutionPlan& csep, execplan::CalpontSystemCatalog::NJLSysDataList& valueList, execplan::CalpontSystemCatalog::OID tableOid);
+
    /** @brief clean beginning and ending glitches and spaces from string
       *
       * @param s string to be cleaned
@@ -814,7 +815,6 @@ private:
     void cleanString(std::string& s);
 	//std::string            fDDLLogFileName;
     DebugLevel fDebugLevel; // internal use debug level
-	
 	
 	
 };

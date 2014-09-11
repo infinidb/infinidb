@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: idberrorinfo.cpp 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: idberrorinfo.cpp 2394 2011-02-08 14:36:22Z rdempsey $
 *
 ******************************************************************************************/
 #include <iostream>
@@ -40,7 +40,9 @@ using namespace config;
 #include "logger.h"
 #include "idberrorinfo.h"
 
-#include "installdir.h"
+#ifdef _MSC_VER
+#include "idbregistry.h"
+#endif
 
 namespace logging {
 
@@ -57,10 +59,14 @@ IDBErrorInfo* IDBErrorInfo::instance()
 
 IDBErrorInfo::IDBErrorInfo()
 {
-	Config* cf = Config::makeConfig();
+	const Config* cf = Config::makeConfig();
 	string configFile(cf->getConfig("SystemConfig", "ErrorMessageFile"));
 	if (configFile.length() == 0)
-		configFile = startup::StartUp::installDir() + "/etc/ErrorMessage.txt";
+#ifdef _MSC_VER
+		configFile = IDBreadRegistry("") + "\\etc\\ErrorMessage.txt";
+#else
+		configFile = "/usr/local/Calpont/etc/ErrorMessage.txt";
+#endif
 	ifstream msgFile(configFile.c_str());
 	while (msgFile.good())
 	{

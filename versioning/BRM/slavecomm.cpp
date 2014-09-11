@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavecomm.cpp 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: slavecomm.cpp 1623 2012-07-03 20:17:56Z pleblanc $
  *
  ****************************************************************************/
 #include <unistd.h>
@@ -26,10 +26,6 @@
 #include <fcntl.h>
 #include <cstdio>
 #include <ctime>
-#ifdef _MSC_VER
-#include <io.h>
-#include <psapi.h>
-#endif
 
 #include "messagequeue.h"
 #include "bytestream.h"
@@ -55,9 +51,6 @@ namespace BRM {
 
 SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
 	slave(s)
-#ifdef _MSC_VER
-	, fPids(0), fMaxPids(64)
-#endif
 {
 	config::Config *config = config::Config::makeConfig();
 	string tmp;
@@ -142,9 +135,6 @@ SlaveComm::SlaveComm(string hostname, SlaveDBRMNode *s) :
 }
 
 SlaveComm::SlaveComm()
-#ifdef _MSC_VER
-	: fPids(0), fMaxPids(64)
-#endif
 {
 	config::Config *config = config::Config::makeConfig();
 
@@ -228,7 +218,7 @@ void SlaveComm::run()
 			}
 			catch (exception &e) {
 				/* 
-				 * The error is either that msg was too short (really slow sender possibly),
+				 * The error is either that msg was too short (really slow sender	 possibly),
 				 * there was a bigger communication failure, or there was a file IO
 				 * error.  Closing the connection for now.
 				 */
@@ -256,24 +246,15 @@ void SlaveComm::processCommand(ByteStream &msg)
 	}
 	msg >> cmd;
 	switch (cmd) {
-		case CREATE_STRIPE_COLUMN_EXTENTS:
-			do_createStripeColumnExtents(msg); break;
-		case CREATE_COLUMN_EXTENT_DBROOT:
-			do_createColumnExtent_DBroot(msg); break;
-		case CREATE_COLUMN_EXTENT_EXACT_FILE:
-			do_createColumnExtentExactFile(msg); break;
+		case CREATE_COLUMN_EXTENT: do_createColumnExtent(msg); break;
 		case CREATE_DICT_STORE_EXTENT: do_createDictStoreExtent(msg); break;
-		case ROLLBACK_COLUMN_EXTENTS_DBROOT:
-			do_rollbackColumnExtents_DBroot(msg); break;
-		case ROLLBACK_DICT_STORE_EXTENTS_DBROOT:
-			do_rollbackDictStoreExtents_DBroot(msg); break;
+		case ROLLBACK_COLUMN_EXTENTS: do_rollbackColumnExtents(msg); break;
+		case ROLLBACK_DICT_STORE_EXTENTS:do_rollbackDictStoreExtents(msg); break;
 		case DELETE_EMPTY_COL_EXTENTS:do_deleteEmptyColExtents(msg); break;
-		case DELETE_EMPTY_DICT_STORE_EXTENTS:
-			do_deleteEmptyDictStoreExtents(msg); break;
+		case DELETE_EMPTY_DICT_STORE_EXTENTS:do_deleteEmptyDictStoreExtents(msg); break;
 		case DELETE_OID: do_deleteOID(msg); break;
 		case DELETE_OIDS: do_deleteOIDs(msg); break;
 		case SET_LOCAL_HWM: do_setLocalHWM(msg); break;
-		case BULK_SET_HWM: do_bulkSetHWM(msg); break;
 		case BULK_SET_HWM_AND_CP: do_bulkSetHWMAndCP(msg); break;
 		case WRITE_VB_ENTRY: do_writeVBEntry(msg); break;
 		case BEGIN_VB_COPY: do_beginVBCopy(msg); break;
@@ -295,80 +276,17 @@ void SlaveComm::processCommand(ByteStream &msg)
 		case MARK_PARTITION_FOR_DELETION: do_markPartitionForDeletion(msg); break;
 		case MARK_ALL_PARTITION_FOR_DELETION: do_markAllPartitionForDeletion(msg); break;
 		case RESTORE_PARTITION: do_restorePartition(msg); break;
-		case OWNER_CHECK: do_ownerCheck(msg); break;
-		case LOCK_LBID_RANGES: do_dmlLockLBIDRanges(msg); break;
-		case RELEASE_LBID_RANGES: do_dmlReleaseLBIDRanges(msg); break;
-		case DELETE_DBROOT: do_deleteDBRoot(msg); break;
-		case BULK_UPDATE_DBROOT: do_bulkUpdateDBRoot(msg); break;
-
+        case LOCK_LBID_RANGES: do_dmlLockLBIDRanges(msg); break;
+        case RELEASE_LBID_RANGES: do_dmlReleaseLBIDRanges(msg); break;
 		default:
 			cerr << "WorkerComm: unknown command " << (int) cmd << endl;
 	}
 }
 
 //------------------------------------------------------------------------------
-// Process a request to create a column extent for a specific OID and DBRoot.
+// Process a request to create a column extent.
 //------------------------------------------------------------------------------
-void SlaveComm::do_createStripeColumnExtents(ByteStream &msg)
-{
-	int        err;
-	uint16_t   tmp16;
-	uint16_t   tmp32;
-	uint16_t   dbRoot;
-	uint32_t   partitionNum;
-	uint16_t   segmentNum;
-	std::vector<CreateStripeColumnExtentsArgIn>  cols;
-	std::vector<CreateStripeColumnExtentsArgOut> extents;
-	ByteStream reply;
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createStripeColumnExtents()" << endl;
-#endif
-
-	deserializeInlineVector(msg, cols);
-	msg >> tmp16;
-	dbRoot = tmp16;
-	msg >> tmp32;
-	partitionNum = tmp32;
-
-	if (printOnly) {
-		cout << "createStripeColumnExtents().  " <<
-			"DBRoot=" << dbRoot << "; Part#=" << partitionNum << endl;
-		for (uint i = 0; i < cols.size(); i++)
-			cout << "StripeColExt arg "    << i + 1 <<
-				": oid="  << cols[i].oid   <<
-				" width=" << cols[i].width << endl;
-		return;
-	}
-
-	err = slave->createStripeColumnExtents(cols,dbRoot,
-		partitionNum, segmentNum, extents);
-	reply << (uint8_t) err;
-	if (err == ERR_OK) {
-		reply << partitionNum;
-		reply << segmentNum;
-		serializeInlineVector( reply, extents );
-	}
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createStripeColumnExtents() err code is " <<
-		err << endl;
-#endif
-
-	if (!standalone)
-		master.write(reply);
-
-	// see bug 3596.  Need to make sure a snapshot file exists.
-	if ((cols.size() > 0) && (cols[0].oid < 3000))
-		takeSnapshot = true;
-	else
-		doSaveDelta = true;
-}
-
-//------------------------------------------------------------------------------
-// Process a request to create a column extent for a specific OID and DBRoot.
-//------------------------------------------------------------------------------
-void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
+void SlaveComm::do_createColumnExtent(ByteStream &msg)
 {
 	int allocdSize, err;
 	uint16_t   tmp16;
@@ -383,7 +301,7 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	ByteStream reply;
 
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createColumnExtent_DBroot()" << endl;
+	cerr << "WorkerComm: do_createColumnExtent()" << endl;
 #endif
 
 	msg >> tmp32;
@@ -394,22 +312,18 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	dbRoot = tmp16;
 	msg >> tmp32;
 	partitionNum = tmp32;
-	msg >> tmp16;
-	segmentNum = tmp16;
 
 	if (printOnly) {
-		cout << "createColumnExtent_DBroot: oid=" << oid <<
-			" colWidth=" << colWidth <<
-			" dbRoot="   << dbRoot   <<
-			" partitionNum=" << partitionNum <<
-			" segmentNum=" << segmentNum << endl;
+		cout << "createColumnExtent: oid=" << oid << " colWidth=" << colWidth << " dbRoot="
+			<< dbRoot << " partitionNum=" << partitionNum << endl;
 		return;
 	}
 
-	err = slave->createColumnExtent_DBroot(oid, colWidth, dbRoot,
+	err = slave->createColumnExtent(oid, colWidth, dbRoot,
 		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
 	reply << (uint8_t) err;
 	if (err == ERR_OK) {
+		reply << dbRoot;
 		reply << partitionNum;
 		reply << segmentNum;
 		reply << (uint64_t) lbid;
@@ -418,80 +332,12 @@ void SlaveComm::do_createColumnExtent_DBroot(ByteStream &msg)
 	}
 
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createColumnExtent_DBroot() err code is " <<
-		err << endl;
+	cerr << "WorkerComm: do_createColumnExtent() err code is " << err << endl;
 #endif
 	if (!standalone)
 		master.write(reply);
-	if (oid < 3000)  // see bug 3596.  Need to make sure a snapshot file exists.
-		takeSnapshot = true;
-	else
-		doSaveDelta = true;
-}
-
-//------------------------------------------------------------------------------
-// Process a request to create a column extent for the exact segment file
-// specified by the requested OID, DBRoot, partition, and segment.
-//------------------------------------------------------------------------------
-void SlaveComm::do_createColumnExtentExactFile(ByteStream &msg)
-{
-	int allocdSize, err;
-	uint16_t   tmp16;
-	uint32_t   tmp32;
-	OID_t      oid;
-	uint32_t   colWidth;
-	uint16_t   dbRoot;
-	uint32_t   partitionNum;
-	uint16_t   segmentNum;
-	LBID_t     lbid;
-	uint32_t   startBlockOffset;
-	ByteStream reply;
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createColumnExtentExactFile()" << endl;
-#endif
-
-	msg >> tmp32;
-	oid = tmp32;
-	msg >> tmp32;
-	colWidth = tmp32;
-	msg >> tmp16;
-	dbRoot = tmp16;
-	msg >> tmp32;
-	partitionNum = tmp32;
-	msg >> tmp16;
-	segmentNum = tmp16;
-
-	if (printOnly) {
-		cout << "createColumnExtentExactFile: oid=" << oid <<
-			" colWidth=" << colWidth <<
-			" dbRoot="   << dbRoot   <<
-			" partitionNum=" << partitionNum <<
-			" segmentNum=" << segmentNum << endl;
-		return;
-	}
-
-	err = slave->createColumnExtentExactFile(oid, colWidth, dbRoot,
-		partitionNum, segmentNum, lbid, allocdSize, startBlockOffset);
-	reply << (uint8_t) err;
-	if (err == ERR_OK) {
-		reply << partitionNum;
-		reply << segmentNum;
-		reply << (uint64_t) lbid;
-		reply << (uint32_t) allocdSize;
-		reply << (uint32_t) startBlockOffset;
-	}
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_createColumnExtentExactFile() err code is " <<
-		err << endl;
-#endif
-	if (!standalone)
-		master.write(reply);
-	if (oid < 3000)  // see bug 3596.  Need to make sure a snapshot file exists.
-		takeSnapshot = true;
-	else
-		doSaveDelta = true;
+	doSaveDelta = true;
+	
 }
 
 //------------------------------------------------------------------------------
@@ -546,32 +392,24 @@ void SlaveComm::do_createDictStoreExtent(ByteStream &msg)
 
 //------------------------------------------------------------------------------
 // Process a request to rollback (delete) a set of column extents.
-// for a given OID and DBRoot.
 //------------------------------------------------------------------------------
-void SlaveComm::do_rollbackColumnExtents_DBroot(ByteStream &msg)
+void SlaveComm::do_rollbackColumnExtents(ByteStream &msg)
 {
 	int        err;
 	OID_t      oid;
-	bool       bDeleteAll;
 	uint32_t   partitionNum;
 	uint16_t   segmentNum;
-	uint16_t   dbRoot;
 	HWM_t      hwm;
-	uint8_t    tmp8;
 	uint16_t   tmp16;
 	uint32_t   tmp32;
 	ByteStream reply;
 
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_rollbackColumnExtents_DBroot()" << endl;
+	cerr << "WorkerComm: do_rollbackColumnExtents()" << endl;
 #endif
 
 	msg >> tmp32;
 	oid = tmp32;
-	msg >> tmp8;
-	bDeleteAll = tmp8;
-	msg >> tmp16;
-	dbRoot = tmp16;
 	msg >> tmp32;
 	partitionNum = tmp32;
 	msg >> tmp16;
@@ -580,19 +418,16 @@ void SlaveComm::do_rollbackColumnExtents_DBroot(ByteStream &msg)
 	hwm = tmp32;
 
 	if (printOnly) {
-		cout << "rollbackColumnExtents_DBroot: oid=" << oid <<
-			" bDeleteAll=" << bDeleteAll << " dbRoot=" << dbRoot <<
-			" partitionNum=" << partitionNum <<
+		cout << "rollbackColumnExtents: oid=" << oid << " partitionNum=" << partitionNum <<
 			" segmentNum=" << segmentNum << " hwm=" << hwm << endl;
 		return;
 	}
 
-	err = slave->rollbackColumnExtents_DBroot(
-		oid, bDeleteAll, dbRoot, partitionNum, segmentNum, hwm);
+	err = slave->rollbackColumnExtents(oid, partitionNum, segmentNum, hwm);
 	reply << (uint8_t) err;
 
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_rollbackColumnExtents_DBroot() err code is " <<
+	cerr << "WorkerComm: do_rollbackColumnExtents() err code is " <<
 		err << endl;
 #endif
 
@@ -602,19 +437,15 @@ void SlaveComm::do_rollbackColumnExtents_DBroot(ByteStream &msg)
 }
 
 //------------------------------------------------------------------------------
-// Process a request to rollback (delete) a set of column extents.
-// for a given OID and DBRoot.
+// Process a request to rollback (delete) a set of dictionary store extents.
 //------------------------------------------------------------------------------
-void SlaveComm::do_rollbackDictStoreExtents_DBroot(ByteStream &msg)
+void SlaveComm::do_rollbackDictStoreExtents(ByteStream &msg)
 {
 	int        err;
 	OID_t      oid;
 	uint32_t   partitionNum;
-	uint16_t   dbRoot;
 	uint32_t   tmp32;
-	uint16_t   tmp16;
 	ByteStream reply;
-	vector<uint16_t> segNums;
 	vector<HWM_t> hwms;
 
 #ifdef BRM_VERBOSE
@@ -623,17 +454,12 @@ void SlaveComm::do_rollbackDictStoreExtents_DBroot(ByteStream &msg)
 
 	msg >> tmp32;
 	oid = tmp32;
-	msg >> tmp16;
-	dbRoot = tmp16;
 	msg >> tmp32;
 	partitionNum = tmp32;
-	deserializeVector(msg, segNums);
 	deserializeVector(msg, hwms);
 	
 	if (printOnly) {
-		cout << "rollbackDictStore: oid=" << oid <<
-			" dbRoot=" << dbRoot <<
-			" partitionNum=" << partitionNum <<
+		cout << "rollbackDictStore: oid=" << oid << " partitionNum=" << partitionNum <<
 			" hwms..." << endl;
 		for (uint i = 0; i < hwms.size(); i++)
 			cout << "   " << i << ": " << hwms[i] << endl;
@@ -641,8 +467,7 @@ void SlaveComm::do_rollbackDictStoreExtents_DBroot(ByteStream &msg)
 	}
 		
 	
-	err = slave->rollbackDictStoreExtents_DBroot(
-		oid, dbRoot, partitionNum, segNums, hwms);
+	err = slave->rollbackDictStoreExtents(oid, partitionNum, hwms);
 	reply << (uint8_t) err;
 
 #ifdef BRM_VERBOSE
@@ -878,40 +703,6 @@ void SlaveComm::do_setLocalHWM(ByteStream &msg)
 	doSaveDelta = true;
 }
 
-void SlaveComm::do_bulkSetHWM(ByteStream &msg)
-{
-	vector<BulkSetHWMArg> args;
-	int        err;
-	VER_t transID;
-	uint32_t tmp32;
-	ByteStream reply;
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_setLocalHWM()" << endl;
-#endif
-
-	deserializeInlineVector(msg, args);
-	msg >> tmp32;
-	transID = tmp32;
-
-	if (printOnly) {
-		cout << "bulkSetHWM().  TransID = " << transID << endl;
-		for (uint i = 0; i < args.size(); i++)
-			cout << "bulkSetHWM arg " << i + 1 << ": oid=" << args[i].oid << " partitionNum=" << args[i].partNum <<
-					" segmentNum=" << args[i].segNum << " hwm=" << args[i].hwm << endl;
-		return;
-	}
-
-	err = slave->bulkSetHWM(args, transID, firstSlave);
-	reply << (uint8_t) err;
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_setLocalHWM() err code is " << err << endl;
-#endif
-	if (!standalone)
-		master.write(reply);
-	doSaveDelta = true;
-}
-
 void SlaveComm::do_bulkSetHWMAndCP(ByteStream &msg)
 {
 	vector<BulkSetHWMArg> hwmArgs;
@@ -952,19 +743,7 @@ void SlaveComm::do_bulkSetHWMAndCP(ByteStream &msg)
 	doSaveDelta = true;
 }
 
-void SlaveComm::do_bulkUpdateDBRoot(ByteStream &msg)
-{
-	vector<BulkUpdateDBRootArg> args;
-	ByteStream reply;
-	int err;
 
-	deserializeInlineVector(msg, args);
-	err = slave->bulkUpdateDBRoot(args);
-	reply << (uint8_t) err;
-	if (!standalone)
-		master.write(reply);
-	doSaveDelta = true;
-}
 
 void SlaveComm::do_markInvalid(ByteStream &msg)
 {
@@ -1202,6 +981,7 @@ void SlaveComm::do_mergeExtentsMaxMin(ByteStream &msg)
 void SlaveComm::do_deletePartition(ByteStream &msg)
 {
 	OID_t      oid;
+	uint32_t   partitionNum;
 	uint32_t   tmp32;
 	int        err;
 	ByteStream reply;
@@ -1211,20 +991,16 @@ void SlaveComm::do_deletePartition(ByteStream &msg)
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_deletePartition()" << endl;
 #endif
-	
-	set<LogicalPartition> partitionNums;
-	deserializeSet<LogicalPartition>(msg, partitionNums);
+
+	msg >> tmp32;
+	partitionNum = tmp32;
 
 	msg >> size;
 	
 	if (printOnly)
-	{
-		cout << "deletePartition: partitionNum: "; 
-		set<LogicalPartition>::const_iterator it;
-		for (it = partitionNums.begin(); it != partitionNums.end(); ++it)
-			cout << (*it) << " ";
-		cout << "\nsize=" << size << " oids..." << endl;
-	}
+		cout << "deletePartition: partitionNum=" << partitionNum << " size=" << size <<
+			" oids..." << endl;
+			
 	for (unsigned i=0; i<size; i++)
 	{
 		msg >> tmp32;
@@ -1236,13 +1012,9 @@ void SlaveComm::do_deletePartition(ByteStream &msg)
 
 	if (printOnly)
 		return;
-	
-	string emsg;
-	err = slave->deletePartition(oids, partitionNums, emsg);
-	reply << (uint8_t) err;
-	if (err != 0)
-		reply << emsg;
 
+	err = slave->deletePartition(oids, partitionNum);
+	reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_deletePartition() err code is " << err << endl;
 #endif
@@ -1258,6 +1030,7 @@ void SlaveComm::do_deletePartition(ByteStream &msg)
 void SlaveComm::do_markPartitionForDeletion(ByteStream &msg)
 {
 	OID_t      oid;
+	uint32_t   partitionNum;
 	uint32_t   tmp32;
 	int        err;
 	ByteStream reply;
@@ -1268,18 +1041,14 @@ void SlaveComm::do_markPartitionForDeletion(ByteStream &msg)
 	cerr << "WorkerComm: do_markPartitionForDeletion()" << endl;
 #endif
 
-	set<LogicalPartition> partitionNums;
-	deserializeSet<LogicalPartition>(msg, partitionNums);
+	msg >> tmp32;
+	partitionNum = tmp32;
 	msg >> size;
 	
 	if (printOnly)
-	{
-		cout << "markPartitionForDeletion: partitionNum: ";
-		set<LogicalPartition>::const_iterator it;
-		for (it = partitionNums.begin(); it != partitionNums.end(); ++it)
-			cout << (*it) << " ";
-		cout << "\nsize=" << size << " oids..." << endl;
-	}
+		cout << "markPartitionForDeletion: partitionNum=" << partitionNum << " size=" 
+			<< size << " oids..." << endl;
+	
 	for (unsigned i=0; i<size; i++)
 	{
 		msg >> tmp32;
@@ -1291,13 +1060,9 @@ void SlaveComm::do_markPartitionForDeletion(ByteStream &msg)
 
 	if (printOnly)
 		return;
-	
-	string emsg;
-	err = slave->markPartitionForDeletion(oids, partitionNums, emsg);
+		
+	err = slave->markPartitionForDeletion(oids, partitionNum);
 	reply << (uint8_t) err;
-	if (err != 0)
-		reply << emsg;
-
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_markPartitionforDeletion() err code is " <<
 		err << endl;
@@ -1358,6 +1123,7 @@ void SlaveComm::do_markAllPartitionForDeletion(ByteStream &msg)
 void SlaveComm::do_restorePartition(ByteStream &msg)
 {
 	OID_t      oid;
+	uint32_t   partitionNum;
 	uint32_t   tmp32;
 	int        err;
 	ByteStream reply;
@@ -1367,20 +1133,15 @@ void SlaveComm::do_restorePartition(ByteStream &msg)
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_restorePartition()" << endl;
 #endif
-	
-	set<LogicalPartition> partitionNums;
-	deserializeSet<LogicalPartition>(msg, partitionNums);
+
+	msg >> tmp32;
+	partitionNum = tmp32;
 
 	msg >> size;
 	
 	if (printOnly)
-	{
-		cout << "restorePartition: partitionNum: ";
-		set<LogicalPartition>::const_iterator it;
-		for (it = partitionNums.begin(); it != partitionNums.end(); ++it)
-			cout << (*it) << " ";
-		cout << "\nsize=" << size << " oids..." << endl;
-	}
+		cout << "restorePartition: partitionNum=" << partitionNum << " size=" << size <<
+			" oids..." << endl;
 	
 	for (unsigned i=0; i<size; i++)
 	{
@@ -1393,49 +1154,11 @@ void SlaveComm::do_restorePartition(ByteStream &msg)
 
 	if (printOnly)
 		return;
-	
-	string emsg;
-	err = slave->restorePartition(oids, partitionNums, emsg);
+		
+	err = slave->restorePartition(oids, partitionNum);
 	reply << (uint8_t) err;
-	if (err != 0)
-		reply << emsg;
-
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_restorePartition() err code is " << err << endl;
-#endif
-	if (!standalone)
-		master.write(reply);
-	doSaveDelta = true;
-}
-
-//------------------------------------------------------------------------------
-// Delete all extents for the specified dbroot
-//------------------------------------------------------------------------------
-void SlaveComm::do_deleteDBRoot(ByteStream &msg)
-{
-	int        err;
-	ByteStream reply;
-	uint32_t   q;
-	uint16_t   dbroot;
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_deleteDBroot()" << endl;
-#endif
-	
-	msg >> q;
-	dbroot = static_cast<uint16_t>(q);
-	
-	if (printOnly)
-	{
-		cout << "deleteDBRoot: " << dbroot << endl; 
-		return;
-	}
-	
-	err = slave->deleteDBRoot(dbroot);
-	reply << (uint8_t) err;
-
-#ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_deleteDBRoot() err code is " << err << endl;
 #endif
 	if (!standalone)
 		master.write(reply);
@@ -1491,8 +1214,7 @@ void SlaveComm::do_beginVBCopy(ByteStream &msg)
 	VER_t transID;
 	LBIDRange_v ranges;
 	VBRange_v freeList;
-	uint32_t tmp32;
-	uint16_t dbRoot;
+	uint32_t tmp;
 	int err;
 	ByteStream reply;
 
@@ -1500,20 +1222,19 @@ void SlaveComm::do_beginVBCopy(ByteStream &msg)
 	cerr << "WorkerComm: do_beginVBCopy()" << endl;
 #endif
 
-	msg >> tmp32;
-	transID = tmp32;
-	msg >> dbRoot;
+	msg >> tmp;
+	transID = tmp;
 	deserializeVector(msg, ranges);
 	
 	if (printOnly) {
-		cout << "beginVBCopy: transID=" << transID << " dbRoot=" << dbRoot << " size="
-				<< ranges.size() <<	" ranges..." << endl;
+		cout << "beginVBCopy: transID=" << transID << " size=" << ranges.size() << 
+			" ranges..." << endl;
 		for (uint i = 0; i < ranges.size(); i++)
 			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
 		return;
 	}
 	
-	err = slave->beginVBCopy(transID, dbRoot, ranges, freeList, firstSlave && !standalone);
+	err = slave->beginVBCopy(transID, ranges, freeList);
 	reply << (uint8_t) err;
 	if (err == ERR_OK)
 		serializeVector(reply, freeList);
@@ -1583,7 +1304,7 @@ void SlaveComm::do_vbRollback1(ByteStream &msg)
 		return;
 	}
 	
-	err = slave->vbRollback(transID, lbidList, firstSlave && !standalone);
+	err = slave->vbRollback(transID, lbidList);
 	reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_vbRollback1() err code is " << err << endl;
@@ -1617,7 +1338,7 @@ void SlaveComm::do_vbRollback2(ByteStream &msg)
 		return;
 	}
 	
-	err = slave->vbRollback(transID, lbidList, firstSlave && !standalone);
+	err = slave->vbRollback(transID, lbidList);
 	reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_vbRollback2() err code is " << err << endl;
@@ -1697,13 +1418,8 @@ void SlaveComm::do_confirm()
 		if (currentSaveFD < 0) {
 			tmp = savefile + "_current";
 			currentSaveFD = open(tmp.c_str(), O_WRONLY | O_CREAT, 0666);
-			if (currentSaveFD < 0) {
-				ostringstream os;
-				os << "WorkerComm: failed to open the current savefile. errno: " 
-					<< strerror(errno);
-				log(os.str());
-				throw runtime_error(os.str());
-			}
+			if (currentSaveFD < 0)
+				throw runtime_error("WorkerComm: invalid savefile prefix");
 #ifndef _MSC_VER
 			fchmod(currentSaveFD, 0666);
 #endif
@@ -1714,20 +1430,14 @@ void SlaveComm::do_confirm()
 		tmp += '\n';
 #endif
 		lseek(currentSaveFD, 0, SEEK_SET);
-		int err = write(currentSaveFD, tmp.c_str(), tmp.length());
-		if (err < (int) tmp.length()) {
-			ostringstream os;
-			os << "WorkerComm: currentfile write() returned " << err << " fd is " << currentSaveFD;
-			if (err < 0) 
-				os << " errno: " << strerror(errno);
-			log(os.str());
-		}
+		//FIXME: check for I/O errors...
+		(void)write(currentSaveFD, tmp.c_str(), tmp.length());
 #ifdef _MSC_VER
 		//FIXME: Do we need to account for Windows EOL conversions?
 		_chsize_s(currentSaveFD, tmp.length());
 		_commit(currentSaveFD);
 #else
-		err = ftruncate(currentSaveFD, tmp.length());
+		(void)ftruncate(currentSaveFD, tmp.length());
 		fsync(currentSaveFD);
 #endif
 		saveFileToggle = !saveFileToggle;
@@ -1747,7 +1457,6 @@ void SlaveComm::do_confirm()
 void SlaveComm::do_flushInodeCache()
 {
 	ByteStream reply;
-	int err;
 
 #ifdef BRM_VERBOSE
 	cerr << "WorkerComm: do_flushInodeCache()" << endl;
@@ -1800,7 +1509,7 @@ void SlaveComm::do_flushInodeCache()
 #else
 	int fd=-1;
 	if ((fd = open("/proc/sys/vm/drop_caches", O_WRONLY)) >= 0) {
-		err = write(fd, "3\n", 2);
+		write(fd, "3\n", 2);
 		close(fd);
 	}
 #endif
@@ -1939,172 +1648,62 @@ int SlaveComm::printJournal(string prefix)
    return ret;
 }
 
-void SlaveComm::do_ownerCheck(ByteStream& msg)
-{
-	string processName;
-	uint32_t pid;
-	ByteStream::byte rb = 0;
-
-	msg >> processName >> pid;
-	idbassert(msg.length() == 0);
-
-	if (standalone)
-		return;
-
-	if (processExists(pid, processName))
-		rb++;
-
-	ByteStream reply;
-	reply << rb;
-	master.write(reply);
-}
-
-//FIXME: needs to be refactored along with SessionManagerServer::lookupProcessStatus()
-#if defined(__linux__)
-bool SlaveComm::processExists(const uint32_t pid, const string& pname)
-{
-	string stat;
-	ostringstream procFileName;
-	ostringstream statProcessField;
-	ifstream in;
-	string::size_type pos;
-	ByteStream reply;
-	char buf[2048];
-
-	procFileName << "/proc/" << pid << "/stat";
-	in.open(procFileName.str().c_str());
-	if (!in) {
-		return false;
-	}
-
-	statProcessField << "(" << pname << ")";
-
-	in.getline(buf, 1024);
-	stat = buf;
-	pos = stat.find(statProcessField.str());
-	if (pos == string::npos) {
-		return false;
-	}
-
-	return true;
-}
-
-
-#elif defined(_MSC_VER)
-//FIXME
-bool SlaveComm::processExists(const uint32_t pid, const string& pname)
-{
-	boost::mutex::scoped_lock lk(fPidMemLock);	
-	if (!fPids)
-		fPids = (DWORD*)malloc(fMaxPids * sizeof(DWORD));
-	DWORD needed = 0;
-	if (EnumProcesses(fPids, fMaxPids * sizeof(DWORD), &needed) == 0)
-		return false;
-	while (needed == fMaxPids * sizeof(DWORD))
-	{
-		fMaxPids *= 2;
-		fPids = (DWORD*)realloc(fPids, fMaxPids * sizeof(DWORD));
-		if (EnumProcesses(fPids, fMaxPids * sizeof(DWORD), &needed) == 0)
-			return false;
-	}
-	DWORD numPids = needed / sizeof(DWORD);
-	for (DWORD i = 0; i < numPids; i++)
-	{
-		if (fPids[i] == pid)
-		{
-			TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
-
-			// Get a handle to the process.
-			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION |
-										   PROCESS_VM_READ,
-										   FALSE, fPids[i]);
-			// Get the process name.
-			if (hProcess != NULL)
-			{
-				HMODULE hMod;
-				DWORD cbNeeded;
-
-				if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
-					GetModuleBaseName(hProcess, hMod, szProcessName, 
-									   sizeof(szProcessName)/sizeof(TCHAR));
-
-				CloseHandle(hProcess);
-
-				if (pname == szProcessName)
-					return true;
-			}
-		}
-	}
-	return false;
-}
-#elif defined(__FreeBSD__)
-//FIXME
-bool SlaveComm::processExists(const uint32_t pid, const string& pname)
-{
-	return false;
-}
-#else
-#error Need to port processExists()
-#endif
-
 void SlaveComm::do_dmlLockLBIDRanges(ByteStream &msg)
 {
-	ByteStream reply;
-	vector<LBIDRange> ranges;
-	int txnID;
-	uint32_t tmp32;
-	int err;
+    ByteStream reply;
+    vector<LBIDRange> ranges;
+    int txnID;
+    uint32_t tmp32;
+    int err;
 
-	deserializeVector<LBIDRange>(msg, ranges);
-	msg >> tmp32;
-	assert(msg.length() == 0);
-	txnID = (int) tmp32;
+    deserializeVector<LBIDRange>(msg, ranges);
+    msg >> tmp32;
+    assert(msg.length() == 0);
+    txnID = (int) tmp32;
 
-	if (printOnly) {
-		cout << "dmlLockLBIDRanges: transID=" << txnID << " size="
-				<< ranges.size() <<	" ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
-			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
-		return;
-	}
+    if (printOnly) {
+        cout << "dmlLockLBIDRanges: transID=" << txnID << " size="
+                << ranges.size() << " ranges..." << endl;
+        for (uint i = 0; i < ranges.size(); i++)
+            cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
+        return;
+    }
 
-	err = slave->dmlLockLBIDRanges(ranges, txnID);
+    err = slave->dmlLockLBIDRanges(ranges, txnID);
 
-	reply << (uint8_t) err;
+    reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_dmlLockLBIDRanges() err code is " << err << endl;
+    cerr << "WorkerComm: do_dmlLockLBIDRanges() err code is " << err << endl;
 #endif
-	if (!standalone)
-		master.write(reply);
-	doSaveDelta = true;
+    if (!standalone)
+        master.write(reply);
+    doSaveDelta = true;
 }
 
 void SlaveComm::do_dmlReleaseLBIDRanges(ByteStream &msg)
 {
-	ByteStream reply;
-	vector<LBIDRange> ranges;
-	int err;
+    ByteStream reply;
+    vector<LBIDRange> ranges;
+    int err;
 
-	deserializeVector<LBIDRange>(msg, ranges);
+    deserializeVector<LBIDRange>(msg, ranges);
 
-	if (printOnly) {
-		cout << "dmlLockLBIDRanges: size=" << ranges.size() << " ranges..." << endl;
-		for (uint i = 0; i < ranges.size(); i++)
-			cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
-		return;
-	}
+    if (printOnly) {
+        cout << "dmlLockLBIDRanges: size=" << ranges.size() << " ranges..." << endl;
+        for (uint i = 0; i < ranges.size(); i++)
+            cout << "   start=" << ranges[i].start << " size=" << ranges[i].size << endl;
+        return;
+    }
 
-	err = slave->dmlReleaseLBIDRanges(ranges);
+    err = slave->dmlReleaseLBIDRanges(ranges);
 
-	reply << (uint8_t) err;
+    reply << (uint8_t) err;
 #ifdef BRM_VERBOSE
-	cerr << "WorkerComm: do_dmlReleaseLBIDRanges() err code is " << err << endl;
+    cerr << "WorkerComm: do_dmlReleaseLBIDRanges() err code is " << err << endl;
 #endif
-	if (!standalone)
-		master.write(reply);
-	doSaveDelta = true;
+    if (!standalone)
+        master.write(reply);
+    doSaveDelta = true;
 }
 
 }
-
-// vim:ts=4 sw=4:

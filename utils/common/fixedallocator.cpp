@@ -1,24 +1,15 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+//
+// C++ Implementation: fixedallocator
+//
+// Description: 
+//
+//
+// Author: Patrick <pleblanc@localhost.localdomain>, (C) 2009
+//
+// Copyright: See COPYING file that comes with this distribution
+//
+//
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
-/******************************************************************************************
-* $Id$
-*
-******************************************************************************************/
 
 //This is one of the first files we compile, check the compiler...
 #if defined(__GNUC__)
@@ -42,6 +33,24 @@ using namespace boost;
 
 namespace utils {
 
+FixedAllocator::FixedAllocator()
+{
+	elementCount = -1;
+	elementSize = 0;
+	capacityRemaining = 0;
+	currentlyStored = 0;
+	tmpSpace = false;
+}
+
+FixedAllocator::FixedAllocator(unsigned long allocSize, bool isTmpSpace, unsigned long numElements)
+{
+	elementCount = numElements;
+	elementSize = allocSize;
+	tmpSpace = isTmpSpace;
+	capacityRemaining = 0;
+	currentlyStored = 0;
+}
+
 FixedAllocator::FixedAllocator(const FixedAllocator &f)
 {
 	elementCount = f.elementCount;
@@ -49,6 +58,11 @@ FixedAllocator::FixedAllocator(const FixedAllocator &f)
 	tmpSpace = f.tmpSpace;
 	capacityRemaining = 0;
 	currentlyStored = 0;
+}
+
+FixedAllocator::~FixedAllocator()
+{
+// 	cout << "~FA!\n";
 }
 
 FixedAllocator & FixedAllocator::operator=(const FixedAllocator &f)
@@ -95,4 +109,4 @@ void FixedAllocator::deallocateAll()
 	capacityRemaining = 0;
 }
 
-}
+};

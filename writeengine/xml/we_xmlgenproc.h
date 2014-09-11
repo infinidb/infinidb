@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: we_xmlgenproc.h 3807 2012-05-01 15:03:59Z dcathey $
+ *   $Id: we_xmlgenproc.h 2968 2011-05-13 19:01:26Z rdempsey $
  *
  ***********************************************************************/
 /** @file */
@@ -50,11 +50,11 @@ typedef std::vector<SysCatColumn> SysCatColumnList;
 
 class XMLGenData;
 
-/** @brief Generates job_xxx.xml file (for cpimport.bin) using XMLGenData as
- *  input.  Can also be used to generate an XML-formatted report.
+/** @brief Processes/generates job_xxx.xml file (for cpimport) using XMLGenData
+ *  as input.
  *
  *  This class was moved from XMLProc, formerly in tools/dbloadxml.  It was
- *  moved to writeengine/xml so that both colxml and cpimport.bin could use it.
+ *  moved to writeengine/xml so that both colxml and cpimport could use it.
  */
 class XMLGenProc
 {

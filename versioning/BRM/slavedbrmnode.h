@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: slavedbrmnode.h 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: slavedbrmnode.h 1623 2012-07-03 20:17:56Z pleblanc $
  *
  *****************************************************************************/
 
@@ -40,7 +40,7 @@
 #include "vbbm.h"
 #include "copylocks.h"
 
-#if defined(_MSC_VER) && defined(xxxSLAVEDBRMNODE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(SLAVEDBRMNODE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -91,69 +91,26 @@ class SlaveDBRMNode {
 	public:
 		EXPORT SlaveDBRMNode() throw();
 		EXPORT ~SlaveDBRMNode() throw();
-
-		/** @brief Allocate a "stripe" of extents for columns in a table.
-		 *
-		 * Allocate a "stripe" of extents for the specified columns and DBRoot
-		 * @param cols (in) List of column OIDs and column widths
-		 * @param dbRoot (in) DBRoot for requested extents.
-		 * @param partitionNum (in/out) Partition number in file path.
-		 *        If allocating OID's first extent for this DBRoot, then
-		 *        partitionNum is input, else it is an output arg.
-		 * @param segmentNum (out) Segment number selected for new extents.
-		 * @param extents (out) list of lbids, numBlks, and fbo for new extents
-		 * @return 0 on success, -1 on error
-		 */
-		EXPORT int createStripeColumnExtents(
-				 const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-						 u_int16_t  dbRoot,
-						 u_int32_t& partitionNum,
-						 u_int16_t& segmentNum,
-				 std::vector<CreateStripeColumnExtentsArgOut>& extents) throw();
 		
-		/** @brief Allocate extent in the specified segment file
-		 *
-		 * Allocate column extent for the exact segment file specified by the
-		 * requested OID,DBRoot, partition, and segment.
-		 * @param OID (in) The OID requesting the extent.
-		 * @param colWidth (in) Column width of the OID.
-		 * @param dbRoot (in) DBRoot where extent is to be added.
-		 * @param partitionNum (in) Partition number in file path.
-		 * @param segmentNum (in) Segment number in file path.
-		 * @param lbid (out) The first LBID of the extent created.
-		 * @param allocdSize (out) The total number of LBIDs allocated.
-		 * @param startBlockOffset (out) The first block of the extent created.
-		 * @return 0 on success, -1 on error
-		 */
-		 EXPORT int createColumnExtentExactFile(OID_t oid,
-						 u_int32_t  colWidth,
-						 u_int16_t  dbRoot,
-						 u_int32_t  partitionNum,
-						 u_int16_t  segmentNum,
-						 LBID_t&    lbid,
-						 int&       allocdSize,
-						 u_int32_t& startBlockOffset) throw();
-
 		/** @brief Allocate an extent for a column file
 		 *
-		 * Allocate a column extent for the specified OID and DBRoot.
+		 * Allocate a column extent for the specified OID.
 		 * @param OID (in) The OID requesting the extent.
 		 * @param colWidth (in) Column width of the OID.
-		 * @param dbRoot (in) DBRoot where extent is to be added.
+		 * @param dbRoot (in/out) If allocating OID's first extent, then
+		 *        dbRoot is an input arg, else it is an output arg.
 		 * @param partitionNum (in/out) Partition number in file path.
-		 *        If allocating OID's first extent for this DBRoot, then
-		 *        partitionNum is input, else it is an output arg.
-		 * @param segmentNum (in/out) Segment number in file path.
-		 *        If allocating OID's first extent for this DBRoot, then
-		 *        segmentNum is input, else it is an output arg.
+         *        If allocating OID's first extent, then
+         *        partitionNum is an input arg, else it is output.
+		 * @param segmentNum (out) Segment number assigned to the extent.
 		 * @param lbid (out) The first LBID of the extent created.
 		 * @param allocdSize (out) The total number of LBIDs allocated.
 		 * @param startBlockOffset (out) The first block of the extent created.
 		 * @return 0 on success, -1 on error
 		 */
-		 EXPORT int createColumnExtent_DBroot(OID_t oid,
+		 EXPORT int createColumnExtent(OID_t oid,
 						 u_int32_t  colWidth,
-						 u_int16_t  dbRoot,
+						 u_int16_t& dbRoot,
 						 u_int32_t& partitionNum,
 						 u_int16_t& segmentNum,
 						 LBID_t&    lbid,
@@ -194,26 +151,6 @@ class SlaveDBRMNode {
 						 uint16_t segmentNum,
 						 HWM_t    hwm) throw();
 
-		/** @brief Rollback (delete) set of extents for specified OID & DBRoot.
-		 *
-		 * Deletes all the extents that logically follow the specified
-		 * column extent; and sets the HWM for the specified extent.
-		 * @param oid OID of the extents to be deleted.
-		 * @param bDeleteAll Indicates if all extents in oid and dbroot are to
-		 *        be deleted; else part#, seg#, and hwm are used.
-		 * @param dbRoot DBRoot of the extents to be deleted.
-		 * @param partitionNum Last partition to be kept.
-		 * @param segmentNum Last segment in partitionNum to be kept.
-		 * @param hwm HWM to be assigned to the last extent that is kept.
-		 * @return 0 on success, -1 on error
-		 */
-		EXPORT int rollbackColumnExtents_DBroot(OID_t oid,
-						 bool     bDeleteAll,
-						 uint16_t dbRoot,
-						 uint32_t partitionNum,	
-						 uint16_t segmentNum,
-						 HWM_t    hwm) throw();
-
 		/** @brief Rollback (delete) a set of dict store extents for an OID.
 		 *
 		 * Arguments specify the last stripe.  Any extents after this are
@@ -228,27 +165,6 @@ class SlaveDBRMNode {
 		 */
 		EXPORT int rollbackDictStoreExtents(OID_t oid,
 						 u_int32_t         partitionNum,
-						 const std::vector<HWM_t>& hwms) throw ();
-
-		/** @brief Rollback (delete) a set of dict store extents for an OID &
-		 *  DBRoot.
-		 *
-		 * Arguments specify the last stripe.  Any extents after this are
-		 * deleted.  The hwm's of the extents in the last stripe are updated
-		 * based on the contents of the hwm vector.  If hwms is a partial list,
-		 * (as in the first stripe of a partition), then any extents in sub-
-		 *  sequent segment files for that partition are deleted.  If hwms is
-		 * empty then all the extents in dbRoot are deleted.
-		 * @param oid OID of the extents to be deleted or updated.
-		 * @param dbRoot DBRoot of the extents to be deleted.
-		 * @param partitionNum Last partition to be kept.
-		 * @param hwms Vector of hwms for the last partition to be kept.
-		 * @return 0 on success, -1 on error
-		 */
-		EXPORT int rollbackDictStoreExtents_DBroot(OID_t oid,
-						 uint16_t          dbRoot,
-						 u_int32_t         partitionNum,
-						 const std::vector<uint16_t>& segNums,
 						 const std::vector<HWM_t>& hwms) throw ();
 						 
 		/** @brief delete of column extents for the specified extents.
@@ -301,31 +217,26 @@ class SlaveDBRMNode {
 		EXPORT int setLocalHWM(OID_t, uint32_t partitionNum, uint16_t segmentNum,
 	                   HWM_t hwm, bool firstNode) throw();
 
-		EXPORT int bulkSetHWM(const std::vector<BulkSetHWMArg> &, VER_t transID,
-				bool firstNode) throw();
-
 		EXPORT int bulkSetHWMAndCP(const std::vector<BulkSetHWMArg> &hwmArgs,
 				const std::vector<CPInfo> & setCPDataArgs,
 				const std::vector<CPInfoMerge> & mergeCPDataArgs,
 				VER_t transID, bool firstNode) throw();
 
-		EXPORT int bulkUpdateDBRoot(const std::vector<BulkUpdateDBRootArg> &) throw();
-
 		/** @brief Delete a Partition for the specified OID(s).
 		 *
 		 * @param OID (in) the OID of interest.
-		 * @param partitionNums (in) the set of partitions to be deleted.
+		 * @param partitionNum (in) the partition to be deleted.
 		 */
 		EXPORT int deletePartition(const std::set<OID_t>& oids,
-						std::set<LogicalPartition>& partitionNums, std::string& emsg) throw();
+						uint32_t partitionNum) throw();
 
 		/** @brief Mark a Partition for the specified OID(s) as out of service.
 		 *
 		 * @param OID (in) the OID of interest.
-		 * @param partitionNums (in) the set of partitions to be marked out of service.
+		 * @param partitionNum (in) the partition to be marked out of service.
 		 */
 		EXPORT int markPartitionForDeletion(const std::set<OID_t>& oids,
-						std::set<LogicalPartition>& partitionNums, std::string& emsg) throw();
+						uint32_t partitionNum) throw();
 						
 		/** @brief Mark all Partitions for the specified OID(s) as out of service.
 		 *
@@ -336,16 +247,10 @@ class SlaveDBRMNode {
 		/** @brief Restore a Partition for the specified OID(s).
 		 *
 		 * @param OID (in) the OID of interest.
-		 * @param partitionNums (in) the set of partitions to be restored.
+		 * @param partitionNum (in) the partition to be restored.
 		 */
 		EXPORT int restorePartition(const std::set<OID_t>& oids,
-						std::set<LogicalPartition>& partitionNum, std::string& emsg) throw();
-
-		/** @brief Delete all extent map rows for the specified dbroot
-		 *
-		 * @param dbroot (in) the dbroot
-		 */
-		EXPORT int deleteDBRoot(uint16_t dbroot) throw();
+						uint32_t partitionNum) throw();
 
 		/** @brief Registers a version buffer entry.
 		 *
@@ -370,13 +275,8 @@ class SlaveDBRMNode {
 		 * buffer blocks to copy the LBID range to.
 		 * @return 0 on success, -1 on error.
 		 */
-
-		/* Note, the params to the analogous DBRM class fcn are slightly different.
-		 * It takes a DBRoot param instead of a VB OID.  The conversion is
-		 * done in the controllernode b/c the OID server is housed there.
-		 */
-		EXPORT int beginVBCopy(VER_t transID, uint16_t vbOID,
-				const LBIDRange_v& ranges, VBRange_v& freeList, bool flushPMCache) throw();
+		EXPORT int beginVBCopy(VER_t transID, const LBIDRange_v& ranges, 
+					  VBRange_v& freeList) throw();
 		
 		/** @brief Atomically unset the copy lock & update the VSS.  Beware!  Read the warning!
 		 * 
@@ -407,8 +307,8 @@ class SlaveDBRMNode {
 		 * @param verID The version of the block now in the database.
 		 * @return 0 on success, -1 on error.
 		 */
-		EXPORT int vbRollback(VER_t transID, const LBIDRange_v& lbidList,
-				bool flushPMCache) throw();
+		EXPORT int vbRollback(VER_t transID, const LBIDRange_v& lbidList) 
+				throw();
 
 		/** @brief Reverse the changes made during the given transaction.
 		 *
@@ -419,8 +319,8 @@ class SlaveDBRMNode {
 		 * @param verID The version of the block now in the database.
 		 * @return 0 on success, -1 on error.
 		 */
-		EXPORT int vbRollback(VER_t transID, const std::vector<LBID_t>& lbidList,
-				bool flushPMCache) throw();
+		EXPORT int vbRollback(VER_t transID, const std::vector<LBID_t>& lbidList) 
+				throw();
 
 		EXPORT int clear() throw();
 
@@ -467,9 +367,9 @@ class SlaveDBRMNode {
 		 */
 		EXPORT int mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMaxMinMap);
 
-		/* Write-side copylocks interface */
-		EXPORT int dmlLockLBIDRanges(const std::vector<LBIDRange> &ranges, int txnID);
-		EXPORT int dmlReleaseLBIDRanges(const std::vector<LBIDRange> &ranges);
+        /* Write-side copylocks interface */
+        EXPORT int dmlLockLBIDRanges(const std::vector<LBIDRange> &ranges, int txnID);
+        EXPORT int dmlReleaseLBIDRanges(const std::vector<LBIDRange> &ranges);
 
 		EXPORT int loadState(std::string filename) throw();
 		EXPORT int saveState(std::string filename) throw();

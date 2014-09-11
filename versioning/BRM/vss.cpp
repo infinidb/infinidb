@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: vss.cpp 1928 2013-06-30 21:20:52Z wweeks $
+ * $Id: vss.cpp 1746 2012-11-05 20:46:10Z pleblanc $
  *
  ****************************************************************************/
 
@@ -41,8 +41,6 @@
 #include "mastersegmenttable.h"
 #include "vbbm.h"
 #include "extentmap.h"
-#include "cacheutils.h"
-
 
 #define VSS_DLLEXPORT
 #include "vss.h"
@@ -65,7 +63,6 @@ VSSEntry::VSSEntry()
 
 /*static*/
 boost::mutex VSSImpl::fInstanceMutex;
-boost::mutex VSS::mutex;
 
 /*static*/
 VSSImpl* VSSImpl::fInstance=0;
@@ -82,7 +79,7 @@ VSSImpl* VSSImpl::makeVSSImpl(unsigned key, off_t size, bool readOnly)
 			BRMShmImpl newShm(key, size);
 			fInstance->swapout(newShm);
 		}
-		idbassert(key == fInstance->fVSS.key());
+		assert(key == fInstance->fVSS.key());
 		return fInstance;
 	}
 
@@ -152,7 +149,7 @@ void VSS::lock(OPS op)
 		}
 		else {
 			fPVSSImpl = VSSImpl::makeVSSImpl(vssShminfo->tableShmkey, 0);
-			idbassert(fPVSSImpl);
+			assert(fPVSSImpl);
 			if (r_only)
 				fPVSSImpl->makeReadOnly();
 			vss = fPVSSImpl->get();
@@ -226,13 +223,13 @@ void VSS::growVSS()
 		allocSize = vssShminfo->allocdSize + VSS_INCREMENT;
 	
 	newshmkey = chooseShmkey();
-	idbassert((allocSize == VSS_INITIAL_SIZE && !fPVSSImpl) || fPVSSImpl);
+	assert((allocSize == VSS_INITIAL_SIZE && !fPVSSImpl) || fPVSSImpl);
 	if (fPVSSImpl)
 	{
 		BRMShmImpl newShm(newshmkey, allocSize);
 		newshmseg = static_cast<char*>(newShm.fMapreg.get_address());
 		memset(newshmseg, 0, allocSize);
-		idbassert(vss);
+		assert(vss);
 		VSSShmsegHeader *tmp = reinterpret_cast<VSSShmsegHeader*>(newshmseg);
 		tmp->capacity = vss->capacity + VSSSTORAGE_INCREMENT/sizeof(VSSEntry);
 		tmp->numHashBuckets = vss->numHashBuckets + VSSTABLE_INCREMENT/sizeof(int);
@@ -477,7 +474,7 @@ bool VSS::isLocked(const LBIDRange& range, VER_t transID) const
 }
 
 //requires write lock
-void VSS::removeEntry(LBID_t lbid, VER_t verID, vector<LBID_t> *flushList)
+void VSS::removeEntry(LBID_t lbid, VER_t verID)
 {
 	int index, prev, bucket;
 
@@ -553,7 +550,6 @@ void VSS::removeEntry(LBID_t lbid, VER_t verID, vector<LBID_t> *flushList)
 		else
 			prev = index;
 	}
-	flushList->push_back(lbid);
 }
 
 bool VSS::isTooOld(LBID_t lbid, VER_t verID) const
@@ -720,7 +716,7 @@ void VSS::commit(VER_t txnID)
 		if ( lbids.size() > 0 )
 		{
 				ostringstream ostr;
-				ostr << "VSS::commit(): After commit for transaction " << txnID << ", entries still locked with lbid:txnId : ";
+				ostr << "VSS::commit(): After commit for transaction " << txnID << ", entries still locked with lbid:txnId : " << endl;
 				log(ostr.str(), logging::LOG_TYPE_DEBUG);
 		}
 		else if ( vss->lockedEntryCount > 0 )
@@ -873,8 +869,8 @@ void VSS::clear()
 
 	newshmkey = chooseShmkey();
 
-	idbassert(fPVSSImpl);
-	idbassert(fPVSSImpl->key() != (unsigned)newshmkey);
+	assert(fPVSSImpl);
+	assert(fPVSSImpl->key() != (unsigned)newshmkey);
 	fPVSSImpl->clear(newshmkey, allocSize);
 	vssShminfo->tableShmkey = newshmkey;
 	vssShminfo->allocdSize = allocSize;
@@ -1124,13 +1120,13 @@ bool VSS::isEmpty(bool useLock)
 	return (fPVSSImpl->get()->currentSize == 0);
 #endif
 	//Should be race-free, but takes along time...
-	bool rc;
-	if (useLock)
-		lock(READ);
-	rc = (fPVSSImpl->get()->currentSize == 0);
-	if (useLock)
-		release(READ);
-	return rc;
+    bool rc;
+    if (useLock)
+        lock(READ);
+    rc = (fPVSSImpl->get()->currentSize == 0);
+    if (useLock)
+        release(READ);
+    return rc;
 }
 
 void VSS::load(string filename)

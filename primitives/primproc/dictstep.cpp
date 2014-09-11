@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+// $Id: dictstep.cpp 1840 2012-02-17 17:14:00Z rdempsey $
 // C++ Implementation: dictstep
 //
 // Description: 
@@ -119,7 +119,7 @@ void DictStep::prep(int8_t outputType, bool makeAbsRids)
 	inputMsg.reset(new uint8_t[bufferSize]);
 	primMsg = (DictInput *) inputMsg.get();
 
-	primMsg->ism.Interleave = 0;
+	primMsg->ism.Reserve = 0;
 	primMsg->ism.Flags = 0;
 // 	primMsg->ism.Flags = PrimitiveMsg::planFlagsToPrimFlags(traceFlags);	
 	primMsg->ism.Command=DICT_SIGNATURE;
@@ -173,7 +173,7 @@ void DictStep::copyResultToTmpSpace(OrderedToken *ot)
 	uint64_t rid64;
 	uint16_t rid16;
 
-	idbassert(primMsg->OutputType & OT_RID);
+	assert(primMsg->OutputType & OT_RID);
 	DictOutput *header = (DictOutput *) &result[0];
 
 	if (header->NVALS == 0) return;
@@ -310,7 +310,7 @@ void DictStep::_execute()
 				pt[primMsg->NVALS].rid =
 				  (fFilterFeeder == NOT_FEEDER ? newRidList[i].rid : i);
 			pt[primMsg->NVALS].offsetIndex = newRidList[i].token & 0x3ff;
- 			idbassert(pt[primMsg->NVALS].offsetIndex != 0);
+ 			assert(pt[primMsg->NVALS].offsetIndex != 0);
 			primMsg->NVALS++;
 			i++;
 		}
@@ -370,7 +370,7 @@ void DictStep::_project()
 			else
 				pt[primMsg->NVALS].rid = newRidList[i].rid;
 			pt[primMsg->NVALS].offsetIndex = newRidList[i].token & 0x3ff;
-			idbassert(pt[primMsg->NVALS].offsetIndex > 0);
+			assert(pt[primMsg->NVALS].offsetIndex > 0);
 			primMsg->NVALS++;
 			i++;
 		}
@@ -378,7 +378,7 @@ void DictStep::_project()
 		issuePrimitive(false);
 		projectResult(tmpStrings);
 	}
-	idbassert(tmpResultCounter == bpp->ridCount);
+	assert(tmpResultCounter == bpp->ridCount);
 	*bpp->serialized << totalResultLength;
  	//cout << "_project() total length = " << totalResultLength << endl;
 	for (i = 0; i < tmpResultCounter; i++) {
@@ -450,7 +450,7 @@ void DictStep::_projectToRG(RowGroup &rg, uint col)
 				pt[primMsg->NVALS].rid = newRidList[i].rid;
 			}
 			pt[primMsg->NVALS].offsetIndex = newRidList[i].token & 0x3ff;
-			idbassert(pt[primMsg->NVALS].offsetIndex > 0);
+			assert(pt[primMsg->NVALS].offsetIndex > 0);
 			primMsg->NVALS++;
 // 			pt++;
 			i++;
@@ -467,13 +467,13 @@ void DictStep::_projectToRG(RowGroup &rg, uint col)
 	}
 
  	//cout << "_projectToRG() total length = " << totalResultLength << endl;
-	idbassert(tmpResultCounter == bpp->ridCount);
+	assert(tmpResultCounter == bpp->ridCount);
 	rg.initRow(&r);
-//	rg.getRow(newRidList[0].pos, &r);
+	rg.getRow(newRidList[0].pos, &r);
 	if (rg.getColTypes()[col] != execplan::CalpontSystemCatalog::VARBINARY) {
 		for (i = 0; i < tmpResultCounter; i++) {
-			rg.getRow(newRidList[i].pos, &r);
  			//cout << "serializing " << tmpStrings[i] << endl;
+			rg.getRow(newRidList[i].pos, &r);
 			r.setStringField(tmpStrings[i], col);
 		}
 	}

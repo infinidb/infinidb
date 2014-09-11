@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: distributedenginecomm.h 9469 2013-05-01 18:38:43Z pleblanc $
+// $Id: distributedenginecomm.h 7636 2011-04-13 02:42:27Z pleblanc $
 //
 // C++ Interface: distributedenginecomm
 //
@@ -97,11 +97,6 @@ public:
 	
 	EXPORT static DistributedEngineComm* instance(ResourceManager& rm);
 
-	/** @brief delete the static instance
-	 *  This has the effect of causing the connection to be rebuilt
-	 */
-	EXPORT static void reset();
-
 	/** @brief currently a nop
 	 *
 	 */
@@ -143,14 +138,14 @@ public:
 #ifdef SHARED_NOTHING_DEMO
 	EXPORT void write(messageqcpp::ByteStream& msg, BRM::OID_t oid=0);
 #else
-	EXPORT void write(uint32_t key, messageqcpp::ByteStream& msg);
+	EXPORT void write(messageqcpp::ByteStream& msg);
 #endif
 
 	//EXPORT void throttledWrite(const messageqcpp::ByteStream& msg);
 
 	/** @brief Special write function for use only by newPMOnline event handlers
 	*/
-	EXPORT void write(messageqcpp::ByteStream &msg, uint connection);
+	EXPORT void write(const messageqcpp::ByteStream &msg, uint connection);
 
 	/** @brief Shutdown this object
 	 *
@@ -189,7 +184,6 @@ public:
 	EXPORT void destroyMulticastSender() { fMulticastSender.destroy(); }
 
 	uint64_t connectedPmServers() const { return fPmConnections.size(); }
-	uint getPmCount() const { return pmCount; }
 
 	friend class ::TestDistributedEngineComm;
 
@@ -202,15 +196,22 @@ private:
 	
 	/* To keep some state associated with the connection */
 	struct MQE {
-		MQE(uint pmCount);
+		MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
+				targetQueueSize(targetRecvQueueSize) {
+#ifdef _MSC_VER
+			unackedWork.reset(new volatile long[pmCount]);
+			memset((void *) unackedWork.get(), 0, pmCount * sizeof(long));
+#else
+			unackedWork.reset(new volatile uint32_t[pmCount]);
+			memset((void *) unackedWork.get(), 0, pmCount * sizeof(uint32_t));
+#endif
+		}
 		StepMsgQueue queue;
 		uint ackSocketIndex;
 #ifdef _MSC_VER
 		boost::scoped_array<volatile long> unackedWork;
-		boost::scoped_array<long> interleaver;
 #else
 		boost::scoped_array<volatile uint32_t> unackedWork;
-		boost::scoped_array<uint> interleaver;
 #endif
 		uint pmCount;
 		// non-BPP primitives don't do ACKs
@@ -244,8 +245,7 @@ private:
  	*
  	* Continues trying to write data to the client at the next index until all clients have been tried.
  	*/
-	int  writeToClient(size_t index, const messageqcpp::ByteStream& bs,
-		uint32_t senderID = std::numeric_limits<uint32_t>::max(), bool doInterleaving=false);
+	int  writeToClient(size_t index, const messageqcpp::ByteStream& bs);
 
 	static DistributedEngineComm* fInstance;
 	ResourceManager& fRm;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_log.cpp 4506 2013-02-02 00:11:15Z bpaul $
+* $Id: we_log.cpp 3403 2011-12-21 16:58:13Z xlou $
 *
 *******************************************************************************/
 
@@ -167,7 +167,7 @@ void Log::setLogFileName( const char* logfile,
     m_errlogFileName = errlogfile;
     m_bConsoleOutput = consoleFlag;
 #ifdef _MSC_VER
-    // cpimport.bin calls BulkLoad::loadJobInfo() before calling
+    // cpimport calls BulkLoad::loadJobInfo() before calling
     // BulkLoad::processJob(). loadJobInfo() attempts to write to this log
     // before it's opened (by processJob()). This doesn't seem to bother Linux
     // but puts Windows in a bad state. Once this logic is fixed, this hack can
@@ -206,11 +206,7 @@ void Log::logSyslog( const std::string& msg,
             msgId = logging::M0076;
             break;
         }
-		case ERR_UNKNOWN:
-		{
-			msgId = logging::M0017;
-            break;
-		}
+
         default:
         {
             msgId = logging::M0087;
@@ -224,22 +220,6 @@ void Log::logSyslog( const std::string& msg,
         errMsgArgs,
         logging::LOG_TYPE_ERROR,
         msgId);
-}
-//------------------------------------------------------------------------------
-// DESCRIPTION:
-// BUG 5022
-//  Close the log files with out calling d'tor. That way we can use the
-//	object again for logging while importing another table or so
-// PARAMETERS:
-//   none
-// RETURN:
-//   none
-//------------------------------------------------------------------------------
-
-void Log::closeLog()
-{
-    m_logFile.close();
-    m_errLogFile.close();
 }
 
 } //end of namespace

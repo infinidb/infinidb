@@ -199,9 +199,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-SUBDIRS = shared dictionary xml wrapper bulk client redistribute splitter \
-	server
-
+SUBDIRS = shared dictionary xml wrapper bulk
 all: all-recursive
 
 .SUFFIXES:

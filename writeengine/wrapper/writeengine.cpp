@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: writeengine.cpp 4669 2013-06-07 14:58:06Z dcathey $
+// $Id: writeengine.cpp 4402 2012-12-13 23:42:20Z chao $
 
 /** @writeengine.cpp
  *   A wrapper class for the write engine to write information to files
@@ -74,15 +74,6 @@ WriteEngineWrapper::WriteEngineWrapper() :  m_opType(NOOP)
    m_dctnry[COMPRESSED_OP]    = new DctnryCompress1;
 }
 
-WriteEngineWrapper::WriteEngineWrapper(const WriteEngineWrapper& rhs) :  m_opType(rhs.m_opType)
-{
-   m_colOp[UN_COMPRESSED_OP] = new ColumnOpCompress0;
-   m_colOp[COMPRESSED_OP]    = new ColumnOpCompress1;
-
-   m_dctnry[UN_COMPRESSED_OP] = new DctnryCompress0;
-   m_dctnry[COMPRESSED_OP]    = new DctnryCompress1;
-}
-
 /**@brief WriteEngineWrapper Constructor
 */
 WriteEngineWrapper::~WriteEngineWrapper()
@@ -98,7 +89,6 @@ WriteEngineWrapper::~WriteEngineWrapper()
 /* static */ void WriteEngineWrapper::init(unsigned subSystemID)
 {
    SimpleSysLog::instance()->setLoggingID(logging::LoggingID(subSystemID));
-   Config::initConfigCache(); 
 }
 
 /*@brief checkValid --Check input parameters are valid
@@ -401,14 +391,15 @@ int WriteEngineWrapper::createColumn(
    std::map<FID,FID> oids;
 
    if (rc == NO_ERROR)
-      rc = flushDataFiles(NO_ERROR, txnid, oids);
+      rc = flushDataFiles(NO_ERROR, oids);
 
    if (rc != NO_ERROR)
    {
+      flushVMCache();
       return rc;
    }
 
-   RETURN_ON_ERROR(BRMWrapper::getInstance()->setLocalHWM(dataOid,partition , 0,0));
+   RETURN_ON_ERROR(BRMWrapper::getInstance()->setLocalHWM_HWMt(dataOid,partition , 0,0));
    // @bug 281 : fix for bug 281 - Add flush VM cache to clear all write buffer
    //flushVMCache();
    return rc;
@@ -423,8 +414,8 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
                                    ColTuple defaultVal, const OID& refColOID,
                                    const ColDataType refColDataType,
                                    int refColWidth, int refCompressionType,
-                                   bool isNULL, int compressionType,
-                                   const string& defaultValStr, 
+                                   uint16_t dbRoot, bool isNULL, int compressionType,
+                                   const string& defaultValStr, long long & nextVal, 
 								   const OID& dictOid, bool autoincrement)
 {
    int      rc = NO_ERROR;
@@ -437,7 +428,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    ColumnOp* colOpRefCol = m_colOp[op(refCompressionType)];
    colOpNewCol->initColumn(newCol);
    colOpRefCol->initColumn(refCol);
-   uint16_t dbRoot = 1;	//not to be used
+
    //Convert HWM of the reference column for the new column
    //Bug 1703,1705
    bool isToken = false;
@@ -460,20 +451,34 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
    colOpNewCol->setColParam(newCol, 0, colOpNewCol->getCorrectRowWidth(dataType, dataWidth),
                       dataType, newColType, (FID)dataOid, compressionType, dbRoot);
    int size = sizeof(Token);
-   if (newColType == WriteEngine::WR_TOKEN) 
+   if (newColType == WriteEngine::WR_TOKEN)
    {
       if (isNULL)
       {
          Token nullToken;
          memcpy(defVal, &nullToken, size);
       }
-	  //Tpkenization is done when crate dictionary file
+      else
+      {
+         DctnryStruct dctnryStruct;
+         dctnryStruct.dctnryOid = dictOid;
+         dctnryStruct.columnOid = dataOid;
+         dctnryStruct.fColPartition = 0;
+         dctnryStruct.fColSegment = 0;
+         dctnryStruct.fColDbRoot = dbRoot;
+		 dctnryStruct.colWidth = dataWidth;
+         DctnryTuple dctnryTuple;
+         memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
+         dctnryTuple.sigSize = defaultValStr.length();
+         rc = tokenize(txnid, dctnryStruct, dctnryTuple);
+         memcpy(defVal, &dctnryTuple.token, size);
+      }
    }
    else
       convertValue(newColType, defVal, defaultVal.data);
 
    if (rc == NO_ERROR)
-      rc = colOpNewCol->fillColumn(txnid, newCol, refCol, defVal, dictOid, dataWidth, defaultValStr, autoincrement);
+      rc = colOpNewCol->fillColumn(newCol, refCol, defVal, nextVal, dictOid, dataWidth);
 
    colOpNewCol->clearColumn(newCol);
    colOpRefCol->clearColumn(refCol);
@@ -483,6 +488,7 @@ int WriteEngineWrapper::fillColumn(const TxnID& txnid, const OID& dataOid,
 // if (rc == NO_ERROR)
 // rc = flushDataFiles();
 
+   flushVMCache();
    return rc;
 }
 
@@ -564,14 +570,16 @@ void WriteEngineWrapper::flushVMCache() const
 //      write(fd, "3", 1);
 //      close(fd);
 
+   BRMWrapper::getInstance()->flushInodeCaches();
 }
 
- /*@insertColumnRecs -  Insert value(s) into a column
+ /*@insertColumnRec -  Insert value(s) into a column
  */
 /***********************************************************
  * DESCRIPTION:
- *    Insert values into  columns (batchinsert)
+ *    Insert value(s) into a column
  * PARAMETERS:
+ *    tableOid - table object id
  *    colStructList - column struct list
  *    colValueList - column value list
  * RETURN:
@@ -579,18 +587,12 @@ void WriteEngineWrapper::flushVMCache() const
  *    others if something wrong in inserting the value
  ***********************************************************/
 
-int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
+int WriteEngineWrapper::insertColumnRec(const TxnID& txnid,
                                         ColStructList& colStructList,
                                         ColValueList& colValueList,
                                         DctnryStructList& dctnryStructList,
                                         DictStrList& dictStrList,
-                                        std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
-										RBMetaWriter* fRBMetaWriter,
-										bool bFirstExtentOnThisPM,
-										bool insertSelect, 
-										bool isAutoCommitOn,
-										OID tableOid,
-										bool isFirstBatchPm)
+                                        bool insertSelect)
 {
    int            rc;
    RID*           rowIdArray = NULL;
@@ -600,582 +602,18 @@ int WriteEngineWrapper::insertColumnRecs(const TxnID& txnid,
    ColValueList   colOldValueList;
    ColValueList   colNewValueList;
    ColStructList  newColStructList;
-   DctnryStructList newDctnryStructList;
-   HWM            hwm = 0;
-   HWM            oldHwm = 0;
-   HWM    		  newHwm = 0;
-   ColTupleList::size_type totalRow;
-   ColStructList::size_type totalColumns;
-   uint64_t rowsLeft = 0;
-   bool newExtent = false;
-   RIDList ridList;
-   ColumnOp* colOp = NULL;
-
-   unsigned i=0;
-#ifdef PROFILE
- StopWatch timer;
-#endif
-   // debug information for testing
-   if (isDebug(DEBUG_2)) {
-      printf("\nIn wrapper insert\n");
-      printInputValue(colStructList, colValueList, ridList);
-   }
-   // end
-
-   //Convert data type and column width to write engine specific
-   for (i = 0; i < colStructList.size(); i++)
-      Convertor::convertColType(&colStructList[i]);
-
-   rc = checkValid(txnid, colStructList, colValueList, ridList);
-   if (rc != NO_ERROR)
-      return rc;
-
-	setTransId(txnid);
-	uint16_t  dbRoot, segmentNum;
-	uint32_t partitionNum;	
-	string    segFile;
-    bool newFile;
-	TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
-	//populate colStructList with file information
-	FILE* pFile = NULL;
-	std::vector<DBRootExtentInfo> extentInfo;
-	int currentDBrootIdx = 0;
-	std::vector<BRM::CreateStripeColumnExtentsArgOut> extents;
-	if (isFirstBatchPm)
-	{
-		currentDBrootIdx = dbRootExtentTrackers[0]->getCurrentDBRootIdx();
-		extentInfo = dbRootExtentTrackers[0]->getDBRootExtentList();
-		dbRoot = extentInfo[currentDBrootIdx].fDbRoot;
-		partitionNum = extentInfo[currentDBrootIdx].fPartition;
-		//check whether this extent is the first on this PM
-		if (bFirstExtentOnThisPM)
-		{
-			//cout << "bFirstExtentOnThisPM is " << bFirstExtentOnThisPM << endl;
-			std::vector<BRM::CreateStripeColumnExtentsArgIn> cols;
-			BRM::CreateStripeColumnExtentsArgIn createStripeColumnExtentsArgIn;
-			for (i=0; i < colStructList.size(); i++)
-			{
-				createStripeColumnExtentsArgIn.oid = colStructList[i].dataOid;
-				createStripeColumnExtentsArgIn.width = colStructList[i].colWidth;
-				cols.push_back(createStripeColumnExtentsArgIn);
-			}
-			rc = BRMWrapper::getInstance()->allocateStripeColExtents(cols, dbRoot, partitionNum, segmentNum, extents);
-			if (rc != NO_ERROR)
-				return rc;
-			//Create column files
-			BRM::CPInfoList_t cpinfoList;
-			BRM::CPInfo cpInfo;
-			cpInfo.max = numeric_limits<int64_t>::min();
-			cpInfo.min = numeric_limits<int64_t>::max();
-			cpInfo.seqNum = -1;	
-			for ( i=0; i < extents.size(); i++)
-			{
-				colOp = m_colOp[op(colStructList[i].fCompressionType)];
-				colOp->initColumn(curCol);
-				colOp->setColParam(curCol, 0, colStructList[i].colWidth, colStructList[i].colDataType,
-				colStructList[i].colType, colStructList[i].dataOid, colStructList[i].fCompressionType,
-					dbRoot, partitionNum, segmentNum);
-				rc = colOp->extendColumn(curCol, false, true, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, dbRoot,  
-					partitionNum, segmentNum, segFile, pFile, newFile);
-				if (rc != NO_ERROR)
-					return rc;
-					
-				//mark the extents to invalid
-				cpInfo.firstLbid = extents[i].startLbid;
-				cpinfoList.push_back(cpInfo);
-				colStructList[i].fColPartition = partitionNum;
-				colStructList[i].fColSegment = segmentNum;
-				colStructList[i].fColDbRoot = dbRoot;
-				dctnryStructList[i].fColPartition = partitionNum;
-				dctnryStructList[i].fColSegment = segmentNum;
-				dctnryStructList[i].fColDbRoot = dbRoot;
-			}
-			//mark the extents to invalid
-			rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList);
-			if (rc != NO_ERROR)
-				return rc;
-			//create corresponding dictionary files
-			for (i=0; i < dctnryStructList.size(); i++)
-			{
-				if (dctnryStructList[i].dctnryOid > 0)
-				{
-					rc = createDctnry(txnid, dctnryStructList[i].dctnryOid, dctnryStructList[i].colWidth, dbRoot, partitionNum,
-                                 segmentNum, dctnryStructList[i].fCompressionType);
-					if ( rc != NO_ERROR)
-						return rc;
-				}	
-			}	
-		}
-		else
-		{
-			std::vector<DBRootExtentInfo> tmpExtentInfo;
-			for (i=0; i < dbRootExtentTrackers.size(); i++)
-			{
-				tmpExtentInfo = dbRootExtentTrackers[i]->getDBRootExtentList();
-				colStructList[i].fColPartition =  tmpExtentInfo[currentDBrootIdx].fPartition;
-				colStructList[i].fColSegment = tmpExtentInfo[currentDBrootIdx].fSegment;
-				colStructList[i].fColDbRoot = tmpExtentInfo[currentDBrootIdx].fDbRoot;
-				//cout << "Load from dbrootExtenttracker oid:dbroot:part:seg = " <<colStructList[i].dataOid<<":"
-				//<<colStructList[i].fColDbRoot<<":"<<colStructList[i].fColPartition<<":"<<colStructList[i].fColSegment<<endl;
-				dctnryStructList[i].fColPartition = tmpExtentInfo[currentDBrootIdx].fPartition;
-				dctnryStructList[i].fColSegment = tmpExtentInfo[currentDBrootIdx].fSegment;
-				dctnryStructList[i].fColDbRoot = tmpExtentInfo[currentDBrootIdx].fDbRoot;
-			}
-		}	
-		
-		//Save the extents info
-		for (i=0; i < colStructList.size(); i++)
-		{		
-			ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[i].dataOid);
-			ColExtsInfo::iterator it = aColExtsInfo.begin();
-			while (it != aColExtsInfo.end())
-			{
-				if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) && (it->segNum == colStructList[i].fColSegment))
-					break;
-				it++;
-			}
-			if (it == aColExtsInfo.end()) //add this one to the list
-			{
-				ColExtInfo aExt;
-				aExt.dbRoot = colStructList[i].fColDbRoot;
-				aExt.partNum = colStructList[i].fColPartition;
-				aExt.segNum = colStructList[i].fColSegment;
-				if (bFirstExtentOnThisPM)
-				{
-					aExt.hwm = extents[i].startBlkOffset;
-					aExt.isNewExt = true;
-				//cout << "adding a ext to metadata" << endl;
-				}
-				else
-				{
-					std::vector<DBRootExtentInfo> tmpExtentInfo;
-					tmpExtentInfo = dbRootExtentTrackers[i]->getDBRootExtentList();
-					aExt.isNewExt = false;
-					aExt.hwm = tmpExtentInfo[currentDBrootIdx].fLocalHwm;
-					//cout << "oid " << colStructList[i].dataOid << " gets hwm " << aExt.hwm << endl;
-				}
-				aExt.current = true;
-				aColExtsInfo.push_back(aExt);
-				//cout << "get from extentinfo oid:hwm = " << colStructList[i].dataOid << ":" << aExt.hwm << endl;
-			}
-			tableMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-		}		
-	}
-	else //get the extent info from tableMetaData
-	{
-		ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[0].dataOid);
-		ColExtsInfo::iterator it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if (it->current) 
-				break;
-			it++;
-		}
-		if (it == aColExtsInfo.end())
-			return 1;
-			
-		for (i=0; i < colStructList.size(); i++)
-		{
-			colStructList[i].fColPartition = it->partNum;
-			colStructList[i].fColSegment = it->segNum;
-			colStructList[i].fColDbRoot = it->dbRoot;
-			dctnryStructList[i].fColPartition = it->partNum;
-			dctnryStructList[i].fColSegment = it->segNum;
-			dctnryStructList[i].fColDbRoot = it->dbRoot;
-		}
-	}
-   curTupleList = static_cast<ColTupleList>(colValueList[0]);
-   totalRow = curTupleList.size();
-   totalColumns = colStructList.size();
-   rowIdArray = new RID[totalRow];
-   // use scoped_array to ensure ptr deletion regardless of where we return
-   boost::scoped_array<RID> rowIdArrayPtr(rowIdArray);
-   memset(rowIdArray, 0, (sizeof(RID)*totalRow));
-
-   // allocate row id(s)
-   curColStruct = colStructList[0];
-   colOp = m_colOp[op(curColStruct.fCompressionType)];
-
-   colOp->initColumn(curCol);
-
-   //Get the correct segment, partition, column file
-   vector<ExtentInfo> colExtentInfo; //Save those empty extents in case of failure to rollback
-   vector<ExtentInfo> dictExtentInfo; //Save those empty extents in case of failure to rollback
-   vector<ExtentInfo> fileInfo;
-   dbRoot = curColStruct.fColDbRoot;
-   //use the first column to calculate row id 
-   ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[0].dataOid);
-   ColExtsInfo::iterator it = aColExtsInfo.begin();
-	while (it != aColExtsInfo.end())
-	{
-		if ((it->dbRoot == colStructList[0].fColDbRoot) && (it->partNum == colStructList[0].fColPartition) && (it->segNum == colStructList[0].fColSegment) && it->current )
-			break;
-		it++;
-	}
-	if (it != aColExtsInfo.end()) 
-	{
-		hwm = it->hwm;
-		//cout << "Got from colextinfo hwm for oid " << colStructList[0].dataOid << " is " << hwm << endl;
-	}
-   
-   oldHwm = hwm; //Save this info for rollback
-   //need to pass real dbRoot, partition, and segment to setColParam
-   colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
-       curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
-       curColStruct.fColDbRoot, curColStruct.fColPartition, curColStruct.fColSegment);
-
-   rc = colOp->openColumnFile(curCol, segFile);
-   if (rc != NO_ERROR) {
-      return rc;
-   }
-
-   //get hwm first
-   // @bug 286 : fix for bug 286 - correct the typo in getHWM
-   //RETURN_ON_ERROR(BRMWrapper::getInstance()->getHWM(curColStruct.dataOid, hwm));
-
-   //...Note that we are casting totalRow to int to be in sync with
-   //...allocRowId().  So we are assuming that totalRow
-   //...(curTupleList.size()) will fit into an int.  We arleady made
-   //...that assumption earlier in this method when we used totalRow
-   //...in the call to calloc() to allocate rowIdArray.
-   Column newCol;
-
-#ifdef PROFILE
-timer.start("allocRowId");
-#endif
-	newColStructList = colStructList;
-	newDctnryStructList = dctnryStructList;
-   rc = colOp->allocRowId(txnid, curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, 
-	   newColStructList, newDctnryStructList, dbRootExtentTrackers, insertSelect, true, tableOid);
-   
-   //cout << "after allocrowid, total row = " <<totalRow << " newExtent is " << newExtent << endl; 
-  // cout << "column oid " << curColStruct.dataOid << " has hwm:newHwm = " << hwm <<":" << newHwm<< endl;
-   if (rc != NO_ERROR) //Clean up will be done by bulkrollback
-	  return rc;
-	
-#ifdef PROFILE
-timer.stop("allocRowId");
-#endif
-   //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
-    if ((curCol.dataFile.fPartition == 0) &&
-       (curCol.dataFile.fSegment   == 0) &&
-       ((totalRow-rowsLeft) > 0) &&
-       (rowIdArray[totalRow-rowsLeft-1] >= (RID)INITIAL_EXTENT_ROWS_TO_DISK))
-    {
-       for (unsigned k=1; k<colStructList.size(); k++)
-       {
-           Column expandCol;
-           colOp = m_colOp[op(colStructList[k].fCompressionType)];
-           colOp->setColParam(expandCol, 0,
-               colStructList[k].colWidth,
-               colStructList[k].colDataType,
-               colStructList[k].colType,
-               colStructList[k].dataOid,
-               colStructList[k].fCompressionType,
-               colStructList[k].fColDbRoot,
-               colStructList[k].fColPartition,
-               colStructList[k].fColSegment);
-           rc = colOp->openColumnFile(expandCol, segFile);
-           if (rc == NO_ERROR)
-           {
-               if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
-               {
-                   rc = colOp->expandAbbrevExtent(expandCol);
-               }
-           }
-           if (rc != NO_ERROR)
-           {
-				return rc;
-           }
-           colOp->clearColumn(expandCol); // closes the file
-       }
-    }
-	
-   //Tokenize data if needed
-   BRMWrapper::setUseVb( true );
-   dictStr::iterator dctStr_iter;
-   ColTupleList::iterator col_iter;
-   for (i = 0; i < colStructList.size(); i++)
-   {
-      if (colStructList[i].tokenFlag)
-      {
-         dctStr_iter = dictStrList[i].begin();
-         col_iter = colValueList[i].begin();
-         Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
-         rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-                     dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
-         if (rc !=NO_ERROR)
-		 {
-			cout << "Error opening dctnry file " << dctnryStructList[i].dctnryOid<< endl;
-             return rc;
-		}
-
-         for (uint32_t     rows = 0; rows < (totalRow - rowsLeft); rows++)
-         {
-             if (dctStr_iter->length() == 0)
-               {
-                   Token nullToken;
-                 col_iter->data = nullToken;
-               }
-             else
-               {
-#ifdef PROFILE
-timer.start("tokenize");
-#endif
-                 DctnryTuple dctTuple;
-                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-                 dctTuple.sigSize = dctStr_iter->length();
-                 dctTuple.isNull = false;
-                   rc = tokenize(txnid, dctTuple, dctnryStructList[i].fCompressionType);
-                 if (rc != NO_ERROR)
-                 {
-                     dctnry->closeDctnry();
-                     return rc;
-                 }
-#ifdef PROFILE
-timer.stop("tokenize");
-#endif
-                   col_iter->data = dctTuple.token;
-               }
-               dctStr_iter++;
-               col_iter++;
-
-         }
-         //close dictionary files
-         rc = dctnry->closeDctnry();
-         if (rc != NO_ERROR)
-             return rc;
-
-         if (newExtent)
-         {
-			//@Bug 4854 back up hwm chunk for the file to be modified
-			if (fRBMetaWriter)
-				fRBMetaWriter->backupDctnryHWMChunk(newDctnryStructList[i].dctnryOid, newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition, newDctnryStructList[i].fColSegment);
-             rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-             //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
-                           newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
-             if (rc !=NO_ERROR)
-                 return rc;
-
-             for (uint32_t     rows = 0; rows < rowsLeft; rows++)
-             {
-             if (dctStr_iter->length() == 0)
-               {
-                   Token nullToken;
-                 col_iter->data = nullToken;
-               }
-             else
-               {
-#ifdef PROFILE
-timer.start("tokenize");
-#endif
-                 DctnryTuple dctTuple;
-                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-                 dctTuple.sigSize = dctStr_iter->length();
-                 dctTuple.isNull = false;
-                 rc = tokenize(txnid, dctTuple, newDctnryStructList[i].fCompressionType);
-                 if (rc != NO_ERROR)
-                 {
-                     dctnry->closeDctnry();
-                     return rc;
-                 }
-#ifdef PROFILE
-timer.stop("tokenize");
-#endif
-                     col_iter->data = dctTuple.token;
-                 }
-                 dctStr_iter++;
-                 col_iter++;
-             }
-             //close dictionary files
-             rc = dctnry->closeDctnry();
-             if (rc != NO_ERROR)
-                 return rc;
-         }
-      }
-   }
-	BRMWrapper::setUseVb( true );
-
-   //Update column info structure @Bug 1862 set hwm
-   //@Bug 2205 Check whether all rows go to the new extent
-   RID lastRid = 0;
-   RID lastRidNew = 0;
-   if (totalRow-rowsLeft > 0)
-   {
-     lastRid = rowIdArray[totalRow-rowsLeft-1];
-     lastRidNew = rowIdArray[totalRow-1];
-   }
-   else
-   {
-     lastRid = 0;
-     lastRidNew = rowIdArray[totalRow-1];
-   }
-   //cout << "rowid allocated is "  << lastRid << endl;
-   //if a new extent is created, all the columns in this table should have their own new extent
-   //First column already processed
-
-   //@Bug 1701. Close the file
-   m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
-   //cout << "Saving hwm info for new ext batch" << endl;
-   //Update hwm to set them in the end
-    bool succFlag = false;
-    unsigned colWidth = 0;
-    int      curFbo = 0, curBio;
-	for (i=0; i < totalColumns; i++)
-    {
-		//shoud be obtained from saved hwm
-		aColExtsInfo = tableMetaData->getColExtsInfo(colStructList[i].dataOid);
-		it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if ((it->dbRoot == colStructList[i].fColDbRoot) && (it->partNum == colStructList[i].fColPartition) 
-				&& (it->segNum == colStructList[i].fColSegment) && it->current)
-				break;
-			it++;
-		}
-		if (it != aColExtsInfo.end()) //update hwm info
-		{
-			oldHwm = it->hwm;
-		}
-		 
-         // save hwm for the old extent
-         colWidth = colStructList[i].colWidth;
-         succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-        // cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
-         if (succFlag)
-         {
-            if ((HWM)curFbo >= oldHwm)
-			{
-				it->hwm = (HWM)curFbo;
-			}
-			//@Bug 4947. set current to false for old extent.
-			if (newExtent)
-			{
-					it->current = false;
-			}
-						
-			//cout << "updated old ext info for oid " << colStructList[i].dataOid << " dbroot:part:seg:hwm:current = " 
-	  //<< it->dbRoot<<":"<<it->partNum<<":"<<it->segNum<<":"<<it->hwm<<":"<< it->current<< " and newExtent is " << newExtent << endl;
-         }
-         else
-            return ERR_INVALID_PARAM;
-			
-		//update hwm for the new extent
-	  if (newExtent)
-	  {
-		it = aColExtsInfo.begin();
-		while (it != aColExtsInfo.end())
-		{
-			if ((it->dbRoot == newColStructList[i].fColDbRoot) && (it->partNum == newColStructList[i].fColPartition) 
-				&& (it->segNum == newColStructList[i].fColSegment) && it->current)
-				break;
-			it++;
-		}
-		succFlag = colOp->calculateRowId(lastRidNew, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-         if (succFlag)
-         {
-			if (it != aColExtsInfo.end())
-			{
-				it->hwm = (HWM)curFbo;
-				//cout << "setting hwm to " << (int)curFbo <<" for seg " <<it->segNum << endl;
-				it->current = true;
-			}
-         }
-		 else
-            return ERR_INVALID_PARAM;
-	  }	
-	  tableMetaData->setColExtsInfo(colStructList[i].dataOid, aColExtsInfo);
-    }
-		
-      //Prepare the valuelist for the new extent
-      ColTupleList colTupleList;
-      ColTupleList newColTupleList;
-      ColTupleList firstPartTupleList;
-      for (unsigned i=0; i < totalColumns; i++)
-      {
-         colTupleList = static_cast<ColTupleList>(colValueList[i]);
-         for (uint64_t j=rowsLeft; j > 0; j--)
-         {
-            newColTupleList.push_back(colTupleList[totalRow-j]);
-         }
-         colNewValueList.push_back(newColTupleList);
-         newColTupleList.clear();
-         //upate the oldvalue list for the old extent
-         for (uint64_t j=0; j < (totalRow-rowsLeft); j++)
-         {
-            firstPartTupleList.push_back(colTupleList[j]);
-         }
-         colOldValueList.push_back(firstPartTupleList);
-         firstPartTupleList.clear();
-      }
-
-   // end of allocate row id
-
-#ifdef PROFILE
-timer.start("writeColumnRec");
-#endif
-//cout << "Writing column record" << endl;
-
-	if (rc == NO_ERROR)
-	{
-		//Mark extents invalid
-		vector<BRM::LBID_t> lbids;
-		bool successFlag = true;
-		unsigned width = 0;
-		int         curFbo = 0, curBio, lastFbo = -1;
-			
-		for (unsigned i = 0; i < colStructList.size(); i++)
-		{
-			colOp = m_colOp[op(colStructList[i].fCompressionType)];
-			width = colStructList[i].colWidth;
-			successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-			if (successFlag) {
-				if (curFbo != lastFbo) {
-					RETURN_ON_ERROR(AddLBIDtoList(txnid,
-													  lbids,
-													  colStructList[i].dataOid,
-													  colStructList[i].fColPartition,
-													  colStructList[i].fColSegment,
-													  curFbo));
-				}
-			}
-		}
-  
-		if (lbids.size() > 0)
-				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
-		colValueList.clear();
-		rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
-	}
-   return rc;
-}
-
-int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
-                                        ColStructList& colStructList,
-                                        ColValueList& colValueList,
-                                        DctnryStructList& dctnryStructList,
-                                        DictStrList& dictStrList)
-{
-   int            rc;
-   RID*           rowIdArray = NULL;
-   ColTupleList   curTupleList;
-   Column         curCol;
-   ColStruct      curColStruct;
-   ColValueList   colOldValueList;
-   ColValueList   colNewValueList;
-   ColStructList  newColStructList;
-   DctnryStructList newDctnryStructList;
-   HWM            hwm = 0;
+   int            hwm = 0;
    HWM            newHwm = 0;
-   HWM            oldHwm = 0;
+   int            oldHwm = 0;
    ColTupleList::size_type totalRow;
    ColStructList::size_type totalColumns;
    uint64_t rowsLeft = 0;
    bool newExtent = false;
    RIDList ridList;
    ColumnOp* colOp = NULL;
-   uint i = 0;
+   std::vector<BulkSetHWMArg> hwmVecNew;
+   std::vector<BulkSetHWMArg> hwmVecOld;
+
 #ifdef PROFILE
  StopWatch timer;
 #endif
@@ -1187,7 +625,7 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
    // end
 
    //Convert data type and column width to write engine specific
-   for (i = 0; i < colStructList.size(); i++)
+   for (unsigned i = 0; i < colStructList.size(); i++)
       Convertor::convertColType(&colStructList[i]);
 
    rc = checkValid(txnid, colStructList, colValueList, ridList);
@@ -1218,16 +656,14 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
    vector<ExtentInfo> fileInfo;
    ExtentInfo info;
    //Don't search for empty space, always append to the end. May need to revisit this part
-   dbRoot = curColStruct.fColDbRoot;
-   RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
+   RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastLocalHWM_int(
       curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm));
-	  
-   for (i = 0; i < colStructList.size(); i++)
-	{
-		colStructList[i].fColPartition = partitionNum;
-		colStructList[i].fColSegment = segmentNum;
-		colStructList[i].fColDbRoot = dbRoot;
-	}
+   info.oid = curColStruct.dataOid;
+   info.partitionNum = partitionNum;
+   info.segmentNum = segmentNum;
+   info.dbRoot = dbRoot;
+   info.hwm = hwm;
+   colExtentInfo.push_back (info);
    oldHwm = hwm; //Save this info for rollback
    //need to pass real dbRoot, partition, and segment to setColParam
    colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
@@ -1255,63 +691,39 @@ int WriteEngineWrapper::insertColumnRec_SYS(const TxnID& txnid,
 #ifdef PROFILE
 timer.start("allocRowId");
 #endif
-
-	newColStructList = colStructList;
-	newDctnryStructList = dctnryStructList;
-	std::vector<DBRootExtentTracker*>  dbRootExtentTrackers;
-   rc = colOp->allocRowId(txnid,
-      curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, newColStructList, newDctnryStructList, 
-	  dbRootExtentTrackers, false, false, 0);
-	
-	if ((rc == ERR_FILE_DISK_SPACE) && newExtent) 
-	{
-		for (i = 0; i < newColStructList.size(); i++)
-		{
-				info.oid = newColStructList[i].dataOid;
-				info.partitionNum = newColStructList[i].fColPartition;
-				info.segmentNum = newColStructList[i].fColSegment;
-				info.dbRoot = newColStructList[i].fColDbRoot;
-				if (newFile)
-					fileInfo.push_back (info);
-					
-				colExtentInfo.push_back (info);
-		}
-		int rc1 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
-		if ((rc1 == 0) &&  newFile)
-        {
-           rc1 = colOp->deleteFile(fileInfo[0].oid, fileInfo[0].dbRoot, fileInfo[0].partitionNum, fileInfo[0].segmentNum);
-		   if ( rc1 != NO_ERROR)
-				return rc;
-		   FileOp fileOp;
-		   for (i = 0; i < newDctnryStructList.size(); i++)
-		   {
-				if (newDctnryStructList[i].dctnryOid > 0)
-				{    
-					info.oid = newDctnryStructList[i].dctnryOid;
-					info.partitionNum = newDctnryStructList[i].fColPartition;
-					info.segmentNum = newDctnryStructList[i].fColSegment;
-					info.dbRoot = newDctnryStructList[i].fColDbRoot;
-					info.newFile = true;
-					fileInfo.push_back (info);
-					dictExtentInfo.push_back (info);
-				}
-			}
-			if (dictExtentInfo.size() > 0)
-			{
-				rc1 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
-				if ( rc1 != NO_ERROR)
-					return rc;
-				for (unsigned j = 0; j < fileInfo.size(); j++)
-				{
-					rc1 = fileOp.deleteFile(fileInfo[j].oid, fileInfo[j].dbRoot,
-                                             fileInfo[j].partitionNum, fileInfo[j].segmentNum);
-				}
-			}
-        }
+   rc = colOp->allocRowId(
+      curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, newCol, rowsLeft, newHwm, newFile, insertSelect);
+   if (newFile)
+   {
+     info.oid = newCol.dataFile.fid;
+     info.partitionNum = newCol.dataFile.fPartition;
+     info.segmentNum = newCol.dataFile.fSegment;
+     info.dbRoot = newCol.dataFile.fDbRoot;
+     fileInfo.push_back (info);
    }
+   //For testing
+   //rc = ERR_FILE_DISK_SPACE;
+   if (rc != NO_ERROR)
+   {
+         if (rc == ERR_FILE_DISK_SPACE)
+         {
+             //Remove the empty extent
+             int rc1 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
+             if ((rc1 == 0) &&  newFile)
+             {
+                 rc1 = colOp->deleteFile(fileInfo[0].oid, fileInfo[0].dbRoot, fileInfo[0].partitionNum, fileInfo[0].segmentNum);
+             }
+         }
+         return rc;
+   }
+#ifdef PROFILE
+timer.stop("allocRowId");
+#endif
+   colStructList[0].fColPartition = partitionNum;
+   colStructList[0].fColSegment = segmentNum;
+   colStructList[0].fColDbRoot = dbRoot;
 
    //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
-// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
    if ((partitionNum == 0) &&
        (segmentNum   == 0) &&
        ((totalRow-rowsLeft) > 0) &&
@@ -1359,11 +771,66 @@ timer.start("allocRowId");
            colOp->clearColumn(expandCol); // closes the file
        }
    }
+	
+	//if ( needExpand )
+	//	rc = flushDataFiles();
+   //Check if new dictionary file is needed.
+   if (newExtent)
+   {
+// DICTIONARY : to be updated with new OP with compression
+      FileOp fileOp;
+      //Create the dictionary files
+      for (unsigned i = 0; i < dctnryStructList.size(); i++)
+      {
+         if (dctnryStructList[i].dctnryOid > 0)
+         {
+            if (!(fileOp.exists (dctnryStructList[i].dctnryOid, newCol.dataFile.fDbRoot, newCol.dataFile.fPartition, newCol.dataFile.fSegment)))
+            {
+               rc = createDctnry(txnid, dctnryStructList[i].dctnryOid,
+                                 dctnryStructList[i].colWidth,
+                                 newCol.dataFile.fDbRoot, newCol.dataFile.fPartition,
+                                 newCol.dataFile.fSegment, dctnryStructList[i].fCompressionType);
+               info.oid = dctnryStructList[i].dctnryOid;
+               info.partitionNum = newCol.dataFile.fPartition;
+               info.segmentNum = newCol.dataFile.fSegment;
+               info.dbRoot = newCol.dataFile.fDbRoot;
+               info.newFile = true;
+               fileInfo.push_back (info);
+               dictExtentInfo.push_back (info);
+            }
+
+            if (rc != NO_ERROR)
+            {
+               int rc1 = 0;
+               int rc2 = 0;
+               if (dictExtentInfo.size() > 0)
+               {
+                  rc1 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
+               }
+               if (colExtentInfo.size() > 0)
+               {
+                  rc2 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
+               }
+               if (newFile && (rc1 == 0) && (rc2 == 0))
+               {
+                 for (unsigned i = 0; i < fileInfo.size(); i++)
+                 {
+                     rc1 = fileOp.deleteFile(fileInfo[i].oid, fileInfo[i].dbRoot,
+                                             fileInfo[i].partitionNum, fileInfo[i].segmentNum);
+                     if (rc1 != 0)
+                        cerr << " Error in removing data files " << endl;
+                  }
+               }
+               return rc;
+            }
+         }
+      }
+   }
 
    //Tokenize data if needed
    dictStr::iterator dctStr_iter;
    ColTupleList::iterator col_iter;
-   for (i = 0; i < colStructList.size(); i++)
+   for (unsigned i = 0; i < colStructList.size(); i++)
    {
       if (colStructList[i].tokenFlag)
       {
@@ -1419,10 +886,13 @@ timer.stop("tokenize");
 
          if (newExtent)
          {
-             rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
+             dctnryStructList[i].fColPartition = newCol.dataFile.fPartition;
+             dctnryStructList[i].fColSegment = newCol.dataFile.fSegment;
+             dctnryStructList[i].fColDbRoot = newCol.dataFile.fDbRoot;
+             rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
              //            dctnryStructList[i].treeOid, dctnryStructList[i].listOid,
-                           newDctnryStructList[i].fColDbRoot, newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
+                           dctnryStructList[i].fColDbRoot, dctnryStructList[i].fColPartition,
+                           dctnryStructList[i].fColSegment);
              if (rc !=NO_ERROR)
                  return rc;
 
@@ -1442,7 +912,7 @@ timer.start("tokenize");
                  memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
                  dctTuple.sigSize = dctStr_iter->length();
                  dctTuple.isNull = false;
-                 rc = tokenize(txnid, dctTuple, newDctnryStructList[i].fCompressionType);
+                 rc = tokenize(txnid, dctTuple, dctnryStructList[i].fCompressionType);
                  if (rc != NO_ERROR)
                  {
                      dctnry->closeDctnry();
@@ -1481,19 +951,37 @@ timer.stop("tokenize");
    }
    //cout << "rowid allocated is "  << lastRid << endl;
    //if a new extent is created, all the columns in this table should have their own new extent
+   //First column already processed
+   FILE* pFile = NULL;
 
    //@Bug 1701. Close the file
    m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
-   std::vector<BulkSetHWMArg> hwmVecNewext;
-   std::vector<BulkSetHWMArg> hwmVecOldext;
-   if (newExtent) //Save all hwms to set them later.
+   
+   if (newExtent)
    {
-	  BulkSetHWMArg aHwmEntryNew;
-	  BulkSetHWMArg aHwmEntryOld;
+      newColStructList = colStructList;
+      newColStructList[0].fColPartition = newCol.dataFile.fPartition;
+      newColStructList[0].fColSegment = newCol.dataFile.fSegment;
+      newColStructList[0].fColDbRoot = newCol.dataFile.fDbRoot;
       bool succFlag = false;
       unsigned colWidth = 0;
       int      curFbo = 0, curBio;
-      for (i=0; i < totalColumns; i++)
+	  //std::vector<BulkSetHWMArg> hwmVecNew;
+	  
+	  BulkSetHWMArg aHwmEntryNew;
+	  BulkSetHWMArg aHwmEntryOld;
+	  aHwmEntryNew.oid = newColStructList[0].dataOid;
+	  aHwmEntryNew.partNum = newCol.dataFile.fPartition;
+	  aHwmEntryNew.segNum = newCol.dataFile.fSegment;
+	  aHwmEntryNew.hwm = newHwm;
+	  hwmVecNew.push_back(aHwmEntryNew); 
+	  aHwmEntryOld.oid = colStructList[0].dataOid;
+	  aHwmEntryOld.partNum = partitionNum;
+	  aHwmEntryOld.segNum = segmentNum;
+	  aHwmEntryOld.hwm = hwm;
+	  hwmVecOld.push_back(aHwmEntryOld); 
+
+      for (unsigned i=1; i < totalColumns; i++)
       {
 		 Column         curColLocal;
 		 colOp->initColumn(curColLocal);
@@ -1504,8 +992,13 @@ timer.stop("tokenize");
             newColStructList[i].colType, newColStructList[i].dataOid,
             newColStructList[i].fCompressionType, dbRoot, partitionNum, segmentNum);
 
-         rc = BRMWrapper::getInstance()->getLastHWM_DBroot(
+         rc = BRMWrapper::getInstance()->getLastLocalHWM_int(
             curColLocal.dataFile.fid, dbRoot, partitionNum, segmentNum, oldHwm);
+
+         // set the old extent info
+         colStructList[i].fColPartition = partitionNum;
+         colStructList[i].fColSegment = segmentNum;
+         colStructList[i].fColDbRoot = dbRoot;
 
          info.oid = curColLocal.dataFile.fid;
          info.partitionNum = partitionNum;
@@ -1519,28 +1012,70 @@ timer.stop("tokenize");
          //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
          if (succFlag)
          {
-            if ((HWM)curFbo > oldHwm)
+            if (curFbo > oldHwm)
 			{
 				aHwmEntryOld.oid = colStructList[i].dataOid;
 				aHwmEntryOld.partNum = partitionNum;
 				aHwmEntryOld.segNum = segmentNum;
 				aHwmEntryOld.hwm = curFbo;
-				hwmVecOldext.push_back(aHwmEntryOld);
+				hwmVecOld.push_back(aHwmEntryOld); 
 			}
          }
          else
             return ERR_INVALID_PARAM;
+
+
+         BRM::LBID_t startLbid;
+		 int allocSize = 0;
+         rc = colOp->extendColumn(curColLocal, false, pFile,
+                                  dbRoot, partitionNum, segmentNum,
+                                  segFile, newHwm, startLbid, newFile, allocSize );
+         if (newFile)
+         {
+            info.oid = curColLocal.dataFile.fid;
+            info.partitionNum = partitionNum;
+            info.segmentNum = segmentNum;
+            info.dbRoot = dbRoot;
+            fileInfo.push_back(info);
+         }
+         //for testing
+         //rc = 1;
+         if (rc != NO_ERROR)
+         {
+            int rc3 = 0;
+            int rc4 = 0;
+            if (colExtentInfo.size() > 0)
+            {
+               rc3 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
+            }
+            if (dictExtentInfo.size() > 0)
+            {
+               rc4 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
+            }
+            if (newFile && (rc3 == 0) && (rc4 == 0))
+            {
+               for (unsigned i = 0; i < fileInfo.size(); i++)
+               {
+                  rc3 = colOp->deleteFile(fileInfo[i].oid, fileInfo[i].dbRoot,fileInfo[i].partitionNum, fileInfo[i].segmentNum);
+               }
+            }
+            return rc;
+         }
 
          colWidth = newColStructList[i].colWidth;
          succFlag = colOp->calculateRowId(lastRidNew, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
          if (succFlag)
          {
 			aHwmEntryNew.oid = newColStructList[i].dataOid;
-			aHwmEntryNew.partNum = newColStructList[i].fColPartition;
-			aHwmEntryNew.segNum = newColStructList[i].fColSegment;
+			aHwmEntryNew.partNum = newCol.dataFile.fPartition;
+			aHwmEntryNew.segNum = newCol.dataFile.fSegment;
 			aHwmEntryNew.hwm = curFbo;
-			hwmVecNewext.push_back(aHwmEntryNew); 
+			hwmVecNew.push_back(aHwmEntryNew); 
          }
+
+         newColStructList[i].fColPartition = newCol.dataFile.fPartition;
+         newColStructList[i].fColSegment = newCol.dataFile.fSegment;
+         newColStructList[i].fColDbRoot = newCol.dataFile.fDbRoot;
 		 m_colOp[op(curColLocal.compressionType)]->clearColumn(curColLocal);
       }
 
@@ -1566,538 +1101,25 @@ timer.stop("tokenize");
          firstPartTupleList.clear();
       }
    }
-
-//Mark extents invalid
-   vector<BRM::LBID_t> lbids;
-   bool successFlag = true;
-   unsigned width = 0;
-   BRM::LBID_t lbid;
-   int         curFbo = 0, curBio, lastFbo = -1;
-   if (totalRow-rowsLeft > 0)
+   else //old extent
    {
-      for (unsigned i = 0; i < colStructList.size(); i++)
-      {
-         colOp = m_colOp[op(colStructList[i].fCompressionType)];
-         width = colStructList[i].colWidth;
-         successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-         if (successFlag) {
-            if (curFbo != lastFbo) {
-               RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
-                   colStructList[i].dataOid, colStructList[i].fColPartition,
-                   colStructList[i].fColSegment, curFbo, lbid));
-               lbids.push_back((BRM::LBID_t)lbid);
-            }
-         }
-      }
-   }
-   lastRid = rowIdArray[totalRow-1];
-   for (unsigned i = 0; i < newColStructList.size(); i++)
-   {
-      colOp = m_colOp[op(newColStructList[i].fCompressionType)];
-      width = newColStructList[i].colWidth;
-      successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-      if (successFlag) 
-      {
-         if (curFbo != lastFbo) 
-         {
-             RETURN_ON_ERROR(AddLBIDtoList(txnid,
-                                           lbids,
-                                           newColStructList[i].dataOid,
-                                           newColStructList[i].fColPartition,
-                                           newColStructList[i].fColSegment,
-                                           curFbo));
-         }
-      }
-   }
-   //cout << "lbids size = " << lbids.size()<< endl;
-   if (lbids.size() > 0)
-       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
-
-   if (rc == NO_ERROR)
-   {
-      if (newExtent)
-      {
-         colValueList.clear();
-         rc = writeColumnRec(txnid, colStructList, colOldValueList, colValueList, rowIdArray, newColStructList, colNewValueList);
-      }
-      else
-      {
-         rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList, rowIdArray, newColStructList, colNewValueList);
-      }
-   }
-#ifdef PROFILE
-timer.stop("writeColumnRec");
-#endif
-//   for (ColTupleList::size_type  i = 0; i < totalRow; i++)
-//      ridList.push_back((RID) rowIdArray[i]);
-
-  // if (rc == NO_ERROR)
-   //   rc = flushDataFiles(NO_ERROR);
-
-	if ( !newExtent )
-	{
-		//flushVMCache();
-	  bool succFlag = false;
-      unsigned colWidth = 0;
-      int curFbo = 0, curBio;
-	  std::vector<BulkSetHWMArg> hwmVec;
-      for (unsigned i=0; i < totalColumns; i++)
-      {
-         //colOp = m_colOp[op(colStructList[i].fCompressionType)];
-		 //Set all columns hwm together
-		 BulkSetHWMArg aHwmEntry;
-         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(colStructList[i].dataOid, dbRoot, partitionNum, segmentNum, hwm));
-         colWidth = colStructList[i].colWidth;
-         succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-         //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
-         if (succFlag)
-         {
-            if ((HWM)curFbo > hwm)
-			{
-				aHwmEntry.oid = colStructList[i].dataOid;
-				aHwmEntry.partNum = partitionNum;
-				aHwmEntry.segNum = segmentNum;
-				aHwmEntry.hwm = curFbo;
-				hwmVec.push_back(aHwmEntry); 
-			}
-         }
-         else
-            return ERR_INVALID_PARAM;
-       }
-	   if (hwmVec.size() > 0 ) 
-	   {
-			std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-			RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVec, mergeCPDataArgs));		
-	   }
-	}
-	if (newExtent)
-	{
-#ifdef PROFILE
-timer.start("flushVMCache");
-#endif
-		std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecNewext, mergeCPDataArgs));
-		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecOldext, mergeCPDataArgs));
-      //flushVMCache();
-#ifdef PROFILE
-timer.stop("flushVMCache");
-#endif
-   }
-
-#ifdef PROFILE
-timer.finish();
-#endif
-   return rc;
-}
-
-int WriteEngineWrapper::insertColumnRec_Single(const TxnID& txnid,
-                                        ColStructList& colStructList,
-                                        ColValueList& colValueList,
-                                        DctnryStructList& dctnryStructList,
-                                        DictStrList& dictStrList)
-{
-   int            rc;
-   RID*           rowIdArray = NULL;
-   ColTupleList   curTupleList;
-   Column         curCol;
-   ColStruct      curColStruct;
-   ColValueList   colOldValueList;
-   ColValueList   colNewValueList;
-   ColStructList  newColStructList;
-   DctnryStructList newDctnryStructList;
-   HWM            hwm = 0;
-   HWM            newHwm = 0;
-   HWM            oldHwm = 0;
-   ColTupleList::size_type totalRow;
-   ColStructList::size_type totalColumns;
-   uint64_t rowsLeft = 0;
-   bool newExtent = false;
-   RIDList ridList;
-   ColumnOp* colOp = NULL;
-   uint i = 0;
-
-#ifdef PROFILE
- StopWatch timer;
-#endif
-   // debug information for testing
-   if (isDebug(DEBUG_2)) {
-      printf("\nIn wrapper insert\n");
-      printInputValue(colStructList, colValueList, ridList);
-   }
-   // end
-
-   //Convert data type and column width to write engine specific
-   for (i = 0; i < colStructList.size(); i++)
-      Convertor::convertColType(&colStructList[i]);
-
-   rc = checkValid(txnid, colStructList, colValueList, ridList);
-   if (rc != NO_ERROR)
-      return rc;
-
-   setTransId(txnid);
-
-   curTupleList = static_cast<ColTupleList>(colValueList[0]);
-   totalRow = curTupleList.size();
-   totalColumns = colStructList.size();
-   rowIdArray = new RID[totalRow];
-   // use scoped_array to ensure ptr deletion regardless of where we return
-   boost::scoped_array<RID> rowIdArrayPtr(rowIdArray);
-   memset(rowIdArray, 0, (sizeof(RID)*totalRow));
-
-   // allocate row id(s)
-   curColStruct = colStructList[0];
-   colOp = m_colOp[op(curColStruct.fCompressionType)];
-
-   colOp->initColumn(curCol);
-
-   //Get the correct segment, partition, column file
-   uint16_t dbRoot, segmentNum;
-   uint32_t partitionNum;
-   vector<ExtentInfo> colExtentInfo; //Save those empty extents in case of failure to rollback
-   vector<ExtentInfo> dictExtentInfo; //Save those empty extents in case of failure to rollback
-   vector<ExtentInfo> fileInfo;
-   ExtentInfo info;
-   //Don't search for empty space, always append to the end. May need to revisit this part
-   dbRoot = curColStruct.fColDbRoot;
-   RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(
-      curColStruct.dataOid, dbRoot, partitionNum, segmentNum, hwm));
-	
-    for (i = 0; i < colStructList.size(); i++)
-	{
+	for (unsigned i=1; i < totalColumns; i++)
+    {
 		colStructList[i].fColPartition = partitionNum;
-		colStructList[i].fColSegment = segmentNum;
-		colStructList[i].fColDbRoot = dbRoot;
+        colStructList[i].fColSegment = segmentNum;
+        colStructList[i].fColDbRoot = dbRoot;
 	}
-   oldHwm = hwm; //Save this info for rollback
-   //need to pass real dbRoot, partition, and segment to setColParam
-   colOp->setColParam(curCol, 0, curColStruct.colWidth, curColStruct.colDataType,
-       curColStruct.colType, curColStruct.dataOid, curColStruct.fCompressionType,
-       dbRoot, partitionNum, segmentNum);
-
-   string segFile;
-   rc = colOp->openColumnFile(curCol, segFile);
-   if (rc != NO_ERROR) {
-      return rc;
    }
 
-   //get hwm first
-   // @bug 286 : fix for bug 286 - correct the typo in getHWM
-   //RETURN_ON_ERROR(BRMWrapper::getInstance()->getHWM(curColStruct.dataOid, hwm));
-
-   //...Note that we are casting totalRow to int to be in sync with
-   //...allocRowId().  So we are assuming that totalRow
-   //...(curTupleList.size()) will fit into an int.  We arleady made
-   //...that assumption earlier in this method when we used totalRow
-   //...in the call to calloc() to allocate rowIdArray.
-   bool newFile;
-
+   // end of allocate row id
 #ifdef PROFILE
-timer.start("allocRowId");
+timer.start("markExtentsInvalid");
 #endif
-	newColStructList = colStructList;
-	newDctnryStructList = dctnryStructList;
-	std::vector<DBRootExtentTracker*>  dbRootExtentTrackers;
-   rc = colOp->allocRowId(txnid,
-      curCol, (uint64_t)totalRow, rowIdArray, hwm, newExtent, rowsLeft, newHwm, newFile, newColStructList, newDctnryStructList, 
-	  dbRootExtentTrackers, false, false, 0);
-	 
-	if ((rc == ERR_FILE_DISK_SPACE) && newExtent) 
-	{
-		for (i = 0; i < newColStructList.size(); i++)
-		{
-				info.oid = newColStructList[i].dataOid;
-				info.partitionNum = newColStructList[i].fColPartition;
-				info.segmentNum = newColStructList[i].fColSegment;
-				info.dbRoot = newColStructList[i].fColDbRoot;
-				if (newFile)
-					fileInfo.push_back (info);
-					
-				colExtentInfo.push_back (info);
-		}
-		int rc1 = BRMWrapper::getInstance()->deleteEmptyColExtents(colExtentInfo);
-		if ((rc1 == 0) &&  newFile)
-        {
-			FileOp fileOp;
-           rc1 = colOp->deleteFile(fileInfo[0].oid, fileInfo[0].dbRoot, fileInfo[0].partitionNum, fileInfo[0].segmentNum);
-		   if ( rc1 != NO_ERROR)
-				return rc;
-		   for (i = 0; i < newDctnryStructList.size(); i++)
-		   {
-				if (newDctnryStructList[i].dctnryOid > 0)
-				{    
-					info.oid = newDctnryStructList[i].dctnryOid;
-					info.partitionNum = newDctnryStructList[i].fColPartition;
-					info.segmentNum = newDctnryStructList[i].fColSegment;
-					info.dbRoot = newDctnryStructList[i].fColDbRoot;
-					info.newFile = true;
-					fileInfo.push_back (info);
-					dictExtentInfo.push_back (info);
-				}
-			}
-			if (dictExtentInfo.size() > 0)
-			{
-				rc1 = BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
-				if ( rc1 != NO_ERROR)
-					return rc;
-				for (unsigned j = 0; j < fileInfo.size(); j++)
-				{
-					rc1 = fileOp.deleteFile(fileInfo[j].oid, fileInfo[j].dbRoot,
-                                             fileInfo[j].partitionNum, fileInfo[j].segmentNum);
-				}
-			}
-        }
-   }
-   
-#ifdef PROFILE
-timer.stop("allocRowId");
-#endif
-
-   //..Expand initial abbreviated extent if any RID in 1st extent is > 256K
-// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
-   if ((partitionNum == 0) &&
-       (segmentNum   == 0) &&
-       ((totalRow-rowsLeft) > 0) &&
-       (rowIdArray[totalRow-rowsLeft-1] >= (RID)INITIAL_EXTENT_ROWS_TO_DISK))
-   {
-       for (unsigned k=1; k<colStructList.size(); k++)
-       {
-           Column expandCol;
-           colOp = m_colOp[op(colStructList[k].fCompressionType)];
-           colOp->setColParam(expandCol, 0,
-               colStructList[k].colWidth,
-               colStructList[k].colDataType,
-               colStructList[k].colType,
-               colStructList[k].dataOid,
-               colStructList[k].fCompressionType,
-               dbRoot,
-               partitionNum,
-               segmentNum);
-           rc = colOp->openColumnFile(expandCol, segFile);
-           if (rc == NO_ERROR)
-           {
-               if (colOp->abbreviatedExtent(expandCol.dataFile.pFile, colStructList[k].colWidth))
-               {
-                   rc = colOp->expandAbbrevExtent(expandCol);
-               }
-           }
-           if (rc != NO_ERROR)
-           {
-               if (newExtent)
-               {
-                   //Remove the empty extent added to the first column
-                   int rc1 = BRMWrapper::getInstance()->
-                                 deleteEmptyColExtents(colExtentInfo);
-                   if ((rc1 == 0) && newFile)
-                   {
-                       rc1 = colOp->deleteFile(fileInfo[0].oid,
-                                                fileInfo[0].dbRoot,
-                                                fileInfo[0].partitionNum,
-                                                fileInfo[0].segmentNum);
-                   }
-               }
-               colOp->clearColumn(expandCol); // closes the file
-               return rc;
-           }
-           colOp->clearColumn(expandCol); // closes the file
-       }
-   }
-	
-   //Tokenize data if needed
-   dictStr::iterator dctStr_iter;
-   ColTupleList::iterator col_iter;
-   for (unsigned i = 0; i < colStructList.size(); i++)
-   {
-      if (colStructList[i].tokenFlag)
-      {
-         dctStr_iter = dictStrList[i].begin();
-         col_iter = colValueList[i].begin();
-         Dctnry* dctnry = m_dctnry[op(dctnryStructList[i].fCompressionType)];
-
-         dctnryStructList[i].fColPartition = partitionNum;
-         dctnryStructList[i].fColSegment = segmentNum;
-         dctnryStructList[i].fColDbRoot = dbRoot;
-         rc = dctnry->openDctnry(dctnryStructList[i].dctnryOid,
-                     dctnryStructList[i].fColDbRoot,
-                     dctnryStructList[i].fColPartition,
-                     dctnryStructList[i].fColSegment);
-         if (rc !=NO_ERROR)
-             return rc;
-
-         for (uint32_t     rows = 0; rows < (totalRow - rowsLeft); rows++)
-         {
-             if (dctStr_iter->length() == 0)
-               {
-                   Token nullToken;
-                 col_iter->data = nullToken;
-               }
-             else
-               {
-#ifdef PROFILE
-timer.start("tokenize");
-#endif
-                 DctnryTuple dctTuple;
-                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-                 dctTuple.sigSize = dctStr_iter->length();
-                 dctTuple.isNull = false;
-                   rc = tokenize(txnid, dctTuple, dctnryStructList[i].fCompressionType);
-                 if (rc != NO_ERROR)
-                 {
-                     dctnry->closeDctnry();
-                     return rc;
-                 }
-#ifdef PROFILE
-timer.stop("tokenize");
-#endif
-                   col_iter->data = dctTuple.token;
-               }
-               dctStr_iter++;
-               col_iter++;
-
-         }
-         //close dictionary files
-         rc = dctnry->closeDctnry();
-         if (rc != NO_ERROR)
-             return rc;
-
-         if (newExtent)
-         {
-             rc = dctnry->openDctnry(newDctnryStructList[i].dctnryOid,
-                           newDctnryStructList[i].fColDbRoot,
-                           newDctnryStructList[i].fColPartition,
-                           newDctnryStructList[i].fColSegment);
-             if (rc !=NO_ERROR)
-                 return rc;
-
-             for (uint32_t     rows = 0; rows < rowsLeft; rows++)
-             {
-             if (dctStr_iter->length() == 0)
-               {
-                   Token nullToken;
-                 col_iter->data = nullToken;
-               }
-             else
-               {
-#ifdef PROFILE
-timer.start("tokenize");
-#endif
-                 DctnryTuple dctTuple;
-                 memcpy(dctTuple.sigValue, dctStr_iter->c_str(), dctStr_iter->length());
-                 dctTuple.sigSize = dctStr_iter->length();
-                 dctTuple.isNull = false;
-                 rc = tokenize(txnid, dctTuple, newDctnryStructList[i].fCompressionType);
-                 if (rc != NO_ERROR)
-                 {
-                     dctnry->closeDctnry();
-                     return rc;
-                 }
-#ifdef PROFILE
-timer.stop("tokenize");
-#endif
-                     col_iter->data = dctTuple.token;
-                 }
-                 dctStr_iter++;
-                 col_iter++;
-             }
-             //close dictionary files
-             rc = dctnry->closeDctnry();
-             if (rc != NO_ERROR)
-                 return rc;
-         }
-      }
-   }
-
-
-   //Update column info structure @Bug 1862 set hwm
-   //@Bug 2205 Check whether all rows go to the new extent
-   RID lastRid = 0;
-   RID lastRidNew = 0;
-   if (totalRow-rowsLeft > 0)
-   {
-     lastRid = rowIdArray[totalRow-rowsLeft-1];
-     lastRidNew = rowIdArray[totalRow-1];
-   }
-   else
-   {
-     lastRid = 0;
-     lastRidNew = rowIdArray[totalRow-1];
-   }
-   //cout << "rowid allocated is "  << lastRid << endl;
-   //if a new extent is created, all the columns in this table should have their own new extent
-
-   //@Bug 1701. Close the file
-   m_colOp[op(curCol.compressionType)]->clearColumn(curCol);
-   std::vector<BulkSetHWMArg> hwmVecNewext;
-   std::vector<BulkSetHWMArg> hwmVecOldext;
-   if (newExtent) //Save all hwms to set them later.
-   {
-	  BulkSetHWMArg aHwmEntryNew;
-	  BulkSetHWMArg aHwmEntryOld;
-      
-      bool succFlag = false;
-      unsigned colWidth = 0;
-      int      curFbo = 0, curBio;
-      for (i=0; i < totalColumns; i++)
-      {
-         colOp = m_colOp[op(newColStructList[i].fCompressionType)];
-
-         // @Bug 2714 need to set hwm for the old extent
-         colWidth = colStructList[i].colWidth;
-         succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-         //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
-         if (succFlag)
-         {
-            if ((HWM)curFbo > oldHwm)
-			{
-				aHwmEntryOld.oid = colStructList[i].dataOid;
-				aHwmEntryOld.partNum = partitionNum;
-				aHwmEntryOld.segNum = segmentNum;
-				aHwmEntryOld.hwm = curFbo;
-				hwmVecOldext.push_back(aHwmEntryOld);
-			}
-         }
-         else
-            return ERR_INVALID_PARAM;
-
-         colWidth = newColStructList[i].colWidth;
-         succFlag = colOp->calculateRowId(lastRidNew, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
-         if (succFlag)
-         {
-			aHwmEntryNew.oid = newColStructList[i].dataOid;
-			aHwmEntryNew.partNum = newColStructList[i].fColPartition;
-			aHwmEntryNew.segNum = newColStructList[i].fColSegment;
-			aHwmEntryNew.hwm = curFbo;
-			hwmVecNewext.push_back(aHwmEntryNew); 
-         }
-      }
-
-      //Prepare the valuelist for the new extent
-      ColTupleList colTupleList;
-      ColTupleList newColTupleList;
-      ColTupleList firstPartTupleList;
-      for (unsigned i=0; i < totalColumns; i++)
-      {
-         colTupleList = static_cast<ColTupleList>(colValueList[i]);
-         for (uint64_t j=rowsLeft; j > 0; j--)
-         {
-            newColTupleList.push_back(colTupleList[totalRow-j]);
-         }
-         colNewValueList.push_back(newColTupleList);
-         newColTupleList.clear();
-         //upate the oldvalue list for the old extent
-         for (uint64_t j=0; j < (totalRow-rowsLeft); j++)
-         {
-            firstPartTupleList.push_back(colTupleList[j]);
-         }
-         colOldValueList.push_back(firstPartTupleList);
-         firstPartTupleList.clear();
-      }
-   }
-
    //Mark extents invalid
    vector<BRM::LBID_t> lbids;
    bool successFlag = true;
    unsigned width = 0;
-   BRM::LBID_t lbid;
+   i64         lbid;
    int         curFbo = 0, curBio, lastFbo = -1;
    if (totalRow-rowsLeft > 0)
    {
@@ -2122,22 +1144,21 @@ timer.stop("tokenize");
       colOp = m_colOp[op(newColStructList[i].fCompressionType)];
       width = newColStructList[i].colWidth;
       successFlag = colOp->calculateRowId(lastRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-      if (successFlag) 
-      {
-         if (curFbo != lastFbo) 
-         {
-             RETURN_ON_ERROR(AddLBIDtoList(txnid,
-                                           lbids,
-                                           newColStructList[i].dataOid,
-                                           newColStructList[i].fColPartition,
-                                           newColStructList[i].fColSegment,
-                                           curFbo));
+      if (successFlag) {
+         if (curFbo != lastFbo) {
+            RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
+               newColStructList[i].dataOid, newColStructList[i].fColPartition, newColStructList[i].fColSegment, curFbo, lbid));
+
+            lbids.push_back((BRM::LBID_t)lbid);
          }
       }
    }
    //cout << "lbids size = " << lbids.size()<< endl;
-   if (lbids.size() > 0)
-       rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+   rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+#ifdef PROFILE
+timer.stop("markExtentsInvalid");
+#endif
+
 #ifdef PROFILE
 timer.start("writeColumnRec");
 #endif
@@ -2168,41 +1189,39 @@ timer.stop("writeColumnRec");
 	  bool succFlag = false;
       unsigned colWidth = 0;
       int curFbo = 0, curBio;
-	  std::vector<BulkSetHWMArg> hwmVec;
+	  BulkSetHWMArg aHwmEntryOld;
       for (unsigned i=0; i < totalColumns; i++)
       {
          //colOp = m_colOp[op(colStructList[i].fCompressionType)];
-		 //Set all columns hwm together
-		 BulkSetHWMArg aHwmEntry;
-         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLastHWM_DBroot(colStructList[i].dataOid, dbRoot, partitionNum, segmentNum, hwm));
+         RETURN_ON_ERROR(BRMWrapper::getInstance()->getLocalHWM_int(colStructList[i].dataOid, partitionNum, segmentNum, hwm));
          colWidth = colStructList[i].colWidth;
          succFlag = colOp->calculateRowId(lastRid, BYTE_PER_BLOCK/colWidth, colWidth, curFbo, curBio);
          //cout << "insertcolumnrec   oid:rid:fbo:hwm = " << colStructList[i].dataOid << ":" << lastRid << ":" << curFbo << ":" << hwm << endl;
          if (succFlag)
          {
-            if ((HWM)curFbo > hwm)
+            if (curFbo > hwm)
 			{
-				aHwmEntry.oid = colStructList[i].dataOid;
-				aHwmEntry.partNum = partitionNum;
-				aHwmEntry.segNum = segmentNum;
-				aHwmEntry.hwm = curFbo;
-				hwmVec.push_back(aHwmEntry); 
+				aHwmEntryOld.oid = colStructList[i].dataOid;
+				aHwmEntryOld.partNum = partitionNum;
+				aHwmEntryOld.segNum = segmentNum;
+				aHwmEntryOld.hwm = curFbo;
+				hwmVecOld.push_back(aHwmEntryOld);
 			}
          }
          else
             return ERR_INVALID_PARAM;
        }
-	   std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-	   RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVec, mergeCPDataArgs));
 	}
+	
+	//set hwm
+	std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
+	RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecNew, mergeCPDataArgs));
+	RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecOld, mergeCPDataArgs));
 	if (newExtent)
 	{
 #ifdef PROFILE
 timer.start("flushVMCache");
 #endif
-		std::vector<BRM::CPInfoMerge> mergeCPDataArgs;
-		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecNewext, mergeCPDataArgs));
-		RETURN_ON_ERROR(BRMWrapper::getInstance()->bulkSetHWMAndCP( hwmVecOldext, mergeCPDataArgs));
       //flushVMCache();
 #ifdef PROFILE
 timer.stop("flushVMCache");
@@ -2214,6 +1233,7 @@ timer.finish();
 #endif
    return rc;
 }
+
 
 /*@brief printInputValue - Print input value
 */
@@ -2316,7 +1336,7 @@ int WriteEngineWrapper::processVersionBuffer(FILE* pFile, const TxnID& txnid,
    int         rc = NO_ERROR;
    int         curFbo = 0, curBio, lastFbo = -1;
    bool        successFlag;
-   BRM::LBID_t lbid;
+   i64         lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
    vector<i32> fboList;
    LBIDRange   range;
@@ -2356,7 +1376,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
    int         rc = NO_ERROR;
    int         curFbo = 0, curBio, lastFbo = -1;
    bool        successFlag;
-   BRM::LBID_t lbid;
+   i64         lbid;
    BRM::VER_t  verId = (BRM::VER_t) txnid;
    LBIDRange   range;
    vector<i32>    fboList;
@@ -2388,63 +1408,6 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
    return rc;
 }
 
-	/**
-    * @brief Process versioning for batch insert - only version the hwm block.
-    */
- int WriteEngineWrapper::processBatchVersions(const TxnID& txnid, std::vector<Column> columns, std::vector<BRM::LBIDRange> &  rangeList)
- {
-	int rc = 0;
-	std::vector<DbFileOp*> fileOps;
-	//open the column files
-	for ( unsigned i = 0; i < columns.size(); i++)
-	{
-		ColumnOp* colOp = m_colOp[op(columns[i].compressionType)];
-		Column curCol;
-		// set params
-		colOp->initColumn(curCol);
-		ColType colType;
-		Convertor::convertColType(columns[i].colDataType, colType); 
-		colOp->setColParam(curCol, 0, columns[i].colWidth,
-        columns[i].colDataType, colType, columns[i].dataFile.oid,
-        columns[i].compressionType,
-        columns[i].dataFile.fDbRoot, columns[i].dataFile.fPartition, columns[i].dataFile.fSegment);	
-		string segFile;		
-		rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
-        if (rc != NO_ERROR)
-			break;
-		columns[i].dataFile.pFile = curCol.dataFile.pFile;
-		fileOps.push_back(colOp);
-	}
-	 
-	if ( rc == 0)
-	{
-		BRM::VER_t  verId = (BRM::VER_t) txnid;
-		rc = BRMWrapper::getInstance()->writeBatchVBs(verId, columns, rangeList, fileOps);
-	}
-	
-	//close files
-	for ( unsigned i = 0; i < columns.size(); i++)
-	{
-		ColumnOp* colOp = dynamic_cast<ColumnOp*> (fileOps[i]);
-		Column curCol;
-		// set params
-		colOp->initColumn(curCol);
-		ColType colType;
-		Convertor::convertColType(columns[i].colDataType, colType); 
-		colOp->setColParam(curCol, 0, columns[i].colWidth,
-        columns[i].colDataType, colType, columns[i].dataFile.oid,
-        columns[i].compressionType,
-        columns[i].dataFile.fDbRoot, columns[i].dataFile.fPartition, columns[i].dataFile.fSegment);	
-		curCol.dataFile.pFile = columns[i].dataFile.pFile;
-		colOp->clearColumn(curCol);
-	}
-	return rc;
- }
- 
- void WriteEngineWrapper::writeVBEnd(const TxnID& txnid, std::vector<BRM::LBIDRange> &  rangeList)
- {
-	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
- }
  int WriteEngineWrapper::updateColumnRec(const TxnID& txnid,
                                       vector<ColStructList>& colExtentsStruct,
                                       ColValueList& colValueList,
@@ -2510,13 +1473,6 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 //timer.stop("tokenize");
 #endif
                }
-			   else
-			   {
-					//if (dctnryStructList[i].dctnryOid == 2001)
-					//	std::cout << " got null token for string " << dctCol_iter->sigValue <<std::endl;
-			   }
-			   //if (dctnryStructList[i].dctnryOid == 2001)
-				//std::cout << " got token for string " << dctCol_iter->sigValue << " op:fbo = " << token.op <<":"<<token.fbo << std::endl;
                tokenList.push_back(token);
             }
          }
@@ -2547,10 +1503,10 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
       }
 */
       //Mark extents invalid
-	//if (colStructList[0].dataOid < 3000) {
       vector<BRM::LBID_t> lbids;
       bool successFlag = true;
       unsigned width = 0;
+      i64         lbid;
       int         curFbo = 0, curBio, lastFbo = -1;
       rid_iter = ridLists[extent].begin();
       i64 aRid = *rid_iter;
@@ -2562,16 +1518,15 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 
          width = colOp->getCorrectRowWidth(colStructList[j].colDataType, colStructList[j].colWidth);
          successFlag = colOp->calculateRowId(aRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-         if (successFlag) 
-         {
+         if (successFlag) {
             if (curFbo != lastFbo)
             {
-                RETURN_ON_ERROR(AddLBIDtoList(txnid,
-                                              lbids,
-                                              colStructList[j].dataOid,
-                                              colStructList[j].fColPartition,
-                                              colStructList[j].fColSegment,
-                                              curFbo));
+               //cout << "updateCol calling getBrmInfo for oid:partition:seg:curfbo = " << colStructList[j].dataOid << ":" << colStructList[j].fColPartition << ":" << colStructList[j].fColSegment << ":" <<curFbo << endl;
+               RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
+                  colStructList[j].dataOid, colStructList[j].fColPartition,
+                  colStructList[j].fColSegment, curFbo, lbid));
+                         //cout << "Mark extentinvalid for lbid = " << lbid << endl;
+               lbids.push_back((BRM::LBID_t)lbid);
             }
          }
       }
@@ -2581,7 +1536,7 @@ int WriteEngineWrapper::processVersionBuffers(FILE* pFile, const TxnID& txnid,
 //#endif
       if (lbids.size() > 0)
          rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
-	//}
+
       rc = writeColumnRec(txnid, colStructList, colValueList, colOldValueList,
                           ridLists[extent], true, ridLists[extent].size());
 
@@ -2599,49 +1554,43 @@ int WriteEngineWrapper::updateColumnRecs(const TxnID& txnid,
                                          ColValueList& colValueList,
                                          const RIDList& ridLists)
 {
-    //Mark extents invalid
-    //int rc = 0;
-    //if (colExtentsStruct[0].dataOid < 3000) 
-    //{
-    vector<BRM::LBID_t> lbids;
-    ColumnOp* colOp = NULL;
-    bool successFlag = true;
-    unsigned width = 0;\
-    int         curFbo = 0, curBio, lastFbo = -1; 
-    i64 aRid = ridLists[0];
-    int rc = 0;
+	
+	  //Mark extents invalid
+      vector<BRM::LBID_t> lbids;
+	  ColumnOp* colOp = NULL;
+      bool successFlag = true;
+      unsigned width = 0;
+      i64         lbid;
+      int         curFbo = 0, curBio, lastFbo = -1; 
+      i64 aRid = ridLists[0];
+	  int rc = 0;
+      for (unsigned j = 0; j< colExtentsStruct.size(); j++)
+      {
+         colOp = m_colOp[op(colExtentsStruct[j].fCompressionType)];
+         if (colExtentsStruct[j].tokenFlag)
+             continue;
 
-    for (unsigned j = 0; j< colExtentsStruct.size(); j++)
-    {
-        colOp = m_colOp[op(colExtentsStruct[j].fCompressionType)];
-        if (colExtentsStruct[j].tokenFlag)
-            continue;
-
-        width = colOp->getCorrectRowWidth(colExtentsStruct[j].colDataType, colExtentsStruct[j].colWidth);
-        successFlag = colOp->calculateRowId(aRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
-        if (successFlag)
-        {
+         width = colOp->getCorrectRowWidth(colExtentsStruct[j].colDataType, colExtentsStruct[j].colWidth);
+         successFlag = colOp->calculateRowId(aRid , BYTE_PER_BLOCK/width, width, curFbo, curBio);
+         if (successFlag) {
             if (curFbo != lastFbo)
             {
-                RETURN_ON_ERROR(AddLBIDtoList(txnid,
-                                              lbids,
-                                              colExtentsStruct[j].dataOid,
-                                              colExtentsStruct[j].fColPartition,
-                                              colExtentsStruct[j].fColSegment,
-                                              curFbo));
+               //cout << "updateCol calling getBrmInfo for oid:partition:seg:curfbo = " << colStructList[j].dataOid << ":" << colStructList[j].fColPartition << ":" << colStructList[j].fColSegment << ":" <<curFbo << endl;
+               RETURN_ON_ERROR(BRMWrapper::getInstance()->getBrmInfo(
+                  colExtentsStruct[j].dataOid, colExtentsStruct[j].fColPartition,
+                  colExtentsStruct[j].fColSegment, curFbo, lbid));
+                         //cout << "Mark extentinvalid for lbid = " << lbid << endl;
+               lbids.push_back((BRM::LBID_t)lbid);
             }
-        }
-    }
+         }
+      }
+	 
+	 if (lbids.size() > 0)
+         rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
+		 
+	rc = writeColumnRecords (txnid, colExtentsStruct, colValueList, ridLists);
 
-    if (lbids.size() > 0)
-    {
-        cout << "BRMWrapper::getInstance()->markExtentsInvalid(lbids); " << lbids.size() << " lbids" << endl;
-        rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
-    }
-    //}	 
-    rc = writeColumnRecords (txnid, colExtentsStruct, colValueList, ridLists);
-
-    return rc;
+   return rc;
 }
 
 int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
@@ -2688,10 +1637,8 @@ int WriteEngineWrapper::writeColumnRecords(const TxnID& txnid,
                                  curColStruct.colWidth, totalRow, ridLists, rangeList);
 
       if (rc != NO_ERROR) {
-		if (curColStruct.fCompressionType == 0)
-			fflush(curCol.dataFile.pFile);
-    	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-        break;
+    	 BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+         break;
       }
 
       switch (curColStruct.colType)
@@ -2778,8 +1725,7 @@ int WriteEngineWrapper::writeColumnRec(const TxnID& txnid,
                                        ColValueList& colOldValueList,
                                        RID* rowIdArray,
                                        const ColStructList& newColStructList,
-                                       const ColValueList& newColValueList,
-									   bool versioning)
+                                       const ColValueList& newColValueList)
 {
    bool           bExcp;
    int            rc = 0;
@@ -2842,18 +1788,13 @@ StopWatch timer;
 
             // handling versioning
 			vector<LBIDRange>   rangeList;
-			if (versioning)
-			{
-					rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+            rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
                                       curColStruct.colWidth, totalRow1, firstPart, rangeList);
-				if (rc != NO_ERROR) {
-					if (curColStruct.fCompressionType == 0)
-						fflush(curCol.dataFile.pFile);
-	
-					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-					break;
-				}
-            }
+			if (rc != NO_ERROR) {
+				fflush(curCol.dataFile.pFile);
+				BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+				break;
+			}
 
             //totalRow1 -= totalRow2;
             // have to init the size here
@@ -2912,8 +1853,7 @@ StopWatch timer;
                   bExcp = true;
                }
                if (bExcp) {
-				  if (versioning)
-						BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+            	  BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
                   return ERR_PARSING;
                }
 #ifdef PROFILE
@@ -2944,10 +1884,7 @@ timer.stop("writeRow ");
             curTupleList.clear();
 
             colOp->clearColumn(curCol);
-			
-			if (versioning)
-				BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-				
+			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
             if (valArray != NULL)
                free(valArray);
 
@@ -2978,17 +1915,12 @@ timer.stop("writeRow ");
 
          // handling versioning
 		 vector<LBIDRange>   rangeList;
-		 if (versioning)
-		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+         rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
                                    curColStruct.colWidth, totalRow2, secondPart, rangeList);
-			if (rc != NO_ERROR) {
-				if (curColStruct.fCompressionType == 0)
-					fflush(curCol.dataFile.pFile);
-				BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-				break;
-			}
-		 }
+         if (rc != NO_ERROR) {
+        	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+            break;
+         }
 
          //totalRow1 -= totalRow2;
          // have to init the size here
@@ -3047,8 +1979,7 @@ timer.stop("writeRow ");
                bExcp = true;
             }
             if (bExcp) {
-			   if (versioning)
-					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+               BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
                return ERR_PARSING;
             }
 #ifdef PROFILE
@@ -3078,9 +2009,7 @@ timer.stop("writeRow ");
          curTupleList.clear();
 
          colOp->clearColumn(curCol);
-		 if (versioning)
-			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-			
+		 BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          if (valArray != NULL)
             free(valArray);
 
@@ -3107,23 +2036,17 @@ timer.stop("writeRow ");
             curColStruct.fColPartition, curColStruct.fColSegment);
 
          rc = colOp->openColumnFile(curCol, segFile, IO_BUFF_SIZE);
-		  //cout << " Opened file oid " << curCol.dataFile.pFile << endl;
          if (rc != NO_ERROR)
             break;
 
          // handling versioning
 		 vector<LBIDRange>   rangeList;
-		 if (versioning)
-		 {
-			rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
+         rc = processVersionBuffer(curCol.dataFile.pFile, txnid, curColStruct,
                                    curColStruct.colWidth, totalRow1, rowIdArray, rangeList);
-				if (rc != NO_ERROR) {
-					if (curColStruct.fCompressionType == 0)
-						fflush(curCol.dataFile.pFile);
-					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
-				break;
-			}
-		}
+         if (rc != NO_ERROR) {
+        	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+            break;
+         }
 
          // have to init the size here
 //       nullArray = (bool*) malloc(sizeof(bool) * totalRow);
@@ -3181,8 +2104,7 @@ timer.stop("writeRow ");
                bExcp = true;
             }
             if (bExcp) {
-				if (versioning)
-					BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+            	BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
                 return ERR_PARSING;
             }
 #ifdef PROFILE
@@ -3210,11 +2132,9 @@ timer.stop("writeRow ");
 
          // clean
          curTupleList.clear();
-		//cout << " close file oid " << curCol.dataFile.pFile << endl;
+
          colOp->clearColumn(curCol);
-		 
-		 if (versioning)
-			BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
+		 BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          if (valArray != NULL)
             free(valArray);
 
@@ -3290,8 +2210,6 @@ StopWatch timer;
 //timer.stop("processVersionBuffers");
       // cout << " rc for processVersionBuffer is " << rc << endl;
       if (rc != NO_ERROR) {
-		if (curColStruct.fCompressionType == 0)
-			fflush(curCol.dataFile.pFile);
     	 BRMWrapper::getInstance()->writeVBEnd(txnid, rangeList);
          break;
       }
@@ -3401,7 +2319,6 @@ int WriteEngineWrapper::tokenize(const TxnID& txnid, DctnryTuple& dctnryTuple, i
 {
   int cop = op(ct);
   m_dctnry[cop]->setTransId(txnid);
-  //cout << "Tokenizing dctnryTuple.sigValue " << dctnryTuple.sigValue << endl;
   return m_dctnry[cop]->updateDctnry(dctnryTuple.sigValue, dctnryTuple.sigSize, dctnryTuple.token);
 }
 
@@ -3479,6 +2396,13 @@ int WriteEngineWrapper::convertRidToColumn (RID& rid, uint16_t& dbRoot, uint32_t
                                             uint16_t startDBRoot, unsigned dbrootCnt)
 {
     int rc = 0;
+    //RID filesPerColumnPartition = Config::getFilesPerColumnPartition();
+    //RID  extentsPerSegmentFile = Config::getExtentsPerSegmentFile();
+    //RID extentRows = BRMWrapper::getInstance()->getExtentRows();
+    //uint16_t startDBRoot;
+    //uint32_t partitionNum;
+    //rc = BRMWrapper::getInstance()->getStartExtent(columnOid, startDBRoot, partitionNum);
+    //unsigned dbrootCnt = Config::DBRootCount();
     partition = rid / (filesPerColumnPartition * extentsPerSegmentFile * extentRows);
 
     segment =(((rid % (filesPerColumnPartition * extentsPerSegmentFile * extentRows)) / extentRows)) % filesPerColumnPartition;
@@ -3495,23 +2419,25 @@ int WriteEngineWrapper::convertRidToColumn (RID& rid, uint16_t& dbRoot, uint32_t
     return rc;
 }
 
-/***********************************************************
- * DESCRIPTION:
- *    Clears table lock for the specified table lock ID.
- * PARAMETERS:
- *    lockID - table lock to be released
- *    errMsg - if error occurs, this is the return error message
- * RETURN:
- *    NO_ERROR if operation is successful
- ***********************************************************/
-int WriteEngineWrapper::clearTableLockOnly(
-    uint64_t     lockID,
-    std::string& errMsg)
+int WriteEngineWrapper::clearLockOnly(const OID& tableOid)
 {
-    bool bReleased;
-    
-    int rc = BRMWrapper::getInstance()->releaseTableLock( lockID,
-        bReleased, errMsg);
+    int        rc = 0;
+    u_int32_t  processID;
+    string     processName;
+    bool       lockStatus;
+    u_int32_t  sid;
+    rc = BRMWrapper::getInstance()->getTableLockInfo(tableOid, processID, processName, lockStatus, sid);
+    if (rc == 0)
+    {
+        if (lockStatus)
+        {
+            rc = BRMWrapper::getInstance()->setTableLock(tableOid, 0, processID, processName, false);
+        }
+        else
+        {
+            rc = 2;
+        }
+    }
 
     return rc;
 }
@@ -3523,31 +2449,30 @@ int WriteEngineWrapper::clearTableLockOnly(
  *    Also clears the table lock for the specified table OID.
  * PARAMETERS:
  *    tableOid - table OID to be rolled back
- *    lockID   - table lock corresponding to tableOid
  *    tableName - table name associated with tableOid
  *    applName - application that is driving this bulk rollback
+ *    rollbackOnly - requests just a rollback w/o clearing table lock
  *    debugConsole - enable debug logging to the console
  *    errorMsg - error message explaining any rollback failure
  * RETURN:
  *    NO_ERROR if rollback completed succesfully
+ *    ERR_TBL_TABLE_HAS_VALID_CPIMPORT_LOCK - cpimport has the table locked
+ *    ERR_TBL_TABLE_HAS_VALID_DML_DDL_LOCK  - DML/DDL has the table locked
+ *    ERR_TBL_TABLE_LOCK_NOT_FOUND          - table not locked
+ *    plus other BRM errors
  ***********************************************************/
-int WriteEngineWrapper::bulkRollback(OID   tableOid,
-                                     uint64_t lockID,
+int WriteEngineWrapper::bulkRollback(const OID& tableOid,
                                      const std::string& tableName,
                                      const std::string& applName,
+                                     bool rollbackOnly,
                                      bool debugConsole, string& errorMsg)
 {
     errorMsg.clear();
 
-    BulkRollbackMgr rollbackMgr(tableOid, lockID, tableName, applName);
+    BulkRollbackMgr rollbackMgr(tableOid, tableName, applName);
     if (debugConsole)
         rollbackMgr.setDebugConsole(true);
-
-    // We used to pass "false" to not keep (delete) the metafiles at the end of
-    // the rollback.  But after the transition to sharedNothing, we pass "true"
-    // to initially keep these files.  The metafiles are deleted later, only
-    // after all the distributed bulk rollbacks are successfully completed.
-    int rc = rollbackMgr.rollback( true );
+    int rc = rollbackMgr.rollback(rollbackOnly, false);
     if (rc != NO_ERROR)
         errorMsg = rollbackMgr.getErrorMsg();
 
@@ -3562,113 +2487,7 @@ int WriteEngineWrapper::rollbackTran(const TxnID& txnid, int sessionId)
 { 
 	//Remove the unwanted tmp files and recover compressed chunks.
 	string prefix;
-
-    // BUG 4312
-    RemoveTxnFromLBIDMap(txnid);
-
-    config::Config *config = config::Config::makeConfig();
-	prefix = config->getConfig("SystemConfig", "DBRMRoot");
-	if (prefix.length() == 0) {
-		cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
-		return -1;
-	}
-	
-	uint64_t pos =  prefix.find_last_of ("/") ;
-	std::string aDMLLogFileName;
-	if (pos != string::npos)
-	{
-		aDMLLogFileName = prefix.substr(0, pos+1); //Get the file path
-	}
-	else
-	{
-		cerr << "Cannot find the dbrm directory for the DML log file";
-		return -1;
-
-	}
-	std::ostringstream oss;
-	oss << txnid;
-	aDMLLogFileName += "DMLLog_" + oss.str();
-	
-	struct stat stFileInfo; 
-	int intStat = stat(aDMLLogFileName.c_str(),&stFileInfo); 
-	if ( intStat == 0 ) //File exists
-	{
-		std::ifstream	       aDMLLogFile; 
-		aDMLLogFile.open(aDMLLogFileName.c_str(), ios::in);
-
-		if (aDMLLogFile) //need recover
-		{
-			std::string backUpFileType;
-			std::string filename;
-			int64_t size;
-			int64_t offset;
-			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
-			{
-				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
-				if (backUpFileType.compare("tmp") == 0 )
-				{
-					//remove the tmp file
-					filename += ".tmp";
-					//cout << " File removed: " << filename << endl;
-					remove(filename.c_str());
-				}
-				else
-				{
-					//copy back to the data file
-					std::string backFileName(filename);
-					if (backUpFileType.compare("chk") == 0 )
-						backFileName += ".chk";
-					else
-						backFileName += ".hdr";
-						
-					FILE * sourceFile = fopen(backFileName.c_str(), "rb");
-					FILE * targetFile = fopen(filename.c_str(), "r+b");
-					size_t byteRead;
-					unsigned char* readBuf = new unsigned char[size];
-					boost::scoped_array<unsigned char> readBufPtr( readBuf );
-					if( sourceFile != NULL ) {
-#ifdef _MSC_VER
-						int rc = _fseeki64( sourceFile, offset, 0 );
-#else
-						int rc = fseeko( sourceFile, offset, 0 );
-#endif
-						if (rc)
-							return ERR_FILE_SEEK;
-						byteRead = fread( readBuf, 1, size, sourceFile );
-						if( (int) byteRead != size )
-							return ERR_FILE_READ;
-					}
-					else
-						return ERR_FILE_NULL;
-					size_t byteWrite;
-
-					if( targetFile != NULL ) {
-						byteWrite = fwrite( readBuf, 1, size, targetFile );
-					if( (int) byteWrite != size )
-						return ERR_FILE_WRITE;
-					}
-					else
-						return ERR_FILE_NULL;
-					fclose(targetFile);
-					fclose(sourceFile);
-					remove(backFileName.c_str());
-				}
-			}
-		}
-	}
-	return BRMWrapper::getInstance()->rollBack(txnid, sessionId); 
-	
-}
-
-int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
-{ 
-	//Remove the unwanted tmp files and recover compressed chunks.
-	string prefix;
-
-    // BUG 4312
-    RemoveTxnFromLBIDMap(txnid);
-
-    config::Config *config = config::Config::makeConfig();
+	config::Config *config = config::Config::makeConfig();
 	prefix = config->getConfig("SystemConfig", "DBRMRoot");
 	if (prefix.length() == 0) {
 		cerr << "Need a valid DBRMRoot entry in Calpont configuation file";
@@ -3708,7 +2527,6 @@ int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 			int64_t offset;
 			while (aDMLLogFile >> backUpFileType >> filename >> size >> offset)
 			{
-
 				//cout << "Found: " <<  backUpFileType << " name " << filename << "size: " << size << " offset: " << offset << endl;
 				std::ostringstream oss;
 				oss << "RollbackTran found " <<  backUpFileType << " name " << filename << " size: " << size << " offset: " << offset;
@@ -3723,7 +2541,7 @@ int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 					remove(filename.c_str());
 					logging::Message::Args args1;
 					args1.add(filename);
-					args1.add(" is removed.");
+					args1.add(" is ewmoved.");
 					SimpleSysLog::instance()->logMsg(args1, logging::LOG_TYPE_INFO, logging::M0007);	
 				}
 				else
@@ -3777,12 +2595,12 @@ int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 						byteWrite = fwrite( readBuf, 1, size, targetFile );
 						if( (int) byteWrite != size )
 						{
-							logging::Message::Args arg3;
-							arg3.add("Rollback cannot copy to file ");
-							arg3.add(filename);
-							arg3.add( "from file ");
-							arg3.add(backFileName);
-							SimpleSysLog::instance()->logMsg(arg3, logging::LOG_TYPE_ERROR, logging::M0007);	
+							logging::Message::Args args3;
+							args3.add("Rollback cannot copy to file ");
+							args3.add(filename);
+							args3.add( "from file ");
+							args3.add(backFileName);
+							SimpleSysLog::instance()->logMsg(args3, logging::LOG_TYPE_ERROR, logging::M0007);	
 							
 							return ERR_FILE_WRITE;
 						}
@@ -3810,25 +2628,17 @@ int WriteEngineWrapper::rollbackBlocks(const TxnID& txnid, int sessionId)
 				}
 			}
 		}
-		remove (aDMLLogFileName.c_str());	
+		remove (aDMLLogFileName.c_str());
 	}
-	
-	return BRMWrapper::getInstance()->rollBackBlocks(txnid, sessionId); 
+		
+	return BRMWrapper::getInstance()->rollBack(txnid, sessionId); 
 	
 }
 
-int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
-{ 
-    // BUG 4312
-    RemoveTxnFromLBIDMap(txnid);
-
-    return BRMWrapper::getInstance()->rollBackVersion(txnid, sessionId); 
-}
-
-int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long nextVal, const uint32_t sessionID)
+int WriteEngineWrapper::updateNextValue(const AutoIncrementValue_t & oidValueMap, const uint32_t sessionID)
 {
 	int rc = NO_ERROR;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	RIDList ridList;
 	ColValueList colValueList;
 	WriteEngine::ColTupleList colTuples;
@@ -3843,41 +2653,45 @@ int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long ne
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	CalpontSystemCatalog::ROPair ropair;
-	
+	AutoIncrementValue_t::const_iterator iter = oidValueMap.begin();
 	try {
-		ropair = systemCatalogPtr->nextAutoIncrRid(columnoid);
+		while ( iter != oidValueMap.end() )
+		{
+			//cout << "WE got table oid " << (*iter).first << endl;
+			ropair = systemCatalogPtr->nextAutoIncrRid((*iter).first);
+			ridList.push_back(ropair.rid);
+			colTuple.data = (*iter).second;
+			colTuples.push_back(colTuple);
+			iter++;	
+		}
 	}
 	catch (...)
 	{
 		rc = ERR_AUTOINC_RID;
 	}
+	
 	if (rc != NO_ERROR)
 		return rc;
 		
-	ridList.push_back(ropair.rid);
-	colTuple.data = nextVal;
-	colTuples.push_back(colTuple);		
 	colValueList.push_back(colTuples);
 	TxnID txnid;
 	rc = writeColumnRecords(txnid, colStructList, colValueList, ridList, false);
 	if (rc != NO_ERROR)
 		return rc;
-		
 	//flush PrimProc cache
-	vector<LBID_t> blockList;
+	BRM::BlockList_t blockList;
 	execplan::CalpontSystemCatalog::SCN verID = 0;
 	BRM::LBIDRange_v lbidRanges;
 	rc = BRMWrapper::getInstance()->lookupLbidRanges(OID_SYSCOLUMN_NEXTVALUE,
                                                      lbidRanges);
 	if (rc != NO_ERROR)
 		return rc;
-		
 	LBIDRange_v::iterator it;
 	for (it = lbidRanges.begin(); it != lbidRanges.end(); it++)
 	{
 		for (LBID_t  lbid = it->start; lbid < (it->start + it->size); lbid++)
 		{
-			blockList.push_back(lbid);
+			blockList.push_back(BRM::LVP_t(lbid, verID));
 		}
 	}
 	rc = cacheutils::flushPrimProcAllverBlocks (blockList);
@@ -3895,10 +2709,8 @@ int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long ne
  * RETURN:
  *    none
  ***********************************************************/
-int WriteEngineWrapper::flushDataFiles(int rc, const TxnID txnId, std::map<FID,FID> & columnOids)
+int WriteEngineWrapper::flushDataFiles(int rc, std::map<FID,FID> & columnOids)
 {
-   RemoveTxnFromLBIDMap(txnId);
-
    for (int i = 0; i < TOTAL_COMPRESS_OP; i++)
    {
       int rc1 = m_colOp[i]->flushFile(rc, columnOids);
@@ -3911,134 +2723,6 @@ int WriteEngineWrapper::flushDataFiles(int rc, const TxnID txnId, std::map<FID,F
    }
 
    return rc;
-}
-
-/***********************************************************
- * DESCRIPTION:
- *    Add an lbid to a list of lbids for sending to markExtentsInvalid.
- *    However, rather than storing each lbid, store only unique first
- *    lbids. This is an optimization to prevent invalidating the same
- *    extents over and over.
- * PARAMETERS:
- *    txnid - the lbid list is per txn. We use this to keep transactions
- *            seperated.
- *    lbids - the current list of lbids. We add to this list
- *            if the discovered lbid is in a new extent.
- *   These next are needed for dbrm to get the lbid
- *    oid       -the table oid.
- *    colPartition - the table column partition
- *    segment   - table segment
- *    fbo       - file block offset
- * RETURN: 0 => OK. -1 => error
- ***********************************************************/
-int WriteEngineWrapper::AddLBIDtoList(const TxnID     txnid,
-                                      vector<BRM::LBID_t>& lbids,
-                                      const OID       oid,
-                                      const u_int32_t colPartition,
-                                      const u_int16_t segment,
-                                      const int       fbo)
-{
-    int rtn = 0;
-
-    BRM::LBID_t     startingLBID;
-    SP_TxnLBIDRec_t spTxnLBIDRec;
-    std::tr1::unordered_map<TxnID, SP_TxnLBIDRec_t>::iterator mapIter;
-
-    // Find the set of extent starting LBIDs for this transaction. If not found, then create it.
-    mapIter = m_txnLBIDMap.find(txnid);
-    if (mapIter == m_txnLBIDMap.end())
-    {
-        // This is a new transaction.
-        SP_TxnLBIDRec_t  sptemp(new TxnLBIDRec);
-        spTxnLBIDRec = sptemp;
-        m_txnLBIDMap[txnid] = spTxnLBIDRec;
-//        cout << "New transaction entry " << txnid << " transaction count " << m_txnLBIDMap.size() << endl;
-    }
-    else
-    {
-        spTxnLBIDRec = (*mapIter).second;
-    }
-    
-    // Get the extent starting lbid given all these values (startingLBID is an out parameter).
-    rtn = BRMWrapper::getInstance()->getStartLbid(oid, colPartition, segment, fbo, startingLBID);
-    if (rtn != 0)
-        return -1;
-
-    if (spTxnLBIDRec->m_LBIDMap.find(startingLBID) == spTxnLBIDRec->m_LBIDMap.end())
-    {
-        // Not found in the map. This must be a new extent. Add it to the list.
-//        cout << "Adding lbid " << startingLBID << " to txn " << txnid << endl;
-        spTxnLBIDRec->AddLBID(startingLBID);
-        lbids.push_back((BRM::LBID_t)startingLBID);
-    }
-    else
-    {
-        ++spTxnLBIDRec->m_squashedLbids;
-    }
-
-    // If the starting LBID list has grown to more than 2000, truncate.
-    // This is the purpose of the seqnum. If spTxnLBIDRec->m_lastSeqnum
-    // is divisible by 1000 and size() > 1000, get rid of everything older
-    // than the last 1000 entries. This is to save memory in large
-    // transactions. We assume older extents are unlikely to be hit again.
-    if (spTxnLBIDRec->m_lastSeqnum % 1000 == 0
-     && spTxnLBIDRec->m_LBIDMap.size() > 1000)
-    {
-//        cout << "Trimming the LBID list for " << txnid << ". LBID count is " << spTxnLBIDRec->m_LBIDMap.size() << endl;
-        uint32_t firstDrop = spTxnLBIDRec->m_lastSeqnum - 1000;
-        std::tr1::unordered_map<BRM::LBID_t, uint32_t>::iterator iter;
-        for (iter = spTxnLBIDRec->m_LBIDMap.begin(); iter != spTxnLBIDRec->m_LBIDMap.end();)
-        {
-            if ((*iter).second < firstDrop)
-            {
-                 iter = spTxnLBIDRec->m_LBIDMap.erase(iter);
-            }
-            else
-            {
-                ++iter;
-            }
-        }
-//        cout << "LBID count is now" << spTxnLBIDRec->m_LBIDMap.size() << endl;
-    }
-
-    return rtn;
-}
-
-
-/***********************************************************
- * DESCRIPTION:
- *    Remove a transaction LBID list from the LBID map
- *    Called when a transaction ends, either commit or rollback
- * PARAMETERS:
- *    txnid - the transaction to remove.
- * RETURN:
- *    0 => success or not found, -1 => error
- ***********************************************************/
-int WriteEngineWrapper::RemoveTxnFromLBIDMap(const TxnID txnid)
-{
-    int rtn = 0;
-    std::tr1::unordered_map<TxnID, SP_TxnLBIDRec_t>::iterator mapIter;
-
-    // Find the set of extent starting LBIDs for this transaction. If not found, then create it.
-    try
-    {
-        mapIter = m_txnLBIDMap.find(txnid);
-        if (mapIter != m_txnLBIDMap.end())
-        {
-            SP_TxnLBIDRec_t spTxnLBIDRec = (*mapIter).second;
-            // Debug
-//            cout << "Remove transaction entry " << txnid << " transaction count " << m_txnLBIDMap.size() << endl;
-//            cout << "    count = " << spTxnLBIDRec->m_LBIDMap.size() << 
-//                    ", lastSeqnum = " <<  spTxnLBIDRec->m_lastSeqnum << 
-//                    ", squashed lbids = " << spTxnLBIDRec->m_squashedLbids << endl;
-            m_txnLBIDMap.erase(txnid);   // spTxnLBIDRec is auto-destroyed
-        }
-    }
-    catch(...)
-    {
-        rtn = -1;
-    }
-    return rtn;
 }
 
 

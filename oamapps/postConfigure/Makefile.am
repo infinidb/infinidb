@@ -5,17 +5,19 @@ AM_CPPFLAGS = $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags) -lreadline -lncurses
-bin_PROGRAMS = postConfigure installer patchInstaller
+bin_PROGRAMS = postConfigure installer patchInstaller queryStats
 postConfigure_SOURCES = postConfigure.cpp helpers.cpp
-postConfigure_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-postConfigure_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+postConfigure_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+postConfigure_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ -lreadline -lncurses $(AM_LDFLAGS)
 installer_SOURCES = installer.cpp helpers.cpp
-installer_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-installer_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+installer_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+installer_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ $(AM_LDFLAGS)
 patchInstaller_SOURCES = patchInstaller.cpp
-patchInstaller_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-patchInstaller_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
-
+patchInstaller_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+patchInstaller_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ $(AM_LDFLAGS)
+queryStats_SOURCES = queryStats.cpp
+queryStats_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+queryStats_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ -lreadline -lncurses $(AM_LDFLAGS)
 
 test:
 

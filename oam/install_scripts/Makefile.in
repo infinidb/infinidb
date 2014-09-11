@@ -206,8 +206,7 @@ bin_SCRIPTS = post-install pre-uninstall \
 calpontLogRotate transactionLog transactionLogArchiver.sh \
 startupTests.sh upgrade-infinidb.sh \
 infinidb install-infinidb.sh calpontAlias run.sh \
-post-mysql-install post-mysqld-install os_check.sh \
-calpontSyslog calpontSyslog-ng syslogSetup.sh infinidb.def
+post-mysql-install post-mysqld-install os_check.sh
 
 dist_local_DATA = module
 all: all-am

@@ -12,20 +12,20 @@ Group: Applications
 License: GPL
 BuildRoot: %{_tmppath}/%{name}-%{release}-buildroot
 %ifarch x86_64
-Provides: libconfigcpp.so()(64bit), libddlpackage.so()(64bit), libddlpackageproc.so()(64bit), libdmlpackage.so()(64bit), libdmlpackageproc.so()(64bit), libexecplan.so()(64bit), libloggingcpp.so()(64bit), libmessageqcpp.so()(64bit), liboamcpp.so()(64bit), libsnmpmanager.so()(64bit), libthreadpool.so()(64bit), libwriteengine.so()(64bit), libbrm.so()(64bit), librwlock.so()(64bit), libfuncexp.so()(64bit), libjoblist.so()(64bit), libdataconvert.so()(64bit), libsm.so()(64bit), libjoiner.so()(64bit), librowgroup.so()(64bit), libcacheutils.so()(64bit), libreplaytxnlog.so()(64bit), libmulticast.so()(64bit), libcommon.so()(64bit), libboost_idb.so()(64bit), libwriteengineclient.so()(64bit), libddlcleanuputil.so()(64bit) libmysqlcl_idb.so()(64bit), libbatchloader.so()(64bit), libwriteengineredistribute.so()(64bit), libquerystats.so()(64bit)
+Provides: libconfigcpp.so()(64bit), libddlpackage.so()(64bit), libddlpackageproc.so()(64bit), libdmlpackage.so()(64bit), libdmlpackageproc.so()(64bit), libexecplan.so()(64bit), libloggingcpp.so()(64bit), libmessageqcpp.so()(64bit), liboamcpp.so()(64bit), libsnmpmanager.so()(64bit), libthreadpool.so()(64bit), libwriteengine.so()(64bit), libbrm.so()(64bit), librwlock.so()(64bit), libfuncexp.so()(64bit), libjoblist.so()(64bit), libdm.so()(64bit), libdataconvert.so()(64bit), libsm.so()(64bit), libjoiner.so()(64bit), librowgroup.so()(64bit), libcacheutils.so()(64bit), libreplaytxnlog.so()(64bit), libmulticast.so()(64bit), libcommon.so()(64bit), libboost_idb.so()(64bit)
 %else
-Provides: libconfigcpp.so, libddlpackage.so, libddlpackageproc.so, libdmlpackage.so, libdmlpackageproc.so, libexecplan.so, libloggingcpp.so, libmessageqcpp.so, liboamcpp.so, libsnmpmanager.so, libthreadpool.so, libwriteengine.so, libbrm.so, librwlock.so, libfuncexp.so, libjoblist.so, libdataconvert.so, libsm.so, libjoiner.so, librowgroup.so, libcacheutils.so, libreplaytxnlog.so, libmulticast.so, libcommon.so, libboost_idb.so, libddlcleanuputil.so, libwriteengineclient.so libmysqlcl_idb.so, libwriteengineredistribute.so, libquerystats.so
+Provides: libconfigcpp.so, libddlpackage.so, libddlpackageproc.so, libdmlpackage.so, libdmlpackageproc.so, libexecplan.so, libloggingcpp.so, libmessageqcpp.so, liboamcpp.so, libsnmpmanager.so, libthreadpool.so, libwriteengine.so, libbrm.so, librwlock.so, libfuncexp.so, libjoblist.so, libdm.so, libdataconvert.so, libsm.so, libjoiner.so, librowgroup.so, libcacheutils.so, libreplaytxnlog.so, libmulticast.so, libcommon.so, libboost_idb.so
 %endif
 
 %description
-Copyright (c) 2012 Calpont Corp., all rights reserved
+Copyright (c) 2011 Calpont Corp., all rights reserved
 Calpont InfiniDB community binary files
 @@BUILDINFO@@
 
 %package mysql
 Summary: Calpont InfiniDB community software MySQL connector
 Group: Applications
-Requires: calpont = %{version}, calpont-mysqld >= 3.5
+Requires: calpont = %{version}, calpont-mysqld >= 1.1
 %ifarch x86_64
 Provides: libcalmysql.so()(64bit)
 %else
@@ -68,8 +68,6 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/DDLProc
 /usr/local/Calpont/bin/ExeMgr
 /usr/local/Calpont/bin/DMLProc
-/usr/local/Calpont/bin/WriteEngineServer
-/usr/local/Calpont/bin/cpimport
 /usr/local/Calpont/bin/post-install
 /usr/local/Calpont/bin/post-mysql-install
 /usr/local/Calpont/bin/post-mysqld-install
@@ -84,16 +82,13 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/run.sh
 /usr/local/Calpont/bin/upgrade-infinidb.sh
 /usr/local/Calpont/bin/os_check.sh
-/usr/local/Calpont/bin/calpontSyslog 
-/usr/local/Calpont/bin/calpontSyslog-ng 
-/usr/local/Calpont/bin/syslogSetup.sh
 # Tools...
 /usr/local/Calpont/bin/dbbuilder
 /usr/local/Calpont/bin/dumpcol
 /usr/local/Calpont/bin/oid2file
 /usr/local/Calpont/bin/editem
 /usr/local/Calpont/bin/evalcol
-/usr/local/Calpont/bin/cpimport.bin
+/usr/local/Calpont/bin/cpimport
 /usr/local/Calpont/bin/load_brm
 /usr/local/Calpont/bin/save_brm
 /usr/local/Calpont/bin/dbrmctl
@@ -120,8 +115,6 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/bin/ddlcleanup
 /usr/local/Calpont/bin/idbmeminfo
 /usr/local/Calpont/bin/print_journal
-/usr/local/Calpont/bin/infinidb.def
-/usr/local/Calpont/bin/redistributeDB
 #
 %config /usr/local/Calpont/etc/Calpont.xml
 %config /usr/local/Calpont/etc/ConsoleCmds.xml
@@ -150,22 +143,16 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/lib/libsnmpmanager.so.1.0.0
 /usr/local/Calpont/lib/libthreadpool.so.1.0.0
 /usr/local/Calpont/lib/libwriteengine.so.1.0.0
-/usr/local/Calpont/lib/libwriteengineclient.so.1.0.0
 /usr/local/Calpont/lib/libsm.so.1.0.0
 /usr/local/Calpont/lib/libbrm.so.1.0.0
 /usr/local/Calpont/lib/librwlock.so.1.0.0
+/usr/local/Calpont/lib/libdm.so.1.0.0
 /usr/local/Calpont/lib/libdataconvert.so.1.0.0
 /usr/local/Calpont/lib/librowgroup.so.1.0.0
 /usr/local/Calpont/lib/libcacheutils.so.1.0.0
 /usr/local/Calpont/lib/libmulticast.so.1.0.0
 /usr/local/Calpont/lib/libcommon.so.1.0.0
 /usr/local/Calpont/lib/libboost_idb.so.1.0.0
-/usr/local/Calpont/lib/libddlcleanuputil.so.1.0.0
-/usr/local/Calpont/lib/libmysqlcl_idb.so.1.0.0
-/usr/local/Calpont/lib/libbatchloader.so.1.0.0
-/usr/local/Calpont/lib/libwriteengineredistribute.so.1.0.0
-/usr/local/Calpont/lib/libquerystats.so.1.0.0
-/usr/local/Calpont/lib/libjemalloc.so.3.3.0
 #
 #
 /usr/local/Calpont/post/functions
@@ -301,12 +288,8 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 /usr/local/Calpont/mysql/syscatalog_mysql.sql
 /usr/local/Calpont/mysql/dumpcat_mysql.sql
 /usr/local/Calpont/mysql/dumpcat.pl
-/usr/local/Calpont/mysql/calsetuserpriority.sql
-/usr/local/Calpont/mysql/calremoveuserpriority.sql
-/usr/local/Calpont/mysql/calshowprocesslist.sql
 
 %config /usr/local/Calpont/mysql/my.cnf
-
 
 # Scriptlets
 # for an install, pre & post run with $1 set to 1
@@ -316,7 +299,7 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/%{name}-%{version}-%{release}
 %post
 rpmmode=install
 if  [ "$1" -eq "$1" 2> /dev/null ]; then
-	if [ $1 -ne 1 ]; then
+    if [ $1 -ne 1 ]; then
 		rpmmode=upgrade
 	fi
 fi
@@ -333,7 +316,7 @@ echo "Calpont RPM install completed"
 %post mysql
 rpmmode=install
 if  [ "$1" -eq "$1" 2> /dev/null ]; then
-	if [ $1 -ne 1 ]; then
+    if [ $1 -ne 1 ]; then
 		rpmmode=upgrade
 	fi
 fi
@@ -347,7 +330,7 @@ echo "Calpont RPM install completed"
 %post mysqld
 rpmmode=install
 if  [ "$1" -eq "$1" 2> /dev/null ]; then
-	if [ $1 -ne 1 ]; then
+    if [ $1 -ne 1 ]; then
 		rpmmode=upgrade
 	fi
 fi
@@ -361,7 +344,7 @@ echo "Calpont RPM install completed"
 %preun
 rpmmode=upgrade
 if  [ "$1" -eq "$1" 2> /dev/null ]; then
-	if [ $1 -ne 1 ]; then
+    if [ $1 -ne 1 ]; then
 		rpmmode=erase
 	fi
 else
@@ -378,7 +361,7 @@ exit 0
 %preun mysqld
 rpmmode=upgrade
 if  [ "$1" -eq "$1" 2> /dev/null ]; then
-	if [ $1 -ne 1 ]; then
+    if [ $1 -ne 1 ]; then
 		rpmmode=erase
 	fi
 else
@@ -387,12 +370,12 @@ fi
 
 if [ $rpmmode = erase ]; then
 	/etc/init.d/mysql-Calpont stop > /dev/null 2>&1
-	if [ -x /sbin/chkconfig ]; then
-		/sbin/chkconfig mysql-Calpont off > /dev/null 2>&1
-		/sbin/chkconfig --del mysql-Calpont > /dev/null 2>&1
-	 elif [ -x /usr/sbin/update-rc.d ]; then
-		/usr/sbin/update-rc.d -f mysql-Calpont remove > /dev/null 2>&1
-	fi
+        if [ -x /sbin/chkconfig ]; then
+               /sbin/chkconfig mysql-Calpont off > /dev/null 2>&1
+               /sbin/chkconfig --del mysql-Calpont > /dev/null 2>&1
+        elif [ -x /usr/sbin/update-rc.d ]; then
+               /usr/sbin/update-rc.d -f mysql-Calpont remove > /dev/null 2>&1
+        fi	
 	rm -f /etc/init.d/mysql-Calpont
 fi
 

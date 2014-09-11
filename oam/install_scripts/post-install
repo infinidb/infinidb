@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/sh
 #
 # $Id: post-install 1886 2010-04-01 18:30:38Z dhill $
 #
@@ -97,6 +97,8 @@ mkdir /var/log/Calpont/data/archive > /dev/null 2>&1
 cp ${prefix}/Calpont/bin/calpontLogRotate /etc/logrotate.d/calpont > /dev/null 2>&1
 cp ${prefix}/Calpont/bin/transactionLog /etc/cron.d/.
 chmod 644 /etc/cron.d/transactionLog
+
+/sbin/ldconfig
 
 #log install message
 test -f /usr/local/Calpont/post/functions && . /usr/local/Calpont/post/functions

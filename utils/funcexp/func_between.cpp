@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_between.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_between.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -38,10 +38,6 @@ using namespace execplan;
 #include "errorids.h"
 using namespace logging;
 
-#include "utils_utf8.h"
-using namespace funcexp;
-
-
 namespace
 {
 	template<typename result_t>
@@ -58,14 +54,12 @@ namespace
 
 	inline bool strGE(string op1, string op2)
 	{
-		//return strcoll(op1.c_str(), op2.c_str()) >= 0;
-		return utf8::idb_strcoll(op1.c_str(), op2.c_str()) >= 0;
+		return strcoll(op1.c_str(), op2.c_str()) >= 0;
 	}
 
 	inline bool strLE(string op1, string op2)
 	{
-		//return strcoll(op1.c_str(), op2.c_str()) <= 0;
-		return utf8::idb_strcoll(op1.c_str(), op2.c_str()) <= 0;
+		return strcoll(op1.c_str(), op2.c_str()) <= 0;
 	}
 
 	inline bool getBool(rowgroup::Row& row,

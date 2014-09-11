@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.cpp 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_dctnrycompress.cpp 2962 2011-05-09 14:46:13Z chao $
 
 
 /** @file */
@@ -71,15 +71,18 @@ DctnryCompress0::~DctnryCompress0()
  */
 DctnryCompress1::DctnryCompress1(Log* logger)
 {
-	m_compressionType = 1;
-	m_chunkManager = new ChunkManager();
-
-	if (logger)
-	{
-		setDebugLevel( logger->getDebugLevel() );
-		setLogger    ( logger );
-	}
-	m_chunkManager->fileOp(this);
+   m_compressionType = 1;
+   fIsInsert = false;
+   
+   fChunkManager = new ChunkManager();
+   
+   DbFileOp::chunkManager(fChunkManager);
+   if (logger)
+   {
+      setDebugLevel( logger->getDebugLevel() );
+      setLogger    ( logger );
+   }
+   fChunkManager->fileOp(this);
 }
 
 /**
@@ -87,43 +90,60 @@ DctnryCompress1::DctnryCompress1(Log* logger)
  */
 DctnryCompress1::~DctnryCompress1()
 {
-	if (m_chunkManager)
-		delete m_chunkManager;
+	if (!fIsInsert)
+		delete fChunkManager;
+}
+
+void DctnryCompress1::chunkManager(ChunkManager * cm)
+{
+	if (fChunkManager != cm)
+	{
+		delete fChunkManager;
+		fChunkManager = cm;
+		fIsInsert = true;
+		fChunkManager->fileOp(this);
+	}
+	
+	DbFileOp::chunkManager(cm);
 }
 
 int DctnryCompress1::updateDctnryExtent(FILE* pFile, int nBlocks)
 {
-	return m_chunkManager->updateDctnryExtent(pFile, nBlocks);
+	return fChunkManager->updateDctnryExtent(pFile, nBlocks);
 }
 
 
 FILE* DctnryCompress1::createDctnryFile(const char *name,int width,const char *mode,int ioBuffSize)
 {
-   return m_chunkManager->createDctnryFile(
+   return fChunkManager->createDctnryFile(
        m_dctnryOID, width, m_dbRoot, m_partition, m_segment, name, mode, ioBuffSize);
 }
 
 
 FILE* DctnryCompress1::openDctnryFile()
 {
-   return m_chunkManager->getFilePtr(
+   return fChunkManager->getFilePtr(
        m_dctnryOID, m_dbRoot, m_partition, m_segment, m_segFileName, "r+b", DEFAULT_BUFSIZ);
 }
 
 
 void DctnryCompress1::closeDctnryFile(bool doFlush, std::map<FID,FID> & columnOids)
 {
+    // return value??
+	if (fIsInsert)
+		return;
+		
     if (doFlush)
-        m_chunkManager->flushChunks(NO_ERROR, columnOids);
+        fChunkManager->flushChunks(NO_ERROR, columnOids);
     else
-        m_chunkManager->cleanUp(columnOids);
+        fChunkManager->cleanUp(columnOids);
     m_dFile = NULL;
 }
 
 
 int DctnryCompress1::numOfBlocksInFile()
 {
-    return m_chunkManager->getBlockCount(m_dFile);
+    return fChunkManager->getBlockCount(m_dFile);
 }
 
 
@@ -134,7 +154,7 @@ int DctnryCompress1::readDBFile(FILE* pFile, unsigned char* readBuf, const i64 l
     if (!isFbo)
         RETURN_ON_ERROR(lbidToFbo(lbid, fbo));
 
-	return m_chunkManager->readBlock(pFile, readBuf, fbo);
+	return fChunkManager->readBlock(pFile, readBuf, fbo);
 }
 
 
@@ -145,7 +165,7 @@ int DctnryCompress1::writeDBFile(FILE* pFile, const unsigned char* writeBuf, con
     RETURN_ON_ERROR(lbidToFbo(lbid, fbo));
 
     for (int i = 0; i < numOfBlock; i++)
-	    RETURN_ON_ERROR(m_chunkManager->saveBlock(pFile, writeBuf, fbo+i));
+	    RETURN_ON_ERROR(fChunkManager->saveBlock(pFile, writeBuf, fbo+i));
 
     return NO_ERROR;
 }
@@ -158,14 +178,14 @@ int DctnryCompress1::writeDBFileNoVBCache(FILE *pFile,
     //RETURN_ON_ERROR(lbidToFbo(lbid, fbo));
 
     for (int i = 0; i < numOfBlock; i++)
-	    RETURN_ON_ERROR(m_chunkManager->saveBlock(pFile, writeBuf, fbo+i));
+	    RETURN_ON_ERROR(fChunkManager->saveBlock(pFile, writeBuf, fbo+i));
 
     return NO_ERROR;
 }
 
 int DctnryCompress1::flushFile(int rc, std::map<FID,FID> & columnOids)
 {
-	return m_chunkManager->flushChunks(rc, columnOids);
+	return fChunkManager->flushChunks(rc, columnOids);
 }
 
 

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleannexstep.h 9219 2013-01-25 18:48:19Z xlou $
+//  $Id: tupleannexstep.h 7829 2011-06-30 20:09:00Z xlou $
 
 
 #ifndef JOBLIST_TUPLEANNEXSTEP_H
@@ -50,11 +50,7 @@ public:
      * @param in the inputAssociation pointer
      * @param out the outputAssociation pointer
      */
-    TupleAnnexStep( uint32_t sessionId,
-					uint32_t txnId,
-					uint32_t verId,
-					uint32_t statementId,
-					const JobInfo& jobInfo);
+    TupleAnnexStep( uint32_t sessionId, uint32_t txnId, uint32_t verId, uint32_t statementId);
 
     /** @brief TupleAnnexStep destructor
      */
@@ -94,13 +90,12 @@ public:
 	void addOrderBy(LimitedOrderBy* lob)     { fOrderBy = lob; }
 	void addConstant(TupleConstantStep* tcs) { fConstant = tcs; }
 	void setDistinct()                       { fDistinct = true; }
-	void setLimit(uint64_t l)                { fLimit = l; }
 
 protected:
 	void execute();
-	void executeNoOrderBy();
-	void executeWithOrderBy();
-	void executeNoOrderByWithDistinct();
+	void executeNoOrderByLimit();
+	void executeWithOrderByLimit();
+	void executeNoOrderByLimitWithDistinct();
 	void formatMiniStats();
 	void printCalTrace();
 
@@ -138,7 +133,6 @@ protected:
 	boost::scoped_ptr<boost::thread> fRunner;
 
 	uint64_t                fRowsReturned;
-	uint64_t                fLimit;
 	bool                    fEndOfResult;
 	bool                    fDelivery;
 	bool                    fDistinct;
@@ -147,7 +141,6 @@ protected:
 	TupleConstantStep*      fConstant;
 
 	funcexp::FuncExp*       fFeInstance;
-	JobList*                fJobList;
 };
 
 

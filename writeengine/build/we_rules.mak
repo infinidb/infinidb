@@ -1,9 +1,9 @@
 IPCS_CLEANUP=$(EXPORT_ROOT)/bin/dbrm stop; ipcs-pat -d > /dev/null; sleep 2; $(EXPORT_ROOT)/bin/dbrm start;
 
-CPPFLAGS=-I. -I$(EXPORT_ROOT)/include -I/usr/include/libxml2
+CPPFLAGS=-I. -I$(EXPORT_ROOT)/include -I../../utils/rwlock -I/usr/include/libxml2
 
 CXXFLAGS+=$(DEBUG_FLAGS) -D_FILE_OFFSET_BITS=64 -Wall -fpic
-LLIBS=-L. -L$(EXPORT_ROOT)/lib -lxml2 -lrwlock -lconfigcpp -lmessageqcpp -lbrm -lboost_thread \
+LLIBS=-L. -L$(EXPORT_ROOT)/lib -lxml2 -lrwlock -lconfigcpp -lmessageqcpp -lbrm -lboost_thread -ldm \
       -lloggingcpp  -lboost_date_time -lboost_filesystem
 TLIBS=$(LLIBS) -lcppunit -ldl
 GLIBS=$(TLIBS:-lcppunit=)
@@ -20,11 +20,9 @@ LOBJS_SHARED= \
 	$(LIBDIR)/we_config.o \
 	$(LIBDIR)/we_convertor.o \
 	$(LIBDIR)/we_dbfileop.o \
-	$(LIBDIR)/we_dbrootextenttracker.o \
 	$(LIBDIR)/we_define.o \
 	$(LIBDIR)/we_fileop.o \
 	$(LIBDIR)/we_log.o \
-	$(LIBDIR)/we_rbmetawriter.o \
 	$(LIBDIR)/we_simplesyslog.o \
 	$(LIBDIR)/we_stats.o
  

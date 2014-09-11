@@ -47,22 +47,12 @@ using namespace joblist;
 
 using namespace boost;
 
-#include "ddlpackageprocessor.h"
-using namespace ddlpackageprocessor;
-
 #include "calpontsystemcatalog.h"
 using namespace execplan;
 
 #include "writeengine.h"
 #include "cacheutils.h"
-#include "we_clients.h"
-#include "dbrm.h"
-
-#include "utils_utf8.h"
-
-
 namespace fs = boost::filesystem;
-
 namespace
 {
 	DistributedEngineComm *Dec;
@@ -79,15 +69,7 @@ namespace
 
 	void added_a_pm(int)
 	{
-        LoggingID logid(23, 0, 0);
-        logging::Message::Args args1;
-        logging::Message msg(1);
-        args1.add("DDLProc caught SIGHUP. Resetting connections");
-        msg.format( args1 );
-        logging::Logger logger(logid.fSubsysID);
-        logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
 		Dec->Setup();
-        WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC)->Setup();
 	}
 }
 
@@ -95,7 +77,21 @@ int main(int argc, char* argv[])
 {
     // get and set locale language
 	string systemLang = "C";
-	systemLang = funcexp::utf8::idb_setlocale();
+
+    Oam oam;
+    try{
+        oam.getSystemConfig("SystemLang", systemLang);
+    }
+    catch(...)
+    {
+		systemLang = "C";
+	}
+
+    setlocale(LC_ALL, systemLang.c_str());
+    printf ("Locale is : %s\n", systemLang.c_str() );
+
+	//BUG 2991
+	setlocale(LC_NUMERIC, "C");
 
     setupCwd();
 
@@ -103,6 +99,7 @@ int main(int argc, char* argv[])
 
 	ResourceManager rm;
 	Dec = DistributedEngineComm::instance(rm);
+
 #ifndef _MSC_VER
 	/* set up some signal handlers */
     struct sigaction ign;
@@ -119,7 +116,7 @@ int main(int argc, char* argv[])
         Oam oam;
         try
         {
-            oam.processInitComplete("DDLProc", ACTIVE);
+            oam.processInitComplete("DDLProc");
         }
         catch (...)
         {
@@ -149,6 +146,7 @@ int main(int argc, char* argv[])
         args.add("receiving DDLPackage");
         message.format( args );
     }
+	
     return 0;
 }
 // vim:ts=4 sw=4:

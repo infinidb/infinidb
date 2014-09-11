@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: insertpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: insertpackageprocessor.h 7681 2011-05-09 14:29:14Z chao $
 *
 *
 ***********************************************************************/
@@ -68,7 +68,7 @@ private:
       * @param result the result of the operation
       */
     bool insertRows( u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema, const std::string& table,
-                     const dmlpackage::RowList& rows, DMLResult& result, long long & nextVal, long long & originalNextVal, execplan::CalpontSystemCatalog::ColType & autoColType,
+                     const dmlpackage::RowList& rows, DMLResult& result, long long & nextVal, execplan::CalpontSystemCatalog::ColType & autoColType,
                      bool insertSelect = false );
 
 

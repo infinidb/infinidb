@@ -22,7 +22,6 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <iomanip>
-#include <fstream>
 using namespace std;
 
 #include <boost/scoped_ptr.hpp>
@@ -30,11 +29,7 @@ using namespace boost;
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include "bytestream.h"
-using namespace messageqcpp;
-
 #include "configcpp.h"
-#include "configstream.h"
 using namespace config;
 
 class ConfigFileTest : public CppUnit::TestFixture {
@@ -56,7 +51,6 @@ CPPUNIT_TEST( test11 );
 CPPUNIT_TEST( test12 );
 CPPUNIT_TEST_EXCEPTION( test13_1, std::runtime_error );
 CPPUNIT_TEST_EXCEPTION( test13_2, std::runtime_error );
-CPPUNIT_TEST( test14 );
 CPPUNIT_TEST_SUITE_END();
 
 private:
@@ -313,30 +307,6 @@ public:
 
 		value = "10,000"; //invalid char causes throw
 		ival = Config::fromText(value);
-	}
-
-	void test14() {
-		ByteStream bs;
-		ifstream ifs("./Calpont.xml");
-		ifs >> bs;
-		string id(".");
-		string value;
-		{
-			ConfigStream cs(bs, id);
-			value = cs.getConfig("Message", "Name");
-			CPPUNIT_ASSERT(value == "Message");
-		}
-		string bss(reinterpret_cast<const char*>(bs.buf()), bs.length());
-		{
-			ConfigStream cs(bss, id);
-			value = cs.getConfig("Message", "Name");
-			CPPUNIT_ASSERT(value == "Message");
-		}
-		{
-			ConfigStream cs(bss.c_str(), id);
-			value = cs.getConfig("Message", "Name");
-			CPPUNIT_ASSERT(value == "Message");
-		}
 	}
 
 }; 

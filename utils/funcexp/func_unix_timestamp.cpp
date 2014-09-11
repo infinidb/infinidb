@@ -135,6 +135,14 @@ int64_t Func_unix_timestamp::getIntVal(rowgroup::Row& row,
 			return -1;
 	}
 
+	struct tm tmp; 
+	tmp.tm_year = year - 1900;
+	tmp.tm_mon = month -1;
+	tmp.tm_mday = day;
+	tmp.tm_hour = hour;
+	tmp.tm_min = min;
+	tmp.tm_sec = sec;
+
 	// same algorithm as my_time.c:my_system_gmt_sec
 	uint loop;
 	time_t tmp_t= 0;
@@ -190,7 +198,16 @@ int64_t Func_unix_timestamp::getIntVal(rowgroup::Row& row,
 	/* shift back, if we were dealing with boundary dates */
 	tmp_t += shift*86400L;
 
-	/* make sure we have legit timestamps (i.e. we didn't over/underflow anywhere above) */
+	/*
+	  This is possible for dates, which slightly exceed boundaries.
+	  Conversion will pass ok for them, but we don't allow them.
+	  First check will pass for platforms with signed time_t.
+	  instruction above (tmp+= shift*86400L) could exceed
+	  MAX_INT32 (== TIMESTAMP_MAX_VALUE) and overflow will happen.
+	  So, tmp < TIMESTAMP_MIN_VALUE will be triggered. On platfroms
+	  with unsigned time_t tmp+= shift*86400L might result in a number,
+	  larger then TIMESTAMP_MAX_VALUE, so another check will work.
+	*/
 	if ((tmp_t < TIMESTAMP_MIN_VALUE) || (tmp_t > TIMESTAMP_MAX_VALUE))
 		tmp_t = 0;
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: configcpp.cpp 3281 2012-09-13 18:38:27Z rdempsey $
+* $Id: configcpp.cpp 3145 2012-06-12 19:30:58Z rdempsey $
 *
 ******************************************************************************************/
 #include "config.h"
@@ -48,19 +48,20 @@ namespace fs=boost::filesystem;
 //#define NDEBUG
 #include <cassert>
 
-#define LIBCONFIG_DLLEXPORT
-#include "configcpp.h"
-#undef LIBCONFIG_DLLEXPORT
-
-#include "exceptclasses.h"
-#include "installdir.h"
 #ifdef _MSC_VER
 #include "idbregistry.h"
 #endif
 
+#define LIBCONFIG_DLLEXPORT
+#include "configcpp.h"
+#undef LIBCONFIG_DLLEXPORT
+
 namespace
 {
-const fs::path defaultCalpontConfigFile("Calpont.xml");
+const string defaultCalpontConfigFile("Calpont.xml");
+const string defaultCalpontConfigFileTemp("Calpont.xml.temp");
+const string tmpCalpontConfigFileTemp("Calpont.xml.temp1");
+const string saveCalpontConfigFileTemp("Calpont.xml.calpontSave");
 }
 
 namespace config
@@ -78,7 +79,7 @@ Config* Config::makeConfig(const char* cf)
 	mutex::scoped_lock lk(fInstanceMapMutex);
 
 	string configFile;
-	string installDir = startup::StartUp::installDir();
+	string installDir("/usr/local/Calpont");
 
 	if (cf == 0)
 	{
@@ -91,8 +92,7 @@ Config* Config::makeConfig(const char* cf)
 #endif
 		if (cf == 0 || *cf == 0)
 		{
-			fs::path configFilePath = fs::path(installDir) / fs::path("etc") / defaultCalpontConfigFile;
-			configFile = configFilePath.string();
+			configFile = installDir + "/etc/" + defaultCalpontConfigFile;
 		}
 		else
 		{
@@ -114,7 +114,7 @@ Config* Config::makeConfig(const char* cf)
 }
 
 Config::Config(const string& configFile, const string& installDir) :
-	fDoc(0), fConfigFile(configFile), fMtime(0), fInstallDir(installDir), fParser(fInstallDir)
+	fDoc(0), fConfigFile(configFile), fMtime(0), fInstallDir(installDir)
 {
 	for ( int i = 0 ; i < 20 ; i++ )
 	{
@@ -140,7 +140,7 @@ Config::~Config()
  		closeConfig();
 }
 
-void Config::parseDoc(void)
+void Config::parseDoc(void) const
 {
 	struct flock fl;
 	int fd;
@@ -206,15 +206,17 @@ void Config::parseDoc(void)
 	return;
 }
 
-void Config::closeConfig(void)
+void Config::closeConfig(void) const
 {
 	xmlFreeDoc(fDoc);
 	fDoc = 0;
 }
 
-const string Config::getConfig(const string& section, const string& name)
+const string Config::getConfig(const string& section, const string& name, const bool close) const
 {
 	mutex::scoped_lock lk(fLock);
+
+	string res;
 
 	if (section.length() == 0 || name.length() == 0)
 		throw invalid_argument("Config::getConfig: both section and name must have a length");
@@ -234,12 +236,41 @@ const string Config::getConfig(const string& section, const string& name)
 		}
 	}
 
-	return fParser.getConfig(fDoc, section, name);
+	xmlNodePtr cur1 = xmlDocGetRootElement(fDoc);
+	if (cur1 == NULL)
+		throw runtime_error("Config::getConfig: error parsing config file " + fConfigFile);
+
+	cur1 = cur1->xmlChildrenNode;
+	while (cur1 != NULL)
+	{
+		if ((!xmlStrcmp(cur1->name, (const xmlChar *)section.c_str())))
+		{
+			xmlNodePtr cur2 = cur1->xmlChildrenNode;
+			while (cur2 != NULL)
+			{
+				if ((!xmlStrcmp(cur2->name, (const xmlChar*)name.c_str())))
+				{
+						xmlNodePtr cur3 = cur2->xmlChildrenNode;
+						if ( cur3 == 0 )
+							res = "";
+						else
+							res = (const char*)cur3->content;
+						return expand(res);
+				}
+				cur2 = cur2->next;
+			}
+		}
+		cur1 = cur1->next;
+	}
+	// maybe nullstr if not found
+	return expand(res);
 }
 
-void Config::getConfig(const string& section, const string& name, vector<string>& values)
+void Config::getConfig(const string& section, const string& name, vector<string>& values) const
 {
 	mutex::scoped_lock lk(fLock);
+
+	string res;
 
 	if (section.length() == 0)
 		throw invalid_argument("Config::getConfig: section must have a length");
@@ -258,15 +289,40 @@ void Config::getConfig(const string& section, const string& name, vector<string>
 		}
 	}
 
-	fParser.getConfig(fDoc, section, name, values);
+	xmlNodePtr cur1 = xmlDocGetRootElement(fDoc);
+	if (cur1 == NULL)
+		throw runtime_error("Config::getConfig: error parsing config file " + fConfigFile);
+
+	cur1 = cur1->xmlChildrenNode;
+	while (cur1 != NULL)
+	{
+		if ((!xmlStrcmp(cur1->name, (const xmlChar *)section.c_str())))
+		{
+			xmlNodePtr cur2 = cur1->xmlChildrenNode;
+			while (cur2 != NULL)
+			{
+				if ((!xmlStrcmp(cur2->name, (const xmlChar*)name.c_str())))
+				{
+						xmlNodePtr cur3 = cur2->xmlChildrenNode;
+						if ( cur3 == 0 )
+							res = "";
+						else
+							res = (const char*)cur3->content;
+						values.push_back(expand(res));
+				}
+				cur2 = cur2->next;
+			}
+		}
+		cur1 = cur1->next;
+	}
 }
 
 void Config::setConfig(const string& section, const string& name, const string& value)
 {
 	mutex::scoped_lock lk(fLock);
 
-	if (section.length() == 0 || name.length() == 0 )
-		throw invalid_argument("Config::setConfig: all of section and name must have a length");
+	if (section.length() == 0 || name.length() == 0 || value.length() == 0)
+		throw invalid_argument("Config::setConfig: all of section, name and value must have a length");
 
 	if (fDoc == 0) {
 		throw runtime_error("Config::setConfig: no XML document!");
@@ -284,7 +340,47 @@ void Config::setConfig(const string& section, const string& name, const string& 
 		}
 	}
 
-	fParser.setConfig(fDoc, section, name, value);
+	xmlNodePtr cur1 = xmlDocGetRootElement(fDoc);
+	if (cur1 == NULL)
+		throw runtime_error("Config::setConfig: error parsing config file " + fConfigFile);
+
+	xmlNodePtr cur2;
+
+	cur1 = cur1->xmlChildrenNode;
+	while (cur1 != NULL)
+	{
+		if (xmlStrcmp(cur1->name, (const xmlChar *)section.c_str()) == 0)
+		{
+			cur2 = cur1->xmlChildrenNode;
+			while (cur2 != NULL)
+			{
+				if (xmlStrcmp(cur2->name, (const xmlChar*)name.c_str()) == 0)
+				{
+						xmlNodePtr cur3 = cur2->xmlChildrenNode;
+						xmlFree(cur3->content);
+						cur3->content = xmlStrdup((const xmlChar*)value.c_str());
+						return;
+				}
+				cur2 = cur2->next;
+			}
+			// We found the section, but not the name, so we need to add a new node here
+			xmlAddChild(cur1, xmlNewText((const xmlChar*)"\t"));
+			xmlNewTextChild(cur1, NULL, (const xmlChar*)name.c_str(), (const xmlChar*)value.c_str());
+			xmlAddChild(cur1, xmlNewText((const xmlChar*)"\n\t"));
+			return;
+		}
+		cur1 = cur1->next;
+	}
+
+	// We did not find the section, so we need to add it and the name here
+	cur1 = xmlDocGetRootElement(fDoc);
+	xmlAddChild(cur1, xmlNewText((const xmlChar*)"\t"));
+	cur2 = xmlNewChild(cur1, NULL, (const xmlChar*)section.c_str(), NULL);
+	xmlAddChild(cur2, xmlNewText((const xmlChar*)"\n\t\t"));
+	xmlNewTextChild(cur2, NULL, (const xmlChar*)name.c_str(), (const xmlChar*)value.c_str());
+	xmlAddChild(cur2, xmlNewText((const xmlChar*)"\n\t"));
+	xmlAddChild(cur1, xmlNewText((const xmlChar*)"\n"));
+
 	return;
 }
 
@@ -292,11 +388,13 @@ void Config::delConfig(const string& section, const string& name)
 {
 	mutex::scoped_lock lk(fLock);
 
+	string res;
+
 	if (section.length() == 0 || name.length() == 0)
-		throw invalid_argument("Config::delConfig: both section and name must have a length");
+		throw invalid_argument("Config::getConfig: both section and name must have a length");
 
 	if (fDoc == 0){
-		throw runtime_error("Config::delConfig: no XML document!");
+		throw runtime_error("Config::getConfig: no XML document!");
 	}
 
 	struct stat statbuf;
@@ -310,7 +408,30 @@ void Config::delConfig(const string& section, const string& name)
 		}
 	}
 
-	fParser.delConfig(fDoc, section, name);
+	xmlNodePtr cur1 = xmlDocGetRootElement(fDoc);
+	if (cur1 == NULL)
+		throw runtime_error("Config::getConfig: error parsing config file " + fConfigFile);
+
+	cur1 = cur1->xmlChildrenNode;
+	while (cur1 != NULL)
+	{
+		if ((!xmlStrcmp(cur1->name, (const xmlChar *)section.c_str())))
+		{
+			xmlNodePtr cur2 = cur1->xmlChildrenNode;
+			while (cur2 != NULL)
+			{
+				xmlNodePtr tmp = cur2;
+				cur2 = cur2->next;
+				if ((!xmlStrcmp(tmp->name, (const xmlChar*)name.c_str())))
+				{
+					xmlUnlinkNode(tmp);
+					xmlFreeNode(tmp);
+				}
+			}
+		}
+		cur1 = cur1->next;
+	}
+
 	return;
 }
 
@@ -337,23 +458,18 @@ void Config::writeConfig(const string& configFile) const
 	fs::rename(outFilePth, configFilePth);
 #else
 
-	const fs::path defaultCalpontConfigFileTemp("Calpont.xml.temp");
-	const fs::path saveCalpontConfigFileTemp("Calpont.xml.calpontSave");
-	const fs::path tmpCalpontConfigFileTemp("Calpont.xml.temp1");
-
-	fs::path etcdir = fs::path(fInstallDir) / fs::path("etc");
-
-	fs::path dcf = etcdir / fs::path(defaultCalpontConfigFile);
-	fs::path dcft = etcdir / fs::path(defaultCalpontConfigFileTemp);
-	fs::path scft = etcdir / fs::path(saveCalpontConfigFileTemp);
-	fs::path tcft = etcdir / fs::path(tmpCalpontConfigFileTemp);
+	string dcf = fInstallDir + "/etc/" + defaultCalpontConfigFile;
+	string dcft = fInstallDir + "/etc/" + defaultCalpontConfigFileTemp;
+	string scft = fInstallDir + "/etc/" + saveCalpontConfigFileTemp;
+	string tcft = fInstallDir + "/etc/" + tmpCalpontConfigFileTemp;
 	//perform a temp write first if Calpont.xml file to prevent possible corruption
 	if ( configFile == dcf ) {
 
-		if (exists(dcft)) fs::remove(dcft);
-		if ((fi = fopen(dcft.string().c_str(), "w+")) == NULL)
+		string cmd = "rm -f " + dcft;
+		::system(cmd.c_str());
+		if ((fi = fopen(dcft.c_str(), "w+")) == NULL)
 			throw runtime_error("Config::writeConfig: error writing config file " + configFile);
-
+	
 		int rc, err=0;
 		rc = xmlDocDump(fi, fDoc);
 		if ( rc < 0) {
@@ -363,27 +479,30 @@ void Config::writeConfig(const string& configFile) const
 		}
 
 		fclose(fi);
-
+	
 		//check temp file
 		try {
-			Config* c1 = makeConfig(dcft.string().c_str());
-
+			Config* c1 = makeConfig(dcft.c_str());
+	
 			string value;
 			value = c1->getConfig("SystemConfig", "SystemName");
 
 			//good read, save copy, copy temp file tp tmp then to Calpont.xml
 			//move to /tmp to get around a 'same file error' in mv command
-			unlink(scft.string().c_str());
-			fs::copy_file(dcf, scft, fs::copy_option::overwrite_if_exists);
-			chmod(scft.string().c_str(), 0666);
+			string cmd = "rm -f " + scft;
+			::system(cmd.c_str());
+			cmd = "cp " + dcf + " " + scft;
+			::system(cmd.c_str());
 
-			if (exists(tcft)) fs::remove(tcft);
-			fs::rename(dcft, tcft);
+			cmd = "rm -f " + tcft;
+			::system(cmd.c_str());
+			cmd = "mv -f " + dcft + " " + tcft;
+			::system(cmd.c_str());
 
-			if (exists(dcf)) fs::remove(dcf);
-			fs::rename(tcft, dcf);
+			cmd = "mv -f " + tcft + " " + dcf;
+			::system(cmd.c_str());
 		}
-		catch (...)
+		catch(...)
 		{
 			throw runtime_error("Config::writeConfig: error writing config file " + configFile);
 		}
@@ -392,9 +511,9 @@ void Config::writeConfig(const string& configFile) const
 	{ // non Calpont.xml, perform update
 		if ((fi = fopen(configFile.c_str(), "w")) == NULL)
 			throw runtime_error("Config::writeConfig: error writing config file " + configFile);
-
+	
 		xmlDocDump(fi, fDoc);
-
+	
 		fclose(fi);
 	}
 #endif
@@ -468,10 +587,6 @@ int64_t Config::fromText(const std::string& text)
 
 	switch (*cptr)
 	{
-	case 'T':
-	case 't':
-		val *= 1024;
-		/* fallthru */
 	case 'G':
 	case 'g':
 		val *= 1024;
@@ -483,7 +598,7 @@ int64_t Config::fromText(const std::string& text)
 	case 'K':
 	case 'k':
 		val *= 1024;
-		/* fallthru */
+		break;
 	case '\0':
 		break;
 	default:
@@ -497,17 +612,21 @@ int64_t Config::fromText(const std::string& text)
 	return val;
 }
 
-time_t Config::getCurrentMTime()
+const string Config::expand(const std::string& in) const
 {
-	mutex::scoped_lock lk(fLock);
+	string out(in);
+	string::size_type pos;
+	const string::size_type len=11;
 
-	struct stat statbuf;
-	if (stat(fConfigFile.c_str(), &statbuf) == 0)
-		return statbuf.st_mtime;
-	else
-		return 0;
+	pos = out.find("$INSTALLDIR");
+	while (pos != string::npos)
+	{
+		out.replace(pos, len, fInstallDir);
+		pos = out.find("$INSTALLDIR");
+	}
+
+	return out;
 }
 
 } //namespace config
-// vim:ts=4 sw=4:
 

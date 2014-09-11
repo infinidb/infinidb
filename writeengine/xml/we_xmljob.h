@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmljob.h 3806 2012-05-01 12:23:02Z dcathey $
+* $Id: we_xmljob.h 3395 2011-12-20 16:03:42Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
@@ -44,8 +44,7 @@ namespace WriteEngine
 class Log;
 struct JobColumn;
 
-/** @brief Reads Job XML file and loads into a "Job" object for use by
- *  cpimport.bin.
+/** @brief Reads Job XML file and loads into a "Job" object for use by cpimport.
  *
  */
 class XMLJob : public XMLOp
@@ -132,10 +131,6 @@ private:
     void           initSatLimits( JobColumn& column ) const;
     void           fillInXMLDataAsLoaded(
                      execplan::CalpontSystemCatalog::RIDList& colRidList);
-    void           fillInXMLDataNotNullDefault(
-                     const std::string& fullTblName,
-                     execplan::CalpontSystemCatalog::ColType& colType,
-                     JobColumn& col );
     void           validateAllColumnsHaveTags( const
                      execplan::CalpontSystemCatalog::RIDList& colRidList) const;
     void           postProcessTableNode( );

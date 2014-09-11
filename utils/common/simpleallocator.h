@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: simpleallocator.h 3048 2012-04-04 15:33:45Z rdempsey $
+ * $Id: simpleallocator.h 2394 2011-02-08 14:36:22Z rdempsey $
  *
  ******************************************************************************/
 
@@ -28,6 +28,8 @@
 #define UTILS_SIMPLEALLOCATOR_H
 
 #include <unistd.h>
+//#define NDEBUG
+#include <cassert>
 #include <list>
 #include <stdint.h>
 #include <limits>
@@ -189,6 +191,7 @@ inline void SimplePool::reset()
 inline void SimplePool::allocateNewChunk()
 {
 	MemUnit* chunk = new MemUnit[fUnitPerChunk];
+	assert(chunk != NULL);
 	fBlockList.push_back(chunk);
 	fNext = chunk;
 	fEnd = chunk + fUnitPerChunk;

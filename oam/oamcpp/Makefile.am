@@ -23,10 +23,10 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 lib_LTLIBRARIES = liboamcpp.la
-liboamcpp_la_SOURCES = liboamcpp.cpp oamcache.cpp
+liboamcpp_la_SOURCES = liboamcpp.cpp
 liboamcpp_la_LDFLAGS = -version-info 1:0:0 $(AM_LDFLAGS)
 liboamcpp_la_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-include_HEADERS = liboamcpp.h oamcache.h
+include_HEADERS = liboamcpp.h
 
 test:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: colxml.cpp 1872 2012-08-01 16:58:23Z dhall $
+ * $Id: colxml.cpp 1808 2012-05-24 14:58:42Z dcathey $
  *
  ******************************************************************************/
 
@@ -32,7 +32,6 @@
 #include "calpontsystemcatalog.h"
 #include "inputmgr.h"
 #include "we_xmlgenproc.h"
-#include "we_config.h"
 #include "dbrm.h"
 
 using namespace std;
@@ -47,7 +46,6 @@ int main(int argc, char **argv)
     setuid( 0 ); // set effective ID to root; ignore return status
 #endif
     setlocale(LC_ALL, "");
-    WriteEngine::Config::initConfigCache(); // load Calpont.xml config settings
 
     InputMgr mgr("299"); //@bug 391
     if (! mgr.input(argc, argv))
@@ -76,7 +74,7 @@ int main(int argc, char **argv)
     }
 
     BRM::DBRM dbrm;
-    if (dbrm.getSystemReady() < 1)
+    if (!dbrm.isSystemReady())
     {
         std::string errMsg(
             "System is not ready.  Verify that InfiniDB is up and ready "

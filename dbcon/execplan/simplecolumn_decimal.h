@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn_decimal.h 8536 2012-05-21 21:27:17Z zzhu $
+*   $Id: simplecolumn_decimal.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -57,7 +57,6 @@ public:
 	SimpleColumn_Decimal(const std::string& schema, 
 		               const std::string& table, 
 		               const std::string& col, 
-		               const bool isInfiniDB,
 		               const u_int32_t sessionID = 0);
 	SimpleColumn_Decimal(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
 	
@@ -103,9 +102,8 @@ template<int len>
 SimpleColumn_Decimal<len>::SimpleColumn_Decimal(const std::string& schema, 
 		           const std::string& table, 
 		           const std::string& col, 
-		           const bool isInfiniDB,
 		           const u_int32_t sessionID) :
-		           SimpleColumn(schema, table, col, isInfiniDB, sessionID) 
+		           SimpleColumn(schema, table, col, sessionID) 
 {
 	setNullVal();
 }

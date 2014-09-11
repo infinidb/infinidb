@@ -21,7 +21,6 @@ using namespace oam;
 string mysqlpw = " ";
 string pwprompt = " ";
 
-extern string installDir;
 
 namespace installer
 {
@@ -30,10 +29,9 @@ bool waitForActive()
 {
 	Oam oam;
 
-	const string cmd = installDir + "/bin/calpontConsole getsystemstatus > /tmp/status.log";
-	system(cmd.c_str());
+	system("/usr/local/Calpont/bin/calpontConsole getsystemstatus > /tmp/status.log");
 
-	for ( int i = 0 ; i < 120 ; i ++ )
+	for ( int i = 0 ; i < 40 ; i ++ )
 	{
 		if (oam.checkLogStatus("/tmp/status.log", "System        ACTIVE") )
 			return true;
@@ -42,7 +40,7 @@ bool waitForActive()
 		cout << ".";
 		cout.flush();
 		sleep (10);
-		system(cmd.c_str());
+		system("/usr/local/Calpont/bin/calpontConsole getsystemstatus > /tmp/status.log");
 	}
 	return false;
 }
@@ -50,13 +48,12 @@ bool waitForActive()
 void dbrmDirCheck() 
 {
 
-	const string fname = installDir + "/etc/Calpont.xml.rpmsave";
-	ifstream oldFile (fname.c_str());
+	ifstream oldFile ("/usr/local/Calpont/etc/Calpont.xml.rpmsave");
 	if (!oldFile) return;
 
 	string SystemSection = "SystemConfig";
 	Config* sysConfig = Config::makeConfig();
-	Config* sysConfigPrev = Config::makeConfig(fname);
+	Config* sysConfigPrev = Config::makeConfig("/usr/local/Calpont/etc/Calpont.xml.rpmsave");
 
 	char* pcommand = 0;
 
@@ -110,13 +107,12 @@ void dbrmDirCheck()
 	if (!File1)
 		return;
 
-	string cmd;
 	// check if current file does't exist
 	// if not, copy prev files to current directory
 	ifstream File2 (dbrmrootCurrent.c_str());
 	if (!File2) {
 		cout << endl << "===== DBRM Data File Directory Check  =====" << endl << endl;
-		cmd = "/bin/cp -rpf " + dbrmrootPrevDir + "/* " + dbrmrootDir + "/.";
+		string cmd = "/bin/cp -rpf " + dbrmrootPrevDir + "/* " + dbrmrootDir + "/.";
 		system(cmd.c_str());
 
 		//update the current file hardcoded path
@@ -176,8 +172,7 @@ void dbrmDirCheck()
 		}
 	}
 
-	cmd = "chmod 1777 -R " + installDir + "/data1/systemFiles/dbrm > /dev/null 2>&1";
-	system(cmd.c_str());
+	system("chmod 1777 -R /usr/local/Calpont/data1/systemFiles/dbrm > /dev/null 2>&1");
 
 	return;
 }
@@ -185,14 +180,11 @@ void dbrmDirCheck()
 void mysqlSetup() 
 {
 	Oam oam;
-	string cmd;
-	cmd = installDir + "/bin/post-mysqld-install --installdir=" + installDir;
-	int rtnCode = system(cmd.c_str());
+	int rtnCode = system("/usr/local/Calpont/bin/post-mysqld-install");
 	if (rtnCode != 0)
 		cout << "Error running post-mysqld-install" << endl;
 
 	//check for password set
-	//start in the same way that mysqld will be started normally.
 	//start in the same way that mysqld will be started normally.
 	try {
 		oam.actionMysqlCalpont(MYSQL_START);
@@ -205,13 +197,12 @@ void mysqlSetup()
 	for (;;)
 	{
 		// check if mysql is supported and get info
-		string calpontMysql = installDir + "/mysql/bin/mysql --defaults-file=" + installDir + "/mysql/my.cnf -u root ";
+		string calpontMysql = "/usr/local/Calpont/mysql/bin/mysql --defaults-file=/usr/local/Calpont/mysql/my.cnf -u root ";
 		string cmd = calpontMysql + pwprompt + " -e 'status' > /tmp/idbmysql.log 2>&1";
 		system(cmd.c_str());
 
 		if (oam.checkLogStatus("/tmp/idbmysql.log", "ERROR 1045") ) {
 			mysqlpw = getpass(prompt.c_str());
-			mysqlpw = "'" + mysqlpw + "'";
 			pwprompt = "--password=" + mysqlpw;
 			prompt = " *** Password incorrect, please re-enter MySQL password > ";
 		}
@@ -235,7 +226,7 @@ void mysqlSetup()
 		}
 	}
 	
-	cmd = installDir + "/bin/post-mysql-install " + pwprompt + " --installdir=" + installDir;
+	string cmd = "/usr/local/Calpont/bin/post-mysql-install " + pwprompt;
 	rtnCode = system(cmd.c_str());
 	if (rtnCode != 0)
 		cout << "Error running post-mysql-install" << endl;
@@ -254,11 +245,12 @@ int sendUpgradeRequest(int IserverTypeInstall)
 {
 	Oam oam;
 
+	// wait until DMLProc is ACTIVE
 	while(true)
 	{
 		try{
 			ProcessStatus procstat;
-			oam.getProcessStatus("WriteEngineServer", "pm1", procstat);
+			oam.getProcessStatus("DMLProc", "pm1", procstat);
 			if ( procstat.ProcessOpState == oam::ACTIVE)
 				break;
 		}
@@ -415,7 +407,7 @@ void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 	Oam oam;
 	string SystemSection = "SystemConfig";
 
-	string dbRoot = installDir + "/data1";
+	string dbRoot = "/usr/local/Calpont/data1";
 
 	try {
 		dbRoot = sysConfig->getConfig(SystemSection, "DBRoot1");
@@ -459,6 +451,50 @@ void checkFilesPerPartion(int DBRootCount, Config* sysConfig)
 	return;
 }
 
+void cleanupFstab()
+{
+	string fileName = "/etc/fstab";
+
+	ifstream oldFile (fileName.c_str());
+	if (!oldFile) return;
+	
+	vector <string> lines;
+	char line[200];
+	string buf;
+	while (oldFile.getline(line, 200))
+	{
+		buf = line;
+		string::size_type pos = buf.find("usr/local/Calpont/data ",0);
+		if (pos != string::npos) {
+			//output to temp file
+			lines.push_back(buf);
+			continue;
+		}
+		pos = buf.find("#",0);
+		if (pos != string::npos) {
+			//output to temp file
+			lines.push_back(buf);
+			continue;
+		}
+		pos = buf.find("usr/local/Calpont/data",0);
+		if (pos == string::npos)
+			//output to temp file
+			lines.push_back(buf);
+	}
+	
+	oldFile.close();
+	unlink (fileName.c_str());
+   	ofstream newFile (fileName.c_str());	
+	
+	//create new file
+	int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+	
+	copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+	newFile.close();
+	
+	close(fd);
+	return;
+}
 
 }
 

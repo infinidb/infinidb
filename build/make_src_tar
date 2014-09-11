@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: make_src_tar 1836 2013-02-15 15:11:15Z dhill $
+# $Id: make_src_tar 1837 2013-02-15 15:11:24Z dhill $
 #
 
 # basedir is the working dir for all the activity
@@ -122,7 +122,7 @@ if [ $enterprise -eq 0 ]; then
 	rm -rf procmon
 	cd oamapps
 	rm -rf calpont-console hardwareMonitor postConfigure resourceMonitor sessionWalker calpontDB \
-		logUtils serverMonitor traphandler sendtrap glusterconf
+		logUtils serverMonitor traphandler sendtrap
 	cd ..
 fi
 cd mysql
@@ -138,7 +138,7 @@ rm -rf tools/reserveStacks
 if [ $enterprise -eq 0 ]; then
 	cp oam/etc/Calpont.xml oam/etc/Calpont.xml.singleserver
 	cd tools
-	for dir in sendPlan cfread ddldriver calpontSupport prat configMgt idb_comp vbgen; do
+	for dir in sendPlan cfread ddldriver dmldriver calpontSupport prat configMgt idb_comp vbgen; do
 		rm -rf $dir
 	done
 	cd ..
@@ -173,6 +173,7 @@ if [ $enterprise -eq 0 ]; then
 	cd ..
 	rm -f utils/winport/idb_64_enterprise.nsi
 	rm -f utils/winport/win_setup_mysql_part4.sql
+	rm -rf writeengine/server
 	rm -rf tools/notificationTester
 fi
 

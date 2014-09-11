@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbuf.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colbuf.cpp 2873 2011-02-08 14:35:57Z rdempsey $
  *
  ****************************************************************************/
 
@@ -48,7 +48,7 @@ int ColumnBuffer::finishFile(bool /*bTruncFile*/)
     return NO_ERROR;
 }
 
-int ColumnBuffer::resetToBeCompressedColBuf( long long& startFileOffset )
+int ColumnBuffer::resetColBuf( long long& startFileOffset )
 {
     return NO_ERROR;
 }

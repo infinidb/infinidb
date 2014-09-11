@@ -18,7 +18,7 @@
 		<BootLaunch>1</BootLaunch>
 		<LaunchID>2</LaunchID>
 		<DepProcessName/>
-		<RunType>ACTIVE_STANDBY</RunType>
+		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG2>
 	<PROCESSCONFIG3>
@@ -39,25 +39,11 @@
 		<ProcessArg12>/var/run/snmptrapd.pid</ProcessArg12>
 		<BootLaunch>1</BootLaunch>
 		<LaunchID>3</LaunchID>
-		<DepProcessName1>ProcessManager</DepProcessName1>
-		<DepModuleName1>@</DepModuleName1>
+		<DepProcessName/>
 		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG3>
 	<PROCESSCONFIG4>
-		<ProcessName>DBRMControllerNode</ProcessName>
-		<ModuleType>ParentOAMModule</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/bin/controllernode</ProcessLocation>
-		<ProcessArg1>/usr/local/Calpont/bin/controllernode</ProcessArg1>
-		<ProcessArg2>fg</ProcessArg2>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>4</LaunchID>
-		<DepProcessName1>ProcessManager</DepProcessName1>
-		<DepModuleName1>@</DepModuleName1>
-		<RunType>SIMPLEX</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG4>
-	<PROCESSCONFIG5>
 		<ProcessName>SNMPAgent</ProcessName>
 		<ModuleType>ChildOAMModule</ModuleType>
 		<ProcessLocation>/usr/local/Calpont/sbin/snmpd</ProcessLocation>
@@ -74,19 +60,19 @@
 		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG5>
-	<PROCESSCONFIG6>
+	</PROCESSCONFIG4>
+	<PROCESSCONFIG5>
 		<ProcessName>ServerMonitor</ProcessName>
 		<ModuleType>ChildOAMModule</ModuleType>
 		<ProcessLocation>/usr/local/Calpont/bin/ServerMonitor</ProcessLocation>
 		<ProcessArg1>/usr/local/Calpont/bin/ServerMonitor</ProcessArg1>
 		<BootLaunch>2</BootLaunch>
-		<LaunchID>6</LaunchID>
+		<LaunchID>5</LaunchID>
 		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG6>
-	<PROCESSCONFIG7>
+	</PROCESSCONFIG5>
+	<PROCESSCONFIG6>
 		<ProcessName>DBRMWorkerNode</ProcessName>
 		<ModuleType>ChildExtOAMModule</ModuleType>
 		<ProcessLocation>/usr/local/Calpont/bin/workernode</ProcessLocation>
@@ -94,34 +80,35 @@
 		<ProcessArg2>DBRM_Worker</ProcessArg2>
 		<ProcessArg3>fg</ProcessArg3>
 		<BootLaunch>2</BootLaunch>
-		<LaunchID>7</LaunchID>
+		<LaunchID>6</LaunchID>
 		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
+		<LogFile>off</LogFile>
+	</PROCESSCONFIG6>
+	<PROCESSCONFIG7>
+		<ProcessName>DBRMControllerNode</ProcessName>
+		<ModuleType>pm</ModuleType>
+		<ProcessLocation>/usr/local/Calpont/bin/controllernode</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/bin/controllernode</ProcessArg1>
+		<ProcessArg2>fg</ProcessArg2>
+		<BootLaunch>2</BootLaunch>
+		<LaunchID>10</LaunchID>
+		<DepProcessName/>
+		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG7>
 	<PROCESSCONFIG8>
-		<ProcessName>DecomSvr</ProcessName>
-		<ModuleType>pm</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/bin/DecomSvr</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>15</LaunchID>
-		<DepProcessName/>
-		<RunType>LOADSHARE</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG8>
-	<PROCESSCONFIG9>
 		<ProcessName>PrimProc</ProcessName>
 		<ModuleType>pm</ModuleType>
 		<ProcessLocation>/usr/local/Calpont/bin/PrimProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>20</LaunchID>
-		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG9>
-	<PROCESSCONFIG10>
+	</PROCESSCONFIG8>
+	<PROCESSCONFIG9>
 		<ProcessName>ExeMgr</ProcessName>
-		<ModuleType>pm</ModuleType>
+		<ModuleType>um</ModuleType>
 		<ProcessLocation>/usr/local/Calpont/bin/ExeMgr</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>30</LaunchID>
@@ -129,54 +116,45 @@
 		<DepModuleName1>pm*</DepModuleName1>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG10>
-	<PROCESSCONFIG11>
-		<ProcessName>WriteEngineServer</ProcessName>
+	</PROCESSCONFIG9>
+	<PROCESSCONFIG10>
+		<ProcessName>DMLProc</ProcessName>
 		<ModuleType>pm</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/bin/WriteEngineServer</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/DMLProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>40</LaunchID>
-		<RunType>LOADSHARE</RunType>
+		<DepProcessName1>ExeMgr</DepProcessName1>
+		<DepModuleName1>pm*</DepModuleName1>
+		<DepProcessName2>PrimProc</DepProcessName2>
+		<DepModuleName2>pm*</DepModuleName2>
+		<DepProcessName3>DBRMControllerNode</DepProcessName3>
+		<DepModuleName3>@</DepModuleName3>
+		<RunType>SIMPLEX</RunType>
+		<LogFile>off</LogFile>
+	</PROCESSCONFIG10>
+	<PROCESSCONFIG11>
+		<ProcessName>DDLProc</ProcessName>
+		<ModuleType>pm</ModuleType>
+		<ProcessLocation>/usr/local/Calpont/bin/DDLProc</ProcessLocation>
+		<BootLaunch>2</BootLaunch>
+		<LaunchID>41</LaunchID>
+		<DepProcessName1>ExeMgr</DepProcessName1>
+		<DepModuleName1>pm*</DepModuleName1>
+		<DepProcessName2>PrimProc</DepProcessName2>
+		<DepModuleName2>pm*</DepModuleName2>
+		<DepProcessName3>DBRMControllerNode</DepProcessName3>
+		<DepModuleName3>@</DepModuleName3>
+		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG11>
 	<PROCESSCONFIG12>
-		<ProcessName>DMLProc</ProcessName>
-		<ModuleType>um</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/bin/DMLProc</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>50</LaunchID>
-		<DepProcessName1>WriteEngineServer</DepProcessName1>
-		<DepModuleName1>pm*</DepModuleName1>
-		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
-		<DepModuleName2>*</DepModuleName2>
-		<DepProcessName3>ExeMgr</DepProcessName3>
-		<DepModuleName3>pm*</DepModuleName3>
-		<DepProcessName4>DDLProc</DepProcessName4>
-		<DepModuleName4>pm*</DepModuleName4>
-		<RunType>SIMPLEX</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG12>
-	<PROCESSCONFIG13>
-		<ProcessName>DDLProc</ProcessName>
-		<ModuleType>um</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/bin/DDLProc</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>51</LaunchID>
-		<DepProcessName1>WriteEngineServer</DepProcessName1>
-		<DepModuleName1>pm*</DepModuleName1>
-		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
-		<DepModuleName2>*</DepModuleName2>
-		<RunType>SIMPLEX</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG13>
-	<PROCESSCONFIG14>
 		<ProcessName>mysqld</ProcessName>
-		<ModuleType>pm</ModuleType>
-		<ProcessLocation>/usr/local/Calpont/mysql/libexec/mysqld</ProcessLocation>
+		<ModuleType>um</ModuleType>
+		<ProcessLocation>/usr/local/Calpont/mysql/libexe/mysqld</ProcessLocation>
 		<BootLaunch>0</BootLaunch>
 		<LaunchID>100</LaunchID>
 		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG13>
+	</PROCESSCONFIG12>
 </Calpont>

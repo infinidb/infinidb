@@ -12,13 +12,10 @@ CREATE FUNCTION calcleartablelock RETURNS STRING SONAME 'libcalmysql.dll';
 create database if not exists calpontsys;
 use calpontsys;
 
-drop table if exists systable restrict;
-drop table if exists syscolumn restrict;
-
 -- SYSTABLE
 create table if not exists systable (
-	tablename varchar(128),
-	`schema` varchar(128),
+	tablename varchar(64),
+	`schema` varchar(64),
 	objectid int,
 	createdate date,
 	lastupdate date,
@@ -32,9 +29,9 @@ create table if not exists systable (
 
 -- SYSCOLUMN
 create table if not exists syscolumn (
-	`schema` varchar(128),
-	tablename varchar(128),
-	columnname varchar(128),
+	`schema` varchar(64),
+	tablename varchar(64),
+	columnname varchar(64),
 	objectid int,
 	dictobjectid int,
 	listobjectid int,
@@ -43,7 +40,7 @@ create table if not exists syscolumn (
 	columnlength int,
 	columnposition int,
 	lastupdate date,
-	defaultvalue varchar(64),
+	defaultvalue varchar(8),
 	nullable int,
 	scale int,
 	prec int,

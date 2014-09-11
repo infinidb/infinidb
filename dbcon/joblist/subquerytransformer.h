@@ -41,9 +41,6 @@ class CalpontSelectExecutionPlan;
 namespace joblist
 {
 
-struct JobInfo;
-class  TupleHashJoinStep;
-
 class SubQueryTransformer
 {
 
@@ -82,31 +79,6 @@ public:
      */
     virtual void run();
 
-    /** @brief virtual outer query jobinfo
-     *  @returns JobInfo*
-     */
-    virtual JobInfo* outJobInfo() const { return fOutJobInfo; }
-
-    /** @brief virtual subquery jobinfo
-     *  @returns JobInfo*
-     */
-    virtual JobInfo* subJobInfo() const { return fSubJobInfo; }
-
-    /** @brief virtual error info pointer
-     *  @returns SErrorInfo&
-     */
-    virtual SErrorInfo& status() const { return fStatus; }
-
-    /** @brief virtual joblist
-     *  @returns STJLP&
-     */
-    virtual const STJLP& subJobList() const { return fSubJobList; }
-
-    /** @brief virtual subquery step
-     *  @returns SJSTEP&
-     */
-    virtual const SJSTEP& subQueryStep() const { return fSubQueryStep; }
-
     /** @brief virtual get correlated steps
      *  @returns const JobStepVector&
      */
@@ -123,22 +95,13 @@ public:
 
 
 protected:
-
-	void checkCorrelateInfo(TupleHashJoinStep*, const JobInfo&);
-
-    JobInfo*      fOutJobInfo;
-    JobInfo*      fSubJobInfo;
+    JobInfo*      fJobInfo;
     SErrorInfo&   fStatus;
     JobStepVector fCorrelatedSteps;
 	RetColsVector fSubReturnedCols;
 	STJLP         fSubJobList;
 	SJSTEP        fSubQueryStep;
 	VirtualTable  fVtable;
-
-	// disable copy constructor and assignment operator
-	SubQueryTransformer(const SubQueryTransformer&);
-	SubQueryTransformer& operator=(const SubQueryTransformer&);
-
 };
 
 
@@ -190,11 +153,6 @@ protected:
 	boost::scoped_array<uint8_t> fRowData;
     bool                         fEmptyResultSet;
     bool                         fExistFilter;
-
-	// disable copy constructor and assignment operator
-	SimpleScalarTransformer(const SimpleScalarTransformer&);
-	SimpleScalarTransformer& operator=(const SimpleScalarTransformer&);
-
 };
 
 

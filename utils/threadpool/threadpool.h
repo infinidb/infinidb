@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: threadpool.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: threadpool.h 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *   Work dervied from Devguy.com's Open Source C++ thread pool implementation 
 *	released under public domain.

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_tempxmlgendata.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_tempxmlgendata.h 3403 2011-12-21 16:58:13Z xlou $
 *
 *******************************************************************************/
 /** @file */
@@ -32,8 +32,8 @@
 namespace WriteEngine
 {
 
-/** @brief Class used by cpimport.bin to store data that is saved into a
- *  temporary runtime Job XML file.
+/** @brief Class used by cpimport to store data that is saved into a temporary
+ *  runtime Job XML file.
  */
 class TempXMLGenData : public XMLGenData
 {

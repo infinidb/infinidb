@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: operator.cpp 8570 2012-05-29 22:29:11Z zzhu $
+*   $Id: operator.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -84,80 +84,39 @@ void Operator::data(const string data)
 	fData = lrtrim(data);
 	transform (fData.begin(), fData.end(), fData.begin(), to_lower()); 
 	if (fData == "+")
-	{
 		fOp = OP_ADD;
-	}
 	else if (fData == "-")
-	{
 		fOp = OP_SUB;
-	}
 	else if (fData == "*")
-	{
 		fOp = OP_MUL;
-	}
 	else if (fData == "/")
-	{
 		fOp = OP_DIV;
-	}
 	else if (fData == "=")
-	{
 		fOp = OP_EQ;
-	}
 	else if (fData == "!=" || fData == "<>")
-	{
 		fOp = OP_NE;
-	}
 	else if (fData == ">")
-	{
 		fOp = OP_GT;
-	}
 	else if (fData == ">=")
-	{
 		fOp = OP_GE;
-	}
 	else if (fData == "<")
-	{
 		fOp = OP_LT;
-	}
 	else if (fData == "<=")
-	{
 		fOp = OP_LE;
-	}
 	else if (fData == "and")
-	{
 		fOp = OP_AND;
-	}
 	else if (fData == "or")
-	{
 		fOp = OP_OR;
-	}
 	else if (fData == "like")
-	{
 		fOp = OP_LIKE;
-	}
 	else if (fData == "not like")
-	{
 		fOp = OP_NOTLIKE;
-		fData = "not like";
-	}
 	else if (fData == "isnull")
-	{
 		fOp = OP_ISNULL;
-		fData = "is null";
-	}
 	else if (fData == "isnotnull")
-	{
 		fOp = OP_ISNOTNULL;
-		fData = "is not null";
-	}
-	else if (fData == "xor")
-	{
-		fOp = OP_XOR;
-	}
 	else
-	{
 		fOp = OP_UNKNOWN;
-	}
 }
 
 const string Operator::toString() const

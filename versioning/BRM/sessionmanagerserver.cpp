@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmanagerserver.cpp 1706 2012-09-20 12:43:42Z rdempsey $
+ * $Id: sessionmanagerserver.cpp 1546 2012-04-03 18:32:59Z dcathey $
  *
  ****************************************************************************/
 
@@ -30,9 +30,16 @@
 #include <cerrno>
 #include <unistd.h>
 
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/sync/named_semaphore.hpp>
+#include <boost/version.hpp>
+namespace bi=boost::interprocess;
+
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <stdexcept>
+#include <ios>
 #include <limits>
 #ifdef _MSC_VER
 #include <io.h>
@@ -60,22 +67,17 @@
 #endif
 
 using namespace std;
-using namespace boost;
-using namespace execplan;
 
 namespace BRM {
 
-const uint32_t SessionManagerServer::SS_READY				= 1 << 0;	// Set by dmlProc one time when dmlProc is ready
-const uint32_t SessionManagerServer::SS_SUSPENDED			= 1 << 1;	// Set by console when the system has been suspended by user.
-const uint32_t SessionManagerServer::SS_SUSPEND_PENDING		= 1 << 2;	// Set by console when user wants to suspend, but writing is occuring.
-const uint32_t SessionManagerServer::SS_SHUTDOWN_PENDING	= 1 << 3;	// Set by console when user wants to shutdown, but writing is occuring.
-const uint32_t SessionManagerServer::SS_ROLLBACK			= 1 << 4;   // In combination with a PENDING flag, force a rollback as soom as possible.
-const uint32_t SessionManagerServer::SS_FORCE				= 1 << 5;   // In combination with a PENDING flag, force a shutdown without rollback.
-
-
-SessionManagerServer::SessionManagerServer() : unique32(0), unique64(0)
+SessionManagerServer::SessionManagerServer() : unique32(0)
+#ifdef _MSC_VER
+	, fPids(0), fMaxPids(64)
+#endif
 {	
 	config::Config* conf;
+	//int err;
+	int madeSems;
 	string stmp;
 	const char *ctmp;
 	
@@ -83,7 +85,7 @@ SessionManagerServer::SessionManagerServer() : unique32(0), unique64(0)
 	try {
 		stmp = conf->getConfig("SessionManager", "MaxConcurrentTransactions");
 	}
-	catch(const std::exception &e) {
+	catch(exception& e) {
 		cout << e.what() << endl;
 		stmp.empty();
 	}
@@ -91,13 +93,27 @@ SessionManagerServer::SessionManagerServer() : unique32(0), unique64(0)
 		int64_t tmp;
 		ctmp = stmp.c_str();
 		tmp = config::Config::fromText(ctmp);
-		if (tmp < 1)
-			maxTxns = 1;
+		if (tmp == numeric_limits<int64_t>::min() || tmp == numeric_limits<int64_t>::max() || tmp < 1)
+			MaxTxns = 1000;
 		else
-			maxTxns = static_cast<int>(tmp);
+			MaxTxns = static_cast<int>(tmp);
 	}
 	else
-		maxTxns = 1;
+		MaxTxns = 1000;
+	
+
+	stmp.clear();
+	try {
+		stmp = conf->getConfig("SessionManager", "SharedMemoryTmpFile");
+	}
+	catch(exception& e) {
+		cout << e.what() << endl;
+		stmp.empty();
+	}
+	if (stmp != "")
+		segmentFilename = strdup(stmp.c_str());
+	else
+		segmentFilename = strdup("/tmp/CalpontShm");
 	
 	txnidFilename = conf->getConfig("SessionManager", "TxnIDFile");
 
@@ -112,48 +128,202 @@ SessionManagerServer::SessionManagerServer() : unique32(0), unique64(0)
 		fchmod(txnidfd, 0666);
 #endif
 
-	semValue = maxTxns;
-	_verID = 0;
-	_sysCatVerID = 0;
-	systemState = 0;
+	madeSems = makeSems();
+	if (madeSems) {
+		for (int i = 0; i < MaxTxns; i++)
+		{
+			shared->sems[1].post();
+		}
+	}
+	
+	getSharedData();
+	unlock();
+}
+
+SessionManagerServer::SessionManagerServer(bool nolock) : unique32(0)
+#ifdef _MSC_VER
+	, fPids(0), fMaxPids(64)
+#endif
+{	
+	config::Config* conf;
+	string stmp;
+	const char *ctmp;
+	
+	conf = config::Config::makeConfig();
 	try {
-		loadState();
+		stmp = conf->getConfig("SessionManager", "MaxConcurrentTransactions");
 	}
-	catch (...) {
-		// first-time run most likely, ignore the error
+	catch(exception& e) {
+		cout << e.what() << endl;
+		stmp.empty();
 	}
+	if (stmp != "") {
+		int64_t tmp;
+		ctmp = stmp.c_str();
+		tmp = config::Config::fromText(ctmp);
+		if (tmp == numeric_limits<int64_t>::min() || tmp == numeric_limits<int64_t>::max() || tmp < 1)
+			MaxTxns = 1000;
+		else
+			MaxTxns = static_cast<int>(tmp);
+	}
+	else
+		MaxTxns = 1000;
+
+	stmp.clear();
+	try {
+		stmp = conf->getConfig("SessionManager", "SharedMemoryTmpFile");
+	}
+	catch(exception& e) {
+		cout << e.what() << endl;
+		stmp.empty();
+	}
+	if (stmp != "")
+		segmentFilename = strdup(stmp.c_str());
+	else
+		segmentFilename = strdup("/tmp/CalpontShm");
+		
+	txnidFilename = conf->getConfig("SessionManager", "TxnIDFile");
+
+	txnidfd = open(txnidFilename.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
+	if (txnidfd < 0) {
+		perror("SessionManagerServer(): open");
+		throw runtime_error("SessionManagerServer: Could not open the transaction ID file");
+	}
+
+	shared = NULL;
+	string keyName = ShmKeys::keyToName(fShmKeys.SESSIONMANAGER_SYSVKEY);
+	bi::shared_memory_object shm(bi::open_only, keyName.c_str(), bi::read_write);
+	bi::mapped_region region(shm, bi::read_write);
+	fOverlayShm.swap(shm);
+	fRegion.swap(region);
+	shared = static_cast<Overlay*>(fRegion.get_address());
 }
 
 SessionManagerServer::~SessionManagerServer()
 {
+	if (shared != NULL) {
+		lock();
+		detachSegment();
+		unlock();
+	}
+	free(segmentFilename);
 	close(txnidfd);
+}
+
+void SessionManagerServer::detachSegment()
+{
+	
+#ifdef DESTROYSHMSEG
+	struct shmid_ds seginfo;
+
+	err = shmctl(shmid, IPC_STAT, &seginfo);
+	if (err < 0) {
+		perror("SessionManagerServer::detachSegment(): shmctl(IPC_STAT)");
+		saveSegment();
+	}
+	else if (seginfo.shm_nattch == 1) 
+		saveSegment();
+#endif
+}
+
+//returns 1 if it created the semaphores, 0 if they already existed
+int SessionManagerServer::makeSems()
+{
+	int rc = -1;
+	string keyName = ShmKeys::keyToName(fShmKeys.SESSIONMANAGER_SYSVKEY);
+	try
+	{
+#if BOOST_VERSION < 104500
+		bi::shared_memory_object shm(bi::create_only, keyName.c_str(), bi::read_write);
+#ifdef __linux__
+		{
+			string pname = "/dev/shm/" + keyName;
+			chmod(pname.c_str(), 0666);
+		}
+#endif
+#else
+		bi::permissions perms;
+		perms.set_unrestricted();
+		bi::shared_memory_object shm(bi::create_only, keyName.c_str(), bi::read_write, perms);
+#endif
+		unsigned size = sizeof(Overlay) + MaxTxns * sizeof(SIDTIDEntry);
+		shm.truncate(size);
+		bi::mapped_region region(shm, bi::read_write);
+		fOverlayShm.swap(shm);
+		fRegion.swap(region);
+		shared = static_cast<Overlay*>(fRegion.get_address());
+		shared->systemState = SS_NOT_READY;
+		shared->txnCount = 0;
+		shared->verID = 0;
+		shared->sysCatVerID = 0;
+		new (&shared->sems[0]) bi::interprocess_semaphore(0);
+		new (&shared->sems[1]) bi::interprocess_semaphore(0);
+		initSegment();
+		rc = 1;
+	}
+	catch (...)
+	{
+		bi::shared_memory_object shm(bi::open_only, keyName.c_str(), bi::read_write);
+		bi::mapped_region region(shm, bi::read_write);
+		fOverlayShm.swap(shm);
+		fRegion.swap(region);
+		shared = static_cast<Overlay*>(fRegion.get_address());
+		rc = 0;
+	}
+	return rc;
+}
+	
+void SessionManagerServer::lock() 
+{
+again:
+	try {
+		shared->sems[0].wait();
+	}
+	catch (boost::interprocess::interprocess_exception &b) {
+		if (b.get_error_code() == 1)   // handle EINTR
+			goto again;
+		throw;
+	}
+}
+
+void SessionManagerServer::unlock() 
+{
+	shared->sems[0].post();
 }
 
 void SessionManagerServer::reset()
 {
-	mutex.try_lock();
-	semValue = maxTxns;
-	condvar.notify_all();
-	activeTxns.clear();
-	mutex.unlock();
+	while (shared->sems[0].try_wait())
+	{
+	}
+	shared->sems[0].post();
+	while (shared->sems[1].try_wait())
+	{
+	}
+	for (int i = 0; i < MaxTxns; i++)
+	{
+		shared->sems[1].post();
+	}
 }
 
-void SessionManagerServer::loadState()
+void SessionManagerServer::getSharedData() 
+{
+	//segment will always be there by now...
+	string keyName = ShmKeys::keyToName(fShmKeys.SESSIONMANAGER_SYSVKEY);
+	bi::shared_memory_object shm(bi::open_only, keyName.c_str(), bi::read_write);
+	bi::mapped_region region(shm, bi::read_write);
+	fOverlayShm.swap(shm);
+	fRegion.swap(region);
+	shared = static_cast<Overlay*>(fRegion.get_address());
+}
+
+inline void SessionManagerServer::initSegment()
 {
 	int lastTxnID;
 	int err;
 	int lastSysCatVerId;
 	
 again:
-
-	// There are now 3 pieces of info stored in the txnidfd file: last
-	// transaction id, last system catalog version id, and the
-	// system state flags. All these values are stored in shared, an
-	// instance of struct Overlay.
-	// If we fail to read a full four bytes for any value, then the
-	// value isn't in the file, and we start with the default.
-
-	// Last transaction id
 	lseek(txnidfd, 0, SEEK_SET);
 	err = read(txnidfd, &lastTxnID, 4);
 	if (err < 0 && errno != EINTR) {
@@ -163,9 +333,9 @@ again:
 	else if (err < 0)
 		goto again;
 	else if (err == sizeof(int))
-		_verID = lastTxnID;
+		shared->verID = lastTxnID;
     
-    // last system catalog version id
+    //lseek(txnidfd, 4, SEEK_SET);
     err = read(txnidfd, &lastSysCatVerId, 4);
     if (err < 0 && errno != EINTR) {
 		perror("Sessionmanager::initSegment(): read");
@@ -174,177 +344,291 @@ again:
 	else if (err < 0)
 		goto again;
 	else if (err == sizeof(int))
-		_sysCatVerID = lastSysCatVerId;
-
-	// System state. Contains flags regarding the suspend state of the system.
-	err = read(txnidfd, &systemState, 4);
-	if (err < 0 && errno == EINTR) {
-		goto again;
-	}
-	else if (err == sizeof(int))
-	{
-		// Turn off the pending and force flags. They make no sense for a clean start.
-		// Turn off the ready flag. DMLProc will set it back on when
-		// initialized.
-		systemState &= ~(SS_READY | SS_SUSPEND_PENDING | SS_SHUTDOWN_PENDING | SS_ROLLBACK | SS_FORCE);
-	}
-	else
-	{
-		// else no problem. System state wasn't saved. Might be an upgraded system.
-		systemState = 0;
-	}
+		shared->sysCatVerID = lastSysCatVerId;
+	// if 0 <= err < sizeof(int), the file is empty and txn's start at 1 like normal
 }
 
-/* Save the systemState flags of the Overlay
- * segment. This is saved in the third
- * word of txnid File
-*/
-void SessionManagerServer::saveSystemState() 
-{ 
-	int err = 0;
-	uint32_t lSystemState = systemState;
-
-	// We don't save the pending flags, the force flag or the ready flag.
-	lSystemState &= ~(SS_READY | SS_SUSPEND_PENDING | SS_SHUTDOWN_PENDING | SS_FORCE);
-	lseek(txnidfd, 8, SEEK_SET);
-	err = write(txnidfd, &lSystemState, sizeof(int));
-	if (err < 0) {
-		perror("SessionManagerServer::saveSystemState(): write(systemState)");
-		throw runtime_error("SessionManagerServer::saveSystemState(): write(systemState) failed");
+#ifdef DESTROYSHMSEG
+void SessionManagerServer::loadSegment() 
+{
+	int fd, err = 0, errCount = 0;
+	uint progress = 0, size;
+	char *seg = reinterpret_cast<char *>(shared);
+	
+	//FIXME: this calc is wrong
+	size = 2*sizeof(int) + MaxTxns*sizeof(SIDTIDEntry);
+	
+	fd = open(segmentFilename, O_RDONLY);
+	if (fd < 0) {
+		perror("SessionManagerServer::loadSegment(): open");
+		if (errno == ENOENT) {
+			cerr << "SessionManagerServer::loadSegment(): (assuming this is the first invocation)" << endl;
+			initSegment();
+			return;
+		}
+		else
+			throw ios_base::failure("SessionManagerServer::loadSegment(): open failed.  Check the error log.");
 	}
-} 
+	while (progress < size && errCount < MaxRetries) {
+		err = read(fd, &seg[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {
+				perror("SessionManagerServer::loadSegment(): read");
+				errCount++;
+			}
+		}
+		else if (err == 0) {
+			close(fd);
+			throw ios_base::failure("SessionManagerServer::loadSegment(): read reports EOF prematurely");
+		}
+		else
+			progress += err;
+	}
+	if (errCount == MaxRetries) {
+		close(fd);
+		throw ios_base::failure("SessionManagerServer::loadSegment(): too many read errors");
+	}
+	close(fd);
+	
+	// a quick, loose consistency check
+	if (semctl(sems, 1, GETVAL) != (MaxTxns - shared->txnCount))
+		throw runtime_error("SessionManagerServer::loadSegment(): ERROR: the txn "
+			"semaphore does not match the txn count");
+
+}
+
+void SessionManagerServer::saveSegment()
+{
+	int fd, err = 0, errCount = 0;
+	uint progress = 0, size;
+	char *seg = reinterpret_cast<char *>(shared);
+
+	size = 2*(sizeof(int)) + MaxTxns*sizeof(SIDTIDEntry);
+	
+	fd = open(segmentFilename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
+	if (fd < 0) {
+		perror("SessionManagerServer::saveSegment(): open");
+		throw ios_base::failure("SessionManagerServer::saveSegment(): open failed.  Check the error log.");
+	}
+	while (progress < size && errCount < MaxRetries) {
+		err = write(fd, &seg[progress], size - progress);
+		if (err < 0) {
+			if (errno != EINTR) {
+				perror("SessionManagerServer::saveSegment(): write");
+				errCount++;
+			}
+		}
+		else
+			progress += err;
+	}
+	if (errCount == MaxRetries) {
+		close(fd);
+		throw ios_base::failure("SessionManagerServer::saveSegment(): too many write errors");
+	}
+	close(fd);
+}
+#endif  // DESTROYSHMSEG
 
 /* See bug 3330.  The SCN returned to queries has to be < the transaction ID.
  * This will have to be revised when we eventually support multiple
  * active transactions.
  */
-const CalpontSystemCatalog::SCN SessionManagerServer::verID()
+const execplan::CalpontSystemCatalog::SCN SessionManagerServer::verID()
 {
 	execplan::CalpontSystemCatalog::SCN ret;
 
-	mutex::scoped_lock lk(mutex);
-	ret = _verID - activeTxns.size();
+	lock();
+	ret = shared->verID - shared->txnCount;
+	unlock();
 	return ret;
+
+//	return shared->verID - shared->txnCount;
 }
 
-const CalpontSystemCatalog::SCN SessionManagerServer::sysCatVerID()
+const execplan::CalpontSystemCatalog::SCN SessionManagerServer::sysCatVerID()
 {
     execplan::CalpontSystemCatalog::SCN ret;
 
-    mutex::scoped_lock lk(mutex);
-    ret = _sysCatVerID - activeTxns.size();
+    lock();
+    ret = shared->sysCatVerID - shared->txnCount;
+    unlock();
     return ret;
+
+//	return shared->sysCatVerID - shared->txnCount;
 }
 
 const TxnID SessionManagerServer::newTxnID(const SID session, bool block, bool isDDL) 
 {
 	TxnID ret; //ctor must set valid = false
+	int i;
 	int err;
-	iterator it;
 	
-	mutex::scoped_lock lk(mutex);
-
-	// if it already has a txn...
-	it = activeTxns.find(session);
-	if (it != activeTxns.end()) {
-		ret.id = it->second;
-		ret.valid = true;
-		return ret;
+	//@Bug 2661 Check if any active transaction This is a just a quick hack to allow only one active transaction a time. 
+	// When we need to support concurrent transaction, this need to change.
+	lock();
+	for (i = 0; i < MaxTxns; i++) {
+		if (shared->activeTxns[i].txnid.valid && (shared->activeTxns[i].sessionid != session) )
+		{
+			unlock();
+			return ret;
+		}
 	}
 
-	if (!block && semValue == 0)
-		return ret;
-	else while (semValue == 0)
-		condvar.wait(lk);
-
-	semValue--;
-	idbassert(semValue <= (uint)maxTxns);
-
-	ret.id = ++_verID;
-	ret.valid = true;
-	activeTxns[session] = ret.id;
-	if (isDDL)
-		++_sysCatVerID;
-
-	int filedata[2];
-	filedata[0] = _verID;
-	filedata[1] = _sysCatVerID;
-
-	lseek(txnidfd, 0, SEEK_SET);
-	err = write(txnidfd, filedata, 8);
-	if (err < 0) {
-		perror("SessionManagerServer::newTxnID(): write(verid)");
-		throw runtime_error("SessionManagerServer::newTxnID(): write(verid) failed");
+again:
+	try {
+		if (!shared->sems[1].try_wait())
+		{
+			if (block)
+				shared->sems[1].wait();
+			else
+				return ret;
+		}
+	}
+	catch(boost::interprocess::interprocess_exception &e) {
+		if (e.get_error_code() == 1)  // handle EINTR
+			goto again;
+		throw;
 	}
 
+	for (i = 0; i < MaxTxns; i++) {
+		if (!shared->activeTxns[i].txnid.valid &&
+			(shared->activeTxns[i].tableOID == 0)) {
+			shared->activeTxns[i].sessionid = session;
+			shared->activeTxns[i].txnid.id = ++shared->verID;
+			
+			if ( isDDL )
+				++shared->sysCatVerID;
+			
+			shared->activeTxns[i].txnid.valid = true;
+			ret = shared->activeTxns[i].txnid;
+			shared->txnCount++;
+			//printSIDTIDEntry("DBG:newTXNID create  ", i);
+			lseek(txnidfd, 0, SEEK_SET);
+			err = write(txnidfd, &shared->verID, sizeof(int));
+			if (err < 0) {
+				perror("SessionManagerServer::newTxnID(): write(txnid)");
+				throw runtime_error("SessionManagerServer::newTxnID(): write(txnid) failed");
+			}
+			//lseek(txnidfd, 4, SEEK_SET);
+			err = write(txnidfd, &shared->sysCatVerID, sizeof(int));
+			if (err < 0) {
+				perror("SessionManagerServer::newTxnID(): write(txnid)");
+				throw runtime_error("SessionManagerServer::newTxnID(): write(txnid) failed");
+			}
+			break;
+		}
+	}
+	
+	unlock();
+	if (i == MaxTxns)
+		throw runtime_error("SessionManagerServer: txn semaphore does not agree with txnCount");
+	
 	return ret;
 }
 
-void SessionManagerServer::finishTransaction(TxnID& txn)
+void SessionManagerServer::finishTransaction(TxnID& txn, bool commit)
 {
-	iterator it;
-	mutex::scoped_lock lk(mutex);
+	int i;
+	bool found = false;
 	
 	if (!txn.valid)
 		throw invalid_argument("SessionManagerServer::finishTransaction(): transaction is invalid");
 
-	for (it = activeTxns.begin(); it != activeTxns.end(); ++it) {
-		if (it->second == txn.id) {
-			activeTxns.erase(it);
+	SID sessionId = 0;
+	
+	lock();
+
+	// Note that we do NOT break from the loop after we find a match, because
+	// we could have multiple entries for the same transaction.  There will be
+	// an entry having a nonzero tableOID for each table in the transaction.
+	for (i = 0; i < MaxTxns; i++) {   //for a constant time op, store the index in the txnid
+		if ((shared->activeTxns[i].txnid.valid) &&
+			(shared->activeTxns[i].txnid.id == txn.id)) {
+			//printSIDTIDEntry("DBG:finishTransaction", i);
+			sessionId = shared->activeTxns[i].sessionid;
 			txn.valid = false;
-			break;
+			shared->activeTxns[i].init();
+			
+			// @bug 2576.  Added use of found bool below.  There were bogus entries showing up in the warning.log file for successful
+			// commits and rollbacks.  For example, the entry below was showing up for successful create table statements.
+			// CAL0000: DBRM: warning: SessionManager::committed() failed (valid error code)
+			found = true;
 		}
 	}
 
-	if (it != activeTxns.end()) {
-		semValue++;
-		idbassert(semValue <= (uint)maxTxns);
-		condvar.notify_one();
+	if(found) {
+		shared->txnCount--;
+		shared->sems[1].post();
 	}
-	else
+	unlock();
+
+	if (!found)
 		throw invalid_argument("SessionManagerServer::finishTransaction(): transaction doesn't exist");
 }
 
 void SessionManagerServer::committed(TxnID& txn)
 {
-	finishTransaction(txn);
+	finishTransaction(txn, true);
 }
 
 void SessionManagerServer::rolledback(TxnID& txn)
 {
-	finishTransaction(txn);
+	finishTransaction(txn, false);
 }
 
 const TxnID SessionManagerServer::getTxnID(const SID session)
 {
+	int i;
 	TxnID ret;
-	iterator it;
 	
-	mutex::scoped_lock lk(mutex);
-
-	it = activeTxns.find(session);
-	if (it != activeTxns.end()) {
-		ret.id = it->second;
-		ret.valid = true;
+	lock();
+	for (i = 0; i < MaxTxns; i++) {
+		if (shared->activeTxns[i].sessionid == session &&
+		   shared->activeTxns[i].txnid.valid) {
+			ret = shared->activeTxns[i].txnid;
+			break;
+		}
 	}
+	unlock();
 	
 	return ret;
 }
 
-shared_array<SIDTIDEntry> SessionManagerServer::SIDTIDMap(int &len)
+char * SessionManagerServer::getShmContents(int &len)
 {
-	int j;
-	shared_array<SIDTIDEntry> ret;
-	mutex::scoped_lock lk(mutex);
-	iterator it;
+	char *ret;
+	
+	len = sizeof(Overlay) + MaxTxns * sizeof(SIDTIDEntry);
+	ret = new char[len];
+	lock();
+	memcpy(ret, shared, len);
+	unlock();
+	return ret;	
+}
 
-	ret.reset(new SIDTIDEntry[activeTxns.size()]);
+const SIDTIDEntry* SessionManagerServer::SIDTIDMap(int& len)
+{
+	int i, j;
+	SIDTIDEntry *ret;
 
-	len = activeTxns.size();
-	for (it = activeTxns.begin(), j = 0; it != activeTxns.end(); ++it, ++j) {
-		ret[j].sessionid = it->first;
-		ret[j].txnid.id = it->second;
-		ret[j].txnid.valid = true;
+	lock();
+	len = shared->txnCount;
+	ret = new SIDTIDEntry[len];
+	for (i = 0, j = 0; i < MaxTxns && j < shared->txnCount; i++) {
+		if (shared->activeTxns[i].txnid.valid)
+			ret[j++] = shared->activeTxns[i];
+	}
+	try {
+		unlock();
+	}
+	catch (...) {
+		delete [] ret;
+		throw;
+	}
+	
+	if (j != len) {
+		delete [] ret;
+		throw runtime_error("Sessionmanager::SIDTIDMap(): txnCount is invalid");
 	}
 	
 	return ret;
@@ -353,6 +637,41 @@ shared_array<SIDTIDEntry> SessionManagerServer::SIDTIDMap(int &len)
 string SessionManagerServer::getTxnIDFilename() const 
 {
 	return txnidFilename;
+}
+
+int SessionManagerServer::verifySize()
+{
+	int i, ret, countsnapshot, semsnap;
+	
+	lock();
+	for (i = 0, ret = 0; i < MaxTxns; i++)
+		if (shared->activeTxns[i].txnid.valid == true)
+			ret++;
+					
+	countsnapshot = shared->txnCount;
+	//semsnap = semctl(sems, 1, GETVAL);
+	//unfortuneately, boost::interprocess does not provide an API to access the sem count :-(
+	semsnap = MaxTxns - ret;
+	unlock();
+	
+	if (ret != countsnapshot) {
+		cerr << "SessionManagerServer::verifySize(): actual count = " << ret 
+				<< " txnCount = " << countsnapshot << endl;
+		throw logic_error("SessionManagerServer::verifySize(): txnCount != actual count");
+	}
+			
+	if (semsnap == -1) {
+		perror("SessionManagerServer::verifySize(): semctl");
+		throw runtime_error("SessionManagerServer::verifySize(): semctl gave an error. Check the log.");
+	}
+		
+	if (ret != MaxTxns - semsnap) {
+		cerr << "SessionManagerServer::verifySize(): actual count = " << ret 
+				<< " semsnap = " << semsnap << endl;
+		throw logic_error("SessionManagerServer::verifySize(): (MaxTxns - semsnap) != actual count");
+	}
+			
+	return ret;
 }
 
 const uint32_t SessionManagerServer::getUnique32()
@@ -364,40 +683,327 @@ const uint32_t SessionManagerServer::getUnique32()
 #endif
 }
 
-const uint64_t SessionManagerServer::getUnique64()
+int8_t SessionManagerServer::setTableLock (  const OID_t tableOID, const u_int32_t sessionID,  const u_int32_t processID, const string processName, bool tolock ) 
+{
+	int i;
+	int8_t  err = 0;
+	TxnID txnid  = getTxnID( sessionID );
+	//DML will share table lock. Only cpimport needs exclusive lock
+	lock();
+	if ( tolock )
+	{
+		for (i = 0; i < MaxTxns; i++) {
+			if ((shared->activeTxns[i].tableOID == tableOID) && ( shared->activeTxns[i].processID != processID ) )
+			{
+				err = ERR_TABLE_LOCKED_ALREADY;
+				//cerr << "SessionManagerServer::setTableLock(lock): table is locked by pid " << shared->activeTxns[i].processID << endl;
+				unlock();
+				return err;
+			}
+			else if ((shared->activeTxns[i].tableOID == tableOID) && ( shared->activeTxns[i].processID == processID ) )
+			{
+				//The table is locked already by this session
+				unlock();
+				return err;
+			}
+		}
+	}
+	
+	if ( tolock )
+	{
+		int write_rc = 0;
+		for (i = 0; i < MaxTxns; i++) {
+			if (!shared->activeTxns[i].txnid.valid &&
+				(shared->activeTxns[i].tableOID == 0))
+			{
+				shared->activeTxns[i].sessionid = sessionID;
+				shared->activeTxns[i].tableOID = tableOID;
+				shared->activeTxns[i].processID = processID;
+				shared->activeTxns[i].txnid = txnid;
+			
+				//@Bug 2569,2570
+				memset( shared->activeTxns[i].processName, 0, MAX_PROCNAME );
+				strncpy( shared->activeTxns[i].processName, processName.c_str(), MAX_PROCNAME-1 );
+				//printSIDTIDEntry("DBG:setTableLock LOCK", i);
+				lseek(txnidfd, 0, SEEK_SET);
+				write_rc = write(txnidfd, &shared->verID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::setTableLock(lock): write(verID)");
+					throw runtime_error("SessionManagerServer::setTableLock(nonDML,lock): write(verID) failed");
+				}
+				//lseek(txnidfd, 4, SEEK_SET);
+				write_rc = write(txnidfd, &shared->sysCatVerID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::setTableLock(lock): write(sysCatVerID)");
+					throw runtime_error("SessionManagerServer::setTableLock(nonDML,lock): write(sysCatVerID) failed");
+				}
+				break;
+			}
+		}
+	}
+	else
+	{
+		int write_rc = 0;
+		for (i = 0; i < MaxTxns; i++) {
+			if (shared->activeTxns[i].tableOID == tableOID)
+			{
+				//printSIDTIDEntry("DBG:setTableLock FREE", i);
+				shared->activeTxns[i].init();
+				lseek(txnidfd, 0, SEEK_SET);
+				write_rc = write(txnidfd, &shared->verID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::setTableLock(unlock): write(verID)");
+					throw runtime_error("SessionManagerServer::setTableLock(unlock): write(verID) failed");
+				}
+				//lseek(txnidfd, 4, SEEK_SET);
+				write_rc = write(txnidfd, &shared->sysCatVerID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::setTableLock(unlock): write(sysCatVerID)");
+					throw runtime_error("SessionManagerServer::setTableLock(unlock): write(sysCatVerID) failed");
+				}
+				break;
+			}
+		}
+	}
+	
+	unlock();
+	if (i == MaxTxns) {
+		if ( tolock )
+			throw runtime_error("SessionManagerServer::setTableLock(lock): cannot add table lock; "
+				"maximum allowable transactions are currently active");
+		else
+			err = ERR_TABLE_NOT_LOCKED;
+	}
+	
+	return err;
+
+}
+
+int8_t SessionManagerServer::updateTableLock (  const OID_t tableOID,  u_int32_t & processID, std::string & processName )
+{
+	int i;
+	int8_t  err = 0;
+	bool tableLocked = false;
+	bool validLock = false;
+	lock();
+	
+	for (i = 0; i < MaxTxns; i++) {
+		if ((shared->activeTxns[i].tableOID == tableOID) )
+		{
+			//Check the lock info
+			if (shared->activeTxns[i].processID != 0)
+			{
+				validLock = lookupProcessStatus (shared->activeTxns[i].processName, shared->activeTxns[i].processID);
+				if (validLock)
+				{
+					processID = shared->activeTxns[i].processID;
+					processName = shared->activeTxns[i].processName;
+					unlock();
+					err = ERR_TABLE_LOCKED_ALREADY;
+					return err;
+				}
+				else //reset the lock
+				{
+					//save the previous lock info
+					u_int32_t preProcessID;
+					std::string  preProcessName;
+					preProcessID = shared->activeTxns[i].processID;
+					preProcessName = shared->activeTxns[i].processName;
+					shared->activeTxns[i].tableOID = tableOID;
+					shared->activeTxns[i].processID = processID;
+					strncpy( shared->activeTxns[i].processName, processName.c_str(), MAX_PROCNAME-1 );
+					processID = preProcessID;
+					processName = preProcessName;
+					tableLocked = true;
+					break;
+				}				
+			}	
+			else
+			{
+				processID = shared->activeTxns[i].processID;
+				processName = shared->activeTxns[i].processName;
+				unlock();
+                                err = ERR_TABLE_LOCKED_ALREADY;
+                                return err;
+
+			}	
+		}
+	}
+	
+	if ( !tableLocked ) //The table is not locked by any process yet. Lock the table with passed in process
+	{
+		int write_rc = 0;
+		for (i = 0; i < MaxTxns; i++) {
+			if (!shared->activeTxns[i].txnid.valid &&
+				(shared->activeTxns[i].tableOID == 0))
+			{
+				shared->activeTxns[i].tableOID = tableOID;
+				shared->activeTxns[i].processID = processID;
+			
+				memset( shared->activeTxns[i].processName, 0, MAX_PROCNAME );
+				strncpy( shared->activeTxns[i].processName, processName.c_str(), MAX_PROCNAME-1 );
+				lseek(txnidfd, 0, SEEK_SET);
+				write_rc = write(txnidfd, &shared->verID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::updateTableLock: write(verID)");
+					throw runtime_error("SessionManagerServer::updateTableLock: write(verID) failed");
+				}
+				
+				write_rc = write(txnidfd, &shared->sysCatVerID, sizeof(int));
+				if (write_rc < 0) {
+					perror("SessionManagerServer::updateTableLock: write(sysCatVerID)");
+					throw runtime_error("SessionManagerServer::updateTableLock: write(sysCatVerID) failed");
+				}
+				break;
+			}
+		}
+	}
+	unlock();
+	return err;
+}
+
+bool SessionManagerServer::lookupProcessStatus(std::string   processName, u_int32_t     processId)
 {
 #ifdef _MSC_VER
-	return InterlockedIncrement64(&unique64);
+	boost::mutex::scoped_lock lk(fPidMemLock);	
+	if (!fPids)
+		fPids = (DWORD*)malloc(fMaxPids * sizeof(DWORD));
+	DWORD needed = 0;
+	if (EnumProcesses(fPids, fMaxPids * sizeof(DWORD), &needed) == 0)
+		return false;
+	while (needed == fMaxPids * sizeof(DWORD))
+	{
+		fMaxPids *= 2;
+		fPids = (DWORD*)realloc(fPids, fMaxPids * sizeof(DWORD));
+		if (EnumProcesses(fPids, fMaxPids * sizeof(DWORD), &needed) == 0)
+			return false;
+	}
+	DWORD numPids = needed / sizeof(DWORD);
+	for (DWORD i = 0; i < numPids; i++)
+	{
+		if (fPids[i] == processId)
+		{
+			TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
+
+			// Get a handle to the process.
+			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION |
+										   PROCESS_VM_READ,
+										   FALSE, fPids[i]);
+			// Get the process name.
+			if (hProcess != NULL)
+			{
+				HMODULE hMod;
+				DWORD cbNeeded;
+
+				if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
+					GetModuleBaseName(hProcess, hMod, szProcessName, 
+									   sizeof(szProcessName)/sizeof(TCHAR));
+
+				CloseHandle(hProcess);
+
+				if (processName == szProcessName)
+					return true;
+			}
+		}
+	}
+	return false;
 #else
-	return __sync_add_and_fetch(&unique64, 1);
+	bool bMatchFound = false;
+
+	std::ostringstream fileName;
+	fileName << "/proc/" << processId << "/stat";
+	FILE* pFile = fopen( fileName.str().c_str(), "r" );
+	if (pFile)
+	{
+		pid_t pid;
+		char  pName[100];
+
+		// Read in process name based on format of /proc/stat file described
+		// in "proc" manpage.  Have to allow for pName being enclosed in ().
+		if ( fscanf(pFile, "%d%s", &pid, pName) == 2 )
+		{
+			pName[strlen(pName)-1] = '\0'; // strip trailing ')'
+			if (processName == &pName[1])  // skip leading '(' in comparison
+			{
+				bMatchFound = true;
+			}
+		}
+
+		fclose( pFile );
+	}
+	
+	return bMatchFound;
 #endif
 }
-
-void SessionManagerServer::setSystemState(uint32_t state)
+		
+int8_t SessionManagerServer::getTableLockInfo ( const OID_t tableOID, u_int32_t & processID,
+	string & processName, bool & lockStatus, SID & sid )
 {
-	mutex::scoped_lock lk(mutex);
-
-	systemState |= state;
-	saveSystemState();
+	int i;
+	int8_t err = 0;
+	lockStatus = false;
+	lock();
+	for (i = 0; i < MaxTxns; i++) {
+		if ( shared->activeTxns[i].tableOID == tableOID ) {
+			lockStatus = true;
+			processID = shared->activeTxns[i].processID;
+			processName = shared->activeTxns[i].processName;
+			sid = shared->activeTxns[i].sessionid;
+			break;
+		}
+	}
+	unlock();
+	
+	return err;
 }
 
-void SessionManagerServer::clearSystemState(uint32_t state)
+std::vector<SIDTIDEntry> SessionManagerServer::getTableLocksInfo ( )
 {
-	mutex::scoped_lock lk(mutex);
+	int i;
+	std::vector<SIDTIDEntry> sidTidEntries;
+	lock();
+	for (i = 0; i < MaxTxns; i++) {
+		if ( shared->activeTxns[i].tableOID > 0 ) {
+			sidTidEntries.push_back( shared->activeTxns[i] );
+		}
+	}
+	unlock();
 
-	systemState &= ~state;
-	saveSystemState();
+	return sidTidEntries;
 }
 
-void SessionManagerServer::getSystemState(uint32_t& state)
+void SessionManagerServer::printSIDTIDEntry ( const char* commentHdr, int idx ) const
 {
-	state = systemState;
+	std::cout << commentHdr <<
+		": txnid.id: "    << shared->activeTxns[idx].txnid.id    <<
+		"; index: "       << idx                                 <<
+		"; txnid.valid: " << shared->activeTxns[idx].txnid.valid <<
+		"; sessionId:   " << shared->activeTxns[idx].sessionid   <<
+		"; tableOID: "    << shared->activeTxns[idx].tableOID    <<
+		"; processID: "   << shared->activeTxns[idx].processID   <<
+		"; processName: " << ( (shared->activeTxns[idx].processName[0]) ? 
+			(shared->activeTxns[idx].processName) : "(empty)" )  << std::endl;
 }
 
-uint32_t SessionManagerServer::getTxnCount()
+int8_t SessionManagerServer::setSystemState(int state)
 {
-	mutex::scoped_lock lk(mutex);
-	return activeTxns.size();
+	int8_t err = -1;
+	if (state == SS_READY || state == SS_NOT_READY)
+	{
+		lock();
+		shared->systemState = state;
+		unlock();
+		err = 0;
+	}
+	return err;
+}
+
+int8_t SessionManagerServer::getSystemState(int& state)
+{
+	lock();
+	state = shared->systemState;
+	unlock();
+	return 0;
 }
 
 }  //namespace

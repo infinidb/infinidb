@@ -20,7 +20,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockrequestprocessor.h 2046 2013-01-31 19:13:16Z pleblanc $
+ *   $Id: blockrequestprocessor.h 1808 2012-01-10 00:10:20Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -123,14 +123,14 @@ public:
 	void flushMany(const LbidAtVer* laVptr, uint32_t cnt) {
 		fbMgr.flushMany(laVptr, cnt); }
 		
-	void flushManyAllversion(const BRM::LBID_t* laVptr, uint32_t cnt) {
+	void flushManyAllversion(const LbidAtVer* laVptr, uint32_t cnt) {
 		fbMgr.flushManyAllversion(laVptr, cnt); }
 
 	void flushOIDs(const uint32_t *oids, uint32_t count) {
 		fbMgr.flushOIDs(oids, count); }
 
-	void flushPartition(const std::vector<BRM::OID_t> &oids, const std::set<BRM::LogicalPartition> &partitions) {
-		fbMgr.flushPartition(oids, partitions); }
+	void flushPartition(const uint32_t *oids, uint32_t count, uint32_t partitionNum) {
+		fbMgr.flushPartition(oids, count, partitionNum); }
 
 	void setReportingFrequency(const uint32_t d) {
 		fbMgr.setReportingFrequency(d); }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_workers.cpp 3983 2012-07-02 16:11:06Z bpaul $
+ * $Id: we_workers.cpp 2925 2011-03-23 15:07:06Z dcathey $
  *
  ****************************************************************************/
 
@@ -84,7 +84,7 @@ void  BulkLoad::read(int id)
 #endif
             if((tableId = lockTableForRead(id)) == -1)
             {
-                fLog.logMsg( "BulkLoad::ReadOperation No more tables "
+                m_log.logMsg( "BulkLoad::ReadOperation No more tables "
                               "available for processing. Read thread " 
                                + Convertor::int2Str(id) + " exiting...",
                                MSGLVL_INFO2);
@@ -106,13 +106,12 @@ void  BulkLoad::read(int id)
                     ") Failed for Table " <<
                     fTableInfo[tableId].getTableName() <<
                     ".  Terminating this job.";
-                fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
-                fLog.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
+                m_log.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
                 break;
             }
         }
     }
-    catch (SecondaryShutdownException& ex)
+    catch (SecondaryShutdownExcept& ex)
     {
         // We are bailing out because another thread set bad job status
         ostringstream oss;
@@ -123,7 +122,7 @@ void  BulkLoad::read(int id)
         else
             oss << "Bulkload Read (thread " << id <<
                 ") Stopped reading Tables. " << ex.what();
-        fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+        m_log.logMsg( oss.str(), MSGLVL_INFO1 );
     }
     catch (exception& ex)
     {
@@ -138,8 +137,7 @@ void  BulkLoad::read(int id)
             oss << "Bulkload Read (thread " << id <<
                 ") Failed for Table. " << ex.what() <<
                 ".  Terminating this job.";
-        if(tableId != -1) fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
-        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
+        m_log.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
     }
     catch (...)
     {
@@ -153,8 +151,7 @@ void  BulkLoad::read(int id)
         else
             oss << "Bulkload Read (thread " << id <<
                 ") Failed for Table.  Terminating this job.";
-        if(tableId != -1) fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
-        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
+        m_log.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
     }
 }
 
@@ -228,7 +225,7 @@ void BulkLoad::parse(int id)
                 //See if JobStatus has been set to terminate by other thread
                 if (BulkStatus::getJobStatus() == EXIT_FAILURE)
                 {
-                    throw SecondaryShutdownException( "BulkLoad::"
+                    throw SecondaryShutdownExcept( "BulkLoad::"
                         "parse() responding to job termination");
                 }
 
@@ -298,10 +295,10 @@ void BulkLoad::parse(int id)
                     ") Failed for Table " <<
                     fTableInfo[tableId].getTableName() <<
                     " during parsing.  Terminating this job.";
-                fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
-                fLog.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
+                m_log.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
 
-                setParseErrorOnTable( tableId, true );
+                boost::mutex::scoped_lock lock(fParseMutex);
+                fTableInfo[tableId].setParseError( );
                 return;
             }
 
@@ -328,10 +325,9 @@ void BulkLoad::parse(int id)
                         ") Failed for Table " <<
                         fTableInfo[tableId].getTableName() <<
                         " during parse completion.  Terminating this job.";
-                    fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
-                    fLog.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
+                    m_log.logMsg( oss.str(), rc, MSGLVL_CRITICAL );
 
-                    setParseErrorOnTable( tableId, false );
+                    fTableInfo[tableId].setParseError( );
                     return;
                 }
 #ifdef PROFILE
@@ -340,7 +336,7 @@ void BulkLoad::parse(int id)
             }
         }
     }
-    catch (SecondaryShutdownException& ex)
+    catch (SecondaryShutdownExcept& ex)
     {
         // We are bailing out because another thread set bad job status
         ostringstream oss;
@@ -349,13 +345,14 @@ void BulkLoad::parse(int id)
                 ") Stopped parsing Table "  <<
                 fTableInfo[tableId].getTableName() << ".  "  << ex.what();
 
-            setParseErrorOnTable( tableId, true );
+            boost::mutex::scoped_lock lock(fParseMutex);
+            fTableInfo[tableId].setParseError( );
         }
         else {
             oss << "Bulkload Parse (thread " << id <<
                 ") Stopped parsing Tables. " << ex.what();
         }
-        fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+        m_log.logMsg( oss.str(), MSGLVL_INFO1 );
     }
     catch (exception& ex)
     {
@@ -367,15 +364,15 @@ void BulkLoad::parse(int id)
                 fTableInfo[tableId].getTableName() << ".  "  << ex.what() <<
                 ".  Terminating this job.";
 
-            setParseErrorOnTable( tableId, true );
-            fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
+            boost::mutex::scoped_lock lock(fParseMutex);
+            fTableInfo[tableId].setParseError( );
         }
         else {
             oss << "Bulkload Parse (thread " << id <<
                 ") Failed for Table. " << ex.what() <<
                 ".  Terminating this job.";
         }
-        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
+        m_log.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
     }
     catch (...)
     {
@@ -387,14 +384,14 @@ void BulkLoad::parse(int id)
                 fTableInfo[tableId].getTableName() <<
                 ".  Terminating this job.";
 
-            setParseErrorOnTable( tableId, true );
-            fTableInfo[tableId].fBRMReporter.addToErrMsgEntry(oss.str());
+            boost::mutex::scoped_lock lock(fParseMutex);
+            fTableInfo[tableId].setParseError( );
         }
         else {
             oss << "Bulkload Parse (thread " << id <<
                 ") Failed for Table.  Terminating this job.";
         }
-        fLog.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
+        m_log.logMsg( oss.str(), ERR_UNKNOWN, MSGLVL_CRITICAL ); 
     }
 }
 
@@ -490,24 +487,6 @@ bool BulkLoad::allTablesDone(Status status)
     }
 
     return true;
-}
-
-//------------------------------------------------------------------------------
-// Set status for specified table to reflect a parsing error.
-// Optionally lock fParseMutex (if requested).
-// May evaluate later whether we need to employ the fParseMutex for this call.
-//------------------------------------------------------------------------------
-void BulkLoad::setParseErrorOnTable( int tableId, bool lockParseMutex )
-{
-    if (lockParseMutex)
-    {
-        boost::mutex::scoped_lock lock(fParseMutex);
-        fTableInfo[tableId].setParseError( );
-    }
-    else
-    {
-        fTableInfo[tableId].setParseError( );
-    }
 }
 
 }

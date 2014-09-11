@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnrycompress.h 4096 2012-08-07 20:06:09Z dhall $
+//  $Id: we_dctnrycompress.h 3052 2011-08-31 18:22:45Z chao $
 
 
 /** @file */
@@ -117,20 +117,10 @@ public:
    /**
    * @brief For bulkload to use
    */
-   void setMaxActiveChunkNum(unsigned int maxActiveChunkNum) { m_chunkManager->setMaxActiveChunkNum(maxActiveChunkNum); };
-   void setBulkFlag(bool isBulkLoad) {m_chunkManager->setBulkFlag(isBulkLoad);};
-//   void chunkManager(ChunkManager* cm);
-
-   /**
-   * @brief virtual method in FileOp
-   */
-   void setTransId(const TxnID& transId) {Dctnry::setTransId(transId); if(m_chunkManager) m_chunkManager->setTransId(transId);}
-
-   /**
-   * @brief Set the IsInsert flag in the ChunkManager. 
-   * This forces flush at end of statement. Used only for bulk insert. 
-   */
-   void setIsInsert(bool isInsert) { m_chunkManager->setIsInsert(isInsert); }
+   void setMaxActiveChunkNum(unsigned int maxActiveChunkNum) { fChunkManager->setMaxActiveChunkNum(maxActiveChunkNum); };
+   void setBulkFlag(bool isBulkLoad) {fChunkManager->setBulkFlag(isBulkLoad);};
+   void chunkManager(ChunkManager* cm);
+   void setTransId(const TxnID& transId) {Dctnry::setTransId(transId); fChunkManager->setTransId(transId);}
 
 protected:
 
@@ -143,6 +133,9 @@ protected:
    * @brief convert lbid to fbo
    */
    int lbidToFbo(const i64 lbid, int& fbo);
+
+   ChunkManager* fChunkManager;
+   bool fIsInsert;
 };
 
 

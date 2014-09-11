@@ -16,39 +16,32 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkload.cpp 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_bulkload.cpp 3792 2012-04-25 19:28:25Z dcathey $
 *
 *******************************************************************************/
 /** @file */
 
-#define WE_BULKLOAD_DLLEXPORT
-#include "we_bulkload.h"
-#undef WE_BULKLOAD_DLLEXPORT
-
 #include <cmath>
 #include <cstdlib>
-#include <climits>
-#include <glob.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <vector>
 #include <sstream>
 #include <boost/filesystem/path.hpp>
+#include "we_bulkload.h"
 #include "we_bulkstatus.h"
 #include "we_rbmetawriter.h"
+#include "we_bulkrollbackmgr.h"
 #include "we_colopbulk.h"
 #include "we_columninfocompressed.h"
 #include "we_config.h"
-#include "we_dbrootextenttracker.h"
 #include "writeengine.h"
 #include "sys/time.h"
 #include "sys/types.h"
 #include "dataconvert.h"
 #include "idbcompress.h"
 #include "calpontsystemcatalog.h"
-#include "we_ddlcommandclient.h"
-
 using namespace std;
 using namespace boost;
 using namespace dataconvert;
@@ -64,7 +57,8 @@ namespace
 //extern WriteEngine::BRMWrapper* brmWrapperPtr;
 namespace WriteEngine
 {
-    /* static */ boost::mutex*       BulkLoad::fDDLMutex = 0;
+    /* static */ WriteEngineWrapper* BulkLoad::fWEWrapper = 0;
+    /* static */ boost::mutex*       BulkLoad::fWEWrapperMutex = 0;
 
     /* static */ const std::string   BulkLoad::DIR_BULK_JOB("job");
     /* static */ const std::string   BulkLoad::DIR_BULK_TEMP_JOB("tmpjob");
@@ -72,81 +66,24 @@ namespace WriteEngine
     /* static */ const std::string   BulkLoad::DIR_BULK_LOG("/log/");
 
 //------------------------------------------------------------------------------
-// A thread to periodically call dbrm to see if a user is
-// shutting down the system or has put the system into write
-// suspend mode. DBRM has 2 flags to check in this case, the
-// ROLLBACK flag, and the FORCE flag. These flags will be
-// reported when we ask for the Shutdown Pending flag (which we
-// ignore at this point). Even if the user is putting the system
-// into write suspend mode, this call will return the flags we
-// are interested in. If ROLLBACK is set, we cancel normally.
-// If FORCE is set, we can't rollback.
-struct CancellationThread
-{
-    CancellationThread(BulkLoad* pBulkLoad) : fpBulkLoad(pBulkLoad)
-    {}
-	BulkLoad* fpBulkLoad;
-    void operator()()
-    {
-        bool bRollback = false;
-        bool bForce = false;
-        int  iShutdown;
-        while (fpBulkLoad->getContinue())
-        {
-            usleep(1000000);    // 1 seconds
-            // Check to see if someone has ordered a shutdown or suspend with
-            // rollback or force.
-            iShutdown = BRMWrapper::getInstance()->isShutdownPending(bRollback, 
-                                                                     bForce);
-            if (iShutdown != ERR_BRM_GET_SHUTDOWN)
-            {
-                if (bRollback)
-                {
-                    if (iShutdown == ERR_BRM_SHUTDOWN)
-                    {
-                        cout << "System stop has been ordered. Rollback" 
-                             << endl;
-                    }
-                    else
-                    {
-					cout << "Database writes have been suspended. Rollback" 
-                         << endl;
-                    }
-                    BulkStatus::setJobStatus( EXIT_FAILURE );
-                }
-                else
-                if (bForce)
-                {
-                    cout << "Immediate system stop has been ordered. "
-                         << "No rollback" 
-                         << endl;
-                }
-            }
-        }
-    }
-};
- 
-//------------------------------------------------------------------------------
 // Constructor
 //------------------------------------------------------------------------------
 BulkLoad::BulkLoad() :
-    fColOp(new ColumnOpBulk()),
-    fColDelim('\0'),
-    fNoOfBuffers(-1), fBufferSize(-1), fFileVbufSize(-1), fMaxErrors(-1),
+    m_colOp(new ColumnOpBulk()),
+    m_colDelim('\0'),
+    fNoOfBuffers(4), fBufferSize(81920), fFileBufferSize(10240), 
     fNoOfParseThreads(3), fNoOfReadThreads(1),
     fKeepRbMetaFiles(false),
     fNullStringMode(false),
     fEnclosedByChar('\0'), // not enabled unless user overrides enclosed by char
     fEscapeChar('\0'),
-    fTotalTime(0.0),
-    fBulkMode(BULK_MODE_LOCAL),
-    fbTruncationAsError(false),
-    fbContinue(false)
+    fTotalTime(0.0)
 {
     fTableInfo.clear();
     setDebugLevel( DEBUG_0 );
 
-    fDDLMutex = new boost::mutex();
+    fWEWrapper      = new WriteEngineWrapper();
+    fWEWrapperMutex = new boost::mutex();
     memset( &fStartTime, 0, sizeof(timeval) );
     memset( &fEndTime,   0, sizeof(timeval) );
 }
@@ -157,9 +94,10 @@ BulkLoad::BulkLoad() :
 BulkLoad::~BulkLoad()
 {
     fTableInfo.clear();
-    delete fDDLMutex;
+    delete fWEWrapper;
+    delete fWEWrapperMutex;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Set alternate directory path for import data files.  If the specified
@@ -208,7 +146,7 @@ int BulkLoad::setAlternateImportDir(const std::string& loadDir,
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Load a job information
@@ -234,50 +172,49 @@ int BulkLoad::loadJobInfo(
     bool  bLogInfo2ToConsole,
     bool  bValidateColumnList )
 {
-    fJobFileName = fullName;
-    fRootDir     = Config::getBulkRoot();
+    startTimer();
+
+    m_jobFileName = fullName;
+    m_rootDir     = Config::getBulkRoot();
 
     if( !exists( fullName.c_str() ) ) {
-        fLog.logMsg( " file " + fullName + " does not exist",
+        m_log.logMsg( " file " + fullName + " does not exist",
                        ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
         return ERR_FILE_NOT_EXIST;
     }
 
     std::string errMsg;
-    int rc = fJobInfo.loadJobXmlFile( fullName, bUseTempJobFile,
-                                      bValidateColumnList, errMsg );
+    int rc = m_jobInfo.loadJobXmlFile( fullName, bUseTempJobFile,
+                                       bValidateColumnList, errMsg );
     if( rc != NO_ERROR ) {
         std::ostringstream oss;
         oss << "Error loading job file " << fullName << "; " << errMsg;
-        fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+        m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
         return rc;
     }
 
-    const Job& curJob = fJobInfo.getJob();
+    const Job& curJob = m_jobInfo.getJob();
     string     logFile, errlogFile;
-    logFile = fRootDir + DIR_BULK_LOG + "Job_" +
+    logFile = m_rootDir + DIR_BULK_LOG + "Job_" +
               Convertor::int2Str( curJob.id ) + LOG_SUFFIX;
-    errlogFile = fRootDir + DIR_BULK_LOG + "Job_" +
+    errlogFile = m_rootDir + DIR_BULK_LOG + "Job_" +
               Convertor::int2Str( curJob.id ) + ERR_LOG_SUFFIX;
-    fLog.setLogFileName(logFile.c_str(),errlogFile.c_str(),bLogInfo2ToConsole);
+    m_log.setLogFileName(logFile.c_str(),errlogFile.c_str(),bLogInfo2ToConsole);
 
     std::ostringstream ossLocale;
     ossLocale << "Locale is : " << systemLang;
-    fLog.logMsg( ossLocale.str(), MSGLVL_INFO2 );
+    m_log.logMsg( ossLocale.str(), MSGLVL_INFO2 );
     cout << "Log file for this job: " << logFile << std::endl;
-    fLog.logMsg( "successfully loaded job file " + fullName, MSGLVL_INFO1 );
+    m_log.logMsg( "successfully loaded job file " + fullName, MSGLVL_INFO1 );
     if (argc > 1)
     {
         std::ostringstream oss;
         oss << "Command line options: ";
         for (int k=1; k<argc; k++)
         {
-            if (!strcmp(argv[k],"\t")) // special case to print a <TAB>
-                oss << "'\\t'" << " ";
-            else
-                oss << argv[k] << " ";
+            oss << argv[k] << " ";
         }
-        fLog.logMsg( oss.str(), MSGLVL_INFO2 );
+        m_log.logMsg( oss.str(), MSGLVL_INFO2 );
     }
 
     // Validate that the user's xml file has been regenerated since the
@@ -287,7 +224,7 @@ int BulkLoad::loadJobInfo(
         if (curJob.jobTableList[i].mapOid == 0)
         {
             rc = ERR_XML_PARSE;
-            fLog.logMsg( "Outdated job file " + fullName +
+            m_log.logMsg( "Outdated job file " + fullName +
                           "; missing required 'tblOid' table attribute." +
                           "  Please regenerate this xml file.",
                           rc, MSGLVL_ERROR );
@@ -312,7 +249,7 @@ int BulkLoad::loadJobInfo(
                     curJob.jobTableList[kT].colList[kC].colName <<
                     " is not available for use.";
                 rc = ERR_COMP_UNAVAIL_TYPE;
-                fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+                m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
                 return rc;
             }
         }
@@ -323,11 +260,11 @@ int BulkLoad::loadJobInfo(
     std::ostringstream ossXMLTime;
     ossXMLTime << "Job file loaded, run time for this step : " <<
         getTotalRunTime() << " seconds";
-    fLog.logMsg( ossXMLTime.str(), MSGLVL_INFO1 );
+    m_log.logMsg( ossXMLTime.str(), MSGLVL_INFO1 );
 
     return NO_ERROR;
 }
-   
+   
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Spawns and joins the Read and Parsing threads to import the data.
@@ -338,58 +275,27 @@ int BulkLoad::loadJobInfo(
 //------------------------------------------------------------------------------
 void BulkLoad::spawnWorkers()
 {
-    // We're fixin' to launch threads. This lets anybody who cares (i.e.
-    // checkCancellation) know that read and parse threads are running.
-    fbContinue = true; 
-
-    // Spawn a thread to check for user cancellation via calpont console
-    // But only in mode 3 (local mode)
-    boost::thread cancelThread;
-    CancellationThread cancelationThread(this);
-    if (getBulkLoadMode() == BULK_MODE_LOCAL)
-    {
-        cancelThread = boost::thread(cancelationThread);
-    }
-
-    // Spawn read threads
     for(int i=0; i<fNoOfReadThreads; ++i)
     {
         fReadThreads.create_thread(boost::bind(&BulkLoad::read, this, (int)i));
     }    
-    fLog.logMsg("No of Read Threads Spawned = " +
+    m_log.logMsg("No of Read Threads Spawned = " +
                  Convertor::int2Str( fNoOfReadThreads ), MSGLVL_INFO1 );
 
-    // Spawn parse threads
     for(int i=0; i<fNoOfParseThreads; ++i)
     {
         fParseThreads.create_thread(boost::bind(&BulkLoad::parse,this,(int)i));
     }
-    fLog.logMsg("No of Parse Threads Spawned = " +
+    m_log.logMsg("No of Parse Threads Spawned = " +
                  Convertor::int2Str( fNoOfParseThreads ), MSGLVL_INFO1 );
               
     fReadThreads.join_all();
     fParseThreads.join_all();
-    fbContinue = false;
-    if (getBulkLoadMode() == BULK_MODE_LOCAL)
-    {
-        cancelThread.join();              
-    }
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
-//    Pre process job.  Determine DBRoot/segment file, HWM etc where we are
-//    to start adding rows, create ColumnInfo object for each column.  Create
-//    initial segment file if necessary.  This could happen in shared-nothing
-//    where CREATE TABLE only creates the initial segment file on one of the
-//    PMs.  The first time rows are added on the other PMs, an initial segment
-//    file must be created.  (This could also happen "if" we ever decide to
-//    allow the user to drop all partitions for a DBRoot, including the last
-//    partition.)
-//    PreProcessing also includes creating the bulk rollback back up files,
-//    initializing auto-increment, sanity checking the consistency of the HWM
-//    across columns, and opening the starting column and dictionary store
-//    files.
+//    Pre process job, mainly validation and conversion
 // PARAMETERS:
 //    job - current job
 //    tableNo - table no
@@ -408,23 +314,18 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
     // Initialize portions of TableInfo object
     tableInfo->setBufferSize(fBufferSize);
-    tableInfo->setFileBufferSize(fFileVbufSize);
+    tableInfo->setFileBufferSize(fFileBufferSize);
     tableInfo->setTableId(tableNo);
-    tableInfo->setColDelimiter(fColDelim);
-    tableInfo->setJobFileName(fJobFileName);
+    tableInfo->setColDelimiter(m_colDelim);
+    tableInfo->setJobFileName(m_jobFileName);
     tableInfo->setJobId(job.id);
     tableInfo->setNullStringMode(fNullStringMode);
     tableInfo->setEnclosedByChar(fEnclosedByChar);
     tableInfo->setEscapeChar(fEscapeChar);
 
-    if (fMaxErrors != -1)
-        tableInfo->setMaxErrorRows(fMaxErrors);
-    else
-        tableInfo->setMaxErrorRows(job.jobTableList[tableNo].maxErrNum);
-
-    // @bug 3929: cpimport.bin error messaging using up too much memory.
+    // @bug 3929: cpimport error messaging using up too much memory.
     // Validate that max allowed error count is within valid range
-    long long maxErrNum = tableInfo->getMaxErrorRows();
+    long long maxErrNum = job.jobTableList[tableNo].maxErrNum;
     if (maxErrNum > MAX_ALLOW_ERROR_COUNT)
     {
         ostringstream oss;
@@ -432,7 +333,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
             " for table " << job.jobTableList[tableNo].tblName <<
             "; this exceeds limit of " << MAX_ALLOW_ERROR_COUNT <<
             "; resetting to " << MAX_ALLOW_ERROR_COUNT;
-        fLog.logMsg( oss.str(), MSGLVL_INFO2 );
+        m_log.logMsg( oss.str(), MSGLVL_INFO2 );
         maxErrNum = MAX_ALLOW_ERROR_COUNT;
     }
     tableInfo->setMaxErrorRows(maxErrNum);
@@ -440,14 +341,10 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     //------------------------------------------------------------------------
     // First loop thru the columns for the "tableNo" table in jobTableList[].
     // and determine the HWM for the smallest width column(s), and save that
-    // as minHWM.  We save additional HWM information acquired from BRM, in
-    // segFileInfo, for later use.
+    // as minHWM.  We save additional information acquired from
+    // getLastLocalHWM for later use.
     //------------------------------------------------------------------------
     std::vector<File> segFileInfo;
-    std::vector<DBRootExtentTracker*>   dbRootExtTrackerVec;
-    std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(
-        job.jobTableList[tableNo].colList.size() );
-    DBRootExtentTracker* pRefDBRootExtentTracker = 0;
     for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
     {
         u_int16_t dbRoot;
@@ -455,11 +352,10 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         u_int16_t segment;
 
         JobColumn curJobCol = job.jobTableList[tableNo].colList[i];
-        OID segFileOid = curJobCol.mapOid;
 
         // convert column data type
         if( curJobCol.typeName.length() >0 &&
-            fColOp->getColDataType( curJobCol.typeName.c_str(), colDataType ))
+            m_colOp->getColDataType( curJobCol.typeName.c_str(), colDataType ))
         {
             job.jobTableList[tableNo].colList[i].dataType =
                curColStruct.colDataType = colDataType;
@@ -468,7 +364,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         {
             ostringstream oss;
             oss << "Column type " << curJobCol.typeName << " is not valid ";
-            fLog.logMsg( oss.str(), ERR_INVALID_PARAM, MSGLVL_ERROR );
+            m_log.logMsg( oss.str(), ERR_INVALID_PARAM, MSGLVL_ERROR );
             return ERR_INVALID_PARAM;
         }
         curColStruct.colWidth = curJobCol.width;
@@ -485,60 +381,16 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
         // check HWM for column file
         HWM hwm;
-
-        rc = BRMWrapper::getInstance()->getDbRootHWMInfo( curJobCol.mapOid,
-            dbRootHWMInfoColVec[i]);
-        if (rc != NO_ERROR)
-        {
+        rc = BRMWrapper::getInstance()->getLastLocalHWM_HWMt(
+            curJobCol.mapOid, dbRoot, partition, segment, hwm );
+        if( rc != NO_ERROR ) {
             WErrorCodes ec;
             ostringstream oss;
-            oss << "Error getting last DBRoot/HWMs for column file " <<
+            oss << "Error getting last HWM for column file " <<
                 curJobCol.mapOid << "; " << ec.errorString(rc);
-            fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+            m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
             return rc;
         }
-
-        // Find DBRoot/segment file where we want to start adding rows
-        BRM::EmDbRootHWMInfo_v& dbRootHWMInfo = dbRootHWMInfoColVec[i];
-        DBRootExtentTracker* pDBRootExtentTracker = new DBRootExtentTracker(
-            curJobCol.mapOid,
-            job.jobTableList[tableNo].colList[i].width,
-            &fLog,
-            dbRootHWMInfo );
-        if (i == 0)
-            pRefDBRootExtentTracker = pDBRootExtentTracker;
-        dbRootExtTrackerVec.push_back( pDBRootExtentTracker );
-                
-        // Start adding rows to DBRoot/segment file that is selected
-        DBRootExtentInfo dbRootExtent;
-        bool bFirstExtentOnThisPM;
-        if (i == 0) // select starting DBRoot/segment for column[0]
-        {
-            std::string trkErrMsg;
-            rc = pDBRootExtentTracker->selectFirstSegFile(dbRootExtent,
-                bFirstExtentOnThisPM, trkErrMsg);
-            if (rc != NO_ERROR)
-            {
-                fLog.logMsg( trkErrMsg, rc, MSGLVL_ERROR );
-                return rc;
-            }
-        }
-        else // select starting DBRoot/segment based on column[0] selection
-        {    // to ensure all columns start with the same DBRoot/segment
-            pDBRootExtentTracker->assignFirstSegFile(
-                *pRefDBRootExtentTracker, // reference column[0] tracker
-                dbRootExtent,
-                bFirstExtentOnThisPM);
-        }
-        dbRoot    = dbRootExtent.fDbRoot;
-        partition = dbRootExtent.fPartition;
-        segment   = dbRootExtent.fSegment;
-        hwm       = dbRootExtent.fLocalHwm;
-
-        // If no extents on this PM, then start adding rows to
-        // first DBRoot and segment file number for "this" PM.
-        if (bFirstExtentOnThisPM)
-            segFileOid= 0; // use as flag to indicate HWM not found
 
         if( job.jobTableList[tableNo].colList[i].width < minWidth )
         {
@@ -553,9 +405,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         fInfo.fPartition = partition;
         fInfo.fSegment   = segment;
         fInfo.hwm        = hwm;
-        fInfo.oid        = segFileOid;
         segFileInfo.push_back( fInfo );
-    } // end of 1st for-loop through the list of columns (get starting HWM)
+    }
 
     //--------------------------------------------------------------------------
     // Validate that the starting HWMs for all the columns are in sync
@@ -573,10 +424,9 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     ostringstream oss11;
     oss11 << "Initializing import: " <<
         "Table-" << job.jobTableList[tableNo].tblName << "...";
-    fLog.logMsg( oss11.str(), MSGLVL_INFO2 );
+    m_log.logMsg( oss11.str(), MSGLVL_INFO2 );
 
-    rc = saveBulkRollbackMetaData( job, tableInfo, segFileInfo,
-                                   dbRootHWMInfoColVec );
+    rc = saveBulkRollbackMetaData( job, tableNo, tableInfo, segFileInfo );
     if (rc != NO_ERROR)
     {
          return rc;
@@ -595,23 +445,15 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         u_int16_t segment   = segFileInfo[i].fSegment;
         HWM       oldHwm    = segFileInfo[i].hwm;
 
-        DBRootExtentTracker* pDBRootExtentTracker = 0;
-        if (dbRootExtTrackerVec.size() > 0)
-            pDBRootExtentTracker = dbRootExtTrackerVec[i];
-
         // Create a ColumnInfo for the next column, and add to tableInfo
         ColumnInfo* info = 0;
         if (job.jobTableList[tableNo].colList[i].compressionType)
-            info = new ColumnInfoCompressed(&fLog, i,
+            info = new ColumnInfoCompressed(&m_log, i,
                 job.jobTableList[tableNo].colList[i],
-                pDBRootExtentTracker,
-                tableInfo);
-                //tableInfo->rbMetaWriter());
+                tableInfo->rbMetaWriter());
         else
-            info = new ColumnInfo(&fLog, i,
-                job.jobTableList[tableNo].colList[i],
-                pDBRootExtentTracker,
-                tableInfo);
+            info = new ColumnInfo(&m_log, i,
+                job.jobTableList[tableNo].colList[i]);
 
         // For auto increment column, we need to get the starting value
         if (info->column.autoIncFlag)
@@ -627,51 +469,153 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         // next block.  Wider columns skip based on multiple of width. If this
         // skipping of blocks requires a new extent, then we extend the column.
         HWM hwm = (minHWM +1) * ( info->column.width/minWidth );
-        info->relativeColWidthFactor( info->column.width/minWidth );
 
-        // HWM not found in prev loop; can't get LBID.  Will create initial
-        // extent on this PM later in this job, if we have valid rows to add.
-        if (segFileInfo[i].oid == 0)
+        BRM::LBID_t lbid;
+
+        // Try to get LBID for our HWM.  If we can't find it, then
+        // that means our block skipping has caused us to advance into
+        // another extent, so we try to create a new extent.
+        bool bSkippedToNewExtent = false;
+        rc = BRMWrapper::getInstance()->getStartLbid(
+            info->column.mapOid,
+            partition,
+            segment,
+            (int)hwm, lbid);
+
+        if (rc != NO_ERROR)
         {
-            // No starting DB file on this PM
-            ostringstream oss3;
-            oss3 << "Currently no extents on dbroot" << dbRoot <<
-                " for column OID " << info->column.mapOid <<
-                "; will create if needed";
-            fLog.logMsg( oss3.str(), MSGLVL_INFO2 );
+            bSkippedToNewExtent = true;
 
-            // Special case: skip initial blk(s) at start of 1st file on each PM
-            hwm = info->column.width/minWidth;
-
-            // We don't have a starting DB file on this PM, so setup delayed
-            // DB file creation.  We will wait and create the initial DB file,
-            // only after we have rows to insert.
-            info->setupDelayedFileCreation(
-                dbRoot, partition, segment, hwm );
+            // Reworked initial block skipping for compression:
+            // Block skipping is causing us to wrap up this extent.
+            // Calculate (round down) the HWM to reference last block
+            // in the current extent.
+            int blocksPerExtent =
+                (BRMWrapper::getInstance()->getExtentRows() *
+                info->column.width) / BYTE_PER_BLOCK;
+            hwm = (((hwm+1) / blocksPerExtent) * blocksPerExtent) - 1;
+            rc = BRMWrapper::getInstance()->getStartLbid(
+                info->column.mapOid,
+                partition,
+                segment,
+                (int)hwm, lbid);
+            if (rc != NO_ERROR)
+            {
+                WErrorCodes ec;
+                ostringstream oss;
+                oss << "Error getting HWM start LBID for last extent in column "
+                       "file OID-" <<
+                       info->column.mapOid <<
+                       "; partition-" << partition <<
+                       "; segment-"   << segment   <<
+                       "; hwm-"       << hwm <<
+                       "; " << ec.errorString(rc);
+                m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
+                return rc;
+            }
         }
-        else
+
+        // Init the ColumnInfo object
+        info->colOp->initColumn( info->curCol );
+        info->colOp->setColParam( info->curCol, i,
+            info->column.width,
+            info->column.dataType,
+            info->column.weType,
+            info->column.mapOid,
+            job.jobTableList[tableNo].colList[i].compressionType,
+            dbRoot, partition, segment );
+
+        // Open the column file
+        if(!info->colOp->exists(info->column.mapOid,
+            dbRoot, partition, segment) )
         {
-            // Establish starting HWM and LBID for this job.
-            // Keep in mind we have initial block skipping to account for.
-            bool bSkippedToNewExtent = false;
-            BRM::LBID_t lbid;
-
-            RETURN_ON_ERROR( preProcessHwmLbid( info,
-                minWidth, partition, segment,
-                hwm, lbid, bSkippedToNewExtent ) );
-
-            // Setup import to start loading into starting HWM DB file
-            RETURN_ON_ERROR( info->setupInitialColumnExtent(
-                dbRoot, partition, segment,
-                job.jobTableList[tableNo].tblName,
-                lbid,
-                oldHwm, hwm,
-                bSkippedToNewExtent, false) );   
+            ostringstream oss;
+            oss << "Column file does not exist for OID-" <<
+                   info->column.mapOid  <<
+                   "; DBRoot-"    << dbRoot <<
+                   "; partition-" << partition <<
+                   "; segment-"   << segment;
+            m_log.logMsg( oss.str(), ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
+            return ERR_FILE_NOT_EXIST;
         }
+
+        std::string segFile;
+        rc = info->colOp->openColumnFile( info->curCol, segFile );
+        if(rc != NO_ERROR) 
+        {
+            WErrorCodes ec;
+            ostringstream oss;
+            oss << "Error opening column file for OID-" <<
+                   info->column.mapOid <<
+                   "; DBRoot-"    << dbRoot <<
+                   "; partition-" << partition <<
+                   "; segment-"   << segment <<
+                   "; filename-"  << segFile <<
+                   "; " << ec.errorString(rc);
+            m_log.logMsg( oss.str(), ERR_FILE_OPEN, MSGLVL_ERROR );
+            return ERR_FILE_OPEN;
+        }
+
+        ostringstream oss1;
+        oss1 << "Initializing import: " <<
+            "Table-"    << job.jobTableList[tableNo].tblName <<
+            "; Col-"    << info->column.colName;
+        if (info->curCol.compressionType)
+            oss1        << " (compressed)";
+        oss1 <<  "; OID-"    << info->column.mapOid <<
+            "; hwm-"    << hwm;
+        if (bSkippedToNewExtent)
+            oss1        << " (full; load into next extent)";
+        oss1 << "; file-"   << info->curCol.dataFile.fSegFileName;
+        m_log.logMsg( oss1.str(), MSGLVL_INFO2 );
+
+        if(info->column.colType == COL_TYPE_DICT)
+        {
+        	RETURN_ON_ERROR( info->openDctnryStore( true ) );
+        }
+
+        info->savedLbid = lbid;
+        info->savedHWM = hwm;
+
+        if (bSkippedToNewExtent)
+            oldHwm  = hwm;
+        rc = info->setupInitialColumnFile(oldHwm, hwm);
+        if (rc != NO_ERROR)
+        {
+            WErrorCodes ec;
+            ostringstream oss;
+            oss << "Error reading/positioning column file for OID-" <<
+                   info->column.mapOid <<
+                   "; DBRoot-"    << dbRoot <<
+                   "; partition-" << partition <<
+                   "; segment-"   << segment <<
+                   "; filename-"  << segFile <<
+                   "; " << ec.errorString(rc);
+            m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
+            return rc;
+        }
+
+        // Reworked initial block skipping for compression:
+        // Block skipping is causing us to wrap up this extent.  We consider
+        // the current extent to be full, so we "pretend" to fill out the
+        // last block by adding 8192 bytes to the bytes written count.
+        // This will help trigger the addition of a new extent when we
+        // try to store the first section of rows to the db.
+        if (bSkippedToNewExtent)
+        {
+            info->updateBytesWrittenCounts( BYTE_PER_BLOCK );
+            info->sizeWrittenStart = info->sizeWritten;
+        }
+
+        // Reworked initial block skipping for compression:
+        // This initializes CP stats for first extent regardless of whether
+        // we end up adding rows to this extent, or initial block skipping
+        // ultimately causes us to start with a new extent.
+        info->lastInputRowInExtentInit( );
 
         tableInfo->addColumn(info);
 
-    } // end of 2nd for-loop through the list of columns
+    } // end of for loop through the list of columns
 
     // Initialize BulkLoadBuffers after we have added all the columns
     tableInfo->initializeBuffers(fNoOfBuffers, 
@@ -681,29 +625,160 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Saves snapshot of extentmap into a bulk rollback meta data file, for
-//    use in a bulk rollback, if the current cpimport.bin job should fail.
+//    use in a bulk rollback, if the current cpimport job should fail.
 // PARAMETERS:
 //    job - current job
+//    tableNo - table no
 //    tableInfo - TableInfo object corresponding to tableNo table.
-//    segFileInfo - Vector of File objects carrying starting DBRoot, partition,
-//                  etc, for the columns belonging to tableNo.
-//    dbRootHWMInfoColVec - Vector of vectors carrying extent/HWM info for each
-//                          dbroot for each column.
+//    segFileInfo - Vector of File objects carrying DBRoot, partition, etc
+//                  for the columns belonging to tableNo.
 // RETURN:
 //    NO_ERROR if success
 //    other if fail
 //------------------------------------------------------------------------------
 int BulkLoad::saveBulkRollbackMetaData( Job& job,
+    int tableNo,
     TableInfo* tableInfo,
-    const std::vector<File>& segFileInfo,
-    const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoColVec)
+    const std::vector<File>& segFileInfo )
 {
-    return tableInfo->saveBulkRollbackMetaData(
-        job, segFileInfo, dbRootHWMInfoColVec );
+    int rc = NO_ERROR;
+
+    rc = tableInfo->rbMetaWriter()->openFile( );
+    if (rc != NO_ERROR)
+    {
+        return rc;
+    }
+
+    for( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ ) 
+    {
+        u_int16_t dbRoot    = segFileInfo[i].fDbRoot;
+        u_int32_t partition = segFileInfo[i].fPartition;
+        u_int16_t segment   = segFileInfo[i].fSegment;
+
+        JobColumn& jobCol   = job.jobTableList[tableNo].colList[i];
+
+        // Save column meta-data info to support bulk rollback, if needed
+        rc = tableInfo->rbMetaWriter()->writeColumnMetaData(
+            jobCol.mapOid,
+            dbRoot,
+            partition,
+            segment,
+            segFileInfo[i].hwm,
+            jobCol.dataType,
+            jobCol.typeName,
+            jobCol.width,
+            jobCol.compressionType );
+        if (rc != NO_ERROR)
+        {
+            tableInfo->rbMetaWriter()->closeFile( false );
+            return rc;
+        }
+
+        if (jobCol.compressionType )
+        {
+            rc = tableInfo->rbMetaWriter()->backupColumnHWMChunk(
+            jobCol.mapOid,
+            dbRoot,
+            partition,
+            segment,
+            segFileInfo[i].hwm );
+            if (rc != NO_ERROR)
+            {
+                tableInfo->rbMetaWriter()->closeFile( false );
+                return rc;
+            }
+        }
+
+        // Save dctnry store meta-data info to support bulk rollback, if needed
+        if ( jobCol.colType == COL_TYPE_DICT ) 
+        {
+            // See how many segment files we have in this partition.
+            // If HWM shows we are working on first stripe in this partition
+            // then we won't have HWM's to save for the trailing segments.
+            unsigned blocksPerExtent =
+               (BRMWrapper::getInstance()->getExtentRows() *
+                jobCol.width) / BYTE_PER_BLOCK;
+            bool bSaveTrailingHwmsInPartition = false;
+            if ((segFileInfo[i].hwm + 1) > blocksPerExtent)
+                bSaveTrailingHwmsInPartition = true;
+
+            // Figure out DBRoot for segment 0 so we can loop thru segment files
+            int dbRootKount = Config::DBRootCount();
+            int firstDbRoot = (int)dbRoot - (segment % dbRootKount);
+            if (firstDbRoot <= 0)
+                firstDbRoot += dbRootKount;
+            u_int16_t dbRootStore = firstDbRoot;
+            const unsigned segsPerPart = Config::getFilesPerColumnPartition();
+
+            // For rollback purposes, record the local HWM for each store file
+            // in the current partition.
+            for (unsigned k=0; k<segsPerPart; k++)
+            {
+                u_int16_t kSeg = k;
+
+                // If the HWM from the corresponding token file indicates we are
+                // still working on the first "stripe" in this partition, then
+                // bSaveTrailingHwmsInPartition will be false; and we have no
+                // extents in the trailing segments for this partition.
+                // In this case we save NoData markers for the trailing segment
+                // files in this partition.
+                if ((kSeg > segment) && !bSaveTrailingHwmsInPartition)
+                {
+                    tableInfo->rbMetaWriter()->writeDictionaryStoreMetaNoDataMarker(
+                        jobCol.dctnry.dctnryOid,
+                        dbRootStore,
+                        partition,
+                        kSeg,
+                        jobCol.compressionType );
+                }
+                else
+                {
+                    // check HWM for dictionary store file
+                    HWM dictHWMStore;
+                    rc = BRMWrapper::getInstance()->getLocalHWM_HWMt(
+                        jobCol.dctnry.dctnryOid,
+                        partition,
+                        kSeg,
+                        dictHWMStore );
+                    if (rc != NO_ERROR)
+                    {
+                        WErrorCodes ec;
+                        ostringstream oss;
+                        oss << "Error1 getting rollback HWM for dictionary "
+                               "file "<<
+                            jobCol.dctnry.dctnryOid <<
+                            "; partition-" << partition <<
+                            "; segment-"   << kSeg <<
+                            "; " << ec.errorString(rc);
+                            m_log.logMsg(oss.str(), rc, MSGLVL_ERROR);
+                        tableInfo->rbMetaWriter()->closeFile( false );
+                        return rc;
+                    }
+
+                    tableInfo->rbMetaWriter()->writeDictionaryStoreMetaData(
+                        jobCol.dctnry.dctnryOid,
+                        dbRootStore,
+                        partition,
+                        kSeg,
+                        dictHWMStore,
+                        jobCol.compressionType );
+                }
+
+                dbRootStore++;
+                if (dbRootStore > dbRootKount)
+                    dbRootStore = 1;
+
+            } // end of loop through segsPerPart
+        }     // extra work for dictionary store file
+    }         // end of loop through all columns in table
+
+    rc = tableInfo->rbMetaWriter()->closeFile( true );
+
+    return rc;
 }
 
 //------------------------------------------------------------------------------
@@ -719,89 +794,76 @@ int BulkLoad::saveBulkRollbackMetaData( Job& job,
 int BulkLoad::preProcessAutoInc( const std::string& fullTableName, 
     ColumnInfo* colInfo)
 {
-    int rc = colInfo->initAutoInc( fullTableName );
-
-    return rc;
-}
-
-//------------------------------------------------------------------------------
-// DESCRIPTION:
-//    Determine starting HWM and LBID, after applying block skipping to HWM.
-// PARAMETERS:
-//    info               - ColumnInfo of column we are working with
-//    minWidth           - minimum width among all columns for this table
-//    partition          - partition of projected starting HWM
-//    segment            - file segment number of projected starting HWM
-//    hwm (input/output) - input:  projected starting HWM after block skipping
-//                         output: adjusted starting HWM 
-//    lbid                 output: LBID associated with adjusted HWM
-//    bSkippedToNewExtent- output:
-//                         true -> normal block skipping use case
-//                         false-> block skipped crossed out of hwm extent
-// RETURN:
-//    NO_ERROR if success
-//    other if fail
-//------------------------------------------------------------------------------
-int BulkLoad::preProcessHwmLbid(
-    const ColumnInfo* info,
-    int          minWidth,
-    u_int32_t    partition,
-    u_int16_t    segment,
-    HWM&         hwm,                  // input/output
-    BRM::LBID_t& lbid,                 // output
-    bool&        bSkippedToNewExtent)  // output
-{
-    int rc = NO_ERROR;
-    bSkippedToNewExtent = false;
-
-    // Get starting LBID for the HWM block; if we can't get the start-
-    // ing LBID, it means initial block skipping crossed extent boundary
-    rc = BRMWrapper::getInstance()->getStartLbid(
-        info->column.mapOid,
-        partition,
-        segment,
-        (int)hwm, lbid);
-
-    // If HWM Lbid is missing, take alternative action to see what to do.
-    // Block skipping has caused us to advance out of the current HWM extent.
-    if (rc != NO_ERROR)
+    string::size_type periodIdx = fullTableName.find('.');
+    if (periodIdx == string::npos)
     {
-        bSkippedToNewExtent = true;
-
-        lbid = INVALID_LBID;
-
-        int blocksPerExtent =
-            (BRMWrapper::getInstance()->getExtentRows() *
-            info->column.width) / BYTE_PER_BLOCK;
-
-        // Look for LBID associated with block at end of current extent
-        u_int32_t numBlocks = (((hwm+1) / blocksPerExtent) * blocksPerExtent);
-
-        hwm = numBlocks - 1;
-        rc = BRMWrapper::getInstance()->getStartLbid(
-            info->column.mapOid,
-            partition,
-            segment,
-            (int)hwm, lbid);
-        if (rc != NO_ERROR)
+        ostringstream oss;
+        oss << "Error parsing full table name in order to "
+            "get auto-increment value for " << fullTableName;
+        m_log.logMsg( oss.str(), ERR_AUTOINC_TABLE_NAME, MSGLVL_ERROR );
+        return ERR_AUTOINC_TABLE_NAME;
+    }
+    else
+    {
+        std::string sName;
+        std::string tName;
+        sName.assign(fullTableName, 0, periodIdx);
+        tName.assign(fullTableName, periodIdx+1,
+            fullTableName.length() - (periodIdx+1));
+        execplan::CalpontSystemCatalog::TableName tbl(sName,tName);
+        long long nextAuto = 0;
+        try
         {
-            WErrorCodes ec;
-            ostringstream oss;
-            oss << "Error getting HWM start LBID "
-                "for previous last extent in column file OID-" <<
-                info->column.mapOid <<
-                "; partition-" << partition <<
-                "; segment-"   << segment   <<
-                "; hwm-"       << hwm       <<
-                "; " << ec.errorString(rc);
-            fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
-            return rc;
+            execplan::CalpontSystemCatalog* systemCatPtr =
+                execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
+                    BULK_SYSCAT_SESSION_ID);
+            systemCatPtr->identity(execplan::CalpontSystemCatalog::EC);
+
+            // Handle bad return code or thrown exception from
+            // system catalog query.
+            nextAuto = systemCatPtr->nextAutoIncrValue( tbl );
+            if (nextAuto == 0) {
+                throw std::runtime_error(
+                    "Not an auto-increment column, or column not found");
+            }
+            else if (nextAuto == -2) {
+                throw std::runtime_error(
+                    "Not able to get current nextValue, table not found");
+            }
+            else if (nextAuto <   0) {
+                throw std::runtime_error(
+                    "auto-increment max value already reached");
+            }
         }
+        catch (std::exception& ex)
+        {
+            ostringstream oss;
+            oss << "Unable to get current auto-increment value for " <<
+                sName << "." << tName << "; " << ex.what();
+            m_log.logMsg( oss.str(), ERR_AUTOINC_INIT1, MSGLVL_ERROR );
+            return ERR_AUTOINC_INIT1;
+        }
+        catch (...)
+        {
+            ostringstream oss;
+            oss << "Unable to get auto-increment value for " <<
+                sName << "." << tName << "; unknown exception";
+            m_log.logMsg( oss.str(), ERR_AUTOINC_INIT2, MSGLVL_ERROR );
+            return ERR_AUTOINC_INIT2;
+        }
+
+        ostringstream oss2;
+        oss2 << "Initializing next auto increment for table-" <<
+            fullTableName << ", column-" << colInfo->column.colName <<
+            "; autoincrement " << nextAuto;
+        m_log.logMsg( oss2.str(), MSGLVL_INFO2 );
+
+        colInfo->initAutoInc( nextAuto );
     }
 
-    return rc;
+    return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    NO_ERROR if success
@@ -817,19 +879,18 @@ int BulkLoad::processJob( )
     Job         curJob;
     size_t      i;
       
-    curJob = fJobInfo.getJob();
+    curJob = m_jobInfo.getJob();
 
-    // For the following parms, we use the value read from the Job XML file if
-    // a cmd line override value was not already assigned by cpimport.cpp.
-    if (fNoOfBuffers  == -1)
-        fNoOfBuffers   = curJob.numberOfReadBuffers;
-    if (fBufferSize   == -1)
-        fBufferSize    = curJob.readBufferSize;
-    if (fFileVbufSize == -1)
-        fFileVbufSize  = curJob.writeBufferSize;
-    if (fColDelim     == '\0')
-        fColDelim      = curJob.fDelimiter;
+    fNoOfBuffers    = curJob.numberOfReadBuffers;
+    fBufferSize     = curJob.readBufferSize;
+    fFileBufferSize = curJob.writeBufferSize;
 
+    // If cmd line override was not given for delimiter, then use the one
+    // from the XML file.  Same goes for enclosedBy and escape characters.
+    if (m_colDelim == '\0')
+    {
+        m_colDelim   = curJob.fDelimiter;
+    }
     //std::cout << "bulkload::fEnclosedByChar<" << fEnclosedByChar << '>' <<
     //std::endl << "bulkload::fEscapeChar<" << fEscapeChar << '>' <<
     //std::endl << "job.fEnclosedByChar<" <<curJob.fEnclosedByChar<< '>' <<
@@ -859,25 +920,23 @@ int BulkLoad::processJob( )
     //std::endl << "bulkload::fEscapeChar<" << fEscapeChar << '>' << std::endl;
 
     //Bug1315 - check whether DBRoots are RW mounted.
-    std::vector<std::string> dbRootPathList;
-    Config::getDBRootPathList( dbRootPathList );
-    for (unsigned int counter=0; counter<dbRootPathList.size(); counter++)
+    int dbRootKount = Config::DBRootCount();
+    for (int counter=0; counter<dbRootKount; counter++)
     {
-        if ( access( dbRootPathList[counter].c_str(),R_OK|W_OK) < 0 )
+        if ( access(Config::getDBRoot(counter),R_OK|W_OK) < 0 )
         {
             rc = ERR_FILE_NOT_EXIST;
             ostringstream oss;
-            oss << "Error accessing DBRoot[" << counter << "] " <<
-                dbRootPathList[counter] << "; " <<
-                strerror(errno);
-            fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+            oss << "Error accessing DBRoot" << counter+1 << " " <<
+                string(Config::getDBRoot(counter)) << "; " << strerror(errno);
+            m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
             return rc;
         }
     }     
 
     // Init total cumulative run time with time it took to load xml file
     double totalRunTime = getTotalRunTime();
-    fLog.logMsg( "PreProcessing check starts", MSGLVL_INFO1 ); 
+    m_log.logMsg( "PreProcessing check starts", MSGLVL_INFO1 ); 
     startTimer();
 
     //--------------------------------------------------------------------------
@@ -887,7 +946,7 @@ int BulkLoad::processJob( )
         (curJob.jobTableList.size() > 1))
     {
         rc = ERR_INVALID_PARAM;
-        fLog.logMsg("Only 1 table can be imported per job when using STDIN",
+        m_log.logMsg("Only 1 table can be imported per job when using STDIN",
             rc, MSGLVL_ERROR );
         return rc;
     }
@@ -898,18 +957,13 @@ int BulkLoad::processJob( )
     std::vector<TableInfo*> tables;
     for( i = 0; i < curJob.jobTableList.size(); i++ )
     {
-        TableInfo *tableInfo = new TableInfo(&fLog,
+        TableInfo *tableInfo = new TableInfo(&m_log,
                                              fTxnID,
                                              fProcessName,
                                              curJob.jobTableList[i].mapOid,
                                              curJob.jobTableList[i].tblName,
                                              fKeepRbMetaFiles);
-        if ((fBulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-            (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-            tableInfo->setBulkLoadMode( fBulkMode, fBRMRptFileName );
-
-        tableInfo->setTruncationAsError(getTruncationAsError());
-        rc = manageImportDataFileList( curJob, i, tableInfo );
+        rc = validateImportDataFiles( curJob, i, tableInfo );
         if (rc != NO_ERROR)
             return rc;     
 
@@ -926,7 +980,7 @@ int BulkLoad::processJob( )
         {
             // Try releasing the table locks we already acquired.
             // Note that loop is k<i since tables[i] lock failed.
-            for ( unsigned k=0; k<i; k++)
+            for (unsigned k=0; k<i; k++)
             {
                 tables[k]->releaseTableLock( );//ignore return code in this case
             }
@@ -937,7 +991,9 @@ int BulkLoad::processJob( )
         // If we have a lock, then init MetaWriter, so that it can delete any
         // leftover backup meta data files that collide with the ones we are
         // going to create.
-        rc = tables[i]->initBulkRollbackMetaData( );
+        rc = tables[i]->rbMetaWriter()->init(
+            curJob.jobTableList[i].mapOid,
+            curJob.jobTableList[i].tblName );
         if (rc != NO_ERROR)
         {
             // Try releasing the table locks we already acquired.
@@ -958,18 +1014,11 @@ int BulkLoad::processJob( )
     {
         if( curJob.jobTableList[i].colList.size() > 0 )
             bHaveColumn = true;
-
-        // If table already marked as complete then we are skipping the
-        // table because there were no input files to process.
-        if( tables[i]->getStatusTI() == WriteEngine::PARSE_COMPLETE)
-            continue;
-
+        
         rc = preProcess( curJob, i, tables[i] );
         if( rc != NO_ERROR ) {
-        	std::string errMsg = "Error in pre-processing the job file for table " +
-                    curJob.jobTableList[i].tblName;
-        	tables[i]->fBRMReporter.addToErrMsgEntry(errMsg);
-            fLog.logMsg( errMsg, rc, MSGLVL_CRITICAL );
+            m_log.logMsg( "Error in pre-processing the job file for table " +
+                curJob.jobTableList[i].tblName, rc, MSGLVL_CRITICAL );
 
             // Okay to release the locks for the tables we did not get to
             for ( unsigned k=i+1; k<tables.size(); k++)
@@ -988,31 +1037,25 @@ int BulkLoad::processJob( )
 
             // Ignore the return code for now; more important to base rc on the
             // success or failure of the previous work
-
-            // BUG 4398: distributed cpimport now calls takeSnapshot for modes 1 & 2
-            if ((fBulkMode != BULK_MODE_REMOTE_SINGLE_SRC) &&
-                (fBulkMode != BULK_MODE_REMOTE_MULTIPLE_SRC))
-            {
-                BRMWrapper::getInstance()->takeSnapshot();
-            }
+            BRMWrapper::getInstance()->takeSnapshot();
 
             return rc;
         }
     }
       
     stopTimer();
-    fLog.logMsg( "PreProcessing check completed", MSGLVL_INFO1 );
+    m_log.logMsg( "PreProcessing check completed", MSGLVL_INFO1 );
 
     std::ostringstream ossPrepTime;
     ossPrepTime << "preProcess completed, run time for this step : " <<
         getTotalRunTime() << " seconds";
-    fLog.logMsg( ossPrepTime.str(), MSGLVL_INFO1 );
+    m_log.logMsg( ossPrepTime.str(), MSGLVL_INFO1 );
     totalRunTime += getTotalRunTime();
 
     if( !bHaveColumn )
     {
         rc = ERR_INVALID_PARAM;
-        fLog.logMsg( "No column definitions in job description file",
+        m_log.logMsg( "No column definitions in job description file",
             rc, MSGLVL_ERROR );
         return rc;
     }
@@ -1034,13 +1077,7 @@ int BulkLoad::processJob( )
 
     // Ignore the return code for now; more important to base rc on the
     // success or failure of the previous work
-
-	// BUG 4398: distributed cpimport now calls takeSnapshot for modes 1 & 2
-    if ((fBulkMode != BULK_MODE_REMOTE_SINGLE_SRC) &&
-        (fBulkMode != BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        BRMWrapper::getInstance()->takeSnapshot();
-    }
+    BRMWrapper::getInstance()->takeSnapshot();
 
     stopTimer();
     totalRunTime += getTotalRunTime();
@@ -1048,7 +1085,7 @@ int BulkLoad::processJob( )
     std::ostringstream ossTotalRunTime;
     ossTotalRunTime << "Bulk load completed, total run time : " <<
         totalRunTime << " seconds" << std::endl;
-    fLog.logMsg( ossTotalRunTime.str(), MSGLVL_INFO1 );
+    m_log.logMsg( ossTotalRunTime.str(), MSGLVL_INFO1 );
 
 #ifdef PROFILE
     Stats::printProfilingResults( );
@@ -1056,11 +1093,10 @@ int BulkLoad::processJob( )
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
-//    Deconstruct the list of 1 or more import files for the specified table,
-//    and validate the existence of the specified files.
+//    Validate the existence of the import data files for the specified table
 // PARAMETERS:
 //    job - current job
 //    tableNo - table no
@@ -1069,9 +1105,9 @@ int BulkLoad::processJob( )
 //    NO_ERROR if success
 //    other if fail
 //------------------------------------------------------------------------------
-int BulkLoad::manageImportDataFileList(Job& job,
-                                       int tableNo,
-                                       TableInfo* tableInfo)
+int BulkLoad::validateImportDataFiles(Job& job,
+                                      int tableNo,
+                                      TableInfo* tableInfo)
 {
     std::vector<std::string> loadFilesList;
     bool bUseStdin = false;
@@ -1088,20 +1124,15 @@ int BulkLoad::manageImportDataFileList(Job& job,
     {
         bUseStdin = true;
 
-        int rc = buildImportDataFileList(std::string(),
-            loadFileName,
-            loadFilesList);
-        if (rc != NO_ERROR)
-        {
-            return rc;
-        }
+        loadFilesList = tokenizeStr(std::string(),
+                        loadFileName);
         if (loadFilesList.size() > 1)
         {
             ostringstream oss;
             oss << "Table " << tableInfo->getTableName() <<
                 " specifies multiple "
                 "load files; This is not allowed when using STDIN";
-            fLog.logMsg( oss.str(), ERR_INVALID_PARAM, MSGLVL_ERROR );
+            m_log.logMsg( oss.str(), ERR_INVALID_PARAM, MSGLVL_ERROR );
             return ERR_INVALID_PARAM;
         }
     }
@@ -1110,9 +1141,7 @@ int BulkLoad::manageImportDataFileList(Job& job,
         std::string importDir;
         if ( fAlternateImportDir == IMPORT_PATH_CWD )  // current working dir
         {
-            char cwdBuf[4096];
-            importDir  = ::getcwd(cwdBuf,sizeof(cwdBuf));
-            importDir += '/';
+            // do nothing
         }
         else if ( fAlternateImportDir.size() > 0 )     // -f path
         {
@@ -1120,46 +1149,12 @@ int BulkLoad::manageImportDataFileList(Job& job,
         }
         else                                           // <BULKROOT>/data/import
         {
-            importDir  = fRootDir;
+            importDir  = m_rootDir;
             importDir += DIR_BULK_IMPORT;
         }
-
-        // Break down loadFileName into vector of file names in case load-
-        // FileName contains a list of files or 1 or more wildcards.
-        int rc = buildImportDataFileList(importDir,
-            loadFileName,
-            loadFilesList);
-        if (rc != NO_ERROR)
-        {
-            return rc;
-        }
-
-        // No filenames is considered a fatal error, except for remote mode2.
-        // For remote mode2 we just mark the table as complete since we will
-        // have no data to load, but we don't consider this as an error.
-        if (loadFilesList.size() == 0)
-        {
-            ostringstream oss;
-            oss << "No import files found.   " << "default dir: " << importDir<<
-                "   importFileName: " << loadFileName;
-            if (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC)
-            {
-                tableInfo->setLoadFilesInput(bUseStdin, loadFilesList);
-                tableInfo->markTableComplete( );
-                fLog.logMsg( oss.str(), MSGLVL_INFO1 );
-                return NO_ERROR;
-            }
-            else
-            {
-                fLog.logMsg( oss.str(), ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
-                return ERR_FILE_NOT_EXIST;
-            }
-        }
+        loadFilesList = tokenizeStr(importDir, loadFileName);
       
-        // Verify that input data files exist.
-        // We also used to check to make sure the input file is not empty, and
-        // if it were, we threw an error at this point, but we removed that
-        // check.  With shared-nothing, an empty file is now acceptable.
+        // Verify that input data files exist and have data
         for (unsigned ndx=0; ndx<loadFilesList.size(); ndx++ ) 
         {
             string fileName = loadFilesList[ndx]; 
@@ -1169,8 +1164,16 @@ int BulkLoad::manageImportDataFileList(Job& job,
                 in.close();
                 ostringstream oss;
                 oss << "input data file " << fileName << " does not exist";
-                fLog.logMsg( oss.str(), ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
+                m_log.logMsg( oss.str(), ERR_FILE_NOT_EXIST, MSGLVL_ERROR );
                 return ERR_FILE_NOT_EXIST;
+            }
+            if(in.peek()==EOF)
+            {
+                in.close();
+                ostringstream oss;
+                oss << "input data file " << fileName << " is an empty file";
+                m_log.logMsg( oss.str(), ERR_FILE_READ, MSGLVL_ERROR );
+                return ERR_FILE_READ;
             }
             in.close();
         }
@@ -1180,7 +1183,7 @@ int BulkLoad::manageImportDataFileList(Job& job,
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Break up the filename string (which may contain a list of file names)
@@ -1189,24 +1192,22 @@ int BulkLoad::manageImportDataFileList(Job& job,
 // PARAMETERS:
 //    location - path prefix
 //    filename - list of file names
-//    loadFiles- vector of file names extracted from filename string
 // RETURN:
-//    NO_ERROR if success
+//    returns a vector of file file path strings
 //------------------------------------------------------------------------------
-int BulkLoad::buildImportDataFileList(
-    const std::string& location,
-    const std::string& filename,
-    std::vector<std::string>& loadFiles)
+std::vector<std::string> BulkLoad::tokenizeStr(const std::string& location,
+                                               const std::string& filename)
 {
     char *filenames = new char[filename.size() + 1];
     strcpy(filenames,filename.c_str());
 
     char *str;
     char *token;
-    for (str=filenames; ; str=NULL)
+    std::vector<std::string> loadFiles;
+    for (str = filenames;;str=NULL)
     {
 #ifdef _MSC_VER
-    //On Windows, only comma and vertbar can separate input files
+	//On Windows, only comma and vertbar can separate input files
         token = strtok(str,",|");
 #else
         token = strtok(str,", |");
@@ -1217,104 +1218,35 @@ int BulkLoad::buildImportDataFileList(
         // If the token (filename) is fully qualified, then use the filename
         // as-is, else prepend the location (path prefix)
         boost::filesystem::path p(token);
-        std::string fullPath;
-        if (p.has_root_path())
+        if (p.has_root_directory())
         {
-            fullPath = token;
+            loadFiles.push_back(std::string(token));
         }
         else
         {
-            fullPath  = location;
+            std::string fullPath(location);
             fullPath += token;
-        }
-
-#ifdef _MSC_VER
-        loadFiles.push_back(fullPath);
-#else
-        // If running mode2, then support a filename with wildcards
-        if (fBulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC)
-        {
-            bool bExpandFileName = false;
-
-            size_t fpos = fullPath.find_first_of( "[*?" );
-            if (fpos != std::string::npos)
-            {
-                bExpandFileName = true;
-            }
-            else // expand a directory name
-            {
-                struct stat curStat;
-                if ( (stat(fullPath.c_str(),&curStat) == 0) &&
-                     (S_ISDIR(curStat.st_mode)) )
-                {
-                    bExpandFileName = true;
-                    fullPath += "/*";
-                }
-            }
-
-            // If wildcard(s) present use glob() function to expand into a list
-            if (bExpandFileName)
-            {
-                glob_t globBuf;
-                memset(&globBuf, 0, sizeof(globBuf));
-                int globFlags = GLOB_ERR | GLOB_MARK;
-                int rc        = glob(fullPath.c_str(), globFlags, 0, &globBuf);
-                if (rc != 0)
-                {
-                    if (rc == GLOB_NOMATCH)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ostringstream oss;
-                        oss << "Error expanding filename " << fullPath;
-                        if (rc == GLOB_NOSPACE)
-                            oss << "; out of memory";
-                        else if (rc == GLOB_ABORTED)
-                            oss << "; error reading directory";
-                        else if (rc == GLOB_NOSYS)
-                            oss << "; globbing not implemented";
-                        else
-                            oss << "; rc-" << rc;
-                        fLog.logMsg(oss.str(), ERR_FILE_GLOBBING, MSGLVL_ERROR);
-
-                        delete [] filenames;
-                        return ERR_FILE_GLOBBING;
-                    }
-                }
-
-                // Include all non-directory files in the import file list
-                std::string fullPath2;
-                for (unsigned int k=0; k<globBuf.gl_pathc; k++)
-                {
-                    fullPath2 = globBuf.gl_pathv[k];
-                    if ( !fullPath2.empty() )
-                    {
-                        if ( fullPath2[ fullPath2.length()-1 ] != '/' )
-                        {
-                            loadFiles.push_back( fullPath2 );
-                        }
-                    }
-                }
-            } // wild card present
-            else
-            {
-                loadFiles.push_back(fullPath);
-            }
-        }     // mode2
-        else
-        {
             loadFiles.push_back(fullPath);
-        }     // not mode2
-#endif
-    }         // loop through filename tokens
-
+        }
+    }
     delete [] filenames;
-
-    return NO_ERROR;
+    return loadFiles;
 }
-
+
+//------------------------------------------------------------------------------
+// DESCRIPTION:
+//    Sets active debug level for logging.
+// PARAMETERS:
+//    level - requested debug level
+// RETURN:
+//    none
+//------------------------------------------------------------------------------
+void BulkLoad::setAllDebug( DebugLevel level )
+{
+    setDebugLevel( level );
+    m_log.setDebugLevel( level );
+}
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
 //    Clear table locks, and rollback any tables that are
@@ -1352,7 +1284,7 @@ int BulkLoad::rollbackLockedTables( )
                 ostringstream oss;
                 oss << "Table " << fTableInfo[i].getTableName() <<
                     " was successfully loaded. ";
-                fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+                m_log.logMsg( oss.str(), MSGLVL_INFO1 );
             }
         }
 
@@ -1367,7 +1299,7 @@ int BulkLoad::rollbackLockedTables( )
                     oss << "Table " << fTableInfo[i].getTableName() <<
                         " (OID-" << fTableInfo[i].getTableOID() << ")" <<
                         " was not successfully loaded.  Rolling back.";
-                    fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+                    m_log.logMsg( oss.str(), MSGLVL_INFO1 );
                 }
                 else
                 {
@@ -1375,7 +1307,7 @@ int BulkLoad::rollbackLockedTables( )
                     oss << "Table " << fTableInfo[i].getTableName() <<
                         " (OID-" << fTableInfo[i].getTableOID() << ")" <<
                         " did not start loading.  No rollback necessary.";
-                    fLog.logMsg( oss.str(), MSGLVL_INFO1 );
+                    m_log.logMsg( oss.str(), MSGLVL_INFO1 );
                 }
 
                 rc = rollbackLockedTable( fTableInfo[i] );
@@ -1389,49 +1321,82 @@ int BulkLoad::rollbackLockedTables( )
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
-//    Clear table lock, and rollback the specified table that is still locked.
-//    This function only comes into play for a mode3, since the tablelock and
-//    bulk rollbacks are managed by the parent (cpipmort file splitter) process
-//    in the case of mode1 and mode2 bulk loads.
+//    Clear table lock, and rollback the specified table
+//    still locked through session manager.
 // PARAMETERS:
 //    tableInfo - the table to be released and rolled back
 // RETURN:
 //    NO_ERROR if success
 //    other if fail
 //------------------------------------------------------------------------------
-int BulkLoad::rollbackLockedTable( TableInfo& tableInfo )
+int BulkLoad::rollbackLockedTable( TableInfo& tableInfo)
 {
-    return tableInfo.rollbackWork( );
+    // Close any column or store files left open by abnormal termination
+    tableInfo.closeOpenDbFiles();
+
+    // Restore/rollback the DB files if we got far enough to begin processing
+    // this table.
+    int rc = NO_ERROR;
+    if (tableInfo.hasProcessingBegun())
+    {
+        const std::string APPLNAME("cpimport");
+        BulkRollbackMgr rbMgr( tableInfo.getTableOID(),
+            tableInfo.getTableName(),
+            APPLNAME, &m_log );
+        rc = rbMgr.rollback( true, fKeepRbMetaFiles );
+        if (rc != NO_ERROR)
+        {
+            ostringstream oss;
+            oss << "Error rolling back table " <<
+                tableInfo.getTableName()    <<
+                "; " << rbMgr.getErrorMsg();
+            m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
+            return rc;
+        }
+    }
+
+    // Delete the meta data files after rollback is complete
+    tableInfo.deleteMetaDataRollbackFile( );
+
+    // Release the table lock
+    rc = tableInfo.releaseTableLock( );
+    if (rc != NO_ERROR)
+    {
+        ostringstream oss;
+        oss << "Table lock not cleared for table " <<
+            tableInfo.getTableName();
+        m_log.logMsg( oss.str(), rc, MSGLVL_ERROR );
+        return rc;
+    }
+
+    return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // DESCRIPTION:
-//    Update next autoincrement value for specified column OID.
+//    Update next autoincrement value for specified table OID.
 // PARAMETERS:
-//    columnOid      - column OID of interest
+//    tableOID       - table OID of interest
 //    nextAutoIncVal - next autoincrement value to assign to tableOID
 // RETURN:
-//    0 if success
+//    NO_ERROR if success
 //    other if fail
 //------------------------------------------------------------------------------
 /* static */
-int BulkLoad::updateNextValue(OID columnOid, long long nextAutoIncVal)
+int BulkLoad::updateNextValue(OID tableOID, long long nextAutoIncVal)
 {
-    // The odds of us ever having 2 updateNextValue() calls going on in parallel
-    // are slim and none.  But it's theoretically possible if we had an import
-    // job for 2 tables; so we put a mutex here just in case the DDLClient code
-    // won't work well with 2 competing WE_DDLCommandClient objects in the same
-    // process (ex: if there is any static data in WE_DDLCommandClient).
-    boost::mutex::scoped_lock lock( *fDDLMutex );
-    WE_DDLCommandClient ddlCommandClt;
-    uint64_t nextVal = nextAutoIncVal;
-    unsigned int rc = ddlCommandClt.UpdateSyscolumnNextval(
-        columnOid, nextVal );
+    WriteEngineWrapper::AutoIncrementValue_t nextValueMap;
+    nextValueMap[tableOID] = nextAutoIncVal;
 
-    return (int)rc;
+    // Perform writeengine wrapper call within mutex to ensure thread safe
+    boost::mutex::scoped_lock lock( *fWEWrapperMutex );
+    int rc = fWEWrapper->updateNextValue( nextValueMap,
+                                          BULK_SYSCAT_SESSION_ID );
+
+    return rc;
 }
 
 } //end of namespace

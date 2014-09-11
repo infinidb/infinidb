@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: ddl.y 8706 2012-07-13 16:25:50Z rdempsey $ */
+/* $Id: ddl.y 7694 2011-05-11 19:14:46Z rdempsey $ */
 /* This describes a substantial subset of SQL92 DDL with some
    enhancements from various vendors.  Most of the nomenclature in the
    grammar is drawn from SQL92. 
@@ -48,11 +48,7 @@
 %{
 #include "sqlparser.h"
 
-#ifdef _MSC_VER
-#include "ddl-gram-win.h"
-#else
 #include "ddl-gram.h"
-#endif
 
 using namespace std;
 using namespace ddlpackage;	
@@ -60,12 +56,13 @@ using namespace ddlpackage;
 /* The user is expect to pass a ParseTree* to grammar_init */
 static ParseTree* parseTree;
 static std::string db_schema;
+
 int ddllex();
 void ddlerror (char const *error);
-char* copy_string(const char *str);
+
 %}
 
-%expect 15
+%expect 6
 
 %debug
 
@@ -108,7 +105,7 @@ char* copy_string(const char *str);
 %}
 
 %token ACTION ADD ALTER AUTO_INCREMENT BIGINT BIT IDB_BLOB CASCADE IDB_CHAR CHARACTER CHECK CLOB COLUMN
-COLUMNS COMMENT CONSTRAINT CONSTRAINTS CREATE CURRENT_USER DATETIME DEC
+COLUMNS COMMENT CONSTRAINT CONSTRAINTS CREATE CURRENT_USER DATE DATETIME DEC
 DECIMAL DEFAULT DEFERRABLE DEFERRED IDB_DELETE DROP ENGINE
 FOREIGN FULL IMMEDIATE INDEX INITIALLY IDB_INT INTEGER KEY MATCH MAX_ROWS
 MIN_ROWS MODIFY NO NOT NULL_TOK NUMBER NUMERIC ON PARTIAL PRECISION PRIMARY
@@ -116,7 +113,7 @@ REFERENCES RENAME RESTRICT SET SMALLINT TABLE TIME
 TINYINT TO UNIQUE UPDATE USER SESSION_USER SYSTEM_USER VARCHAR VARBINARY
 VARYING WITH ZONE DOUBLE IDB_FLOAT REAL CHARSET IF EXISTS CHANGE TRUNCATE
 
-%token <str> IDENT FCONST SCONST CP_SEARCH_CONDITION_TEXT ICONST DATE
+%token <str> IDENT FCONST SCONST CP_SEARCH_CONDITION_TEXT ICONST
 
 /* Notes:
  * 1. "ata" stands for alter_table_action
@@ -540,38 +537,6 @@ rename_column:
 	{$$ = new AtaRenameColumn($3, $4, $5, NULL);}
 	|CHANGE COLUMN column_name column_name data_type column_option
 	{$$ = new AtaRenameColumn($3, $4, $5, $6);}
-	|CHANGE column_name column_name data_type column_qualifier_list
-	{$$ = new AtaRenameColumn($2, $3, $4, $5, NULL);}
-	|CHANGE COLUMN column_name column_name data_type column_qualifier_list
-	{$$ = new AtaRenameColumn($3, $4, $5, $6, NULL);}
-	|CHANGE column_name column_name data_type column_qualifier_list column_option
-	{$$ = new AtaRenameColumn($2, $3, $4, $5, NULL, $6);}
-	|CHANGE COLUMN column_name column_name data_type column_qualifier_list column_option
-	{$$ = new AtaRenameColumn($3, $4, $5, $6, NULL, $7);}
-	|CHANGE column_name column_name data_type default_clause 
-	{$$ = new AtaRenameColumn($2, $3, $4, NULL, $5);}
-	|CHANGE COLUMN column_name column_name data_type default_clause
-	{$$ = new AtaRenameColumn($3, $4, $5, NULL, $6);}
-	|CHANGE column_name column_name data_type default_clause column_option
-	{$$ = new AtaRenameColumn($2, $3, $4, NULL, $5, $6);}
-	|CHANGE COLUMN column_name column_name data_type default_clause column_option
-	{$$ = new AtaRenameColumn($3, $4, $5, NULL, $6, $7);}
-	|CHANGE column_name column_name data_type column_qualifier_list default_clause 
-	{$$ = new AtaRenameColumn($2, $3, $4, $5, $6);}
-	|CHANGE COLUMN column_name column_name data_type column_qualifier_list default_clause
-	{$$ = new AtaRenameColumn($3, $4, $5, $6, $7);}
-	|CHANGE column_name column_name data_type default_clause column_qualifier_list  
-	{$$ = new AtaRenameColumn($2, $3, $4, $6, $5);}
-	|CHANGE COLUMN column_name column_name data_type default_clause column_qualifier_list
-	{$$ = new AtaRenameColumn($3, $4, $5, $7, $6);}
-	|CHANGE column_name column_name data_type column_qualifier_list default_clause column_option
-	{$$ = new AtaRenameColumn($2, $3, $4, $5, $6, $7);}
-	|CHANGE COLUMN column_name column_name data_type column_qualifier_list default_clause column_option
-	{$$ = new AtaRenameColumn($3, $4, $5, $6, $7, $8);}	
-	|CHANGE column_name column_name data_type default_clause column_qualifier_list column_option
-	{$$ = new AtaRenameColumn($2, $3, $4, $6, $5, $7);}
-	|CHANGE COLUMN column_name column_name data_type default_clause column_qualifier_list column_option
-	{$$ = new AtaRenameColumn($3, $4, $5, $7, $6, $8);}	
 	;
 
 drop_table_constraint_def:
@@ -615,8 +580,7 @@ ata_add_column:
 	;
 
 column_name:
-	DATE
-	|IDENT
+	IDENT
 	;
 
 constraint_name:
@@ -654,14 +618,6 @@ column_def:
 	| column_name data_type opt_null_tok default_clause column_qualifier_list column_option
 	{
 		$$ = new ColumnDef($1, $2, $5, $4, $6);
-	}
-	| column_name data_type opt_null_tok column_qualifier_list default_clause
-	{
-		$$ = new ColumnDef($1, $2, $4, $5);
-	}
-	| column_name data_type opt_null_tok column_qualifier_list default_clause column_option
-	{
-		$$ = new ColumnDef($1, $2, $4, $5, $6);
 	}
 	| column_name data_type opt_null_tok default_clause column_option
 	{

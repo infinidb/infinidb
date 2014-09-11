@@ -45,6 +45,7 @@ returnedcolumn.cpp \
 rowcolumn.cpp \
 selectfilter.cpp \
 sessionmanager.cpp \
+sessionmonitor.cpp \
 simplecolumn.cpp \
 simplefilter.cpp \
 simplescalarfilter.cpp \
@@ -80,6 +81,7 @@ returnedcolumn.h \
 rowcolumn.h \
 selectfilter.h \
 sessionmanager.h \
+sessionmonitor.h \
 simplecolumn.h \
 simplefilter.h \
 simplescalarfilter.h \

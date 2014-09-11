@@ -22,7 +22,6 @@
  ***********************************************************************/
 
 #include <map>
-#include <boost/scoped_ptr.hpp>
 using namespace std;
 
 #include "ddlpkg.h"
@@ -43,7 +42,6 @@ using namespace std;
 #include "dbrm.h"
 #include "idberrorinfo.h"
 #include "errorids.h"
-#include "we_messages.h"
 using namespace BRM;
 
 using namespace config;
@@ -52,7 +50,6 @@ using namespace ddlpackageprocessor;
 using namespace ddlpackage;
 using namespace execplan;
 using namespace logging;
-using namespace WriteEngine;
 
 namespace
 {
@@ -74,12 +71,35 @@ typedef map<u_int32_t, string> PKNameMap;
 //FIXME: when DDL is parallelized again, access to this map needs to be protected by a lock!
 PKNameMap pkNameMap;
 
+BRM::DBRM dbrm;
+vector<BRM::OID_t> oidList;
 WriteEngine::WriteEngineWrapper writeEngine;
 
 void cleanPMSysCache()
 {
-	vector<BRM::OID_t> oidList = getAllSysCatOIDs();
-	cacheutils::flushOIDsFromCache ( oidList );
+	int err = 0;
+
+	//FIXME: is there any part of the list that we can cache?
+	oidList.clear();
+	BRM::OID_t oid = 0;
+	for (oid=1001;oid <= 1011; oid++)
+	{					
+		oidList.push_back(oid);
+	}
+	for (oid=2001; oid <= 2006; oid+=3)
+	{
+		oidList.push_back(oid);
+	}
+	for (oid=1021; oid <= 1042; oid++)
+	{
+		oidList.push_back(oid);
+	}
+	for (oid=2061; oid <= 2078; oid+=3)
+	{
+		oidList.push_back(oid);
+	}
+
+	err = cacheutils::flushOIDsFromCache ( oidList );   
 }
 
 struct PackageHandler
@@ -89,8 +109,8 @@ struct PackageHandler
 
         DDLPackageProcessor::DDLResult result;
         result.result = DDLPackageProcessor::NO_ERROR;
-        //boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
-
+        //CalpontSystemCatalog* systemCatalogPtr;
+               
         try
         {
 			//cout << "DDLProc received package " << fPackageType << endl;
@@ -100,7 +120,7 @@ struct PackageHandler
                     {
                         CreateTableStatement createTableStmt;
                         createTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
                         CreateTableProcessor processor;
                         PKNameMap::iterator it = pkNameMap.find(createTableStmt.fSessionID);
                         if (it == pkNameMap.end())
@@ -108,11 +128,11 @@ struct PackageHandler
                             // TODO: should check if this createtablestmt has primary key
                             processor.PKName("");
                         else
-                            processor.PKName((*it).second);
+                            processor.PKName((*it).second);    
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid.valid = true;
 						//cout << "create table using txnid " << fTxnid.id << endl;
-                        result = processor.processPackage(createTableStmt);
+                        result = processor.processPackage(createTableStmt);                        
                         if (it != pkNameMap.end())
                             pkNameMap.erase(it);
                         systemCatalogPtr->removeCalpontSystemCatalog( createTableStmt.fSessionID );
@@ -124,7 +144,7 @@ struct PackageHandler
                     {
                         CreateIndexStatement createIndexStmt;
                         createIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createIndexStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createIndexStmt.fSessionID );
                         CreateIndexProcessor processor;
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid..valid = true;
@@ -139,8 +159,8 @@ struct PackageHandler
                     {
                     	AlterTableStatement alterTableStmt;
                     	alterTableStmt.unserialize(fByteStream);
-                    	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
-                    	AlterTableProcessor processor;
+                    	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
+                    	AlterTableProcessor processor;   
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid.valid = true;
                     	PKNameMap::iterator it = pkNameMap.find(alterTableStmt.fSessionID);
@@ -149,8 +169,8 @@ struct PackageHandler
                     	// TODO: should check if this createtablestmt has primary key
                     	processor.PKName("");
                     	else
-                    		processor.PKName((*it).second);
-                    	result = processor.processPackage(alterTableStmt);
+                    		processor.PKName((*it).second);  
+                    	result = processor.processPackage(alterTableStmt);                        
                     	if (it != pkNameMap.end())
                     	    pkNameMap.erase(it);
                         systemCatalogPtr->removeCalpontSystemCatalog( alterTableStmt.fSessionID );
@@ -162,12 +182,13 @@ struct PackageHandler
                     {
                         DropTableStatement dropTableStmt;
                         dropTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
-                        boost::scoped_ptr<DropTableProcessor> processor(new DropTableProcessor());
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
+                        DropTableProcessor* processor = new DropTableProcessor();
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
 						//cout << "Drop table using txnid " << fTxnid.id << endl;
                         result = processor->processPackage(dropTableStmt);
+						delete processor;
                         systemCatalogPtr->removeCalpontSystemCatalog( dropTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog( dropTableStmt.fSessionID | 0x80000000);
                     }
@@ -176,12 +197,13 @@ struct PackageHandler
                     {
                         TruncTableStatement truncTableStmt;
                         truncTableStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
-                        boost::scoped_ptr<TruncTableProcessor> processor(new TruncTableProcessor());
+                        TruncTableProcessor* processor = new TruncTableProcessor();
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
                         result = processor->processPackage(truncTableStmt);
+                        delete processor;
                         systemCatalogPtr->removeCalpontSystemCatalog(truncTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog(truncTableStmt.fSessionID | 0x80000000);
                     }
@@ -190,12 +212,13 @@ struct PackageHandler
                     {
                         MarkPartitionStatement markPartitionStmt;
                         markPartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
-                        CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
-                        boost::scoped_ptr<MarkPartitionProcessor> processor(new MarkPartitionProcessor());
+                        CalpontSystemCatalog* systemCatalogPtr =
+				CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
+                        MarkPartitionProcessor* processor = new MarkPartitionProcessor();
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
                         result = processor->processPackage(markPartitionStmt);
+                        delete processor;
                         systemCatalogPtr->removeCalpontSystemCatalog(markPartitionStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog(markPartitionStmt.fSessionID | 0x80000000);
                     }
@@ -204,12 +227,13 @@ struct PackageHandler
                     {
                         RestorePartitionStatement restorePartitionStmt;
                         restorePartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(restorePartitionStmt.fSessionID);
-                        boost::scoped_ptr<RestorePartitionProcessor> processor(new RestorePartitionProcessor());
+                        RestorePartitionProcessor* processor = new RestorePartitionProcessor();
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
                         result = processor->processPackage(restorePartitionStmt);
+                        delete processor;
                         systemCatalogPtr->removeCalpontSystemCatalog(restorePartitionStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog(restorePartitionStmt.fSessionID | 0x80000000);
                     }
@@ -218,12 +242,13 @@ struct PackageHandler
                     {
                         DropPartitionStatement dropPartitionStmt;
                         dropPartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(dropPartitionStmt.fSessionID);
-                        boost::scoped_ptr<DropPartitionProcessor> processor(new DropPartitionProcessor());
+                        DropPartitionProcessor* processor = new DropPartitionProcessor();
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
                         result = processor->processPackage(dropPartitionStmt);
+                        delete processor;
                         systemCatalogPtr->removeCalpontSystemCatalog(dropPartitionStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog(dropPartitionStmt.fSessionID | 0x80000000);
                     }
@@ -233,7 +258,7 @@ struct PackageHandler
                     {
                         DropIndexStatement dropIndexStmt;
                         dropIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
                         DropIndexProcessor processor;
                         result = processor.processPackage(dropIndexStmt);
                         systemCatalogPtr->CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
@@ -254,12 +279,12 @@ struct PackageHandler
 
                 ml.logErrorMessage( result.message );
             }
-			//cleanPMSysCache();
+			cleanPMSysCache();
             messageqcpp::ByteStream results;
             messageqcpp::ByteStream::byte status =  result.result;
             results << status;
             results << result.message.msg();
-
+		
             fIos.write(results);
 
             fIos.close();
@@ -276,7 +301,7 @@ struct PackageHandler
 			messageqcpp::ByteStream::byte status = DDLPackageProcessor::CREATE_ERROR;
             results << status;
 			results << string(idbEx.what());
-
+		
             fIos.write(results);
 
             fIos.close();
@@ -292,7 +317,7 @@ struct PackageHandler
     messageqcpp::ByteStream fByteStream;
     messageqcpp::ByteStream::quadbyte fPackageType;
 	BRM::TxnID fTxnid;
-
+	
 
 };
 
@@ -302,24 +327,21 @@ namespace ddlprocessor
 {
 DDLProcessor::DDLProcessor( int packageMaxThreads, int packageWorkQueueSize )
         :fPackageMaxThreads(packageMaxThreads), fPackageWorkQueueSize(packageWorkQueueSize),
-         fMqServer(DDLProcName)
+        fAcceptPackages(true), fMqServer(DDLProcName)
 {
     fDdlPackagepool.setMaxThreads(fPackageMaxThreads);
     fDdlPackagepool.setQueueSize(fPackageWorkQueueSize);
 	csc = CalpontSystemCatalog::makeCalpontSystemCatalog();
 	csc->identity(CalpontSystemCatalog::EC);
-	fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DDLPROC);
-	fPMCount = fWEClient->getPmCount();
 }
 
 void DDLProcessor::process()
 {
-    DBRM dbrm;
     messageqcpp::IOSocket ios;
     messageqcpp::ByteStream bs;
     PackageHandler handler;
     messageqcpp::ByteStream::quadbyte packageType;
-
+	
 	cout << "DDLProc is ready..." << endl;
 
     try
@@ -332,337 +354,256 @@ void DDLProcessor::process()
             bs >> sessionID;
             bs >> packageType;
 
-            uint32_t stateFlags;
-			if (dbrm.getSystemState(stateFlags) > 0)		// > 0 implies succesful retrieval. It doesn't imply anything about the contents
+            if (packageType == ddlpackage::DDL_STOP)
             {
-                messageqcpp::ByteStream results;
-                const char* responseMsg=0;
-                messageqcpp::ByteStream::byte status;
-                bool bReject = false;
-                // Check to see if we're in write suspended mode
-                // If so, we can't process the request.
-                if (stateFlags & SessionManagerServer::SS_SUSPENDED)
-                {
-                    status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-                    responseMsg = "Writing to the database is disabled.";
-                    bReject = true;
-                }
-                // Check to see if we're in write suspend or shutdown pending mode
-                if (stateFlags & SessionManagerServer::SS_SUSPEND_PENDING
-                 || stateFlags & SessionManagerServer::SS_SHUTDOWN_PENDING)
-                {
-                    if (stateFlags & SessionManagerServer::SS_SUSPEND_PENDING)
-                    {
-                        responseMsg = "Writing to the database is disabled.";
-                    }
-                    else
-                    {
-                        responseMsg = "The database is being shut down.";
-                    }
-                    status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-                    bReject = true;
-                }
-                if (bReject)
-                {
-                    results << status;
-                    //@bug 266
-                    MessageLog logger(LoggingID(27));
-                    logging::Message::Args args;
-                    logging::Message message(2);
-                    args.add(responseMsg);
-                    message.format( args );
-                    results << message.msg();
-                    ios.write(results);
-                    std::cout << responseMsg << endl;
-                    std::cout << "Command rejected. Status " << (int)status << message.msg() << endl;
-                    continue;
-                }
+                stopAcceptingPackages(ios);
             }
-
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
-            //Check if any other active transaction
-            bool bIsDbrmUp = true;
-            bool anyOtherActiveTransaction = true;
-            execplan::SessionManager sessionManager;
-            BRM::SIDTIDEntry blockingsid;
-#endif
-            //check whether the system is ready to process statement.
-            if (dbrm.getSystemReady() < 1)
+            else if (packageType == ddlpackage::DDL_RESUME)
             {
-                messageqcpp::ByteStream results;
-                messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
-                results << status;
-                string msg ("System is not ready yet. Please try again." );
-
-                results << msg;
-                ios.write(results);
-
-                ios.close();
-                continue;
+                resumeAcceptingPackages(ios);
             }
-            int i = 0;
-            int waitPeriod = 10;
-            //@Bug 2487 Check transaction map every 1/10 second
-
-            int sleepTime = 100; // sleep 100 milliseconds between checks
-            int numTries = 10;  // try 10 times per second
-
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
-            string waitPeriodStr = config::Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
-            if ( waitPeriodStr.length() != 0 )
-                waitPeriod = static_cast<int>(config::Config::fromText(waitPeriodStr));
-
-            numTries = 	waitPeriod * 10;
-            struct timespec rm_ts;
-
-            rm_ts.tv_sec = sleepTime/1000;
-            rm_ts.tv_nsec = sleepTime%1000 *1000000;
-            //cout << "starting i = " << i << endl;
-            BRM::TxnID txnid;
-            int rc = 0;
-            //anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp );
-            while (anyOtherActiveTransaction)
+            else if (fAcceptPackages)
             {
-                anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
-                    blockingsid );
-                if (anyOtherActiveTransaction)
-                {
-                    for ( ; i < numTries; i++ )
-                    {
+#ifdef SERIALIZE_DDL_DML_CPIMPORT                
+                //Check if any other active transaction
+				bool bIsDbrmUp = true;
+            	bool anyOtherActiveTransaction = true;
+				execplan::SessionManager sessionManager; 
+				BRM::SIDTIDEntry blockingsid;
+#endif            
+				//check whether the system is ready to process statement.
+				if (!dbrm.isSystemReady())
+				{
+					messageqcpp::ByteStream results;
+                	messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
+                
+                	results << status;
+					string msg ("System is not ready yet. Please try again." );
+
+                	results << msg;
+                	ios.write(results);
+
+                	ios.close();
+				}
+				
+            	int i = 0;
+            	int waitPeriod = 10;
+				//@Bug 2487 Check transaction map every 1/10 second
+
+			    int sleepTime = 100; // sleep 100 milliseconds between checks
+				int numTries = 10;  // try 10 times per second
+				
+#ifdef SERIALIZE_DDL_DML_CPIMPORT 
+            	string waitPeriodStr = Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
+            	if ( waitPeriodStr.length() != 0 )
+            		waitPeriod = static_cast<int>(Config::fromText(waitPeriodStr));
+            		
+            	numTries = 	waitPeriod * 10;
+				struct timespec rm_ts;
+
+				rm_ts.tv_sec = sleepTime/1000; 
+				rm_ts.tv_nsec = sleepTime%1000 *1000000;
+				//cout << "starting i = " << i << endl;
+				BRM::TxnID txnid;
+				//anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp );	
+				while (anyOtherActiveTransaction)
+				{
+					anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
+						blockingsid );
+					if (anyOtherActiveTransaction) 
+					{
+						for ( ; i < numTries; i++ )
+						{
 #ifdef _MSC_VER
-                        Sleep(rm_ts.tv_sec * 1000);
+							Sleep(rm_ts.tv_sec * 1000);
 #else
-                        struct timespec abs_ts;
-                        //cout << "session " << sessionID << " nanosleep on package type " << (int)packageType << endl;
-                        do
-                        {
-                            abs_ts.tv_sec = rm_ts.tv_sec;
-                            abs_ts.tv_nsec = rm_ts.tv_nsec;
-                        }
-                        while(nanosleep(&abs_ts,&rm_ts) < 0);
+							struct timespec abs_ts;
+							//cout << "session " << sessionID << " nanosleep on package type " << (int)packageType << endl;
+							do
+							{
+								abs_ts.tv_sec = rm_ts.tv_sec; 
+								abs_ts.tv_nsec = rm_ts.tv_nsec;
+							} 
+							while(nanosleep(&abs_ts,&rm_ts) < 0);
 #endif
-                        anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
-                            blockingsid );
-                        if ( !anyOtherActiveTransaction )
-                        {
-                            //cout << "Ready to process type " << (int)packageType << endl;
-                            txnid = sessionManager.getTxnID(sessionID);
-                            if ( !txnid.valid )
-                            {
-                                txnid = sessionManager.newTxnID(sessionID, true, true);
-                                if (txnid.valid) {
-                                    //cout << "Ready to process type " << (int)packageType << " with txnid " << txnid.id << endl;
-                                    anyOtherActiveTransaction = false;
-                                    break;
-                                }
-                                else
-                                {
-                                    anyOtherActiveTransaction = true;
-                                }
-                            }
-                            else
-                            {
-                                string errorMsg;
-                                rc = commitTransaction(txnid.id, errorMsg);
-                                if ( rc != 0)
-                                    throw std::runtime_error(errorMsg);
-                                //need unlock the table.
-                                std::vector<TableLockInfo> tableLocks = dbrm.getAllTableLocks();
-                                bool lockReleased = true;
-                                for (unsigned k = 0; k < tableLocks.size(); k++)
-                                {
-                                    if (tableLocks[k].ownerTxnID == txnid.id)
-                                    {
-                                        lockReleased = dbrm.releaseTableLock(tableLocks[k].id);
-                                        if (!lockReleased)
-                                        {
-                                            ostringstream os;
-                                            os << "tablelock id " << tableLocks[k].id << " is not found";
-                                            throw std::runtime_error(os.str());
-                                        }
-                                    }
-                                }
-                                sessionManager.committed(txnid);
-                                txnid = sessionManager.newTxnID(sessionID, true, true);
-                                if (txnid.valid) {
-                                    //cout << "Ready to process type " << (int)packageType << " with txnid " << txnid.id << endl;
-                                    anyOtherActiveTransaction = false;
-                                    break;
-                                }
-                                else
-                                {
-                                    anyOtherActiveTransaction = true;
-                                }
-                            }
-                        }
-                    }
-                        //cout << "ending i = " << i << endl;
-                }
-                else
-                {
-                    //cout << "Ready to process type " << (int)packageType << endl;
-                    txnid = sessionManager.getTxnID(sessionID);
-                    if ( !txnid.valid )
-                    {
-                        txnid = sessionManager.newTxnID(sessionID, true, true);
-                        if (!txnid.valid) {
-                            //cout << "cannot get txnid " << (int)packageType << " for session " << sessionID <<  endl;
-                            anyOtherActiveTransaction = true;
-                        }
-                        else
-                        {
-                            anyOtherActiveTransaction = false;
-                        }
-                    }
-                    else
-                    {
-                        string errorMsg;
-                        rc = commitTransaction(txnid.id, errorMsg);
-                        if ( rc != 0)
-                            throw std::runtime_error(errorMsg);
-                        //need unlock the table.
-                        std::vector<TableLockInfo> tableLocks = dbrm.getAllTableLocks();
-                        bool lockReleased = true;
-                        for (unsigned k = 0; k < tableLocks.size(); k++)
-                        {
-                            if (tableLocks[k].ownerTxnID == txnid.id)
-                            {
-                                lockReleased = dbrm.releaseTableLock(tableLocks[k].id);
-                                if (!lockReleased)
-                                {
-                                    ostringstream os;
-                                    os << "tablelock id " << tableLocks[k].id << " is not found";
-                                    throw std::runtime_error(os.str());
-                                }
-                            }
-                        }
-                        sessionManager.committed(txnid);
-                        txnid = sessionManager.newTxnID(sessionID, true, true);
-                        if (!txnid.valid) {
-                            //cout << "cannot get txnid " << (int)packageType << " for session " << sessionID <<  endl;
-                            anyOtherActiveTransaction = true;
-                        }
-                        else
-                        {
-                            anyOtherActiveTransaction = false;
-                        }
-                    }
-                }
-
-                if ((anyOtherActiveTransaction) && (i >= numTries))
-                {
-                    //cout << " Erroring out on package type " << (int)packageType << endl;
-                    break;
-                }
-            }
+							anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
+								blockingsid );
+							if ( !anyOtherActiveTransaction )
+							{
+								//cout << "Ready to process type " << (int)packageType << endl;
+								txnid = sessionManager.getTxnID(sessionID);
+								if ( !txnid.valid )
+								{
+									txnid = sessionManager.newTxnID(sessionID, true, true);
+									if (txnid.valid) {
+										//cout << "Ready to process type " << (int)packageType << " with txnid " << txnid.id << endl;
+										anyOtherActiveTransaction = false;
+										break;
+									}
+								}
+								else
+								{
+									writeEngine.commit(txnid.id);
+									sessionManager.committed(txnid);
+									txnid = sessionManager.newTxnID(sessionID, true, true);
+									if (txnid.valid) {
+										//cout << "Ready to process type " << (int)packageType << " with txnid " << txnid.id << endl;
+										anyOtherActiveTransaction = false;
+										break;
+									}
+								}
+							}
+						}
+							//cout << "ending i = " << i << endl;
+					}
+					else
+					{
+						//cout << "Ready to process type " << (int)packageType << endl;
+						txnid = sessionManager.getTxnID(sessionID);
+						if ( !txnid.valid )
+						{
+							txnid = sessionManager.newTxnID(sessionID, true, true);
+							if (!txnid.valid) {
+								//cout << "cannot get txnid " << (int)packageType << " for session " << sessionID <<  endl;
+								anyOtherActiveTransaction = true;
+							}
+						}
+						else 
+						{
+							writeEngine.commit(txnid.id);
+							sessionManager.committed(txnid);
+							txnid = sessionManager.newTxnID(sessionID, true, true);
+							if (!txnid.valid) {
+								//cout << "cannot get txnid " << (int)packageType << " for session " << sessionID <<  endl;
+								anyOtherActiveTransaction = true;
+							}
+						}
+					}
+						
+					if ((anyOtherActiveTransaction) && (i >= numTries))
+					{
+						//cout << " Erroring out on package type " << (int)packageType << endl;
+						break;  
+					}
+				}
 #endif
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
-            if ((anyOtherActiveTransaction) && (i >= numTries))
-            {
-                messageqcpp::ByteStream results;
-                messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
+#ifdef SERIALIZE_DDL_DML_CPIMPORT				
+				if ((anyOtherActiveTransaction) && (i >= numTries))
+				{
+					messageqcpp::ByteStream results;
+                	messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
+                
+                	results << status;
+					Message::Args args;
+					args.add(static_cast<uint64_t>(blockingsid.sessionid));
 
-                results << status;
-                Message::Args args;
-                args.add(static_cast<uint64_t>(blockingsid.sessionid));
+					CalpontSystemCatalog::OID to = blockingsid.tableOID;
+					if (to < 3000)
+					{
+						vector<SIDTIDEntry> st;
+						sessionManager.getTableLocksInfo(st);
+						vector<SIDTIDEntry>::iterator iter = st.begin();
+						vector<SIDTIDEntry>::iterator end = st.end();
+						to = 0;
+						while (iter != end)
+						{
+							if (iter->sessionid == blockingsid.sessionid && iter->tableOID >= 3000)
+							{
+								to = iter->tableOID;
+								break;
+							}
+							++iter;
+						}
+					}
 
-                results << IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args);
-				//@Bug 3854 Log to debug.log
-				LoggingID logid(15, 0, 0);
-				logging::Message::Args args1;
-				logging::Message msg(1);
-				args1.add(IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args));
-				msg.format( args1 );
-				logging::Logger logger(logid.fSubsysID);
-				logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
+					if (to < 3000)
+						args.add("another table");
+					else
+						args.add(csc->tableName(to).toString());
 
-                ios.write(results);
+                	results << IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args);
+					
+					//@Bug 3854 Log to debug.log
+					LoggingID logid(15, 0, 0);
+					logging::Message::Args args1;
+					logging::Message msg(1);
+					args1.add(IDBErrorInfo::instance()->errorMsg(ERR_ACTIVE_TRANSACTION, args));
+					msg.format( args1 );
+					logging::Logger logger(logid.fSubsysID);
+					logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
+				
+                	ios.write(results);
 
-                ios.close();
+                	ios.close();
+            	}
+				else
+                {
+                	handler.fIos = ios;
+                	handler.fByteStream = bs;
+                	handler.fPackageType = packageType;
+					handler.fTxnid = txnid;
+                	fDdlPackagepool.invoke(handler);
+			
+                }
+#endif
             }
             else
             {
-                handler.fIos = ios;
-                handler.fByteStream = bs;
-                handler.fPackageType = packageType;
-                handler.fTxnid = txnid;
-                fDdlPackagepool.invoke(handler);
+                messageqcpp::ByteStream results;
+                messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
+                
+                results << status;
+                //@bug 266
+                logging::Message::Args args;
+        		logging::Message message(2);
+        		args.add("Writing to the database is disabled.");
+        		message.format( args );
+				results << message.msg();
+                ios.write(results);
 
+                ios.close();
             }
-#endif
         }
     }
     catch (exception& ex)
     {
         cerr << ex.what() << endl;
-		messageqcpp::ByteStream results;
-        messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
-        results << status;
-        results << ex.what();
-        ios.write(results);
-
-        ios.close();
     }
     catch(...)
     {
         cerr << "Caught unknown exception!" << endl;
-		messageqcpp::ByteStream results;
-        messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
-        results << status;
-        results << "Caught unknown exception!";
-        ios.write(results);
-
-        ios.close();
     }
 
     // wait for all the threads to exit
     fDdlPackagepool.wait();
 }
 
-int DDLProcessor::commitTransaction(uint32_t txnID, std::string & errorMsg)
+void DDLProcessor::stopAcceptingPackages(messageqcpp::IOSocket& ios)
 {
-	ByteStream bytestream;
-	DBRM dbrm;
-	uint64_t uniqueId = dbrm.getUnique64();
-	fWEClient->addQueue(uniqueId);
-	bytestream << (ByteStream::byte)WE_SVR_COMMIT_VERSION;
-	bytestream << uniqueId;
-	bytestream << txnID;
-	uint msgRecived = 0;
-	fWEClient->write_to_all(bytestream);
-	boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-	bsIn.reset(new ByteStream());
-	int rc = 0;
-	ByteStream::byte tmp8;
-	while (1)
-	{
-		if (msgRecived == fPMCount)
-			break;
-		fWEClient->read(uniqueId, bsIn);
-		if ( bsIn->length() == 0 ) //read error
-		{
-			rc = 1;
-			errorMsg = "DDL cannot communicate with WES";
-			fWEClient->removeQueue(uniqueId);
-			break;
-		}
-		else {
-			*bsIn >> tmp8;
-			rc = tmp8;
-			if (rc != 0) {
-				*bsIn >> errorMsg;
-				fWEClient->removeQueue(uniqueId);
-				break;
-			}
-			else
-				msgRecived++;
-		}
-	}
-	return rc;
+    fAcceptPackages = false;
+    // wait for all the threads to exit
+    fDdlPackagepool.wait();
+
+	messageqcpp::ByteStream results;
+    messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NO_ERROR;
+    results << status;
+
+    ios.write(results);
+    ios.close();
 }
+
+void DDLProcessor::resumeAcceptingPackages(messageqcpp::IOSocket& ios)
+{
+    fAcceptPackages = true;
+
+	messageqcpp::ByteStream results;
+    messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NO_ERROR;
+    results << status;
+
+    ios.write(results);
+    ios.close();
+}
+
 }  // namespace ddlprocessor
 // vim:ts=4 sw=4:
 

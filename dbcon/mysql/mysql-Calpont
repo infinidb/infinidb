@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/bin/sh
+
+#
+# $Id: mysql-Calpont 8170 2011-12-08 20:19:23Z zzhu $
+#
 
 # Copyright Abandoned 1996 TCX DataKonsult AB & Monty Program KB & Detron HB
 # This file is public domain and comes with NO WARRANTY of any kind
@@ -44,23 +48,8 @@
 # If you change base dir, you must also change datadir. These may get
 # overwritten by settings in the MySQL configuration files.
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-basedir=$INFINIDB_INSTALL_DIR/mysql
+basedir=/usr/local/Calpont/mysql
 datadir=$basedir/db
-
-SUDO=
-if [ -z "$NO_NONROOT_SUDO" -a "$USER" != "root" ]; then 
-	SUDO="sudo"
-fi
 
 # Default value, in seconds, afterwhich the script should timeout waiting
 # for server start. 
@@ -198,7 +187,6 @@ wait_for_pid () {
           continue  # Check again.
         fi
 
-        kill_by_pid
         # there's nothing that will affect the file.
         log_failure_msg "Manager of pid-file quit without updating file."
         return 1  # not waiting any more.
@@ -219,28 +207,6 @@ wait_for_pid () {
   fi
 }
 
-kill_by_pid() {
-  # let's see if we can kill the 2 mysql procs by hand
-  # get the port # mysqld is listening on (we can't just kill every mysql on the host
-  # we can only kill ours...)
-  port=$(awk '-F[ =]' '/^port/ {print $NF}' $basedir/my.cnf | head -1)
-  if [ -n "$port" ]; then
-    if [ -x /usr/sbin/lsof ]; then
-      eval $(/usr/sbin/lsof -P -i:$port | tail -1 | awk '{printf "pname=%s\npid=%d\n", $1, $2}')
-      if [ x$pname = xmysqld ]; then
-        ppid=$(ps -o ppid= -p $pid)
-        $SUDO kill -9 $ppid
-        sleep 1
-        $SUDO kill -9 $pid
-        echo $echo_n "Force shutting down (no/bad pid file)" 
-        log_success_msg
-        exit 0
-      fi
-    fi
-  fi
-  return
-}
-
 # Get arguments from the my.cnf file,
 # the only group, which is read from now on is [mysqld]
 if test -x ./bin/my_print_defaults
@@ -254,7 +220,7 @@ then
   print_defaults="$bindir/mysql_print_defaults"
 else
   # Try to find basedir in /etc/my.cnf
-  conf=$basedir/mysql/my.cnf
+  conf=/usr/local/Calpont/mysql/my.cnf
   print_defaults=
   if test -r $conf
   then
@@ -345,9 +311,6 @@ case "$mode" in
     find . -name '@0024vtable*' | xargs /bin/rm -f
     cd ..
 
-    # hook for InfiniDB automated testing
-    test -x /usr/local/bin/idb-testing-mysql-pre-start && /usr/local/bin/idb-testing-mysql-pre-start $basedir
-
     echo $echo_n "Starting MySQL"
     if test -x $manager -a "$use_mysqld_safe" = "0"
     then
@@ -407,28 +370,29 @@ case "$mode" in
     then
       mysqlmanager_pid=`cat $pid_file`
       echo $echo_n "Shutting down MySQL"
-      $SUDO kill $mysqlmanager_pid
+      kill $mysqlmanager_pid
       # mysqlmanager should remove the pid_file when it exits, so wait for it.
-      wait_for_pid removed "$mysqlmanager_pid"
+      wait_for_pid removed "$mysqlmanager_pid"; return_value=$?
 			
       # @bug2639. force kill mysqld and mysqld_safe after timeout
-        $SUDO kill -9 $(ps -efl|awk "{if (\$4==$mysqlmanager_pid) print \$5}") &>/dev/null 
-        $SUDO kill -9 $mysqlmanager_pid &>/dev/null
+      if test $return_value -ne 0
+      then 
+        kill -9 $(ps -efl|awk "{if (\$4==$mysqlmanager_pid) print \$5}") &>/dev/null 
+        kill -9 $mysqlmanager_pid &>/dev/null
+        echo $echo_n "Force shutting down" 
         log_success_msg
-
+        return_value=0
+      fi
+			
       # delete lock for RedHat / SuSE
       if test -f $lock_dir
       then
         rm -f $lock_dir
       fi
+      exit $return_value
     else
-      kill_by_pid
       log_failure_msg "MySQL manager or server PID file could not be found!"
     fi
-
-    # hook for InfiniDB automated testing
-    test -x /usr/local/bin/idb-testing-mysql-post-stop && /usr/local/bin/idb-testing-mysql-post-stop $basedir
-
     ;;
 
   'restart')
@@ -479,7 +443,7 @@ case "$mode" in
         log_failure_msg "MySQL is not running"
         exit 3
       else
-        log_failure_msg "MySQL running but PID file could not be found"
+        log_failure_msg "MySQL is running but PID file could not be found"
         exit 4
       fi
     fi

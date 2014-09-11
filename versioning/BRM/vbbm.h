@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: vbbm.h 1928 2013-06-30 21:20:52Z wweeks $
+ * $Id: vbbm.h 1746 2012-11-05 20:46:10Z pleblanc $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@
 	
 #define VBBM_INCREMENT (VBTABLE_INCREMENT + VBSTORAGE_INCREMENT)
 
-#if defined(_MSC_VER) && defined(xxxVBBM_DLLEXPORT)
+#if defined(_MSC_VER) && defined(VBBM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -63,8 +63,8 @@ class VSS;
 
 struct VBFileMetadata {
 	OID_t OID;
-	uint64_t fileSize;
-	uint64_t nextOffset;
+	u_int64_t filesize;
+	u_int64_t nextOffset;
 };
 
 struct VBBMEntry {
@@ -78,6 +78,8 @@ struct VBBMEntry {
 
 struct VBShmsegHeader {
 	int nFiles;
+	uint64_t vbTotalSize;
+	int currentVBFileIndex;    // [0, nFiles], not an OID
 	int vbCapacity;
 	int vbCurrentSize;
 	int vbLWM;
@@ -98,7 +100,7 @@ public:
 #ifdef NDEBUG
 		{ fVBBM.grow(key, size); }
 #else
-		{ int rc=fVBBM.grow(key, size); idbassert(rc==0); }
+		{ int rc=fVBBM.grow(key, size); assert(rc==0); }
 #endif
 	inline void makeReadOnly() { fVBBM.setReadOnly(); }
 	inline void clear(unsigned key, off_t size) { fVBBM.clear(key, size); }
@@ -163,8 +165,7 @@ class VBBM : public Undoable {
 		EXPORT void release(OPS op);
 		EXPORT int lookup(LBID_t lbid, VER_t ver, OID_t &oid, u_int32_t &fbo) const;
 		EXPORT void insert(LBID_t lbid, VER_t ver, OID_t oid, u_int32_t fbo);
-		EXPORT void getBlocks(int num, OID_t vbOID, std::vector<VBRange> &vbRanges, VSS& vss,
-				bool flushPMCache);
+		EXPORT void getBlocks(int num, std::vector<VBRange> &vbRanges, VSS& vss);
 		EXPORT void removeEntry(LBID_t, VER_t ver);
 		
 		EXPORT int size() const;
@@ -176,10 +177,7 @@ class VBBM : public Undoable {
 		EXPORT void writeData(int fd, u_int8_t *buf, off_t offset, int size) const;
 		EXPORT void readData(int fd, u_int8_t *buf, off_t offset, int size);
 		EXPORT void load(std::string filename);
-		EXPORT void loadVersion1(std::ifstream &in);
-		EXPORT void loadVersion2(std::ifstream &in);
 		EXPORT void save(std::string filename);
-
 #ifdef BRM_DEBUG
 		EXPORT int getShmid() const;
 #endif
@@ -198,11 +196,11 @@ class VBBM : public Undoable {
 		bool r_only;
 		MSTEntry *vbbmShminfo;
 		MasterSegmentTable mst;
-		static boost::mutex mutex; // @bug5355 - made mutex static
+		boost::mutex mutex;
 		static const int MAX_IO_RETRIES=10;
 
 		key_t chooseShmkey() const;
-		void growVBBM(bool addAFile = false);
+		void growVBBM();
 		void copyVBBM(VBShmsegHeader *dest);
 		void initShmseg(int nFiles);
 		
@@ -211,11 +209,6 @@ class VBBM : public Undoable {
 		int getIndex(LBID_t lbid, VER_t verID, int& prev, int& bucket) const;
 		ShmKeys fShmKeys;
 		VBBMImpl* fPVBBMImpl;
-
-		/* Shared nothing mods */
-		uint64_t currentFileSize;
-		void setCurrentFileSize();
-		uint addVBFileIfNotExists(OID_t vbOID);
 };
 
 }

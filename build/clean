@@ -1,12 +1,11 @@
 #!/bin/sh
 #
-# $Id: clean 1844 2013-03-15 14:25:45Z pleblanc $
+# $Id: clean 1271 2010-10-07 13:13:51Z rdempsey $
 #
 
 for x in \
 dbcon \
 ddlproc \
-decomsvr \
 dmlib \
 dmlproc \
 exemgr \

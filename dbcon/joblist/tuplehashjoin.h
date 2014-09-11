@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehashjoin.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: tuplehashjoin.h 8323 2012-02-15 16:28:09Z pleblanc $
 
 
 #ifndef TUPLEHASHJOIN_H_
@@ -23,7 +23,6 @@
 
 #include "jobstep.h"
 #include "calpontsystemcatalog.h"
-#include "hasher.h"
 #include "tuplejoiner.h"
 #include <boost/shared_ptr.hpp>
 #include <map>
@@ -34,8 +33,6 @@
 namespace joblist
 {
 class BatchPrimitive;
-class ResourceManager;
-class TupleBPS;
 
 class TupleHashJoinStep : public JobStep, public TupleDeliveryStep
 {
@@ -88,11 +85,6 @@ public:
 	void view1(const std::string& vw) { fView1 = vw; }
 	std::string view2() const { return fView2; }
 	void view2(const std::string& vw) { fView = fView2 = vw; }
-
-	std::string schema1() const { return fSchema1; }
-	void schema1(const std::string& s) { fSchema1 = s; }
-	std::string schema2() const { return fSchema2; }
-	void schema2(const std::string& s) { fSchema = fSchema2 = s; }
 
 	int32_t sequence1() const { return fSequence1; }
 	void sequence1(int32_t seq) { fSequence1 = seq; }
@@ -182,9 +174,9 @@ public:
 	const rowgroup::RowGroup& getDeliveredRowGroup() const;
 
 	// joinId
-	void joinId(int64_t id) { fJoinId = id; }
-	int64_t joinId() const { return fJoinId; }
-
+	void joinId(uint64_t id) { fJoinId = id; }
+	uint64_t joinId() const { return fJoinId; }
+	
 	/* semi-join support */
 	void addJoinFilter(boost::shared_ptr<execplan::ParseTree>, uint index);
 	bool hasJoinFilter() const { return (fe.size() > 0); }
@@ -193,9 +185,6 @@ public:
 
 	/* UM Join logic */
 	boost::shared_array<uint8_t> joinOneRG(boost::shared_array<uint8_t> input);
-
-	uint32_t tokenJoin() const { return fTokenJoin; }
-	void tokenJoin(uint32_t k) { fTokenJoin = k;    }
 
 private:
 	TupleHashJoinStep();
@@ -234,9 +223,6 @@ private:
 
 	std::string fView1;
 	std::string fView2;
-
-	std::string fSchema1;
-	std::string fSchema2;
 
 	int32_t fSequence1;
 	int32_t fSequence2;
@@ -376,9 +362,6 @@ private:
 	std::vector<std::string> smallTableNames;
 	bool isExeMgr;
 	uint lastSmallOuterJoiner;
-
-	//@bug5958 & 6117, stores the table key for identify token join
-	uint32_t fTokenJoin;
 };
 
 }

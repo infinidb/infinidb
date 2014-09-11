@@ -688,7 +688,6 @@ THD::THD()
 	infinidb_vtable.isUnion = false;
 	infinidb_vtable.impossibleWhereOnUnion = false;
 	infinidb_vtable.isUpdateWithDerive = false;
-	infinidb_vtable.isInfiniDBDML = false;
   // ------------------------------ Calpont InfiniDB ------------------------------
 }
 

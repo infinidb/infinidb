@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: bytestream.h 3137 2012-06-07 14:26:39Z rdempsey $
+* $Id: bytestream.h 2859 2011-09-29 20:29:01Z pleblanc $
 *
 *
 ******************************************************************************************/
@@ -29,13 +29,11 @@
 #include <sys/types.h>
 #include <stdexcept>
 #include <vector>
-#include <set>
 #include <boost/shared_ptr.hpp>
 #include <boost/version.hpp>
 #include <stdint.h>
 #include <cstring>
 
-#include "exceptclasses.h"
 #include "serializeable.h"
 
 class ByteStreamTestSuite;
@@ -143,10 +141,6 @@ public:
 	 * push an arbitrary class onto the end of the stream.
 	 */
 	inline ByteStream& operator<<(const Serializeable& s);
-	/**
-	 * push a ByteStream onto the end of the stream.
-	 */
-	EXPORT ByteStream& operator<<(const ByteStream& bs);
 
 	/**
 	 *	extract a byte from the front of the stream.
@@ -179,10 +173,6 @@ public:
 	 * extract an arbitrary object from the front of the stream.
 	 */
 	inline ByteStream& operator>>(Serializeable& s);
-	/**
-	 * extract a ByteStream from the front of the stream.
-	 */
-	EXPORT ByteStream& operator>>(ByteStream& bs);
 
 	/**
 	 *	Peek at a byte from the front of the stream.
@@ -210,10 +200,6 @@ public:
 	 * calling length()).
 	 */
 	inline void peek(byte*& b) const;
-	/**
-	 * Peek at a ByteStream from the front of the stream.
-	 */
-	EXPORT void peek(ByteStream& bs) const;
 
 	/**
 	 *	load the stream from an array. Clears out any previous data.
@@ -390,7 +376,7 @@ template<typename T>
 void serializeVector(messageqcpp::ByteStream& bs, const std::vector<T>& v)
 {
 	typename std::vector<T>::const_iterator it;
-	uint64_t size;
+	uint32_t size;
 	
 	size = v.size();
 	bs << size;
@@ -404,7 +390,7 @@ void deserializeVector(messageqcpp::ByteStream& bs, std::vector<T>& v)
 {
 	uint i;
 	T tmp;
-	uint64_t size;
+	uint32_t size;
 	
 	v.clear();
 	bs >> size;
@@ -414,16 +400,10 @@ void deserializeVector(messageqcpp::ByteStream& bs, std::vector<T>& v)
 	}
 }
 
-#ifdef _MSC_VER
-//Until the API is fixed to be 64-bit clean...
-#pragma warning (push)
-#pragma warning (disable : 4267)
-#endif
-
 template<typename T>
 void serializeInlineVector(messageqcpp::ByteStream &bs, const std::vector<T> &v)
 {
-	uint64_t size = v.size();
+	messageqcpp::ByteStream::quadbyte size = static_cast<messageqcpp::ByteStream::quadbyte>(v.size());
 	bs << size;
 	if (size > 0)
 		bs.append((const uint8_t *) &(v[0]), sizeof(T) * size);
@@ -434,7 +414,7 @@ inline void serializeVector(ByteStream& bs, const std::vector<int64_t>& v) { ser
 template<typename T>
 void deserializeInlineVector(messageqcpp::ByteStream &bs, std::vector<T> &v)
 {
-	uint64_t size;
+	messageqcpp::ByteStream::quadbyte size;
 	const uint8_t *buf;
 
 	v.clear();
@@ -448,38 +428,7 @@ void deserializeInlineVector(messageqcpp::ByteStream &bs, std::vector<T> &v)
 	}
 }
 
-#ifdef _MSC_VER
-#pragma warning (pop)
-#endif
-
 inline void deserializeVector(ByteStream& bs, std::vector<int64_t>& v) { deserializeInlineVector<int64_t>(bs, v); }
-
-/// Generic method to serialize a set of T's that implement Serializeable
-template<typename T>
-void serializeSet(messageqcpp::ByteStream &bs, const std::set<T> &s)
-{
-	uint64_t size = s.size();
-	bs << size;
-	typename std::set<T>::const_iterator it;
-	for (it = s.begin(); it != s.end(); ++it)
-		bs << *it;
-}
-
-/// Generic method to deserialize a set of T's that implement Serializeable
-template<typename T>
-void deserializeSet(messageqcpp::ByteStream& bs, std::set<T>& s)
-{
-	uint i;
-	T tmp;
-	uint64_t size;
-	
-	s.clear();
-	bs >> size;
-	for (i = 0; i < size; i++) {
-		bs >> tmp;
-		s.insert(tmp);
-	}
-}
 
 }//namespace messageqcpp
 

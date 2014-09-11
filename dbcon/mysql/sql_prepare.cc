@@ -3380,10 +3380,6 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
   Statement stmt_backup;
   Query_arena *old_stmt_arena;
   bool error= TRUE;
-  
-  // @InfiniDB check infinidb table
-  TABLE_LIST* global_list = NULL;
-  bool hasCalpont = FALSE;
 
   char saved_cur_db_name_buf[NAME_LEN+1];
   LEX_STRING saved_cur_db_name=
@@ -3478,61 +3474,15 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
 
   // @infinidb. vtable process around stmt_execute. 
   // @bug3742. mysqli php support for prepare/execute stmt
-  // @bug4833. the state checking will be done inside idb_vtable_process() function
-  // check infinidb table
-  // @bug2976. Check global tables for IDB table. If no IDB tables involved, redo this query with normal path.
-  // @bug5111. Skip InfiniDB process for queries without InfiniDB tables.
-  if (thd && thd->lex)
-  	global_list = thd->lex->query_tables;
-  for (; global_list; global_list = global_list->next_global)
+  if (thd->command == COM_STMT_EXECUTE && thd->infinidb_vtable.vtable_state != THD::INFINIDB_DISABLE_VTABLE)
   {
-    if (!(global_list->table && global_list->table->s && global_list->table->s->db_plugin))
-      continue;
-    // @InfiniDB watch out for FROM clause derived table. union memeory table has tablename="union" 
-    if (global_list->table && global_list->table->isInfiniDB())
-    {
-      hasCalpont = true;
-      continue;
-    }
-#if (defined(_MSC_VER) && defined(_DEBUG)) || defined(SAFE_MUTEX)
-    else if (global_list->table &&
-             global_list->table->s &&
-       global_list->table->s->db_plugin &&
-       strcmp((*global_list->table->s->db_plugin)->name.str, "MEMORY") == 0 ||
-       global_list->table->s->table_category == TABLE_CATEGORY_TEMPORARY)
-#else
-    else if (global_list->table &&
-             global_list->table->s &&
-       global_list->table->s->db_plugin &&
-       strcmp(global_list->table->s->db_plugin->name.str, "MEMORY") == 0 || 
-       global_list->table->s->table_category == TABLE_CATEGORY_TEMPORARY)
-#endif
-    {
-      continue;
-    }
-  }
- 
-  if (hasCalpont && thd->command == COM_STMT_EXECUTE)
-  {
-    // @bug5298. disable re-prepare observer for infinidb query
-    thd->m_reprepare_observer = NULL;
-
-    if (thd->lex)
-      thd->lex->result = 0;
-    // @bug5962. reset the in_use flag so the prepared stmt
-    // can be executed again in IDB.
-    //flags|= IS_IN_USE;
-    flags&= ~ (uint) IS_IN_USE;
-
+  	if (thd->lex)
+    	thd->lex->result = 0;
+    flags|= IS_IN_USE;
     if (idb_vtable_process(thd, this)) // if failed, fall through to normal path
-    {
       thd->infinidb_vtable.vtable_state = THD::INFINIDB_DISABLE_VTABLE;
-    }
     else
-    {
-      thd->set_statement(&stmt_backup);
       return false;
-    }
   }
   
   /*

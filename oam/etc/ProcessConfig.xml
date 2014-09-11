@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- $Id: ProcessConfig.xml 3649 2013-06-18 17:54:58Z dhill $ -->
+<!-- $Id: ProcessConfig.xml 2945 2012-05-31 18:31:13Z dhill $ -->
 <Calpont Version="V1.0.0">
 	<PROCESSCONFIG1>
 		<ProcessName>ProcessMonitor</ProcessName>
 		<ModuleType>ChildExtOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/ProcMon</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/ProcMon</ProcessLocation>
 		<BootLaunch>0</BootLaunch>
 		<LaunchID>1</LaunchID>
 		<DepProcessName/>
@@ -14,7 +14,7 @@
 	<PROCESSCONFIG2>
 		<ProcessName>ProcessManager</ProcessName>
 		<ModuleType>ParentOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/ProcMgr</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/ProcMgr</ProcessLocation>
 		<BootLaunch>1</BootLaunch>
 		<LaunchID>2</LaunchID>
 		<DepProcessName/>
@@ -24,14 +24,14 @@
 	<PROCESSCONFIG3>
 		<ProcessName>SNMPTrapDaemon</ProcessName>
 		<ModuleType>ParentOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/sbin/snmptrapd</ProcessLocation>
-		<ProcessArg1>$INSTALLDIR/sbin/snmptrapd</ProcessArg1>
+		<ProcessLocation>/usr/local/Calpont/sbin/snmptrapd</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/sbin/snmptrapd</ProcessArg1>
 		<ProcessArg2>-M</ProcessArg2>
-		<ProcessArg3>$INSTALLDIR/share/snmp/mibs</ProcessArg3>
+		<ProcessArg3>/usr/local/Calpont/share/snmp/mibs</ProcessArg3>
 		<ProcessArg4>-m</ProcessArg4>
-		<ProcessArg5>$INSTALLDIR/share/snmp/mibs/CALPONT-MIB.txt</ProcessArg5>
+		<ProcessArg5>/usr/local/Calpont/share/snmp/mibs/CALPONT-MIB.txt</ProcessArg5>
 		<ProcessArg6>-c</ProcessArg6>
-		<ProcessArg7>$INSTALLDIR/etc/snmptrapd.conf</ProcessArg7>
+		<ProcessArg7>/usr/local/Calpont/etc/snmptrapd.conf</ProcessArg7>
 		<ProcessArg8>-C</ProcessArg8>
 		<ProcessArg9>-Lf</ProcessArg9>
 		<ProcessArg10>/var/log/Calpont/snmptrapd.log</ProcessArg10>
@@ -47,8 +47,8 @@
 	<PROCESSCONFIG4>
 		<ProcessName>DBRMControllerNode</ProcessName>
 		<ModuleType>ParentOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/controllernode</ProcessLocation>
-		<ProcessArg1>$INSTALLDIR/bin/controllernode</ProcessArg1>
+		<ProcessLocation>/usr/local/Calpont/bin/controllernode</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/bin/controllernode</ProcessArg1>
 		<ProcessArg2>fg</ProcessArg2>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>4</LaunchID>
@@ -60,10 +60,10 @@
 	<PROCESSCONFIG5>
 		<ProcessName>SNMPAgent</ProcessName>
 		<ModuleType>ChildOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/sbin/snmpd</ProcessLocation>
-		<ProcessArg1>$INSTALLDIR/sbin/snmpd</ProcessArg1>
+		<ProcessLocation>/usr/local/Calpont/sbin/snmpd</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/sbin/snmpd</ProcessArg1>
 		<ProcessArg2>-c</ProcessArg2>
-		<ProcessArg3>$INSTALLDIR/etc/snmpd.conf</ProcessArg3>
+		<ProcessArg3>/usr/local/Calpont/etc/snmpd.conf</ProcessArg3>
 		<ProcessArg4>-C</ProcessArg4>
 		<ProcessArg5>-Lf</ProcessArg5>
 		<ProcessArg6>/var/log/Calpont/snmpd.log</ProcessArg6>
@@ -78,8 +78,8 @@
 	<PROCESSCONFIG6>
 		<ProcessName>ServerMonitor</ProcessName>
 		<ModuleType>ChildOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/ServerMonitor</ProcessLocation>
-		<ProcessArg1>$INSTALLDIR/bin/ServerMonitor</ProcessArg1>
+		<ProcessLocation>/usr/local/Calpont/bin/ServerMonitor</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/bin/ServerMonitor</ProcessArg1>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>6</LaunchID>
 		<DepProcessName/>
@@ -89,8 +89,8 @@
 	<PROCESSCONFIG7>
 		<ProcessName>DBRMWorkerNode</ProcessName>
 		<ModuleType>ChildExtOAMModule</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/workernode</ProcessLocation>
-		<ProcessArg1>$INSTALLDIR/bin/workernode</ProcessArg1>
+		<ProcessLocation>/usr/local/Calpont/bin/workernode</ProcessLocation>
+		<ProcessArg1>/usr/local/Calpont/bin/workernode</ProcessArg1>
 		<ProcessArg2>DBRM_Worker</ProcessArg2>
 		<ProcessArg3>fg</ProcessArg3>
 		<BootLaunch>2</BootLaunch>
@@ -100,81 +100,67 @@
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG7>
 	<PROCESSCONFIG8>
-		<ProcessName>DecomSvr</ProcessName>
+		<ProcessName>PrimProc</ProcessName>
 		<ModuleType>pm</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/DecomSvr</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/PrimProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
-		<LaunchID>15</LaunchID>
-		<DepProcessName/>
+		<LaunchID>20</LaunchID>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG8>
 	<PROCESSCONFIG9>
-		<ProcessName>PrimProc</ProcessName>
-		<ModuleType>pm</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/PrimProc</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>20</LaunchID>
-		<DepProcessName/>
-		<RunType>LOADSHARE</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG9>
-	<PROCESSCONFIG10>
 		<ProcessName>ExeMgr</ProcessName>
 		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/ExeMgr</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/ExeMgr</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>30</LaunchID>
 		<DepProcessName1>PrimProc</DepProcessName1>
 		<DepModuleName1>pm*</DepModuleName1>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG10>
-	<PROCESSCONFIG11>
-		<ProcessName>WriteEngineServer</ProcessName>
+	</PROCESSCONFIG9>
+	<PROCESSCONFIG10>
+		<ProcessName>DMLProc</ProcessName>
 		<ModuleType>pm</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/WriteEngineServer</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/bin/DMLProc</ProcessLocation>
 		<BootLaunch>2</BootLaunch>
 		<LaunchID>40</LaunchID>
-		<RunType>LOADSHARE</RunType>
+		<DepProcessName1>ExeMgr</DepProcessName1>
+		<DepModuleName1>um*</DepModuleName1>
+		<DepProcessName2>PrimProc</DepProcessName2>
+		<DepModuleName2>pm*</DepModuleName2>
+		<DepProcessName3>ProcessManager</DepProcessName3>
+		<DepModuleName3>@</DepModuleName3>
+		<DepProcessName4>DBRMControllerNode</DepProcessName4>
+		<DepModuleName4>@</DepModuleName4>
+		<RunType>SIMPLEX</RunType>
+		<LogFile>off</LogFile>
+	</PROCESSCONFIG10>
+	<PROCESSCONFIG11>
+		<ProcessName>DDLProc</ProcessName>
+		<ModuleType>pm</ModuleType>
+		<ProcessLocation>/usr/local/Calpont/bin/DDLProc</ProcessLocation>
+		<BootLaunch>2</BootLaunch>
+		<LaunchID>41</LaunchID>
+		<DepProcessName1>ExeMgr</DepProcessName1>
+		<DepModuleName1>um*</DepModuleName1>
+		<DepProcessName2>PrimProc</DepProcessName2>
+		<DepModuleName2>pm*</DepModuleName2>
+		<DepProcessName3>ProcessManager</DepProcessName3>
+		<DepModuleName3>@</DepModuleName3>
+		<DepProcessName4>DBRMControllerNode</DepProcessName4>
+		<DepModuleName4>@</DepModuleName4>
+		<RunType>SIMPLEX</RunType>
 		<LogFile>off</LogFile>
 	</PROCESSCONFIG11>
 	<PROCESSCONFIG12>
-		<ProcessName>DMLProc</ProcessName>
-		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/DMLProc</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>50</LaunchID>
-		<DepProcessName1>WriteEngineServer</DepProcessName1>
-		<DepModuleName1>pm*</DepModuleName1>
-		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
-		<DepModuleName2>*</DepModuleName2>
-		<DepProcessName3>ExeMgr</DepProcessName3>
-		<DepModuleName3>um*</DepModuleName3>
-		<RunType>SIMPLEX</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG12>
-	<PROCESSCONFIG13>
-		<ProcessName>DDLProc</ProcessName>
-		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/bin/DDLProc</ProcessLocation>
-		<BootLaunch>2</BootLaunch>
-		<LaunchID>51</LaunchID>
-		<DepProcessName1>WriteEngineServer</DepProcessName1>
-		<DepModuleName1>pm*</DepModuleName1>
-		<DepProcessName2>DBRMWorkerNode</DepProcessName2>
-		<DepModuleName2>*</DepModuleName2>
-		<RunType>SIMPLEX</RunType>
-		<LogFile>off</LogFile>
-	</PROCESSCONFIG13>
-	<PROCESSCONFIG14>
 		<ProcessName>mysqld</ProcessName>
 		<ModuleType>um</ModuleType>
-		<ProcessLocation>$INSTALLDIR/mysql/libexec/mysqld</ProcessLocation>
+		<ProcessLocation>/usr/local/Calpont/mysql/libexe/mysqld</ProcessLocation>
 		<BootLaunch>0</BootLaunch>
 		<LaunchID>100</LaunchID>
 		<DepProcessName/>
 		<RunType>LOADSHARE</RunType>
 		<LogFile>off</LogFile>
-	</PROCESSCONFIG14>
+	</PROCESSCONFIG12>
 </Calpont>

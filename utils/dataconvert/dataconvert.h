@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: dataconvert.h 3277 2012-09-13 12:34:45Z rdempsey $
+* $Id: dataconvert.h 3256 2012-09-07 15:58:18Z xlou $
 *
 *
 ****************************************************************************/
@@ -25,7 +25,6 @@
 #ifndef DATACONVERT_H
 #define DATACONVERT_H
 
-#include <unistd.h>
 #include <string>
 #include <boost/any.hpp>
 #include <vector>
@@ -40,6 +39,10 @@
 
 #include "calpontsystemcatalog.h"
 #include "columnresult.h"
+
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 // remove this block if the htonll is defined in library
 #ifdef __linux__
@@ -93,22 +96,10 @@ struct Date
     unsigned month  : 4;
     unsigned year   : 16;
     // NULL column value = 0xFFFFFFFE
-    Date( ) :
-    	spare(0x3E), day(0x3F), month(0xF), year(0xFFFF) {}
+    Date( )   { year = 0xFFFF; month = 0xF; day = 0x3F; spare = 0x3E;}
     // Construct a Date from a 64 bit integer Calpont date.
-    Date(uint64_t val) :
-    	spare(0), day((val >> 6) & 077), month((val >> 12) & 0xF), year((val >> 16)) {}
-    // Construct using passed in parameters, no value checking
-    Date(unsigned y, unsigned m, unsigned d) : spare(0), day(d), month(m), year(y) {}
-
-    int32_t convertToMySQLint() const;
+    Date(uint64_t val) { year = (val >> 16); month = (val >> 12) & 0xF; day = (val >> 6) & 077; spare = 0; }
 };
-
-inline
-int32_t Date::convertToMySQLint() const
-{
-	return (int32_t) (year*10000)+(month*100)+day;
-}
 
 /** @brief a structure to hold a datetime
  */
@@ -122,25 +113,12 @@ struct DateTime
     unsigned month   : 4;
     unsigned year    : 16;
     // NULL column value = 0xFFFFFFFFFFFFFFFE
-    DateTime( ) :
-    	msecond(0xFFFFE), second(0x3F), minute(0x3F), hour(0x3F), day(0x3F), month(0xF), year(0xFFFF) {}
+    DateTime( ) { year = 0xFFFF; month = 0xF; day = 0x3F;
+        hour = 0x3F; minute = 0x3F; second = 0x3F; msecond = 0xFFFFE; }
     // Construct a DateTime from a 64 bit integer Calpont datetime.
-    DateTime(uint64_t val) :
-    	msecond(val & 0xFFFFF), second((val >> 20) & 077), minute((val >> 26) & 077),
-    	hour((val >> 32) & 077), day((val >> 38) & 077), month((val >> 44) & 0xF),
-    	year(val >> 48) {}
-    // Construct using passed in parameters, no value checking
-    DateTime(unsigned y, unsigned m, unsigned d, unsigned h, unsigned min, unsigned sec, unsigned msec) :
-    	msecond(msec), second(sec), minute(min), hour(h), day(d), month(m), year(y) {}
-
-    int64_t convertToMySQLint() const;
+    DateTime(uint64_t val) {  year = val >> 48; month = (val >> 44) & 0xF; day = (val >> 38) & 077;
+    hour = (val >> 32) & 077; minute = (val >> 26) & 077; second = (val >> 20) & 077; msecond = val & 0xFFFFF; }
 };
-
-inline
-int64_t DateTime::convertToMySQLint() const
-{
-	return (int64_t) (year*10000000000LL)+(month*100000000)+(day*1000000)+(hour*10000)+(minute*100)+second;
-}
 
 /** @brief a structure to hold a time
  *  range: -838:59:59 ~ 838:59:59
@@ -161,13 +139,14 @@ struct Time
 	         day (0xFFF){}
 
 	// Construct a Time from a 64 bit integer InfiniDB time.
-	Time(int64_t val) :
-		msecond(val & 0xffffff),
-		second((val >> 24) & 0xff),
-		minute((val >> 32) & 0xff),
-		hour((val >> 40) & 0xfff),
-		day((val >> 52) & 0xfff)
-		{}
+	Time(int64_t val)
+	{
+		day = (val >> 52) & 0xfff;
+		hour = (val >> 40) & 0xfff;
+		minute = (val >> 32) & 0xff;
+		second = (val >> 24) & 0xff;
+		msecond = val & 0xffffff; 
+	}
 };
 
 /** @brief DataConvert is a component for converting string data to Calpont format
@@ -257,19 +236,20 @@ public:
     static inline bool isEscapedChar(char c) { return ('%' == c || '_' == c); }
     
     // convert string to date
-    EXPORT static int64_t stringToDate(const std::string& data);
+    EXPORT static int64_t stringToDate(std::string data);
     // convert string to datetime
-    EXPORT static int64_t stringToDatetime(const std::string& data, bool* isDate = NULL);
+    EXPORT static int64_t stringToDatetime(std::string data, bool* isDate = NULL);
     // convert integer to date
     EXPORT static int64_t intToDate(int64_t data);
     // convert integer to datetime
     EXPORT static int64_t intToDatetime(int64_t data, bool* isDate = NULL);
     
     // convert string to date. alias to stringToDate
-    EXPORT static int64_t dateToInt(const std::string& date);
+    EXPORT static int64_t dateToInt(std::string date);
     // convert string to datetime. alias to datetimeToInt
-    EXPORT static int64_t datetimeToInt(const std::string& datetime);
-    EXPORT static int64_t stringToTime (const std::string& data);
+    EXPORT static int64_t datetimeToInt(std::string datetime);
+    EXPORT static int64_t stringToTime (std::string data);
+    
     // bug4388, union type conversion
     EXPORT static execplan::CalpontSystemCatalog::ColType convertUnionColType(std::vector<execplan::CalpontSystemCatalog::ColType>&);
 
@@ -338,7 +318,7 @@ inline void DataConvert::decimalToString( int64_t int_val, uint8_t scale, char* 
 	if (int_val < 0)
 	{
 		ptr++;
-		idbassert(l1 >= 2);
+		assert(l1 >= 2);
 		l1--;
 	}
 	//need to make sure we have enough leading zeros for this to work...

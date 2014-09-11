@@ -4,7 +4,7 @@
 #
 # $Id$
 #
-# Copyright (C) 2009-2012 Calpont Corporation
+# Copyright (C) 2007 Calpont Corp
 # All rights reserved
 #
 #-------------------------------------------------------------------------------

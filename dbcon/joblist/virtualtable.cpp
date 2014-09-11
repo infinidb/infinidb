@@ -73,36 +73,36 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	string columnName;
 	string viewName(view);
 	ostringstream oss;
-	UniqId colId;
+	UniqId idAlias;
 	if ((sc = dynamic_cast<SimpleColumn*>(column.get())) != NULL)
 	{
 		columnName = sc->columnName();
-		colId = UniqId(sc);
+		idAlias = UniqId(sc->oid(), sc->tableAlias(), viewName);
 	}
 	else if ((agc = dynamic_cast<AggregateColumn*>(column.get())) != NULL)
 	{
 //		oss << agc->functionName() << "_" << agc->expressionId();
 //		oss << "Aggregate_" << agc->expressionId();
 		columnName = agc->data();
-		colId = UniqId(agc->expressionId(), agc->alias(), "", viewName);
+		idAlias = UniqId(agc->expressionId(), agc->alias(), viewName);
 	}
 	else if ((arc = dynamic_cast<ArithmeticColumn*>(column.get())) != NULL)
 	{
 //		oss << "Arithmetic_" << arc->expressionId();
 		columnName = arc->data();
-		colId = UniqId(arc->expressionId(), arc->alias(), "", viewName);
+		idAlias = UniqId(arc->expressionId(), arc->alias(), viewName);
 	}
 	else if ((fc = dynamic_cast<FunctionColumn*>(column.get())) != NULL)
 	{
 //		oss << fc->functionName() << "_" << fc->expressionId();
 		columnName = fc->data();
-		colId = UniqId(fc->expressionId(), fc->alias(), "", viewName);
+		idAlias = UniqId(fc->expressionId(), fc->alias(), viewName);
 	}
 	else if ((cc = dynamic_cast<ConstantColumn*>(column.get())) != NULL)
 	{
 //		oss << "Constant_" << cc->expressionId();
 		columnName = cc->data();
-		colId = UniqId(cc->expressionId(), cc->alias(), "", viewName);
+		idAlias = UniqId(cc->expressionId(), cc->alias(), viewName);
 	}
 	else // new column type has added, but this code is not updated.
 	{
@@ -128,19 +128,19 @@ void VirtualTable::addColumn(const SRCP& column, const string& view)
 	SSC ssc(vc);
 	fColumns.push_back(ssc);
 	fColumnTypes.push_back(column->resultType());
-	fColumnMap.insert(make_pair(colId, index));
+	fColumnMap.insert(make_pair(idAlias, index));
 }
 
 
 const CalpontSystemCatalog::OID& VirtualTable::columnOid(uint i) const
 {
-	idbassert(i < fColumns.size());
+	assert(i < fColumns.size());
 	return fColumns[i]->oid();
 }
 
 void VirtualTable::columnType(CalpontSystemCatalog::ColType& type, uint i)
 {
-	idbassert(i < fColumnTypes.size());
+	assert(i < fColumnTypes.size());
 	fColumnTypes[i] = type;
 	fColumns[i]->resultType(type);
 }
@@ -148,7 +148,7 @@ void VirtualTable::columnType(CalpontSystemCatalog::ColType& type, uint i)
 
 const CalpontSystemCatalog::ColType& VirtualTable::columnType(uint i) const
 {
-	idbassert(i < fColumnTypes.size());
+	assert(i < fColumnTypes.size());
 	return fColumnTypes[i];
 }
 

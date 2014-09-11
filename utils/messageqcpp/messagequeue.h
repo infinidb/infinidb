@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: messagequeue.h 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: messagequeue.h 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *
 ******************************************************************************************/
@@ -78,7 +78,7 @@ public:
 	 * 
 	 * construct a server queue for thisEnd. Optionally specify a Config object to use.
 	 */
-	EXPORT explicit MessageQueueServer(const std::string& thisEnd, config::Config* config=0,
+	EXPORT explicit MessageQueueServer(const std::string& thisEnd, const config::Config* config=0,
 		size_t blocksize=ByteStream::BlockSize, int backlog=5, bool syncProto=true);
 
 	/**
@@ -161,8 +161,8 @@ private:
 	void setup(size_t blocksize, int backlog, bool syncProto);
 
 	std::string fThisEnd;		/// the process name for this process
-	struct sockaddr fServ_addr;	/// the addr of the server (may be this process)
-	config::Config* fConfig;			/// config file has the IP addrs and port numbers
+	struct sockaddr_in fServ_addr;	/// the addr of the server (may be this process)
+	const config::Config* fConfig;			/// config file has the IP addrs and port numbers
 	mutable ServerSocket fListenSock;	/// the socket the server listens on for new connections
 	mutable IOSocket fClientSock;	/// the socket connected to a client
 
@@ -191,7 +191,7 @@ public:
 	 * 
 	 * construct a queue from this process to otherEnd. Optionally specify a Config object to use.
 	 */
-	EXPORT explicit MessageQueueClient(const std::string& otherEnd, config::Config* config=0, bool syncProto=true);
+	EXPORT explicit MessageQueueClient(const std::string& otherEnd, const config::Config* config=0, bool syncProto=true);
 
 	/**
 	 * @brief construct a queue to otherEnd
@@ -242,27 +242,17 @@ public:
 	/**
 	 * @brief accessors and mutators
 	 */    
-	EXPORT const sockaddr serv_addr() const { return fServ_addr; }
-	EXPORT const std::string otherEnd() const { return fOtherEnd; }
+	EXPORT const sockaddr_in& serv_addr() const { return fServ_addr; }
+	EXPORT const std::string& otherEnd() const { return fOtherEnd; }
 	EXPORT const bool isAvailable() const { return fIsAvailable; }
 	EXPORT void isAvailable (const bool isAvailable) { fIsAvailable = isAvailable; }
-	EXPORT const std::string moduleName() const {return fModuleName;}
+	EXPORT const std::string& moduleName() const {return fModuleName;}
 	EXPORT void moduleName(const std::string& moduleName) {fModuleName = moduleName;}
 
 	/**
 	 * @brief set the sync proto
 	 */
-	inline void syncProto(bool use);
-
-	/**
-	 * @brief return the address as a string
-	 */
-	inline const std::string addr2String() const;
-
-	/**
-	 * @brief compare the addresses of 2 MessageQueueClient
-	 */
-	inline const bool isSameAddr(const MessageQueueClient& rhs) const;
+	EXPORT void syncProto(bool use);
 
 	/*
 	 * allow test suite access to private data for OOB test
@@ -286,19 +276,16 @@ private:
 	void setup(bool syncProto);
 
 	std::string fOtherEnd;		/// the process name for this process
-	struct sockaddr fServ_addr;	/// the addr of the server (may be this process)
-	config::Config* fConfig;			/// config file has the IP addrs and port numbers
+	struct sockaddr_in fServ_addr;	/// the addr of the server (may be this process)
+	const config::Config* fConfig;			/// config file has the IP addrs and port numbers
 	mutable ClientSocket fClientSock;	/// the socket to communicate with the server
 	mutable logging::Logger fLogger;
 	bool fIsAvailable;
 	std::string fModuleName;
 };
 
+//inline const IOSocket& MessageQueueServer::clientSock() const { return fClientSock; }
 inline IOSocket& MessageQueueServer::clientSock() const { return fClientSock; }
-inline const std::string MessageQueueClient::addr2String() const { return fClientSock.addr2String(); }
-inline const bool MessageQueueClient::isSameAddr(const MessageQueueClient& rhs) const
-	{ return fClientSock.isSameAddr(rhs.fClientSock); }
-inline void MessageQueueClient::syncProto(bool use) { fClientSock.syncProto(use); }
 
 } 
 

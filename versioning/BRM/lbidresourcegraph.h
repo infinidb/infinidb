@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: lbidresourcegraph.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: lbidresourcegraph.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -40,7 +40,7 @@
 #include "transactionnode.h"
 #include "resourcenode.h"
 
-#if defined(_MSC_VER) && defined(xxxLBIDRESOURCEGRAPH_DLLEXPORT)
+#if defined(_MSC_VER) && defined(LBIDRESOURCEGRAPH_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

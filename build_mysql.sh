@@ -36,8 +36,6 @@ popd >/dev/null
 for file in $filelist; do
 	cp ../dbcon/mysql/$file sql
 done
-cp ../dbcon/mysql/include/*.h include
-cp ../dbcon/mysql/mysys/*.h mysys
 
 autoreconf --force --install
 ./configure --prefix="$prefix/Calpont/mysql" $withdebug --without-libedit --with-readline --with-client-ldflags="-Wl,-rpath -Wl,/usr/local/Calpont/mysql/lib/mysql"

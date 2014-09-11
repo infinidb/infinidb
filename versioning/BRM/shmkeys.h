@@ -15,14 +15,14 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: shmkeys.h 1852 2013-02-22 17:20:54Z rdempsey $
+// $Id: shmkeys.h 1756 2012-11-09 21:54:39Z rdempsey $
 #ifndef BRM_SHMEYS_H_
 #define BRM_SHMEYS_H_
 
 #include <stdint.h>
 #include <string>
 
-#if defined(_MSC_VER) && defined(xxxSHMKEYS_DLLEXPORT)
+#if defined(_MSC_VER) && defined(SHMKEYS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -42,10 +42,8 @@ public:
 	~ShmKeys() { }
 
 	/******** The shmseg/sem key range assigments  *******/
-#if defined(COMMUNITY_KEYRANGE)
+#ifdef COMMUNITY_KEYRANGE
 	const static uint32_t KEYRANGE_SIZE = 0x1000;
-#elif defined(_MSC_VER)
-	const static uint32_t KEYRANGE_SIZE = 0x2000;
 #else
 	const static uint32_t KEYRANGE_SIZE = 0x10000;
 #endif
@@ -57,12 +55,12 @@ public:
 
 	/****** Fixed location assignments *******/
 	uint32_t MST_SYSVKEY;
+	uint32_t SESSIONMANAGER_SYSVKEY;
 	uint32_t PROCESSSTATUS_SYSVKEY;
 	uint32_t SYSTEMSTATUS_SYSVKEY;
 	uint32_t SWITCHSTATUS_SYSVKEY;
 	uint32_t STORAGESTATUS_SYSVKEY;
 	uint32_t NICSTATUS_SYSVKEY;
-	uint32_t DBROOTSTATUS_SYSVKEY;
 	uint32_t DECOMSVRMUTEX_SYSVKEY;
 
 	EXPORT static std::string keyToName(unsigned key);

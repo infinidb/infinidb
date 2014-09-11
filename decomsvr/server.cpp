@@ -70,9 +70,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <cerrno>
-#ifndef _MSC_VER
-#include <dirent.h>
-#endif
 using namespace std;
 
 #include <boost/thread.hpp>
@@ -81,9 +78,6 @@ using namespace std;
 using namespace boost;
 
 #include "quicklz.h"
-#ifndef _MSC_VER
-#include "config.h"
-#endif
 
 //#define SINGLE_THREADED
 
@@ -117,26 +111,6 @@ const int ERR_BADINPUT = -3;
  * else is the same
  */
 const uint8_t CHUNK_MAGIC2 = 0xfe;
-
-// A version of idbassert_s & log() that doesn't require linking the logging lib.
-// Things printed to stderr go to /tmp/decomsvr.err
-#ifndef __STRING
-#define __STRING(x) #x
-#endif
-#define idbassert_s(x, s) do { \
-	if (!(x)) { \
-		std::ostringstream os; \
-\
-		os << __FILE__ << "@" << __LINE__ << ": assertion \'" << __STRING(x) << "\' failed.  Error msg \'" << s << "\'"; \
-		std::cerr << os.str() << std::endl; \
-		throw runtime_error(os.str()); \
-	} \
-} while (0)
-
-void log(const string &s) 
-{
-	cerr << s << endl;
-}
 
 struct CompressedDBFileHeader
 {
@@ -191,28 +165,6 @@ private:
 bool serverInit()
 {
 #ifndef _MSC_VER
-
-	//Set parent PID to init
-	setsid();
-
-	//Handle certain signals (we want these to return EINTR so we can throw)
-	//SIGPIPE
-	//I don't think we'll get any of these from init (except possibly HUP, but that's an indication
-	// of bad things anyway)
-	//SIGHUP?
-	//SIGUSR1?
-	//SIGUSR2?
-	//SIGPOLL?
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(struct sigaction));
-	sa.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &sa, 0);
-	sigaction(SIGHUP, &sa, 0);
-	sigaction(SIGUSR1, &sa, 0);
-	sigaction(SIGUSR2, &sa, 0);
-#ifndef __FreeBSD__
-	sigaction(SIGPOLL, &sa, 0);
-#endif
 	int fd;
 	close(2);
 	fd = open("/tmp/decomsrv.err",O_CREAT|O_TRUNC|O_WRONLY,0644);
@@ -233,8 +185,7 @@ bool initCtlFifo()
 	WSAStartup(minVersion, &wsadata);
 #endif
 	ListenSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	idbassert_s(ListenSock >= 0, string("socket create error: ") + strerror(errno));
-	//if (ListenSock < 0) throw runtime_error(string("socket create error: ") + strerror(errno));
+	if (ListenSock < 0) throw runtime_error(string("socket create error: ") + strerror(errno));
 #ifndef _MSC_VER
 	int optval = 1;
 	setsockopt(ListenSock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&optval), sizeof(optval));
@@ -263,24 +214,20 @@ again:
 			//cerr << "Addr in use..." << endl;
 			if (++tries >= MaxTries)
 			{
-				log("Waited too long for socket to bind...giving up");
 				//cerr << "Waited too long for socket to bind...giving up" << endl;
 				exit(1);
 			}
 			sleep(10);
 			goto again;
 		}
-		idbassert_s(0, string("socket bind error: ") + strerror(errno));
-		//throw runtime_error(string("socket bind error: ") + strerror(errno));
+		throw runtime_error(string("socket bind error: ") + strerror(errno));
 	}
 	rc = listen(ListenSock, 16);
-	idbassert_s(rc >= 0, string("socket listen error") + strerror(errno));
-	//if (rc < 0) throw runtime_error(string("socket listen error") + strerror(errno));
+	if (rc < 0) throw runtime_error(string("socket listen error") + strerror(errno));
 
 	return true;
 }
 
-#ifndef _MSC_VER
 void readn(int fd, void* buf, const size_t wanted)
 {
 	size_t needed = wanted;
@@ -305,52 +252,15 @@ void readn(int fd, void* buf, const size_t wanted)
 			if (en == EAGAIN || en == EINTR || en == 512)
 				continue;
 			ostringstream oss;
-			oss << "decomsrv: read() returned " << rrc << " (" << strerror(en) << ")";
-			idbassert_s(0, oss.str());
+			oss << "read() returned " << rrc << " (" << strerror(en) << ")";
+			throw runtime_error(oss.str());
 		}
 		needed -= rrc;
 		sofar += rrc;
 	}
 }
 
-size_t writen(int fd, const void *data, size_t nbytes)
-{
-	size_t nleft;
-	ssize_t nwritten;
-	const char *bufp = (const char *) data;
-	nleft = nbytes;
-
-	while (nleft > 0)
-	{
-		// the O_NONBLOCK flag is not set, this is a blocking I/O.
-  		if ((nwritten = ::write(fd, bufp, nleft)) < 0)
-		{
-			if (errno == EINTR)
-				nwritten = 0;
-			else {
-				// save the error no first
-				int e = errno;
-				string errorMsg = "decomsvr: write() error: ";
-		 		scoped_array<char> buf(new char[80]);
-#if STRERROR_R_CHAR_P
-				const char* p;
-		 		if ((p = strerror_r(e, buf.get(), 80)) != 0)
-					errorMsg += p;
-#else
-				int p;
-		 		if ((p = strerror_r(e, buf.get(), 80)) == 0)
-					errorMsg += buf.get();
-#endif
-				idbassert_s(0, errorMsg);
-			}
-		}
-		nleft -= nwritten;
-		bufp += nwritten;
-	}
-
-	return nbytes;
-}
-#else
+#ifdef _MSC_VER
 void reads(SOCKET fd, void* buf, const size_t wanted)
 {
 	size_t needed = wanted;
@@ -376,7 +286,7 @@ void reads(SOCKET fd, void* buf, const size_t wanted)
 				continue;
 			ostringstream oss;
 			oss << "read() returned " << rrc << " (" << strerror(en) << ")";
-			idbassert_s(0, oss.str());
+			throw runtime_error(oss.str());
 		}
 		needed -= rrc;
 		sofar += rrc;
@@ -395,9 +305,8 @@ string readString(SockType fd)
 {
 	string s;
 	uint32_t len = readNumber32(fd);
-	idbassert_s(len <= 64, "while reading a string len (>64)");
-	//if (len > 64)
-	//	throw runtime_error("while reading a string len (>64)");
+	if (len > 64)
+		throw runtime_error("while reading a string len (>64)");
 	char* buf = (char*)alloca(len+1); //this should be at most 65 bytes and should always succeed
 	SockReadFcn(fd, buf, len);
 	buf[len] = 0;
@@ -608,32 +517,28 @@ void ThreadFunc::operator()()
 #ifdef _MSC_VER
 	HANDLE h;
 	h = CreateFile(cfifo.c_str(), GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	idbassert_s(h != INVALID_HANDLE_VALUE, "while opening cpipe");
-	//if (!(h != INVALID_HANDLE_VALUE))
-	//	throw runtime_error("while opening cpipe");
+	if (!(h != INVALID_HANDLE_VALUE))
+		throw runtime_error("while opening cpipe");
 	cleaner.handle = h;
 
 	DWORD nread;
 	BOOL drrc;
 	drrc = ReadFile(h, &ccount, 8, &nread, 0);
-	idbassert_s(drrc != 0 && nread == 8 && ccount < 8 * 1024 * 1024, "while reading from cpipe");
-	//if (!(drrc != 0 && nread == 8 && ccount < 8 * 1024 * 1024))
-	//	throw runtime_error("while reading from cpipe");
+	if (!(drrc != 0 && nread == 8 && ccount < 8 * 1024 * 1024))
+		throw runtime_error("while reading from cpipe");
 
 	scoped_array<char> in(new char[ccount]);
 
 	drrc = ReadFile(h, in.get(), (DWORD)ccount, &nread, 0);
-	idbassert_s(drrc != 0 && nread == ccount, "while reading from cpipe");
-	//if (!(drrc != 0 && nread == ccount))
-	//	throw runtime_error("while reading from cpipe");
+	if (!(drrc != 0 && nread == ccount))
+		throw runtime_error("while reading from cpipe");
 
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
 	int fd = open(cfifo.c_str(), O_RDONLY);
-	idbassert_s(fd >= 0, "when opening data fifo for input");
-//	if (fd < 0)
-//		throw runtime_error("when opening data fifo for input");
+	if (fd < 0)
+		throw runtime_error("when opening data fifo for input");
 
 	cleaner.fd = fd;
 
@@ -648,9 +553,8 @@ void ThreadFunc::operator()()
 #endif
 #ifdef _MSC_VER
 	h = CreateFile(ufifo.c_str(), GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	idbassert_s(h != INVALID_HANDLE_VALUE, "while opening upipe");
-	//if (!(h != INVALID_HANDLE_VALUE))
-	//	throw runtime_error("while opening upipe");
+	if (!(h != INVALID_HANDLE_VALUE))
+		throw runtime_error("while opening upipe");
 	cleaner.handle = h;
 
 	uint64_t outlen = 512 * 1024 * 8;
@@ -667,23 +571,20 @@ void ThreadFunc::operator()()
 	BOOL dwrc;
 	DWORD nwritten;
 	dwrc = WriteFile(h, &outlen, 8, &nwritten, 0);
-	idbassert_s(dwrc != 0 && nwritten == 8, "while writing to upipe");
-	//if (!(dwrc != 0 && nwritten == 8))
-	//	throw runtime_error("while writing to upipe");
+	if (!(dwrc != 0 && nwritten == 8))
+		throw runtime_error("while writing to upipe");
 
 	dwrc = WriteFile(h, out.get(), (DWORD)outlen, &nwritten, 0);
-	idbassert_s(dwrc != 0 && nwritten == outlen, "while writing to upipe");
-	//if (!(dwrc != 0 && nwritten == outlen))
-	//	throw runtime_error("while writing to upipe");
+	if (!(dwrc != 0 && nwritten == outlen))
+		throw runtime_error("while writing to upipe");
 
 	FlushFileBuffers(h);
 	CloseHandle(h);
 	cleaner.handle = INVALID_HANDLE_VALUE;
 #else
 	fd = open(ufifo.c_str(), O_WRONLY);
-	idbassert_s(fd >= 0, "when opening data fifo for output");
-	//if (fd < 0)
-	//	throw runtime_error("when opening data fifo for output");
+	if (fd < 0)
+		throw runtime_error("when opening data fifo for output");
 
 	cleaner.fd = fd;
 
@@ -698,60 +599,21 @@ void ThreadFunc::operator()()
 	else
 		outlen = ol;
 
-	rrc = writen(fd, &outlen, 8);
-	idbassert_s(rrc == 8, "when writing len to data fifo");
-	//if (rrc != 8)
-	//{
-	//	throw runtime_error("when writing len to data fifo");
-	//}
-	rrc = writen(fd, out.get(), outlen);
-	idbassert_s(rrc == (ssize_t)outlen, "when writing data to data fifo");
-	//if (rrc != (ssize_t)outlen)
-	//{
-	//	throw runtime_error("when writing data to data fifo");
-	//}
+	rrc = write(fd, &outlen, 8);
+	if (rrc != 8)
+	{
+		throw runtime_error("when writing len to data fifo");
+	}
+	rrc = write(fd, out.get(), outlen);
+	if (rrc != (ssize_t)outlen)
+	{
+		throw runtime_error("when writing data to data fifo");
+	}
 
 	close(fd);
 	cleaner.fd = -1;
 #endif
 }
-
-#ifndef _MSC_VER
-void cleanupFifos()
-{
-	//find all existing fifos and try get rid of them....
-	DIR* dirp=0;
-	struct dirent* direntp=0;
-	char fifoname[PATH_MAX];
-	int fd=-1;
-
-	dirp = opendir("/tmp");
-	strcpy(fifoname, "/tmp/");
-
-	direntp = readdir(dirp);
-	while (direntp != 0)
-	{
-		if (memcmp(direntp->d_name, "cdatafifo", 9) == 0)
-		{
-			strcpy(&fifoname[5], direntp->d_name);
-			fd = open(fifoname, O_RDONLY|O_NONBLOCK);
-			//opening and closing this fifo will cause PP to unblock and retry
-			if (fd >= 0)
-			{
-				close(fd);
-			}
-			else
-			{
-				fd = open(fifoname, O_WRONLY|O_NONBLOCK);
-				if (fd >= 0)
-					close(fd);
-			}
-		}
-		direntp = readdir(dirp);
-	}
-	closedir(dirp);
-}
-#endif
 
 }
 
@@ -786,16 +648,11 @@ int main(int argc, char** argv)
 
 	if (!serverInit())
 	{
-		log("Could not initialize the Decompression Server!");
-		//cerr << "Could not initialize the Decompression Server!" << endl;
+		cerr << "Could not initialize the Decompression Server!" << endl;
 		return 1;
 	}
 
 	initCtlFifo();
-
-#ifndef _MSC_VER
-	cleanupFifos();
-#endif
 
 	DecomMessage m;
 
@@ -808,13 +665,11 @@ int main(int argc, char** argv)
 #endif
 		dataSock = accept(ListenSock, 0, 0);
 #ifdef _MSC_VER
-		idbassert_s(dataSock != INVALID_SOCKET, string("socket accept error: ") + strerror(errno));
-		//if (dataSock == INVALID_SOCKET)
-		//	throw runtime_error(string("socket accept error: ") + strerror(errno));
+		if (dataSock == INVALID_SOCKET)
 #else
-		//if (dataSock < 0)
-		idbassert_s(dataSock >= 0, string("socket accept error: ") + strerror(errno));
+		if (dataSock < 0)
 #endif
+			throw runtime_error(string("socket accept error: ") + strerror(errno));
 		m = getNextMsg(dataSock);
 		shutdown(dataSock, SHUT_RDWR);
 #ifdef _MSC_VER
@@ -832,8 +687,7 @@ int main(int argc, char** argv)
 #endif
 		}
 		else
-			idbassert_s(0, "Invalid msg");
-			//cerr << "Invalid msg" << endl;
+			cerr << "Invalid msg" << endl;
 	}
 
 	return 0;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: unique32generator.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: unique32generator.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -41,19 +41,18 @@ namespace joblist {
  * class which maintains a single DBRM connection exclusively reserved for
  * this purpose.
  */
-class UniqueNumberGenerator
+class Unique32Generator
 {
 	public:
-		static UniqueNumberGenerator* instance();      // singleton accessor
+		static Unique32Generator* instance();      // singleton accessor
 		static void               deleteInstance();// singleton cleanup
 		uint32_t                  getUnique32();   // generate unique 32-bit int
-		uint64_t				  getUnique64();	// generate unique 64-bit int
 		
 	private:
-		UniqueNumberGenerator()  { }
-		~UniqueNumberGenerator() { }
+		Unique32Generator()  { }
+		~Unique32Generator() { }
 
-		static UniqueNumberGenerator* fUnique32Generator;
+		static Unique32Generator* fUnique32Generator;
 		static boost::mutex       fLock;
 		BRM::DBRM                 fDbrm;
 };

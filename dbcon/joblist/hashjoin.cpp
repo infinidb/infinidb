@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: hashjoin.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: hashjoin.cpp 7406 2011-02-08 02:05:10Z zzhu $
 // C++ Implementation: hashjoin
 //
 // Description: 
@@ -171,8 +171,8 @@ void HashJoinStep::run()
 	// any init to do?
 	// sanity checks?
 
-	idbassert(inJSA.outSize() == 2);
-	idbassert(outJSA.outSize() == 2);
+	assert(inJSA.outSize() == 2);
+	assert(outJSA.outSize() == 2);
  
 	mainRunner.reset(new boost::thread(HJRunner(this)));
 }
@@ -365,10 +365,10 @@ void HashJoinStep::hjRunner()
 	rightOut = outJSA.outAt(1)->fifoDL();
 	if (rightOut == NULL)
 		rightOutDL = outJSA.outAt(1)->dataList();
-	idbassert(leftDL);
-	idbassert(rightDL);
-	idbassert(leftOut || leftOutDL);
-	idbassert(rightOut || rightOutDL);
+	assert(leftDL);
+	assert(rightDL);
+	assert(leftOut || leftOutDL);
+	assert(rightOut || rightOutDL);
 
 	leftIt = leftDL->getIterator();
 	rightIt = rightDL->getIterator();
@@ -1822,7 +1822,7 @@ const string HashJoinStep::toString() const
     size_t idlsz;
 
     idlsz = inJSA.outSize();
-    idbassert(idlsz == 2);
+    assert(idlsz == 2);
     dl1 = inJSA.outAt(0)->dataList();
     if (dl1) oid1 = dl1->OID();
     dl2 = inJSA.outAt(1)->dataList();

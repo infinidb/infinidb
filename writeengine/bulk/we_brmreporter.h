@@ -16,15 +16,13 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_brmreporter.h 3983 2012-07-02 16:11:06Z bpaul $
+ * $Id: we_brmreporter.h 3615 2012-03-09 16:41:14Z dcathey $
  *
  *****************************************************************************/
 
 #include <fstream>
 #include <string>
 #include <vector>
-#include <utility>
-#include "boost/tuple/tuple.hpp"
 
 #include "brmtypes.h"
 
@@ -41,8 +39,7 @@ class Log;
 /** @brief Accumulate update info that is later forwarded to BRM.
  *
  * This class accumulates BRM data (HWM and Casual Partition).  At the end
- * of the job, the BRMReporter object either saves the data to a report file,
- * or the information is sent directly to BRM.
+ * of the job, the BRMReporter object sends the information directly to BRM.
  */
 class BRMReporter
 {
@@ -68,43 +65,9 @@ class BRMReporter
      */
     void addToHWMInfo(const BRM::BulkSetHWMArg& hwmEntry);
 
-    /** @brief Add a ErrMsg entry to the output list
-     *  @param Critical Error Message
+    /** @brief Send HWM and Casual Partition Data to BRM
      */
-    void addToErrMsgEntry(const std::string& errCritMsg);
-
-    /* @brief Save Critical error messages to the BRM report file
-     * @param rptFileName Name of file to save info, else info is dropped
-     */
-	void sendErrMsgToFile ( const std::string& rptFileName );
-
-    /** @brief Send HWM and Casual Partition Data to the applicable destination
-     *  @param rptFileName Name of file to save info, else info is sent to BRM.
-     *  @param errFiles    List of *.err filenames to record in report file
-     *  @param badFiles    List of *.bad filenames to record in report file
-     */
-    int sendBRMInfo( const std::string& rptFileName,
-                     const std::vector<std::string>& errFiles,
-                     const std::vector<std::string>& badFiles );
-
-    /** @brief Report summary totals
-     *  @param totalReadRows Total number of rows read
-     *  @param totalInsertedRows Total number of rows inserted
-     *  @param satCounts Number of out-of-range values for each column,
-     *                   Vector is vector of column name, count pairs.
-     */
-    void reportTotals(u_int64_t totalReadRows,
-                      u_int64_t totalInsertedRows,
-               const std::vector<boost::tuple<ColDataType,std::string,u_int64_t> >& satCounts);
-
-    /** @brief Generate report for job that exceeds error limit
-     *  @param rptFileName Name of file to save info, else info is dropped
-     *  @param errFiles    List of *.err filenames to record in report file
-     *  @param badFiles    List of *.bad filenames to record in report file
-     */
-    void rptMaxErrJob(const std::string& rptFileName,
-                     const std::vector<std::string>& errFiles,
-                     const std::vector<std::string>& badFiles );
+    int sendBRMInfo( );
 
   private:  
 
@@ -113,19 +76,10 @@ class BRMReporter
     BRMReporter(const BRMReporter&);
     BRMReporter& operator=(const BRMReporter&);
 
-    int  sendHWMandCPToBRM( );      // send HWM and CP updates to BRM
-    void sendHWMToFile( );          // save HWM updates to a report file
-    void sendCPToFile ( );          // save CP  updates to a report file
-    int  openRptFile  ( );          // open BRM Report file
-    void closeRptFile ( );          // close BRM Report file
-
     Log*              fLog;         // Logger
     std::string       fTableName;   // Name of db table we are saving info for
     BRM::CPInfoMergeList_t          fCPInfo;  // Collection of CP info to send
     std::vector<BRM::BulkSetHWMArg> fHWMInfo; // Collection of HWM info to send
-	std::vector<std::string>		fCritErrMsgs;	//Collection of CRIT ERRs
-    std::string       fRptFileName; // Name of BRM report file
-    std::ofstream     fRptFile;     // BRM report file that is generated
 };
 
 } // end of namespace

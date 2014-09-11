@@ -16,12 +16,11 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: editem.cpp 2092 2013-01-09 20:53:52Z rdempsey $
+* $Id: editem.cpp 1397 2011-02-03 17:56:12Z rdempsey $
 */
 
 #include <iostream>
 #include <vector>
-#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 #include <sstream>
@@ -56,7 +55,7 @@ namespace {
 
 OID_t MaxOID;
 
-DBRM* emp=0;
+DBRM em;
 
 string pname;
 
@@ -65,83 +64,31 @@ bool sflg = false;
 bool aflg = false;
 bool fflg = false;
 bool vflg = false;
-bool mflg = false;
 
-struct SortExtentsByPartitionFirst
-{
-	bool operator() (const EMEntry& entry1, const EMEntry& entry2)
-	{
-		if ( (entry1.partitionNum <  entry2.partitionNum) ||
-			((entry1.partitionNum == entry2.partitionNum) &&
-			 (entry1.dbRoot       <  entry2.dbRoot))      ||
-			((entry1.partitionNum == entry2.partitionNum) &&
-			 (entry1.dbRoot       == entry2.dbRoot)       &&
-			 (entry1.segmentNum   <  entry2.segmentNum))  ||
-			((entry1.partitionNum == entry2.partitionNum) &&
-			 (entry1.dbRoot       == entry2.dbRoot)       &&
-			 (entry1.segmentNum   == entry2.segmentNum)   &&
-			 (entry1.blockOffset  <  entry2.blockOffset)) )
-			return true;
-		else
-			return false;
-	}
-};
-
-struct SortExtentsByDBRootFirst
-{
-	bool operator() (const EMEntry& entry1, const EMEntry& entry2)
-	{
-		if ( (entry1.dbRoot       <  entry2.dbRoot)       ||
-			((entry1.dbRoot       == entry2.dbRoot)       &&
-			 (entry1.partitionNum <  entry2.partitionNum))||
-			((entry1.dbRoot       == entry2.dbRoot)       &&
-			 (entry1.partitionNum == entry2.partitionNum) &&
-			 (entry1.segmentNum   <  entry2.segmentNum))  ||
-			((entry1.dbRoot       == entry2.dbRoot)       &&
-			 (entry1.partitionNum == entry2.partitionNum) &&
-			 (entry1.segmentNum   == entry2.segmentNum)   &&
-			 (entry1.blockOffset  <  entry2.blockOffset)) )
-			return true;
-		else
-			return false;
-	}
-};
-
-//------------------------------------------------------------------------------
-// Describes program usage to the user
-//------------------------------------------------------------------------------
 void usage(const string& pname)
 {
 	cout << "usage: " << pname <<
-	" [-tsahvm] [-di]|[-o oid -S opt]|[-c oid]|[-x]|[-e oid]|[-r oid]|"
-	"[-w oid]|[-l]|[-b lbid][-C][-p dbr]" << endl <<
+	" [-tsahv] [-di]|[-o oid]|[-c oid]|[-x oid]|[-e oid]|[-r oid]|"
+	"[-w oid]|[-l]|[-b lbid][-C]" << endl <<
 		"   examins/modifies the extent map." << endl <<
-		"   -h     \tdisplay this help text" << endl <<
 		"   -o oid \tdisplay extent map for oid" << endl <<
-		"   -S opt \tSort order for -o (1-partition, dbroot, seg#, fbo;"<<endl<<
-		"          \t                   2-dbroot, partition, seg#, fbo;"<<endl<<
-		"          \t                   default is unsorted)"  << endl <<
 		"   -d     \tdump the entire extent map" << endl <<
 		"   -c oid \tclear the min/max vals for oid" << endl <<
 		"   -C     \tclear all min/max vals" << endl <<
 		"   -t     \tdisplay min/max values as dates" << endl <<
 		"   -s     \tdisplay min/max values as timestamps" << endl <<
 		"   -a     \tdisplay min/max values as char strings" << endl <<
-		"   -x     \tcreate/extend one or more oids" << endl <<
+		"   -x oid \tcreate/extend oid" << endl <<
 		"   -e oid \tdelete oid" << endl <<
 		"   -r oid \trollback or delete extents" << endl <<
 		"   -v     \tdisplay verbose output" << endl <<
+		"   -h     \tdisplay this help text" << endl <<
 		"   -w oid \tedit HWM for an oid" << endl <<
 		"   -l     \tdump the free list" << endl <<
 		"   -b lbid\tdisplay info about lbid" << endl <<
-		"   -i     \tformat the output for import (implies -dm)" << endl <<
-		"   -m     \tdisplay actual min/max values" << endl <<
-		"   -p dbr \tdelete all extents on dbroot dbr" << endl;
+		"   -i     \tformat the output for import (implies -d)" << endl;
 }
 
-//------------------------------------------------------------------------------
-// Converts a non-dictionary char column to a string
-//------------------------------------------------------------------------------
 const string charcolToString(int64_t v)
 {
 	ostringstream oss;
@@ -155,9 +102,6 @@ const string charcolToString(int64_t v)
 	return oss.str();
 }
 
-//------------------------------------------------------------------------------
-// Formats an integer to it's date, datetime, or char equivalent
-//------------------------------------------------------------------------------
 const string fmt(int64_t v)
 {
 	ostringstream oss;
@@ -174,26 +118,15 @@ const string fmt(int64_t v)
 	{
 		oss << charcolToString(v);
 	}
-	else if (mflg)
-	{
-		oss << v;
-	}
 	else
 	{
-		if (v == numeric_limits<int64_t>::max() ||
-			v <= (numeric_limits<int64_t>::min() + 2))
-			oss << "notset";
-		else
-			oss << v;
+		oss << v;
 	}
 
 	return oss.str();
 }
 
-//------------------------------------------------------------------------------
-// Dump all the extents for the specified OID
-//------------------------------------------------------------------------------
-int dumpone(OID_t oid, unsigned int sortOrder)
+int dumpone(OID_t oid)
 {
 	std::vector<struct EMEntry> entries;
 	std::vector<struct EMEntry>::iterator iter;
@@ -203,49 +136,37 @@ int dumpone(OID_t oid, unsigned int sortOrder)
 	int32_t seqNum;
 	bool header;
 	bool needtrailer = false;
-	unsigned extentRows = emp->getExtentRows();
+	unsigned extentRows = em.getExtentRows();
 	unsigned colWidth = 0;
 
-	CHECK(emp->getExtents(oid, entries, false, false, true));
+	CHECK(em.getExtents(oid, entries, false, false, true));
 	if (entries.size() > 0)
 	{
-		if (sortOrder == 1) {
-			SortExtentsByPartitionFirst sorter;
-			std::sort( entries.begin(), entries.end(), sorter );
-		}
-		else if (sortOrder == 2) {
-			SortExtentsByDBRootFirst sorter;
-			std::sort( entries.begin(), entries.end(), sorter );
-		}
-
 		header = false;
 		iter = entries.begin();
 		end = entries.end();
 		while (iter != end)
 		{
+			max=-1;
+			min=-1;
+			seqNum=0;
 			u_int32_t lbidRangeSize = iter->range.size * 1024;
-			max       = iter->partition.cprange.hi_val;
-			min       = iter->partition.cprange.lo_val;
-			seqNum    = iter->partition.cprange.sequenceNum;
-			int state = iter->partition.cprange.isValid;
+			int state = em.getExtentMaxMin(iter->range.start, max, min, seqNum);
 			if (!header)
 			{
 				if ( iter->colWid > 0 )
 				{
-					cout << "Col OID = " << oid << ", NumExtents = " <<
-						entries.size() << ", width = " << iter->colWid;
-					if (vflg) {
-						uint32_t partNum;
-						uint16_t segNum;
-						uint16_t dbRoot;
-						HWM_t    hwm;
-						CHECK(emp->getLastLocalHWM(
-							oid,dbRoot,partNum,segNum,hwm));
-						cout << ";   LastLocalHWM: DBRoot-" << dbRoot <<
-							", part#-" << partNum << ", seg#-" << segNum <<
-							", HWM-" << hwm;
-					}
-					cout << endl;
+					HWM_t hwm;
+					CHECK(em.getHWM(oid, hwm));
+					cout << "Col OID = " << oid << ", HWM = " << hwm <<
+						", width = " << iter->colWid;
+					uint32_t partNum;
+					uint16_t segNum;
+					uint16_t dbRoot;
+					CHECK(em.getLastLocalHWM(oid,dbRoot,partNum,segNum,hwm));
+					cout << ";   LastLocalHWM: DBRoot-" << dbRoot <<
+						", part#-" << partNum << ", seg#-" << segNum <<
+						", HWM-" << hwm << endl;
 					colWidth = iter->colWid;
 				}
 				else
@@ -316,22 +237,16 @@ int dumpone(OID_t oid, unsigned int sortOrder)
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Dumps all the extents in the extent map
-//------------------------------------------------------------------------------
 int dumpall()
 {
 	for (OID_t oid = 0; oid <= MaxOID; oid++)
 	{
-		dumpone(oid, 0 /* no sorting */);
+		dumpone(oid);
 	}
 
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Deletes all the extents in the extent map
-//------------------------------------------------------------------------------
 int zapit()
 {
 #ifdef REALLY_DANGEROUS
@@ -339,11 +254,11 @@ int zapit()
 
 	for (OID_t oid = 0; oid <= MaxOID; oid++)
 	{
-		CHECK(emp->lookup(oid, range));
+		CHECK(em.lookup(oid, range));
 		if (range.size() > 0)
 		{
-			CHECK(emp->deleteOID(oid));
-			CHECK(emp->confirmChanges());
+			CHECK(em.deleteOID(oid));
+			CHECK(em.confirmChanges());
 		}
 	}
 #else
@@ -352,16 +267,13 @@ int zapit()
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Clears Casual Partition min/max for all the extents in the extent map
-//------------------------------------------------------------------------------
 int clearAllCPData()
 {
 	BRM::LBIDRange_v ranges;
 	int oid, err;
 
 	for (oid = 0; oid < MaxOID; oid++) {
-		err = emp->lookup(oid, ranges);
+		err = em.lookup(oid, ranges);
 		if (err == 0 && ranges.size() > 0) {
 			BRM::CPInfo cpInfo;
 			BRM::CPInfoList_t vCpInfo;
@@ -374,20 +286,17 @@ int clearAllCPData()
 				cpInfo.firstLbid = r.start;
 				vCpInfo.push_back(cpInfo);
 			}
-			CHECK(emp->setExtentsMaxMin(vCpInfo));
+			CHECK(em.setExtentsMaxMin(vCpInfo));
 		}
 	}
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Clears Casual Partition min/max for the specified OID
-//------------------------------------------------------------------------------
 int clearmm(OID_t oid)
 {
 
 	BRM::LBIDRange_v ranges;
-	CHECK(emp->lookup(oid, ranges));
+	CHECK(em.lookup(oid, ranges));
 	BRM::LBIDRange_v::size_type rcount = ranges.size();
 
 	// @bug 2280.  Changed to use the batch interface to clear the CP info to make the clear option faster.
@@ -402,83 +311,82 @@ int clearmm(OID_t oid)
 		cpInfo.firstLbid = r.start;
 		vCpInfo.push_back(cpInfo);
 	}
-	CHECK(emp->setExtentsMaxMin(vCpInfo));
+	CHECK(em.setExtentsMaxMin(vCpInfo));
 
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Create/add extents to dictionary OID, or a list of column OIDs.
-//------------------------------------------------------------------------------
-int extendOids( )
+int extendOid(OID_t oid)
 {
-	uint16_t  dbRoot;
 	uint32_t  partNum;
 	uint16_t  segNum;
-	OID_t     oid;
-	u_int32_t colWidth;
+	uint16_t  dbRoot;
 	char      DictStoreOIDFlag;
+	u_int32_t colWidth;
+	int       size;
+	LBID_t    lbid;
+	u_int32_t startBlock;
+	int       allocd;
 
-	vector<CreateStripeColumnExtentsArgIn> cols;
+	unsigned extentRows = em.getExtentRows();
+	cout << "Enter number of extents to allocate to " << oid <<
+		" (extent size is " << extentRows << " rows): ";
+
+	string resp;
+	cin >> resp;
+	if (resp.empty())
+		return 1;
+	size = (int)strtol(resp.c_str(), 0, 0);
+	if (size <= 0)
+	{
+		cerr << "size must be greater than 0." << endl;
+		usage(pname);
+		return 1;
+	}
 
 	cout << "Are you extending a dictionary store oid (y/n)? ";
 	cin >> DictStoreOIDFlag;
 
 	if ((DictStoreOIDFlag == 'y') || (DictStoreOIDFlag == 'Y'))
 	{
-		LBID_t lbid;
-		int    allocd;
-
-		cout << "Enter OID, DBRoot, and Partition#, and Segment# "
+		cout << "Enter DBRoot, and Partition#, and Segment# "
 			"(separated by spaces): ";
-		cin >> oid >> dbRoot >> partNum >> segNum;
+		cin >> dbRoot >> partNum >> segNum;
 
-		CHECK(emp->createDictStoreExtent ( oid, dbRoot, partNum, segNum,
-			lbid, allocd));
-
-		if (vflg)
+		for (int i=0; i<size; i++)
 		{
-			cout << oid << " created/extended w/ " << allocd << " blocks; "
-			"beginning LBID: " << lbid << 
-			"; DBRoot: " << dbRoot <<
-			"; Part#: "  << partNum <<
-			"; Seg#: "   << segNum << endl;
+			CHECK(em.createDictStoreExtent ( oid, dbRoot, partNum, segNum,
+				lbid, allocd));
+
+			if (vflg)
+			{
+				cout << oid << " created/extended w/ " << allocd << " blocks; "
+				"beginning LBID: " << lbid << 
+				"; DBRoot: " << dbRoot <<
+				"; Part#: "  << partNum <<
+				"; Seg#: "   << segNum << endl;
+			}
 		}
 	}
 	else
 	{
-		while (1)
+		cout << "Enter column width, DBRoot, and part# (separated by spaces), " << 
+			endl << "DBRoot and part# will only be used if it's the first extent: ";
+		cin >> colWidth >> dbRoot >> partNum;
+
+		for (int i=0; i<size; i++)
 		{
-			cout << "Enter OID and column width (separated by spaces); "
-				"0 OID represents end of list: ";
-			cin >> oid >> colWidth;
-			if (oid == 0) break;
+			CHECK(em.createColumnExtent ( oid, colWidth, dbRoot, partNum,
+				segNum, lbid, allocd, startBlock));
 
-			CreateStripeColumnExtentsArgIn colArg;
-			colArg.oid   = oid;
-			colArg.width = colWidth;
-			cols.push_back( colArg );
-		}
-
-		vector<CreateStripeColumnExtentsArgOut> newExtents;
-
-		cout << "Enter DBRoot and partition# (partition "
-			"only used for empty DBRoot): ";
-		cin  >> dbRoot >> partNum;
-	
-		CHECK(emp->createStripeColumnExtents(cols, dbRoot, partNum,
-			segNum, newExtents));
-
-		cout << "Extents created in partition " << partNum <<
-			", segment " << segNum << endl;
-		if (vflg)
-		{
-			for (unsigned k=0; k<newExtents.size(); k++)
+			if (vflg)
 			{
-				cout << "Column OID-" << cols[k].oid <<
-					"; LBID-"  << newExtents[k].startLbid <<
-					"; nblks-" << newExtents[k].allocSize <<
-					"; fbo-"   << newExtents[k].startBlkOffset << endl;
+				cout << oid << " created/extended w/ " << allocd << " blocks; "
+				"beginning LBID: " << lbid << 
+				"; startBlkOffset: " << startBlock << 
+				"; DBRoot: " << dbRoot <<
+				"; Part#: "  << partNum <<
+				"; Seg#: "   << segNum << endl;
 			}
 		}
 	}
@@ -486,16 +394,10 @@ int extendOids( )
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Rollback (delete) all extents for the specified OID, that follow the
-// designated extent
-//------------------------------------------------------------------------------
 int rollbackExtents(OID_t oid)
 {
 	char      DictStoreOIDFlag;
 	uint32_t  partNum;
-	uint16_t  dbRoot;
-	uint16_t  segNum;
 	HWM_t     hwm;
 
 	cout << "Are you rolling back extents for a dictionary store oid (y/n)? ";
@@ -503,41 +405,33 @@ int rollbackExtents(OID_t oid)
 
 	if ((DictStoreOIDFlag == 'y') || (DictStoreOIDFlag == 'Y'))
 	{
-		unsigned int     hwmCount;
-		vector<uint16_t> segNums;
-		vector<HWM_t>    hwms;
+		unsigned int hwmCount;
+		vector<HWM_t> hwms;
 
-		cout << "Enter DBRoot#, part#, and the number of HWMs to be entered "
-			"(separated by spaces): ";
-		cin >> dbRoot >> partNum >> hwmCount;
+		cout << "Enter part#, and the number of HWMs to be entered (separated by spaces): ";
+		cin >> partNum >> hwmCount;
 		for (unsigned int k=0; k<hwmCount; k++)
 		{
-			cout << "Enter seg# and HWM for a last extent " <<
-				"(separated by spaces): ";
-			cin >> segNum >> hwm;
+			cout << "Enter HWM for the last extent in segment file " << k << ": ";
+			cin >> hwm;
 			hwms.push_back(hwm);
-			segNums.push_back(segNum);
 		}
 
-		CHECK(emp->rollbackDictStoreExtents_DBroot( oid, dbRoot, partNum,
-			segNums, hwms ));
+		CHECK(em.rollbackDictStoreExtents( oid, partNum, hwms ));
 	}
 	else
 	{
-		cout << "Enter DBRoot#, part#, seg#, and HWM for the last extent "
-			"on that DBRoot (separated by spaces): ";
-		cin >> dbRoot >> partNum >> segNum >> hwm;
+		uint16_t  segNum;
 
-		CHECK(emp->rollbackColumnExtents_DBroot( oid, false,
-			dbRoot, partNum, segNum, hwm ));
+		cout << "Enter part#, seg#, and HWM for the last extent (separated by spaces): ";
+		cin >> partNum >> segNum >> hwm;
+
+		CHECK(em.rollbackColumnExtents( oid, partNum, segNum, hwm ));
 	}
 
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Delete the specified OID from the extent map
-//------------------------------------------------------------------------------
 int deleteOid(OID_t oid)
 {
 	if (!fflg)
@@ -554,14 +448,11 @@ int deleteOid(OID_t oid)
 
 	cout << "Deleting extent map info for " << oid << endl;
 
-	CHECK(emp->deleteOID(oid));
+	CHECK(em.deleteOID(oid));
 
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Update the local HWM for the specified OID and segment file
-//------------------------------------------------------------------------------
 int editHWM(OID_t oid)
 {
 	HWM_t    oldHWM;
@@ -571,24 +462,21 @@ int editHWM(OID_t oid)
 
 	cout << "Enter Partition#, and Segment# (separated by spaces): ";
 	cin >> partNum >> segNum;
-	CHECK(emp->getLocalHWM(oid, partNum, segNum, oldHWM));
+	CHECK(em.getLocalHWM(oid, partNum, segNum, oldHWM));
 
 	cout << "HWM for partition " << partNum << " and segment " << segNum <<
 		" is currently " << oldHWM <<
 		".  Enter new value: ";
 	cin >> newHWM;
 
-	CHECK(emp->setLocalHWM(oid, partNum, segNum, newHWM));
+	CHECK(em.setLocalHWM(oid, partNum, segNum, newHWM));
 
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Dump the free list information
-//------------------------------------------------------------------------------
 int dumpFL()
 {
-	vector<InlineLBIDRange> v = emp->getEMFreeListEntries();
+	vector<InlineLBIDRange> v = em.getEMFreeListEntries();
 
 	vector<InlineLBIDRange>::iterator iter = v.begin();
 	vector<InlineLBIDRange>::iterator end = v.end();
@@ -603,9 +491,6 @@ int dumpFL()
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Dump information about the specified LBID
-//------------------------------------------------------------------------------
 int dumpLBID(LBID_t lbid)
 {
 	uint16_t ver = 0;
@@ -615,8 +500,8 @@ int dumpLBID(LBID_t lbid)
 	uint16_t segNum;
 	uint32_t fbo;
 	int rc;
-	rc = emp->lookupLocal(lbid, ver, false, oid, dbroot, partNum, segNum, fbo);
-	idbassert(rc == 0);
+	rc = em.lookupLocal(lbid, ver, false, oid, dbroot, partNum, segNum, fbo);
+	assert(rc == 0);
 	cout << "LBID " << lbid << " is part of OID " << oid <<
 		"; DbRoot "     << dbroot  <<
 		"; partition# " << partNum <<
@@ -625,22 +510,8 @@ int dumpLBID(LBID_t lbid)
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-// Delete all the extents for the specified DBRoot
-//------------------------------------------------------------------------------
-int deleteAllOnDBRoot(uint16_t dbroot)
-{
-	int rc;
-	rc = emp->deleteDBRoot(dbroot);
-	idbassert(rc == 0);
-	return 0;
 }
 
-}
-
-//------------------------------------------------------------------------------
-// main entry point into this program
-//------------------------------------------------------------------------------
 int main(int argc, char** argv)
 {
 	int c;
@@ -659,13 +530,10 @@ int main(int argc, char** argv)
 	bool bflg = false;
 	bool iflg = false;
 	LBID_t lbid = 0;
-	bool pflg = false;
-	uint16_t dbroot = 0;
-	unsigned int sortOrder = 0; // value of 0 means no sorting
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "dzCc:o:tsxe:r:fvhw:lb:aimp:S:")) != EOF)
+	while ((c = getopt(argc, argv, "dzCc:o:tsx:e:r:fvhw:lb:ai")) != EOF)
 		switch (c)
 		{
 		case 'd':
@@ -693,6 +561,7 @@ int main(int argc, char** argv)
 			break;
 		case 'x':
 			xflg = true;
+			oid = (OID_t)strtoul(optarg, 0, 0);
 			break;
 		case 'e':
 			eflg = true;
@@ -725,16 +594,6 @@ int main(int argc, char** argv)
 		case 'i':
 			iflg = true;
 			break;
-		case 'm':
-			mflg = true;
-			break;
-		case 'p':
-			pflg = true;
-			dbroot = (uint16_t)strtoul(optarg, 0, 0);
-			break;
-		case 'S':
-			sortOrder = strtoul(optarg, 0, 0);
-			break;
 		case 'h':
 		case '?':
 		default:
@@ -758,8 +617,6 @@ int main(int argc, char** argv)
 	{
 	}
 
-	emp = new DBRM();
-
 	MaxOID = -1;
 	if (localModuleType != "um")
 	{
@@ -767,7 +624,7 @@ int main(int argc, char** argv)
 		MaxOID = oidm.size();
 	}
 
-	if (emp->isReadWrite() != ERR_OK)
+	if (em.isReadWrite() != ERR_OK)
 	{
 		cerr << endl << "Warning! The DBRM is currently in Read-Only mode!" << endl
 			<< "Updates will not propagate!" << endl << endl;
@@ -775,16 +632,16 @@ int main(int argc, char** argv)
 
 	if (iflg)
 	{
-		dflg = mflg = true;
+		dflg = true;
 		ExtentMap em;
 		cout << em;
 		return 0;
 	}
 
 	if ((int)dflg + (int)cflg + (int)oflg + (int)xflg + (int)eflg + (int)wflg +
-		(int)lflg + (int)bflg + (int)Cflg + (int)rflg + (int)pflg > 1)
+		(int)lflg + (int)bflg + (int)Cflg + (int)rflg > 1)
 	{
-		cerr << "Only one of d/c/o/x/e/w/l/b/r/C/p can be specified." << endl;
+		cerr << "Only one of d/c/o/x/e/w/l/b/r/C can be specified." << endl;
 		usage(pname);
 		return 1;
 	}
@@ -803,11 +660,8 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	if (pflg)
-		return deleteAllOnDBRoot(dbroot);
-
 	if (oflg)
-		return dumpone(oid, sortOrder);
+		return dumpone(oid);
 
 	if (dflg)
 		return dumpall();
@@ -824,7 +678,7 @@ int main(int argc, char** argv)
 	if (cflg)
 		return clearmm(oid);
 	if (xflg)
-		return extendOids();
+		return extendOid(oid);
 	if (eflg)
 		return deleteOid(oid);
 	if (wflg)

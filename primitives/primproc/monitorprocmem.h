@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: monitorprocmem.h 2012 2012-12-10 21:08:03Z xlou $
+ * $Id: monitorprocmem.h 1588 2011-02-08 14:37:03Z rdempsey $
  *
  *****************************************************************************/
 
@@ -46,36 +46,23 @@ class MonitorProcMem
         /** @brief MonitorProcMem constructor
          *
          * @param maxPct (in) maximum allowable memory usage
-         * @param memChk (in) monitor total system physical memory usage
          * @param msgLog (in) message logger to log msg to
          * @param sec    (in) number of seconds between memory checks
          */
         explicit MonitorProcMem(size_t   maxPct,
-								size_t   memChk,
                                 Logger*  msgLog,
-                                unsigned sec=1) :
+                                unsigned sec=15) :
                  fPid     ( getpid() ),
                  fMaxPct  ( maxPct   ),
-                 fSleepSec( sec      ),
-                 fMsgLog  ( msgLog   ),
-                 fPageSize( getpagesize() ) { fAggMemCheck = memChk; }
+                 fSleepSec( sec ),
+                 fMsgLog  ( msgLog ),
+                 fPageSize( getpagesize() ) { }
 
         /** @brief Thread entry point
          *
          * Entry point for this thread that monitors memory usage.
          */
         void operator()() const;
-
-        /* return the % of total memory used
-         *
-         */
-        static unsigned memUsedPct();
-
-        /* return if memory usage is above aggregation flush limit
-         *
-         */
-        static bool flushAggregationMem();
-
 
     private:
         //Defaults are okay
@@ -97,20 +84,11 @@ class MonitorProcMem
          */
         void pause_() const;
 
-        /* return the system % of free memory
-         *
-         */
-        unsigned memAvailPct() const;
-
         pid_t    fPid;       // process pid
         size_t   fMaxPct;    // max allowable % memory use
         unsigned fSleepSec;  // sleep interval in seconds
         Logger*  fMsgLog;    // Logger used to record error msg
         int      fPageSize;  // page size for this host (in bytes)
-
-		// @bug4507, monitor % of total used system memory
-		static unsigned fMemAvailPct;
-		static unsigned fAggMemCheck;
 };
 
 }

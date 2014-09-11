@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: copylocks.h 1938 2013-07-11 17:06:49Z dhall $
+ * $Id: copylocks.h 1305 2011-04-06 20:36:40Z pleblanc $
  *
  *****************************************************************************/
 
@@ -48,7 +48,7 @@
 #define CL_INITIAL_SIZE (50*sizeof(CopyLockEntry))
 #define CL_INCREMENT (50*sizeof(CopyLockEntry))
 
-#if defined(_MSC_VER) && defined(xxxCOPYLOCKS_DLLEXPORT)
+#if defined(_MSC_VER) && defined(COPYLOCKS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -72,7 +72,7 @@ public:
 #ifdef NDEBUG
 		{ fCopyLocks.grow(key, size); }
 #else
-		{ int rc=fCopyLocks.grow(key, size); idbassert(rc==0); }
+		{ int rc=fCopyLocks.grow(key, size); assert(rc==0); }
 #endif
 	inline void makeReadOnly() { fCopyLocks.setReadOnly(); }
 	inline void clear(unsigned key, off_t size) { fCopyLocks.clear(key, size); }
@@ -137,7 +137,7 @@ class CopyLocks : public Undoable {
 		MSTEntry* shminfo;
 		MasterSegmentTable mst;
 		bool r_only;
-		static boost::mutex mutex; // @bug5355 - made mutex static
+		boost::mutex mutex;
 		static const int MAX_IO_RETRIES=10;
 		ShmKeys fShmKeys;
 		CopyLocksImpl* fCopyLocksImpl;

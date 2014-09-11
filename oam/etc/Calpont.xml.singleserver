@@ -49,10 +49,6 @@
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8622</Port>
 	</pm1_ServerMonitor>
-	<pm1_WriteEngineServer>
-		<IPAddr>127.0.0.1</IPAddr>
-		<Port>8630</Port>
-	</pm1_WriteEngineServer>
 	<DDLProc>
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8612</Port>
@@ -66,21 +62,18 @@
 	</BatchInsert>
 	<PrimitiveServers>
 		<Count>1</Count>
-		<ConnectionsPerPrimProc>8</ConnectionsPerPrimProc>
+		<ConnectionsPerPrimProc>4</ConnectionsPerPrimProc>
 		<ProcessorThreshold>128</ProcessorThreshold>
-		<!-- <ProcessorThreads>16</ProcessorThreads> --> <!-- defaults to num cores * 2 -->
+                <!-- <ProcessorThreads>16</ProcessorThreads> --> <!-- defaults to num cores * 2 -->
 		<ProcessorQueueSize>10K</ProcessorQueueSize> <!-- minimum of extent size 8192 -->
 		<DebugLevel>0</DebugLevel>
 		<LBID_Shift>13</LBID_Shift>
 		<ColScanBufferSizeBlocks>512</ColScanBufferSizeBlocks>
 		<ColScanReadAheadBlocks>512</ColScanReadAheadBlocks> <!-- s/b factor of extent size 8192 -->
 		<!-- <BPPCount>16</BPPCount> --> <!-- Default num cores * 2.  A cap on the number of simultaneous primitives per jobstep -->
-		<PrefetchThreshold>1</PrefetchThreshold>
+		<PrefetchThreshold>5</PrefetchThreshold>
 		<PTTrace>0</PTTrace>
 		<RotatingDestination>n</RotatingDestination>
-		<!-- <HighPriorityPercentage>60</HighPriorityPercentage> -->
-		<!-- <MediumPriorityPercentage>30</MediumPriorityPercentage> -->
-		<!-- <LowPriorityPercentage>10</LowPriorityPercentage> -->
 	</PrimitiveServers>
 	<PMS1>
 		<IPAddr>127.0.0.1</IPAddr>
@@ -220,27 +213,26 @@
 		-->
 		<!-- Warning: Do not change this value once database is built -->
 		<DBRootCount>1</DBRootCount>
-		<DBRoot1>$INSTALLDIR/data1</DBRoot1>
-		<DBRMRoot>$INSTALLDIR/data1/systemFiles/dbrm/BRM_saves</DBRMRoot>
-		<TableLockSaveFile>$INSTALLDIR/data1/systemFiles/dbrm/tablelocks</TableLockSaveFile>
-		<DBRMTimeOut>20</DBRMTimeOut> <!-- in seconds -->
-		<DBRMSnapshotInterval>100000</DBRMSnapshotInterval>
-		<ExternalCriticalThreshold>90</ExternalCriticalThreshold>
-		<ExternalMajorThreshold>80</ExternalMajorThreshold>
-		<ExternalMinorThreshold>70</ExternalMinorThreshold>
+		<DBRoot1>/usr/local/Calpont/data1</DBRoot1>
+		<DBRMRoot>/usr/local/Calpont/data1/systemFiles/dbrm/BRM_saves</DBRMRoot>
+        <DBRMTimeOut>20</DBRMTimeOut> <!-- in seconds -->
+        <DBRMSnapshotInterval>100000</DBRMSnapshotInterval>
+		<RAIDCriticalThreshold>90</RAIDCriticalThreshold>
+		<RAIDMajorThreshold>80</RAIDMajorThreshold>
+		<RAIDMinorThreshold>70</RAIDMinorThreshold>
 		<TempDiskPath>/tmp</TempDiskPath>
 		<WorkingDir>/tmp</WorkingDir>
 		<TransactionArchivePeriod>10</TransactionArchivePeriod>
 		<NMSIPAddress>0.0.0.0</NMSIPAddress>
 		<TempSaveSize>128M</TempSaveSize> <!-- default SWSDL max element save size -->
 		<WaitPeriod>10</WaitPeriod> <!-- in seconds -->
+
 		<TempFileDir>/tmp/infinidb_tmp_files</TempFileDir>
-		<CalpontHome>$INSTALLDIR</CalpontHome>
 		<ModuleHeartbeatPeriod>10</ModuleHeartbeatPeriod>
 		<ModuleHeartbeatCount>3</ModuleHeartbeatCount>
 		<ProcessRestartCount>10</ProcessRestartCount>
 		<ProcessRestartPeriod>120</ProcessRestartPeriod>
-		<SwapAction>restartSystem</SwapAction>	<!-- OAM command (or 'none') to run when swap space exceeds Major Threshold -->
+		<SwapAction>restartSystem</SwapAction> <!-- OAM command (or 'none') to run when swap space exceeds Major Threshold -->
 		<ActivePmFailoverDisabled>n</ActivePmFailoverDisabled>
 	</SystemConfig>
 	<SystemModuleConfig>
@@ -265,8 +257,6 @@
 		<ModuleSwapMajorThreshold1>80</ModuleSwapMajorThreshold1>
 		<ModuleSwapMinorThreshold1>70</ModuleSwapMinorThreshold1>
 		<ModuleDiskMonitorFileSystem1-1>/</ModuleDiskMonitorFileSystem1-1>
-		<ModuleDBRootCount1-1>unassigned</ModuleDBRootCount1-1>
-		<ModuleDBRootID1-1-1>unassigned</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
 		<RunType2>LOADSHARE</RunType2>
@@ -288,8 +278,6 @@
 		<ModuleSwapMajorThreshold2>80</ModuleSwapMajorThreshold2>
 		<ModuleSwapMinorThreshold2>70</ModuleSwapMinorThreshold2>
 		<ModuleDiskMonitorFileSystem1-2>/</ModuleDiskMonitorFileSystem1-2>	
-		<ModuleDBRootCount1-2>unassigned</ModuleDBRootCount1-2>
-		<ModuleDBRootID1-1-2>unassigned</ModuleDBRootID1-1-2>
 		<ModuleType3>pm</ModuleType3>
 		<ModuleDesc3>Performance Module</ModuleDesc3>
 		<RunType3>SIMPLEX</RunType3>
@@ -311,8 +299,6 @@
 		<ModuleSwapMajorThreshold3>80</ModuleSwapMajorThreshold3>
 		<ModuleSwapMinorThreshold3>70</ModuleSwapMinorThreshold3>
 		<ModuleDiskMonitorFileSystem1-3>/</ModuleDiskMonitorFileSystem1-3>
-		<ModuleDBRootCount1-3>1</ModuleDBRootCount1-3>
-		<ModuleDBRootID1-1-3>1</ModuleDBRootID1-1-3>
 	</SystemModuleConfig>
 	<SystemExtDeviceConfig>
 		<Count>0</Count>
@@ -322,30 +308,29 @@
 	</SystemExtDeviceConfig>
 	<SessionManager>
 		<MaxConcurrentTransactions>1000</MaxConcurrentTransactions>
-		<SharedMemoryTmpFile>$INSTALLDIR/data1/systemFiles/dbrm/CalpontShm</SharedMemoryTmpFile>
-		<TxnIDFile>$INSTALLDIR/data1/systemFiles/dbrm/SMTxnID</TxnIDFile>
+		<SharedMemoryTmpFile>/usr/local/Calpont/data1/systemFiles/dbrm/CalpontShm</SharedMemoryTmpFile>
+		<TxnIDFile>/usr/local/Calpont/data1/systemFiles/dbrm/SMTxnID</TxnIDFile>
 	</SessionManager>
 	<SessionMonitor>
-		<SharedMemoryTmpFile>$INSTALLDIR/data1/systemFiles/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
+		<SharedMemoryTmpFile>/usr/local/Calpont/data1/systemFiles/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
 		<TransactionAgeLimit>10</TransactionAgeLimit>
 	</SessionMonitor>
-	<VersionBuffer> 
-		<!-- VersionBufferFileSize must be a multiple of 8192.
-			One version buffer file will be put on each DB root. -->
-		<VersionBufferFileSize>1GB</VersionBufferFileSize> 
+	<VersionBuffer> <!-- Total version buffer size must be at least 819200000 bytes, the max of VersionBufferFileSize tested is 10GB -->
+		<NumVersionBufferFiles>4</NumVersionBufferFiles> <!-- Max of NumVersionBufferFiles is 1000 -->
+		<VersionBufferFileSize>1GB</VersionBufferFileSize> <!-- VersionBufferFileSize must be a multiple of 8192 and cannot be larger than 32TB -->
 	</VersionBuffer>
 	<OIDManager>
 		<!-- XXXPAT: This is located in tmp so we all have R/W access.
-		It should be relocated to $INSTALLDIR/share/oidbitmap
+		It should be relocated to /usr/local/Calpont/share/oidbitmap
 		on the production machine-->
 		<!-- Do not change this file after database built	 -->
-		<OIDBitmapFile>$INSTALLDIR/data1/systemFiles/dbrm/oidbitmap</OIDBitmapFile>
+		<OIDBitmapFile>/usr/local/Calpont/data1/systemFiles/dbrm/oidbitmap</OIDBitmapFile>
 		<!-- Do not change this value after database built	 -->
 		<FirstOID>3000</FirstOID>
 	</OIDManager>
 	<WriteEngine>
-		<BulkRoot>$INSTALLDIR/data/bulk</BulkRoot>
-		<BulkRollbackDir>$INSTALLDIR/data/bulk/rollback</BulkRollbackDir>
+		<BulkRoot>/usr/local/Calpont/data/bulk</BulkRoot>
+		<BulkRollbackDir>/usr/local/Calpont/data/bulk/rollback</BulkRollbackDir>
 		<MaxFileSystemDiskUsagePct>98</MaxFileSystemDiskUsagePct>
 		<CompressedPaddingBlocks>1</CompressedPaddingBlocks> <!-- Number of blocks used to pad compressed chunks -->
 	</WriteEngine>
@@ -408,7 +393,7 @@
 	<DBBC>
 		<!-- The percentage of RAM to use for the disk block cache. Defaults to 86% -->
 		<NumBlocksPct>66</NumBlocksPct>
-		<!-- <NumThreads>16</NumThreads> --> <!-- 1-256.  Default is 16. -->
+		<!-- <NumThreads>16</NumThreads> --> <!-- 1-256.  Default num cores * 2 -->
 		<NumCaches>1</NumCaches><!-- # of parallel caches to instantiate -->
 		<IOMTracing>0</IOMTracing>
 		<BRPTracing>0</BRPTracing>
@@ -422,24 +407,14 @@
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<SingleServerInstall>y</SingleServerInstall>
 		<ServerTypeInstall>2</ServerTypeInstall>
-		<DBRootStorageType>internal</DBRootStorageType>
-		<UMStorageType>internal</UMStorageType>
+		<UserStorageType>local</UserStorageType>
+		<UserStorageLoc1>unassigned</UserStorageLoc1>
+		<DBRootStorageType>local</DBRootStorageType>
+		<DBRootStorageLoc1>unassigned</DBRootStorageLoc1>
+		<SharedNothing>n</SharedNothing>
 		<SystemLogConfigFile>unassigned</SystemLogConfigFile>	
-		<rpw>unassigned</rpw>
-		<Cloud>n</Cloud>
-		<EEPackageType>rpm</EEPackageType>
 		<EnableSNMP>y</EnableSNMP>
-		<AmazonX509Certificate>unassigned</AmazonX509Certificate>
-		<AmazonX509PrivateKey>unassigned</AmazonX509PrivateKey>
-		<AmazonRegion>us-east-1</AmazonRegion>
-		<AmazonZone>unassigned</AmazonZone>
-		<PMInstanceType>unassigned</PMInstanceType>
-		<UMInstanceType>unassigned</UMInstanceType>
-		<UMSecurityGroup>unassigned</UMSecurityGroup>
-		<UMVolumeSize>unassigned</UMVolumeSize>
-		<PMVolumeSize>unassigned</PMVolumeSize>
-		<UMAutoSync>n</UMAutoSync>
-		<AmazonAutoTagging>n</AmazonAutoTagging>
+		<EEPackageType>rpm</EEPackageType>
 	</Installation>
 	<ExtentMap>
 		<!--
@@ -461,16 +436,11 @@
 	<JobList>
 		<FlushInterval>16K</FlushInterval>
 		<FifoSize>32</FifoSize>
-		<RequestSize>1</RequestSize>  <!-- Number of extents per request, should be
-			  less than MaxOutstandingRequests. Otherwise, default value 1 is used. -->
-		<!--  ProcessorThreadsPerScan is the number of jobs issued to process
-			  each extent.  The default is 16.  MaxOutstandingRequests is the size of 
-			  the window of work in terms of extents.  A value of 20 means there 
-			  is 20 extents worth of work for the PMs to process at any given time.
-			  ProcessorThreadsPerScan * MaxOutstandingRequests should be at least
-			  as many threads are available across all PMs.  -->
-        <!-- <ProcessorThreadsPerScan>16</ProcessorThreadsPerScan> -->
-        <MaxOutstandingRequests>20</MaxOutstandingRequests>
+                <RequestSize>1</RequestSize>  <!-- Number of extents per request, should be
+                   less than MaxOutstandingRequests. Otherwise, default value 1 is used. -->
+                <MaxOutstandingRequests>1</MaxOutstandingRequests> <!-- Number of outstanding extents -->
+                <!--  ProcessorThreadsPerScan Must be power of 2 <= ProcessorThreads.  Defaults to num cores * 2.  -->
+                <!-- <ProcessorThreadsPerScan>16</ProcessorThreadsPerScan> -->
 	</JobList>
 	<TupleWSDL>
 		<MaxSize>1M</MaxSize>                   <!-- Max size in bytes per bucket -->
@@ -482,10 +452,4 @@
 		<!-- <RowAggrBuckets>32</RowAggrBuckets> --> <!-- Default value is number of cores * 4 -->
 		<!-- <RowAggrRowGroupsPerThread>20</RowAggrRowGroupsPerThread> --> <!-- Default value is 20 -->
 	</RowAggregation>
-	<CrossEngineSupport>
-		<Host>unassigned</Host>
-		<Port>3306</Port>
-		<User>unassigned</User>
-		<Password></Password>
-	</CrossEngineSupport>
 </Calpont>

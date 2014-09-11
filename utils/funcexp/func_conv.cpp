@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_conv.cpp 3589 2013-02-14 13:23:49Z rdempsey $
+* $Id: func_conv.cpp 3011 2012-02-29 22:02:53Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -121,115 +121,51 @@ int64_t convStrToNum(const string& str, int base, bool unsignedFlag)
 	return (negative ? -((int64_t) j) : (int64_t) j);
 }
 
-const char *convNumToStr(int64_t val,char *dst,int radix)
+char *convNumToStr(int64_t val,char *dst,int radix)
 {
-	if (radix == 16 || radix == -16)
-		sprintf(dst, "%lX", val);
-	else if (radix == 8 || radix == -8)
-		sprintf(dst, "%lo", val);
-	else if (radix == 10)
+	char buffer[65];
+	register char *p;
+	int64_t long_val;
+	uint64_t uval= (uint64_t) val;
+	
+	if (radix < 0)
 	{
-		uint64_t uval = static_cast<uint64_t>(val);
-		sprintf(dst, "%lu", uval);
-	}
-	else if (radix == -10)
-		sprintf(dst, "%ld", val);
-	else if (radix == 2 || radix == -2)
-	{
-		char tmp[65];
-		char* ptr = &tmp[64];
-		*ptr-- = 0;
-		for (int i = 0; i < 64; i++)
-		{
-			if (val&1)
-				*ptr-- = '1';
-			else
-				*ptr-- = '0';
-			val >>= 1;
+		if (radix < -36 || radix > -2) return (char*) 0;
+		if (val < 0) {
+			*dst++ = '-';
+			uval = (uint64_t)0 - uval;
 		}
-		ptr = strchr(tmp, '1');
-		if (ptr == 0)
-			strcpy(dst, &tmp[63]);
-		else
-			strcpy(dst, ptr);
-	}
-	else if (radix == 4 || radix == -4)
-	{
-		char tmp[33];
-		char* ptr = &tmp[32];
-		*ptr-- = 0;
-		for (int i = 0; i < 32; i++)
-		{
-			*ptr-- = '0' + (val&3);
-			val >>= 2;
-		}
-		ptr = strpbrk(tmp, "123");
-		if (ptr == 0)
-			strcpy(dst, &tmp[31]);
-		else
-			strcpy(dst, ptr);
-	}
-#if 0
-	else if (radix == 8 || radix == -8)
-	{
-		char tmp[23];
-		char* ptr = &tmp[22];
-		*ptr-- = 0;
-		for (int i = 0; i < 22; i++)
-		{
-			*ptr-- = '0' + (val&7);
-			val >>= 3;
-		}
-		ptr = strpbrk(tmp, "1234567");
-		if (ptr == 0)
-			strcpy(dst, &tmp[21]);
-		else
-			strcpy(dst, ptr);
-	}
-	else if (radix == 16 || radix == -16)
-	{
-		char tmp[17];
-		char* ptr = &tmp[16];
-		*ptr-- = 0;
-		for (int i = 0; i < 16; i++)
-		{
-			int v = val&0xf;
-			if (v > 9)
-				*ptr-- = 'A' + v - 10;
-			else
-				*ptr-- = '0' + v;
-			val >>= 4;
-		}
-		ptr = strpbrk(tmp, "123456789ABCDEF");
-		if (ptr == 0)
-			strcpy(dst, &tmp[15]);
-		else
-			strcpy(dst, ptr);
-	}
-#endif
-	else if (radix == 32 || radix == -32)
-	{
-		char tmp[14];
-		char* ptr = &tmp[13];
-		*ptr-- = 0;
-		for (int i = 0; i < 13; i++)
-		{
-			int v = val&0x1f;
-			if (v > 9)
-				*ptr-- = 'A' + v - 10;
-			else
-				*ptr-- = '0' + v;
-			val >>= 5;
-		}
-		ptr = strpbrk(tmp, "123456789ABCDEFGHIJKLMNOPQRSTUV");
-		if (ptr == 0)
-			strcpy(dst, &tmp[12]);
-		else
-			strcpy(dst, ptr);
+		radix = -radix;
 	}
 	else
-		*dst = 0;
-	return dst;
+	{
+		if (radix > 36 || radix < 2) return (char*) 0;
+	}
+	if (uval == 0)
+	{
+		*dst++='0';
+		*dst='\0';
+		return dst;
+	}
+	p = &buffer[sizeof(buffer)-1];
+	*p = '\0';
+
+	while (uval > (uint64_t) LONG_MAX)
+	{
+		uint64_t quo= uval/(uint) radix;
+		uint rem= (uint) (uval- quo* (uint) radix);
+		*--p = digit_upper[rem];
+		uval= quo;
+	}
+	long_val= (int64_t) uval;
+	while (long_val != 0)
+	{
+		int64_t quo= long_val/radix;
+		*--p = digit_upper[(unsigned char) (long_val - quo*radix)];
+		long_val= quo;
+	}
+	while ((*dst++ = *p++) != 0) ;
+	return dst-1;
 }
 
 CalpontSystemCatalog::ColType Func_conv::operationType(FunctionParm& fp, CalpontSystemCatalog::ColType& resultType)
@@ -246,7 +182,7 @@ string Func_conv::getStrVal(rowgroup::Row& row,
 {
 	string res= parm[0]->data()->getStrVal(row, isNull);
 	string str;
-	char ans[65];
+	char ans[65],*ptr;
 	int64_t dec;
 	int64_t from_base = parm[1]->data()->getIntVal(row, isNull);
 	int64_t to_base = parm[2]->data()->getIntVal(row, isNull);
@@ -257,15 +193,16 @@ string Func_conv::getStrVal(rowgroup::Row& row,
 		isNull = true;
 		return "";
 	}
+	isNull = false;
 
 	if (from_base < 0)
 		dec= convStrToNum(res, -from_base, false);
 	else
 		dec= (int64_t) convStrToNum( res, from_base, true);
 
-	str = convNumToStr(dec, ans, to_base);
+	ptr= convNumToStr(dec, ans, to_base);
 
-	isNull = str.empty();
+	str.append(ans, 0, (uint)(ptr-ans));
 
 	return str;
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ha_view.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: ha_view.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -27,8 +27,8 @@
 #define HA_VIEW
 
 //#undef LOG_INFO
-#include "ha_calpont_impl_if.h"
 #include "idb_mysql.h"
+#include "ha_calpont_impl_if.h"
 
 namespace execplan
 {
@@ -41,20 +41,19 @@ namespace cal_impl_if
 class View
 {
 public:
-	View(SELECT_LEX& select, gp_walk_info* parentGwip) :
+	View(SELECT_LEX& select, gp_walk_info* parentGwip) : 
 		fSelect(select),
 		fParentGwip(parentGwip) {}
 	~View() {}
-
+	
 	execplan::CalpontSystemCatalog::TableAliasName& viewName();
 	void viewName(execplan::CalpontSystemCatalog::TableAliasName& viewName);
-
+	
 	/** get execution plan for this view. merge the table list and join list to the
 	    parent select.
 	 */
 	void transform();
-	uint32_t processOuterJoin(gp_walk_info& gwi);
-
+	
 private:
 	SELECT_LEX fSelect;
 	gp_walk_info* fParentGwip;

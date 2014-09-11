@@ -175,12 +175,6 @@ bool end_active_trans(THD *thd)
 {
   int error=0;
   DBUG_ENTER("end_active_trans");
-  /*Bug 5320 */	
-  if ((thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE) 
-  || (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ALTER_VTABLE) 
-  || (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DROP_VTABLE))
-    DBUG_RETURN(error);
-	
   if (unlikely(thd->in_sub_stmt))
   {
     my_error(ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0));
@@ -720,12 +714,7 @@ int end_trans(THD *thd, enum enum_mysql_completiontype completion)
   bool do_release= 0;
   int res= 0;
   DBUG_ENTER("end_trans");
-  /*Bug 5320 */	
-  if ((thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE) 
-  || (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ALTER_VTABLE) 
-  || (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DROP_VTABLE))
-    DBUG_RETURN(res);
-	
+
   if (unlikely(thd->in_sub_stmt))
   {
     my_error(ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0));
@@ -1249,10 +1238,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 
 		if (idb_vtable_process(thd))
 		{
-			thd->row_count_func = 0; //Bug 5315
 			thd->infinidb_vtable.vtable_state = THD::INFINIDB_DISABLE_VTABLE;
 			mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
-			thd->infinidb_vtable.isInfiniDBDML = false; //@bug5117
 		}
 
     while (!thd->killed && (end_of_stmt != NULL) && ! thd->is_error())
@@ -7887,8 +7874,7 @@ static void idb_to_lower(char* str)
 {
 	bool inquote = false;
 	char quote = 0;
-	uint length = strlen(str);
-	for (uint i = 0; i < length; i++)
+	for (uint i = 0; i < strlen(str); i++)
 	{
 		if (str[i] == '`' || str[i] == '\'' || str[i] == '"')
 		{
@@ -7916,8 +7902,7 @@ static std::string idb_cleanQuery(char* str)
 	bool inquote = false;
 	std::string temp;
 	char quote = 0;
-	uint length = strlen(str);
-	for (uint i = 0; i < length; i++)
+	for (uint i = 0; i < strlen(str); i++)
 	{
 		temp.append(1, str[i]);
 		// @bug3935.

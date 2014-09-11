@@ -200,9 +200,9 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
 SUBDIRS = dbbuilder editem dbloadxml \
-          getConfig cplogger \
-          clearShm setConfig viewtablelock cleartablelock ddlcleanup \
-          idbmeminfo
+        getConfig cplogger \
+        clearShm setConfig viewtablelock cleartablelock ddlcleanup \
+	idbmeminfo
 
 all: all-recursive
 

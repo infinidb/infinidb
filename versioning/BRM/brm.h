@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: brm.h 1709 2012-09-25 21:58:35Z zzhu $
+ * $Id: brm.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -33,4 +33,4 @@
 #include "blockresolutionmanager.h"
 #include "sessionmanagerserver.h"
 #include "dbrm.h"
-#include "logicalpartition.h"
+

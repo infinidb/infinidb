@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: inetstreamsocket.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: inetstreamsocket.h 2436 2011-03-07 17:48:38Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -29,19 +29,12 @@
 #ifndef _MSC_VER
 #include <netinet/in.h>
 #endif
-#include <cstring>
 
 #include "socket.h"
 #include "socketparms.h"
 #include "bytestream.h"
 
 //#define MQ_SYNC_PROTO 1
-
-#if defined(_MSC_VER) && defined(xxxINETSTREAMSOCKET_DLLEXPORT)
-#define EXPORT __declspec(dllexport)
-#else
-#define EXPORT
-#endif
 
 class MessageQTestSuite;
 
@@ -85,12 +78,12 @@ public:
 	/** fSocket accessor
 	 *
 	 */
-	inline virtual const SocketParms socketParms() const;
+	inline virtual const SocketParms& socketParms() const;
 
 	/** sockaddr mutator
 	 *
 	 */
-	inline virtual void sa(const sockaddr* sa);
+	inline virtual void sa(const sockaddr_in& sa);
 
 	/** call socket() to get a sd
 	 *
@@ -105,7 +98,7 @@ public:
 	/** test if this socket is open
 	 *
 	 */
-	inline virtual const bool isOpen() const;
+	inline virtual bool isOpen() const;
 
 	/** read a message from the socket
 	 * 
@@ -145,7 +138,7 @@ public:
 	/** bind to a port
 	 *
 	 */
-	virtual void bind(const sockaddr* serv_addr);
+	virtual void bind(const struct sockaddr_in* serv_addr);
 
 	/** listen for connections
 	 *
@@ -160,7 +153,7 @@ public:
 	/** connect to a server socket
 	 *
 	 */
-	virtual void connect(const sockaddr* serv_addr);
+	virtual void connect(const struct sockaddr_in* serv_addr);
 
 	/** dynamically allocate a copy of this object
 	 *
@@ -182,28 +175,13 @@ public:
 	 */
 	virtual void syncProto(bool use) { fSyncProto = use; }
 
-	const int getConnectionNum() const { return fSocketParms.sd(); }
+	int getConnectionNum() const { return fSocketParms.sd(); }
 
 	/* The caller needs to know when/if the remote closes the connection or sends data.
 	 * Returns 0 on timeout, 1 if there is data to read, 2 if the connection was dropped.
 	 * On error 3 is returned.
 	 */
 	static int pollConnection(int connectionNum, long msecs);
-
-	/** return the address as a string
-	 *
-	 */
-	virtual const std::string addr2String() const;
-
-	/** compare 2 addresses
-	 *
-	 */
-	virtual const bool isSameAddr(const Socket* rhs) const;
-
-	/** ping an ip address
-	 *
-	 */
-	EXPORT static int ping(const std::string& ipaddr, const struct timespec* timeout=0);
 
 	/*
 	 * allow test suite access to private data for OOB test
@@ -237,10 +215,10 @@ private:
 
 };
 
-inline const bool InetStreamSocket::isOpen() const { return (fSocketParms.sd() >= 0); }
-inline const SocketParms InetStreamSocket::socketParms() const { return fSocketParms; }
+inline bool InetStreamSocket::isOpen() const { return (fSocketParms.sd() >= 0); }
+inline const SocketParms& InetStreamSocket::socketParms() const { return fSocketParms; }
 inline void InetStreamSocket::socketParms(const SocketParms& socketParms) { fSocketParms = socketParms; }
-inline void InetStreamSocket::sa(const sockaddr* sa) { memcpy(&fSa, sa, sizeof(sockaddr_in)); }
+inline void InetStreamSocket::sa(const sockaddr_in& sa) { fSa = sa; }
 
 /**
  * stream an InetStreamSocket rep to any ostream
@@ -252,8 +230,6 @@ inline std::ostream& operator<<(std::ostream& os, const InetStreamSocket& rhs)
 }
 
 } //namespace messageqcpp
-
-#undef EXPORT
 
 #endif //MESSAGEQCPP_INETSTREAMSOCKET_H
 

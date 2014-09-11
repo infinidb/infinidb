@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.cpp 3956 2013-07-08 19:17:26Z bpaul $
+//  $Id: rowaggregation.cpp 2941 2011-11-30 16:55:06Z zzhu $
 
 
 /** @file rowaggregation.cpp
@@ -46,7 +46,6 @@
 #include "rowgroup.h"
 #include "funcexp.h"
 #include "rowaggregation.h"
-#include "utils_utf8.h"
 
 //..comment out NDEBUG to enable assertions, uncomment NDEBUG to disable
 //#define NDEBUG
@@ -215,7 +214,7 @@ void RowAggregation::updateStringMinMax(string val1, string val2, int64_t col, i
 #ifdef STRCOLL_ENH__
 	else
 	{
-		int tmp = funcexp::utf8::idb_strcoll(val1.c_str(), val2.c_str());
+		int tmp = strcoll(val1.c_str(), val2.c_str());
 		if ((tmp < 0 && func == rowgroup::ROWAGG_MIN) ||
 			(tmp > 0 && func == rowgroup::ROWAGG_MAX))
 		{
@@ -504,7 +503,6 @@ void RowAggregation::addRowGroup(const RowGroup* pRows)
 				return;
 		}
 	}
-	fRowGroupOut->setDBRoot(pRows->getDBRoot());
 
 	Row rowIn;
 	pRows->initRow(&rowIn);
@@ -693,17 +691,6 @@ void RowAggregation::initialize()
 
 	// Save the RowGroup data pointer
 	fResultDataVec.push_back(fRowGroupOut->getData());
-
-	// for 8k poc: an empty output row group to match message count
-	fEmptyRowGroup = *fRowGroupOut;
-	fEmptyRowData.reset(new uint8_t[fRowGroupOut->getEmptySize() + fRow.getSize()]);
-	fEmptyRowGroup.setData(fEmptyRowData.get());
-	fEmptyRowGroup.resetRowGroup(0);
-	fEmptyRowGroup.initRow(&fEmptyRow);
-	fEmptyRowGroup.getRow(0, &fEmptyRow);
-	memcpy(fEmptyRow.getData(), fNullRowData.get(), fEmptyRow.getSize());
-	if (fAggMapKeyLength == 0)  // no groupby
-		fEmptyRowGroup.setRowCount(1);
 }
 
 
@@ -1504,18 +1491,6 @@ void RowAggregation::loadResult(messageqcpp::ByteStream& bs)
 	}
 
 	fSecondaryRowDataVec.clear();
-}
-
-
-void RowAggregation::loadEmptySet(messageqcpp::ByteStream& bs)
-{
-	// caculate total row count
-	uint64_t rowCount = fEmptyRowGroup.getRowCount();
-
-	// add the header
-	uint64_t dataSize = fEmptyRowGroup.getEmptySize() + rowCount * fEmptyRow.getSize();
-	bs << (uint32_t) dataSize;
-	bs.append(fEmptyRowGroup.getData(), dataSize);
 }
 
 

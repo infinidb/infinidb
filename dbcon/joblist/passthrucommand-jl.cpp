@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: passthrucommand-jl.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: passthrucommand-jl.cpp 8272 2012-01-19 16:28:34Z xlou $
 // C++ Implementation: passthrucommand-jl
 //
 // Description: 
@@ -35,7 +35,7 @@ using namespace std;
 #include "bytestream.h"
 using namespace messageqcpp;
 
-#include "primitivestep.h"
+#include "jobstep.h"
 #include "tablecolumn.h"
 #include "command-jl.h"
 #include "passthrucommand-jl.h"
@@ -69,7 +69,7 @@ PassThruCommandJL::~PassThruCommandJL()
 {
 }
 
-void PassThruCommandJL::setLBID(uint64_t l, uint dbroot)
+void PassThruCommandJL::setLBID(uint64_t l)
 {
 }
 

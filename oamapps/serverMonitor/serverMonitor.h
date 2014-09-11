@@ -21,10 +21,6 @@
 #include <sys/statvfs.h> 
 #include <stdio.h> 
 #include <sys/sysinfo.h>
-#include <string>
-#include <sys/shm.h>
-#include <sys/wait.h>
-#include <errno.h>
 
 #include "liboamcpp.h"
 #include "messagelog.h"
@@ -32,10 +28,6 @@
 #include "loggingid.h"
 #include "snmpmanager.h"
 #include "socketclosed.h"
-#include "shmkeys.h"
-#include "snmpglobal.h"
-#
-
 
 #define CPU_DEBUG 0		// 0 for supported
 #define DISK_DEBUG 0		// 0 for supported
@@ -66,9 +58,9 @@ typedef   std::list<processMemory> ProcessMemoryList;
 typedef struct 
 {
 	std::string deviceName;
-	uint64_t totalBlocks;
-	uint64_t usedBlocks;
-	uint64_t usedPercent;
+	long long totalBlocks;
+	long long usedBlocks;
+	double usedPercent;
 } SMSystemDisk;
 
 typedef   std::list<SMSystemDisk> SystemDiskList;
@@ -78,11 +70,6 @@ typedef   std::list<SMSystemDisk> SystemDiskList;
 * @brief Local Process-Monitor Monitor Thread
 */
 void procmonMonitor();
-
-/**
-* @brief UM Auto Sync Thread
-*/
-void UMAutoSync();
 
 /**
 * @brief CPU Monitor Thread
@@ -176,7 +163,7 @@ public:
 	/**
 	* @brief send alarm
 	*/
-	bool sendResourceAlarm(std::string alarmItem, oam::ALARMS alarmID, int action, int usage);
+	void sendResourceAlarm(std::string alarmItem, oam::ALARMS alarmID, int action, int usage);
 	
 	/**
 	* @brief check CPU alarm

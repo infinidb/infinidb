@@ -7,8 +7,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = calpontConsole
 calpontConsole_SOURCES = calpontConsole.cpp
-calpontConsole_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-calpontConsole_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) -lreadline -lncurses $(AM_LDFLAGS)
+calpontConsole_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+calpontConsole_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ -lreadline -lncurses $(AM_LDFLAGS)
 
 test:
 

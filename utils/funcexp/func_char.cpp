@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_char.cpp 3651 2013-03-19 22:55:43Z bpaul $
+* $Id: func_char.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -94,61 +94,65 @@ string Func_char::getStrVal(Row& row,
 		case execplan::CalpontSystemCatalog::MEDINT:
 		case execplan::CalpontSystemCatalog::TINYINT:
 		case execplan::CalpontSystemCatalog::SMALLINT:
-			{
-				int64_t value = parm[0]->data()->getIntVal(row, isNull);
+		{
+			int64_t value = parm[0]->data()->getIntVal(row, isNull);
 
-				if ( !getChar(value, oss) ) {
-					isNull = true;
-					return "";
-				}
-
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
-		case execplan::CalpontSystemCatalog::CHAR:
-		case execplan::CalpontSystemCatalog::DOUBLE:
-			{
-				double value = parm[0]->data()->getDoubleVal(row, isNull);
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::FLOAT:
-			{
-				float value = parm[0]->data()->getFloatVal(row, isNull);
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::DECIMAL:
-			{
-				IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
-				// get decimal and round up
-				int value = d.value / power(d.scale);
-				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
-				if ( lefto > 4 )
-					value++;
-				if ( !getChar((int64_t)value, oss) ) {
-					isNull = true;
-					return "";
-				}
-			}
-			break;
-
-		case execplan::CalpontSystemCatalog::DATE:
-		case execplan::CalpontSystemCatalog::DATETIME:
-			{
+			if ( !getChar(value, oss) ) {
 				isNull = true;
 				return "";
 			}
-			break;
+
+			return oss.str();
+		}
+		break;
+	
+		case execplan::CalpontSystemCatalog::VARCHAR: // including CHAR'
+		case execplan::CalpontSystemCatalog::CHAR:
+		case execplan::CalpontSystemCatalog::DOUBLE:
+		{
+			double value = parm[0]->data()->getDoubleVal(row, isNull);
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+			return oss.str();
+		}
+		break;
+	
+		case execplan::CalpontSystemCatalog::FLOAT:
+		{
+			float value = parm[0]->data()->getFloatVal(row, isNull);
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+			return oss.str();
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DECIMAL:
+		{
+			IDB_Decimal d = parm[0]->data()->getDecimalVal(row, isNull);
+			// get decimal and round up
+			int value = d.value / power(d.scale);
+			int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+			if ( lefto > 4 )
+				value++;
+			if ( !getChar((int64_t)value, oss) ) {
+				isNull = true;
+				return "";
+			}
+			return oss.str();
+		}
+		break;
+
+		case execplan::CalpontSystemCatalog::DATE:
+		case execplan::CalpontSystemCatalog::DATETIME:
+		{
+			isNull = true;
+			return "";
+		}
+		break;
 
 		default:
 		{
@@ -156,19 +160,9 @@ string Func_char::getStrVal(Row& row,
 			oss << "char: datatype of " << execplan::colDataTypeToString(ct.colDataType);
 			throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
 		}
-			
 	}
-	// Bug 5110 : Here the data in col is null. But there might have other
-	// non-null columns we processed before and we do not want entire value
-	// to become null. Therefore we set isNull flag to false.
-	if(isNull)
-	{
-		isNull = false;
-		return "";
-	}
-
-	return oss.str();
 	
+	return 0;
 }
 
 

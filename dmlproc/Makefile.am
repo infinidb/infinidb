@@ -23,8 +23,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = DMLProc
-DMLProc_SOURCES = dmlproc.cpp dmlprocessor.cpp dmlresultbuffer.cpp batchinsertprocessor.cpp
-DMLProc_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) -lthreadpool -lddlcleanuputil -lbatchloader $(AM_LDFLAGS)
+DMLProc_SOURCES = dmlproc.cpp dmlprocessor.cpp dmlresultbuffer.cpp
+DMLProc_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) -lthreadpool $(AM_LDFLAGS)
 
 test:
 

@@ -1802,7 +1802,6 @@ public:
   	bool impossibleWhereOnUnion;
   	bool isInsertSelect;
   	bool isUpdateWithDerive;
-	bool isInfiniDBDML; // default false
   };
    
   INFINIDB_VTABLE infinidb_vtable;					// Calpont InfiniDB custom structure

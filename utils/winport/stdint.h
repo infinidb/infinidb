@@ -51,7 +51,6 @@ typedef int key_t;
 typedef int pid_t;
 typedef int mode_t;
 typedef int clockid_t;
-typedef int uid_t;
 
 struct lldiv_t__
 {

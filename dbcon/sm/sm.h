@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: sm.h 9262 2013-02-06 21:07:19Z zzhu $
+ *   $Id: sm.h 7700 2011-05-16 13:07:28Z rdempsey $
  *
  ***********************************************************************/
 /** @file */
@@ -33,9 +33,9 @@
 
 #include "calpontsystemcatalog.h"
 #include "clientrotator.h"
+#include "tableband.h"
 #include "rowgroup.h"
 #include "calpontselectexecutionplan.h"
-#include "querystats.h"
 
 #define IDB_SM_DEBUG 0
 #define IDB_SM_PROFILE 0
@@ -153,12 +153,13 @@ struct cpsm_tplsch_t
 		ctp(0) {}
 	~cpsm_tplsch_t() 
 	{
-		delete rowGroup;
+		//delete [] ctp;
 	}
 
 	char tbName[100];
 	tableid_t tableid;
 	uint64_t rowsreturned;
+	joblist::TableBand rowData;
 	rowgroup::RowGroup *rowGroup;
 	messageqcpp::ByteStream bs;	// rowgroup bytestream. need to stay with the life span of rowgroup
 	uint32_t traceFlags;
@@ -168,33 +169,60 @@ struct cpsm_tplsch_t
 	// @bug 626
 	uint16_t saveFlag;  
 	uint32_t bandsReturned;
-	std::vector<execplan::CalpontSystemCatalog::ColType> ctp;
+	execplan::CalpontSystemCatalog::ColType* ctp;
 	std::string errMsg;
 	void deserializeTable(messageqcpp::ByteStream& bs)
 	{
-		if (!rowGroup)
+		// tuple interface toggled off -- table band
+		if (traceFlags & execplan::CalpontSelectExecutionPlan::TRACE_TUPLE_OFF)
 		{
-			rowGroup = new rowgroup::RowGroup();
-			rowGroup->deserialize(bs);
+			rowData.unserialize(bs);
 		}
+		// tuple interface
 		else
 		{
-			rowGroup->setData(const_cast<uint8_t*>(bs.buf())); 
+			if (!rowGroup)
+			{
+				rowGroup = new rowgroup::RowGroup();
+				rowGroup->deserialize(bs);
+			}
+			else
+			{
+				rowGroup->setData(const_cast<uint8_t*>(bs.buf())); 
+			}
 		}
 	}
 	
 	uint16_t getStatus()
 	{
-		assert (rowGroup != 0);
-		return rowGroup->getStatus();
+		// tuple interface toggled off -- table band
+		if (traceFlags & execplan::CalpontSelectExecutionPlan::TRACE_TUPLE_OFF)
+		{
+			return rowData.getStatus();
+		}
+		// tuple interface
+		else
+		{
+			assert (rowGroup != 0);
+			return rowGroup->getStatus();
+		}
 	}
 	
 	uint64_t getRowCount()
 	{
-		if (rowGroup)
-			return rowGroup->getRowCount(); 
+		// tuple interface toggled off -- table band
+		if (traceFlags & execplan::CalpontSelectExecutionPlan::TRACE_TUPLE_OFF)
+		{
+			return rowData.getRowCount();
+		}
+		// tuple interface
 		else
-			return 0;
+		{
+			if (rowGroup)
+				return rowGroup->getRowCount(); 
+			else
+				return 0;
+		}
 	}
 	
 	void setErrMsg()
@@ -210,7 +238,6 @@ struct cpsm_tplsch_t
 		}
 	}
 };
-typedef boost::shared_ptr<cpsm_tplsch_t> sp_cpsm_tplsch_t;
 
 enum RequestType
 {
@@ -238,6 +265,7 @@ public:
      EXPORT void write(messageqcpp::ByteStream bs);
 
     ~cpsm_conhdl_t() {
+        if (exeMgr)
     	    delete exeMgr;
 	}
 	EXPORT const std::string toString() const;
@@ -253,10 +281,10 @@ public:
 	std::string tablename;
 	int tboid;
 	short requestType; // 0 -- ID2NAME; 1 -- NAME2ID
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog* csc;
 	// @bug 649; @bug 626
 	std::map <int, int> tidMap;     // tableid-tableStartCount map
-	std::map <int, sp_cpsm_tplsch_t> tidScanMap;
+	std::map <int, cpsm_tplsch_t> tidScanMap;
 	std::map <int, int> keyBandMap; // key-savedBandCount map
 	int curFetchTb;                 // current fetching table key
 	std::string queryStats;
@@ -308,10 +336,10 @@ extern status_t sm_init(const char*, const char*, const char*, const char*, void
 extern status_t sm_cleanup(void*);
 
 extern status_t tpl_open(tableid_t, void**, void*);
-extern status_t tpl_scan_open(tableid_t, tpl_fetch_hint_t, sp_cpsm_tplsch_t&, void*);
-extern status_t tpl_scan_fetch(sp_cpsm_tplsch_t&, fldl_val_t*, void*, void*, int* = NULL);
-extern status_t tpl_scan_close(sp_cpsm_tplsch_t&, void*);
-extern status_t tpl_close(void*, cpsm_conhdl_t**, querystats::QueryStats& stats);
+extern status_t tpl_scan_open(tableid_t, tpl_fetch_hint_t, void**, void*);
+extern status_t tpl_scan_fetch(void*, fldl_val_t*, void*, void*, int* = NULL);
+extern status_t tpl_scan_close(void*, void*);
+extern status_t tpl_close(void*, void*);
 
 extern int tbname2id(const char*, const char*, void*);
 /** @brief Util function to map table id to table name */

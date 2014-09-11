@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: serialize.cpp 8926 2012-09-25 21:56:32Z zzhu $
+*   $Id: serialize.cpp 7533 2011-03-09 21:35:05Z chao $
 *
 *
 ***********************************************************************/
@@ -25,7 +25,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "brmtypes.h"
 
 #define DDLPKG_DLLEXPORT
 #include "ddlpkg.h"
@@ -471,7 +470,7 @@ int TruncTableStatement::serialize(ByteStream& bytestream)
 /** @brief Construct from Bytestream */
 int MarkPartitionStatement::unserialize(ByteStream& bytestream)
 {
-	int ret=1;
+    int ret=1;
 
 	fTableName = new QualifiedName();
 	fTableName->unserialize(bytestream);
@@ -485,23 +484,15 @@ int MarkPartitionStatement::unserialize(ByteStream& bytestream)
 	// read the owner (default schema)
 	bytestream >> fOwner;
 	
-	fPartitions.clear();
-	uint32_t size = 0;
-	bytestream >> size;
-	BRM::LogicalPartition part;
-	for (uint i = 0; i < size; i++)
-	{
-		part.unserialize(bytestream);
-		fPartitions.insert(part);
-	}
+	bytestream >> fPartition;
 
-	return ret;
+    return ret;
 }
 
 /** @brief Serialize to ByteStream */
 int MarkPartitionStatement::serialize(ByteStream& bytestream)
 {
-	int ret=1;
+    int ret=1;
 
 
 	bytestream << (quadbyte) DDL_MARK_PARTITION_STATEMENT;
@@ -518,12 +509,8 @@ int MarkPartitionStatement::serialize(ByteStream& bytestream)
 	// write the owner (default schema)
 	bytestream << fOwner;
 
-	bytestream << (uint32_t)fPartitions.size();
-	set<BRM::LogicalPartition>::iterator it;
-	for (it = fPartitions.begin(); it != fPartitions.end(); ++it)
-		(*it).serialize(bytestream);
-	
-	return ret;
+	bytestream << fPartition;
+    return ret;
 }
 
 ///////////////////////////////////////
@@ -547,14 +534,7 @@ int DropPartitionStatement::unserialize(ByteStream& bytestream)
 	// read the owner (default schema)
 	bytestream >> fOwner;
 	
-	uint32_t size = 0;
-	bytestream >> size;
-	BRM::LogicalPartition part;
-	for (uint i = 0; i < size; i++)
-	{
-		part.unserialize(bytestream);
-		fPartitions.insert(part);
-	}
+	bytestream >> fPartition;
 
     return ret;
 }
@@ -562,7 +542,7 @@ int DropPartitionStatement::unserialize(ByteStream& bytestream)
 /** @brief Serialize to ByteStream */
 int DropPartitionStatement::serialize(ByteStream& bytestream)
 {
-	int ret=1;
+    int ret=1;
 
 	bytestream << (quadbyte) DDL_DROP_PARTITION_STATEMENT;
 
@@ -577,12 +557,9 @@ int DropPartitionStatement::serialize(ByteStream& bytestream)
 
 	// write the owner (default schema)
 	bytestream << fOwner;
-	bytestream << (uint32_t)fPartitions.size();
-	set<BRM::LogicalPartition>::iterator it;
-	for (it = fPartitions.begin(); it != fPartitions.end(); ++it)
-		(*it).serialize(bytestream);
-	
-	return ret;
+
+	bytestream << fPartition;
+    return ret;
 }
 
 ///////////////////////////////////////
@@ -592,7 +569,7 @@ int DropPartitionStatement::serialize(ByteStream& bytestream)
 /** @brief Construct from Bytestream */
 int RestorePartitionStatement::unserialize(ByteStream& bytestream)
 {
-	int ret=1;
+    int ret=1;
 
 	fTableName = new QualifiedName();
 	fTableName->unserialize(bytestream);
@@ -606,22 +583,17 @@ int RestorePartitionStatement::unserialize(ByteStream& bytestream)
 	// read the owner (default schema)
 	bytestream >> fOwner;
 	
-	uint32_t size = 0;
-	bytestream >> size;
-	BRM::LogicalPartition part;
-	for (uint i = 0; i < size; i++)
-	{
-		part.unserialize(bytestream);
-		fPartitions.insert(part);
-	}
+	bytestream >> fPartition;
 
-	return ret;
+    return ret;
 }
 
 /** @brief Serialize to ByteStream */
 int RestorePartitionStatement::serialize(ByteStream& bytestream)
 {
-	int ret=1;
+    int ret=1;
+
+	//cout << "TruncTableStatement serialize testing started" << endl;
 
 	bytestream << (quadbyte) DDL_RESTORE_PARTITION_STATEMENT;
 
@@ -637,12 +609,8 @@ int RestorePartitionStatement::serialize(ByteStream& bytestream)
 	// write the owner (default schema)
 	bytestream << fOwner;
 
-	bytestream << (uint32_t)fPartitions.size();
-	set<BRM::LogicalPartition>::iterator it;
-	for (it = fPartitions.begin(); it != fPartitions.end(); ++it)
-		(*it).serialize(bytestream);
-
-	return ret;
+	bytestream << fPartition;
+    return ret;
 }
 
 ///////////////////////////////////////
@@ -1004,21 +972,6 @@ int AtaRenameColumn::unserialize(ByteStream& bytestream)
 		fNewType = new ColumnType(DDL_INT);
 	fNewType->unserialize(bytestream);
 
-	read_vec<ColumnConstraintDef>(fConstraints, bytestream);
-
-	// read default value. It might not be there since the parser does
-	// not make one unless specified.
-
-	quadbyte type;
-	bytestream >> type;
-
-	if(type == DDL_NULL) {
-		fDefaultValue = 0;
-	}
-	else {
-		fDefaultValue = new ColumnDefaultValue();
-		fDefaultValue->unserialize(bytestream);
-	}
     return ret;
 }
 
@@ -1032,18 +985,8 @@ int AtaRenameColumn::serialize(ByteStream& bytestream)
 	bytestream << fNewName;
 	if (!fNewType)
 		fNewType = new ColumnType(DDL_INT);
-	fNewType->serialize(bytestream);
-	
-	// serialize column constraints.
-	write_vec<ColumnConstraintDef>(fConstraints, bytestream);
+	fNewType->serialize(bytestream);;
 
-	if(0 == fDefaultValue) {
-		bytestream << (quadbyte)DDL_NULL;
-	}
-	else {
-		bytestream << (quadbyte)DDL_COLUMN_DEFAULT_VALUE;
-		fDefaultValue->serialize( bytestream );
-	}
     return ret;
 }
 

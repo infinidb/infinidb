@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_substr.cpp 3716 2013-04-18 16:35:52Z bpaul $
+* $Id: func_substr.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -57,9 +56,9 @@ std::string Func_substr::getStrVal(rowgroup::Row& row,
 	if (isNull)
 		return "";
 
-	size_t strwclen = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+	size_t strwclen = mbstowcs(0, tstr.c_str(), 0) + 1;
 	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-	strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
+	strwclen = mbstowcs(wcbuf, tstr.c_str(), strwclen);
 	wstring str(wcbuf, strwclen);
 
 	int64_t start = fp[1]->data()->getIntVal(row, isNull) - 1;
@@ -92,9 +91,9 @@ std::string Func_substr::getStrVal(rowgroup::Row& row,
 	}
 
 	wstring out = str.substr(start, n);
-	size_t strmblen = utf8::idb_wcstombs(0, out.c_str(), 0) + 1;
+	size_t strmblen = wcstombs(0, out.c_str(), 0) + 1;
 	char* outbuf = (char*)alloca(strmblen * sizeof(char));
-	strmblen = utf8::idb_wcstombs(outbuf, out.c_str(), strmblen);
+	strmblen = wcstombs(outbuf, out.c_str(), strmblen);
 	return string(outbuf, strmblen);
 #else
 	string str = fp[0]->data()->getStrVal(row, isNull);

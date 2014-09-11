@@ -33,9 +33,7 @@ using namespace boost;
 #include "logicoperator.h"
 #include "constantcolumn.h"
 #include "existsfilter.h"
-#include "predicateoperator.h"
 #include "selectfilter.h"
-#include "simplefilter.h"
 #include "simplescalarfilter.h"
 using namespace execplan;
 
@@ -150,20 +148,6 @@ bool simpleScalarFilterToParseTree(SimpleScalarFilter* sf, ParseTree*& pt, JobIn
 
 	// Do not catch exceptions here, let caller handle them.
 	transformer.run();
-
-	// if subquery errored out
-	if (status->errCode)
-	{
-		ostringstream oss;
-		oss << "Sub-query failed: ";
-		if (status->errMsg.empty())
-			oss << "error code " << status->errCode;
-		else
-			oss << status->errMsg;
-
-		status->errMsg = oss.str();
-		throw runtime_error(status->errMsg);
-	}
 
 	// Construct simple filters based on the scalar result.
 	bool isScalar = false;
@@ -298,7 +282,7 @@ ParseTree* trim(ParseTree*& pt)
 	}
 	else if ((lhs == NULL || rhs == NULL) && dynamic_cast<LogicOperator*>(pt->data()))
 	{
-		idbassert(dynamic_cast<LogicOperator*>(pt->data())->data() == "and");
+		assert(dynamic_cast<LogicOperator*>(pt->data())->data() == "and");
 		ParseTree* br = pt;
 		ParseTree* nl = NULL; // the left()/right() are overloaded
 
@@ -318,7 +302,7 @@ ParseTree* trim(ParseTree*& pt)
 }
 
 
-void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
+void handleNotIn(JobStepVector& jsv, JobInfo& jobInfo)
 {
 	// convert CORRELATED join (but not MATCHNULLS) to expression.
 	for (JobStepVector::iterator i = jsv.begin(); i != jsv.end(); i++)
@@ -335,16 +319,16 @@ void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
 		sop->resultType(sop->operationType());
 		SimpleFilter* sf = new SimpleFilter(sop, lhs, rhs);
 
-		ExpressionStep* es = new ExpressionStep(jobInfo->sessionId,
-												jobInfo->txnId,
-												jobInfo->verId,
-												jobInfo->statementId);
+		ExpressionStep* es = new ExpressionStep(jobInfo.sessionId,
+												jobInfo.txnId,
+												jobInfo.verId,
+												jobInfo.statementId);
 
 		if (es == NULL)
-			throw runtime_error("Failed to create ExpressionStep 2");
+			throw runtime_error ("Failed to create ExpressionStep 2");
 
-		es->logger(jobInfo->logger);
-		es->expressionFilter(sf, *jobInfo);
+		es->logger(jobInfo.logger);
+		es->expressionFilter(sf, jobInfo);
 		i->reset(es);
 
 		delete sf;
@@ -352,7 +336,7 @@ void handleNotIn(JobStepVector& jsv, JobInfo* jobInfo)
 }
 
 
-bool isNotInSubquery(JobStepVector& jsv)
+bool checkNotIn(JobStepVector& jsv, JobInfo& jobInfo)
 {
 	// use MATCHNULLS(execplan::JOIN_NULL_MATCH) to identify NOT IN and NOT EXIST
 	bool notIn = false;
@@ -383,8 +367,8 @@ void doCorrelatedExists(const ExistsFilter* ef, JobInfo& jobInfo)
 
 	// @bug3524, special handling of not in.
 	JobStepVector& jsv = transformer.correlatedSteps();
-	if (isNotInSubquery(jsv) == true)
-		handleNotIn(jsv, transformer.subJobInfo());
+	if (checkNotIn(jsv, jobInfo))
+		handleNotIn(jsv, jobInfo);
 
 	transformer.updateCorrelateInfo();
 	jsv.push_back(subQueryStep);
@@ -530,7 +514,7 @@ namespace joblist
 void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 {
 	SimpleScalarFilter* sf = dynamic_cast<SimpleScalarFilter*>(p->data());
-	idbassert(sf != NULL);
+	assert(sf != NULL);
 	ParseTree* parseTree = NULL;
 
 	// Parse filters to job step.
@@ -570,7 +554,7 @@ void doSimpleScalarFilter(ParseTree* p, JobInfo& jobInfo)
 void doExistsFilter(const ParseTree* p, JobInfo& jobInfo)
 {
 	const ExistsFilter* ef = dynamic_cast<const ExistsFilter*>(p->data());
-	idbassert(ef != NULL);
+	assert(ef != NULL);
 	if (ef->correlated())
 		doCorrelatedExists(ef, jobInfo);
 	else
@@ -581,7 +565,7 @@ void doExistsFilter(const ParseTree* p, JobInfo& jobInfo)
 void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 {
 	const SelectFilter* sf = dynamic_cast<const SelectFilter*>(p->data());
-	idbassert(sf != NULL);
+	assert(sf != NULL);
 
 	SErrorInfo status(jobInfo.status);
 	SubQueryTransformer transformer(&jobInfo, status);
@@ -646,7 +630,7 @@ void doSelectFilter(const ParseTree* p, JobInfo& jobInfo)
 void preprocessHavingClause(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 {
 	ParseTree* havings = (csep->having());
-	idbassert(havings != NULL); // check having exists before calling this function.
+	assert(havings != NULL); // check having exists before calling this function.
 
 	// check select filter in having
 	havings->walk(sfInHaving, &jobInfo);
@@ -716,15 +700,9 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 			CalpontSystemCatalog::ColType ct;
 			string alias(extractTableAlias(sc));
 			string view(sc->viewName());
-			string schema(sc->schemaName());
-//			string name(sc->columnName());
 			if (!sc->schemaName().empty())
 			{
-				ct = sc->colType();
-//XXX use this before connector sets colType in sc correctly.
-				if (sc->isInfiniDB())
-					ct = jobInfo.csc->colType(sc->oid());
-//X
+				ct = jobInfo.csc->colType(oid);
 				dictOid = isDictCol(ct);
 			}
 			else
@@ -738,15 +716,15 @@ void addOrderByAndLimit(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo)
 					sc->oid((tblOid+1) + sc->colPosition());
 				}
 				oid = sc->oid();
-				ct = jobInfo.vtableColTypes[UniqId(oid, alias, schema, view)];
+				ct = jobInfo.vtableColTypes[UniqId(oid, alias, view)];
 			}
 
-			tupleKey = getTupleKey(jobInfo, sc);
+			tupleKey = getTupleKey(jobInfo, oid, alias, view);
 
 			// for dictionary columns, replace the token oid with string oid
 			if (dictOid > 0)
 			{
-				tupleKey = jobInfo.keyInfo->dictKeyMap[tupleKey];
+				tupleKey = getTupleKey(jobInfo, dictOid, alias, view, sc->alias());
 			}
 		}
 		else
@@ -776,20 +754,6 @@ void preprocessSelectSubquery(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo
 	}
 }
 
-
-SJSTEP doUnionSub(CalpontExecutionPlan* ep, JobInfo& jobInfo)
-{
-	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(ep);
-	SErrorInfo status(jobInfo.status);
-	SubQueryTransformer transformer(&jobInfo, status);
-	transformer.setVarbinaryOK();
-	SJSTEP subQueryStep = transformer.makeSubQueryStep(csep, false);
-	SJSTEP subAd(new SubAdapterStep(jobInfo.sessionId,
-									jobInfo.txnId,
-									jobInfo.statementId,
-									subQueryStep));
-	return subAd;
-}
 
 }
 // vim:ts=4 sw=4:

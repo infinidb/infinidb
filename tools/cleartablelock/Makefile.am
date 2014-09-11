@@ -23,9 +23,9 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = cleartablelock
-cleartablelock_SOURCES = cleartablelock.cpp cleartablelockthread.cpp
+cleartablelock_SOURCES = cleartablelock.cpp
 cleartablelock_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-cleartablelock_LDFLAGS = @idb_common_ldflags@ @idb_exec_libs@ -lwriteengine -lcacheutils $(AM_LDFLAGS)
+cleartablelock_LDFLAGS = @idb_common_ldflags@ @idb_exec_libs@ -lwriteengine -lcacheutils -ldm $(AM_LDFLAGS)
 
 test:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: rollback.cpp 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: rollback.cpp 1266 2011-02-08 14:36:09Z rdempsey $
  *
  ****************************************************************************/
 
@@ -29,7 +29,14 @@
  * 		rollback -r transID  	(for each one to roll them back)
  */
 
-#include "dbrm.h"
+#include "brmtypes.h"
+#include "rwlock.h"
+#include "mastersegmenttable.h"
+#include "extentmap.h"
+#include "copylocks.h"
+#include "vss.h"
+#include "vbbm.h"
+#include "blockresolutionmanager.h"
 
 #include <iostream>
 #include <stdlib.h>
@@ -52,7 +59,7 @@ void help(string name)
 
 void printTxnIDs() 
 {
-	DBRM brm;
+	BlockResolutionManager brm;
 	set<VER_t> txnList;
 	set<VER_t>::iterator it;
 	int err;
@@ -67,7 +74,7 @@ void printTxnIDs()
 
 void rollbackTxn(VER_t txnID)
 {
-	DBRM brm;
+	BlockResolutionManager brm;
 	vector<LBID_t> lbidList;
 	int err;
 

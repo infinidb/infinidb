@@ -30,7 +30,7 @@
 
 #include "rwlock.h"
 
-#if defined(_MSC_VER) && defined(xxxRWLOCKMONITOR_DLLEXPORT)
+#if defined(_MSC_VER) && defined(RWLOCKMONITOR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

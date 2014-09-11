@@ -193,10 +193,10 @@ const int FileBufferMgr::insert(const BRM::LBID_t lbid, const BRM::VER_t ver, co
 		HashObject_t lastFB = {fbdata.lbid, fbdata.ver, 0};
 		filebuffer_uset_iter_t iter = fbSet.find( lastFB ); //should be there
 
-		idbassert(iter != fbSet.end());
+		assert(iter != fbSet.end());
 		pi = iter->poolIdx;
-		idbassert(pi < maxCacheSize());
-		idbassert(pi < fFBPool.size());
+		assert(pi < maxCacheSize());
+		assert(pi < fFBPool.size());
 
 		/* Why does this iterator return a const HashObject_t? */
 		HashObject_t &ref = const_cast<HashObject_t &>(*pr.first);
@@ -237,15 +237,15 @@ const int FileBufferMgr::insert(const BRM::LBID_t lbid, const BRM::VER_t ver, co
 		ret=1;
 	}
 
-	idbassert(pi < fFBPool.size());
+	assert(pi < fFBPool.size());
 	fFBPool[pi].listLoc(fbList.begin());
 
 	if (gPMProfOn && gPMStatsPtr)
 		gPMStatsPtr->markEvent(lbid, pthread_self(), gSession, 'J');
 
-	idbassert(fCacheSize <= maxCacheSize());
-// 	idbassert(fCacheSize == fbSet.size());
-// 	idbassert(fCacheSize == fbList.size());
+	assert(fCacheSize <= maxCacheSize());
+// 	assert(fCacheSize == fbSet.size());
+// 	assert(fCacheSize == fbList.size());
 	return ret;
 }
 
@@ -258,9 +258,9 @@ void FileBufferMgr::depleteCache()
 		HashObject_t lastFB = {fbdata.lbid, fbdata.ver, 0};
 		filebuffer_uset_iter_t iter = fbSet.find( lastFB ); 
 
-		idbassert(iter != fbSet.end());
+		assert(iter != fbSet.end());
 		uint32_t idx = iter->poolIdx;
-		idbassert(idx < fFBPool.size());
+		assert(idx < fFBPool.size());
 		//Save position in FileBuffer pool for reuse.
 		fEmptyPoolSlots.push_back(idx);
 		fbSet.erase(iter);

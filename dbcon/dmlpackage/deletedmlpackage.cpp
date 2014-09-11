@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletedmlpackage.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: deletedmlpackage.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -71,7 +71,7 @@ int DeleteDMLPackage::write(messageqcpp::ByteStream& bytestream)
     }
     if(fHasFilter)
     {
-        bytestream += *(fPlan.get());
+        fPlan->serialize(bytestream);
     }
 
     return retval;
@@ -101,9 +101,12 @@ int DeleteDMLPackage::read(messageqcpp::ByteStream& bytestream)
     retval = fTable->read(bytestream);
     if(fHasFilter)
     {
-         fPlan.reset(new messageqcpp::ByteStream(bytestream));
+        if(fPlan != 0)
+            delete fPlan;
+        fPlan = new execplan::CalpontSelectExecutionPlan();
+        if(fPlan)
+            fPlan->unserialize(bytestream);
     }
-
     return retval;
 }
 

@@ -17,8 +17,7 @@
 
 # $Id: Makefile.am 878 2009-04-03 20:34:32Z rdempsey $
 
-SUBDIRS = shared dictionary xml wrapper bulk client redistribute splitter \
-	server
+SUBDIRS = shared dictionary xml wrapper bulk
 
 test:
 

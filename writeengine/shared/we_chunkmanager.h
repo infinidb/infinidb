@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.h 4395 2012-12-13 21:10:31Z chao $
+//  $Id: we_chunkmanager.h 4442 2013-01-14 13:59:57Z rdempsey $
 
 
 /** @file */
@@ -236,9 +236,8 @@ public:
 
 	// @brief Use this flag to flush chunk when is full.
     void setIsInsert(bool isInsert) { fIsInsert = isInsert; }
-    bool getIsInsert() { return fIsInsert; }
 	
-    void setTransId(const TxnID& transId) { fTransId = transId; }
+	void setTransId(const TxnID& transId) { fTransId = transId; }
 
 protected:
     // @brief Retrieve pointer to a compressed DB file.
@@ -318,6 +317,7 @@ protected:
     bool                                        fIsBulkLoad;
 	bool                                        fDropFdCache;
 	bool 										fIsInsert;
+	bool 										fIsDctnry;
     FileOp*                                     fFileOp;
     compress::IDBCompressInterface              fCompressor;
 

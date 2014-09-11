@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmlop.cpp 4200 2012-09-24 15:28:27Z dcathey $
+* $Id: we_xmlop.cpp 2972 2011-05-17 20:50:24Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -104,33 +104,9 @@ bool XMLOp::getNodeAttribute( xmlNode* pNode, const char* pTag,
 }
 
 //------------------------------------------------------------------------------
-// Get node attribute value for strings
-// pNode - current node
-// pTag - compare tag
-// dataType - column data type
-// pVal (output) - return value buffer
-// returns TRUE if found, FALSE otherwise
-//------------------------------------------------------------------------------
-bool XMLOp::getNodeAttributeStr( xmlNode* pNode, const char* pTag,
-    std::string& strVal ) const
-{
-    xmlChar* pTmp = NULL;
-    bool     bFound = false;
-
-    pTmp = xmlGetProp( pNode, (xmlChar*) pTag );
-    if( pTmp ) {
-        bFound = true;
-        strVal = (char*)pTmp;
-        xmlFree( pTmp );
-    } // end if 
-
-    return bFound;
-}
-
-//------------------------------------------------------------------------------
 // Get node element content
 // pNode - current node
-// pVal - return value
+// pTag - compare tag
 // dataType - column data type
 // returns TRUE if found, FALSE otherwise
 //------------------------------------------------------------------------------
@@ -148,29 +124,6 @@ bool XMLOp::getNodeContent( const xmlNode* pNode, void* pVal,
             strcpy( buf, (char*) pTmp );
             xmlFree( pTmp );
             convertNodeValue( pVal, buf, dataType );
-        }
-    }
-
-    return bFound;      
-}
-
-//------------------------------------------------------------------------------
-// Get node element content for strings
-// pNode - current node
-// strVal - return value
-// returns TRUE if found, FALSE otherwise
-//------------------------------------------------------------------------------
-bool XMLOp::getNodeContentStr( const xmlNode* pNode, std::string& strVal)
-{
-    xmlChar* pTmp = NULL;
-    bool     bFound = false;
-
-    if( pNode->children != NULL ) {
-        pTmp = xmlNodeGetContent( pNode->children );
-        if( pTmp ) {
-            bFound = true;
-            strVal = (char*)pTmp;
-            xmlFree( pTmp );
         }
     }
 

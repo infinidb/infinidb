@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: funchelpers.h 3580 2013-02-12 23:15:56Z rdempsey $
+//  $Id: funchelpers.h 2817 2011-07-25 22:59:43Z xlou $
 
 /** @file */
 
@@ -29,9 +29,13 @@
 
 #define ULONGLONG_MAX ulonglong_max
 
+
 namespace funcexp
 {
-
+static unsigned long lfactor[9]=
+{
+  1L, 10L, 100L, 1000L, 10000L, 100000L, 1000000L, 10000000L, 100000000L
+};
 // 10 ** i
 const int64_t powerOf10_c[] = {
 	1ll,
@@ -430,55 +434,44 @@ inline int  getNumbers( const string expr, int *array, string funcType)
 	if ( expr.size() == 0 )
 		return 0;
 
-	// @bug 4703 reworked this code to avoid use of incrementally
-	//           built string to hold temporary values while
-	//           scanning expr for numbers.  This function is now
-	//           covered by a unit test in tdriver.cpp
-	bool foundNumber = false;
-	int  number = 0;
-	int  neg = 1;
+	string number = "";
 	for ( unsigned int i=0 ; i < expr.size() ; i++ )
 	{
-		char value = expr[i];
-		if ( (value >= '0' && value <= '9') )
-		{
-			foundNumber = true;
-			number = ( number * 10 ) + ( value - '0' );
-		}
-		else if ( value == '-' && !foundNumber )
-		{
-			neg = -1;
-		}
-		else if ( value == '-')
-		{
-			// this is actually an error condition - it means that
-			// input came in with something like NN-NN (i.e. a dash
-			// between two numbers.  To match prior code we will
-			// return the number up to the dash and just return
-			array[index] = number * funcNeg * neg;
-			index++;
-
-			return index;
-		}
+		string value = expr.substr(i,1);
+		if ( (value >= "0" && value <= "9") ||
+				value == "-" )
+			number = number + value;
 		else
 		{
-			if ( foundNumber )
-			{
-				array[index] = number * funcNeg * neg;
-				number = 0;
-				neg = 1;
+			if ( !number.empty() ) {
+				array[index] = atoi(number.c_str()) * funcNeg;
+				number = "";
 				index++;
 
 				if ( index > 9 )
-					return index;
+					return true;
 			}
 		}
 	}
 
-	if ( foundNumber )
-	{
-		array[index] = number * funcNeg * neg;
+	if ( !number.empty() ) {
+		int neg = 1;
+		unsigned int i=0;
+		for (  ; i < number.size() ; i++ )
+		{
+			if ( number.substr(i,1) == "-" )
+				neg = -neg;
+			else
+				break;
+		}
+
+		if ( i == number.size() )
+			i = 0;
+
+		array[index] = atoi(number.substr(i,80).c_str()) * neg * funcNeg;
 		index++;
+		if ( index > 9 )
+			return true;
 	}
 
 	return index;
@@ -1126,6 +1119,172 @@ inline uint64_t dateAdd( uint64_t time, string expr, string unit, bool dateType,
 	return value;
 
 }
+
+inline long long infinidb_strtoll10(const char *nptr, char **endptr, int *error)
+{
+  const char *s, *end, *start, *n_end, *true_end;
+  char *dummy;
+  unsigned char c;
+  unsigned long i, j, k;
+  unsigned long long li;
+  int negative;
+  unsigned long cutoff, cutoff2, cutoff3;
+
+  s= nptr;
+  /* If fixed length string */
+  if (endptr)
+  {
+    end= *endptr;
+    while (s != end && (*s == ' ' || *s == '\t'))
+      s++;
+    if (s == end)
+      goto no_conv;
+  }
+  else
+  {
+    endptr= &dummy;				/* Easier end test */
+    while (*s == ' ' || *s == '\t')
+      s++;
+    if (!*s)
+      goto no_conv;
+    /* This number must be big to guard against a lot of pre-zeros */
+    end= s+65535;				/* Can't be longer than this */
+  }
+
+  /* Check for a sign.	*/
+  negative= 0;
+  if (*s == '-')
+  {
+    *error= -1;					/* Mark as negative number */
+    negative= 1;
+    if (++s == end)
+      goto no_conv;
+	  
+    cutoff=  MAX_NEGATIVE_NUMBER / LFACTOR2;
+    cutoff2= (MAX_NEGATIVE_NUMBER % LFACTOR2) / 100;
+    cutoff3=  MAX_NEGATIVE_NUMBER % 100;
+  }
+  else
+  {
+    *error= 0;
+    if (*s == '+')
+    {
+      if (++s == end)
+	goto no_conv;
+    }
+    cutoff=  ULONGLONG_MAX / LFACTOR2;
+    cutoff2= ULONGLONG_MAX % LFACTOR2 / 100;
+    cutoff3=  ULONGLONG_MAX % 100;
+  }
+
+  /* Handle case where we have a lot of pre-zero */
+  if (*s == '0')
+  {
+    i= 0;
+    do
+    {
+      if (++s == end)
+	goto end_i;				/* Return 0 */
+    }
+    while (*s == '0');
+    n_end= s+ INIT_CNT;
+  }
+  else
+  {
+    /* Read first digit to check that it's a valid number */
+    if ((c= (*s-'0')) > 9)
+      goto no_conv;
+    i= c;
+    n_end= ++s+ INIT_CNT-1;
+  }
+
+  /* Handle first 9 digits and store them in i */
+  if (n_end > end)
+    n_end= end;
+  for (; s != n_end ; s++)
+  {
+    if ((c= (*s-'0')) > 9)
+      goto end_i;
+    i= i*10+c;
+  }
+  if (s == end)
+    goto end_i;
+
+  /* Handle next 9 digits and store them in j */
+  j= 0;
+  start= s;				/* Used to know how much to shift i */
+  n_end= true_end= s + INIT_CNT;
+  if (n_end > end)
+    n_end= end;
+  do
+  {
+    if ((c= (*s-'0')) > 9)
+      goto end_i_and_j;
+    j= j*10+c;
+  } while (++s != n_end);
+  if (s == end)
+  {
+    if (s != true_end)
+      goto end_i_and_j;
+    goto end3;
+  }
+  if ((c= (*s-'0')) > 9)
+    goto end3;
+
+  /* Handle the next 1 or 2 digits and store them in k */
+  k=c;
+  if (++s == end || (c= (*s-'0')) > 9)
+    goto end4;
+  k= k*10+c;
+  *endptr= (char*) ++s;
+
+  /* number string should have ended here */
+  if (s != end && (c= (*s-'0')) <= 9)
+    goto overflow;
+
+  /* Check that we didn't get an overflow with the last digit */
+  if (i > cutoff || (i == cutoff && ((j > cutoff2 || j == cutoff2) &&
+                                     k > cutoff3)))
+    goto overflow;
+  li=i*LFACTOR2+ (unsigned long long) j*100 + k;
+  return (long long) li;
+
+overflow:					/* *endptr is set here */
+  *error= -1;
+  return negative ? LONGLONG_MIN : (long long) ULONGLONG_MAX;
+
+end_i:
+  *endptr= (char*) s;
+  return (negative ? ((long long) -(long) i) : (long long) i);
+
+end_i_and_j:
+  li= (unsigned long long) i * lfactor[(uint) (s-start)] + j;
+  *endptr= (char*) s;
+  return (negative ? -((long long) li) : (long long) li);
+
+end3:
+  li=(unsigned long long) i*LFACTOR+ (unsigned long long) j;
+  *endptr= (char*) s;
+  return (negative ? -((long long) li) : (long long) li);
+
+end4:
+  li=(unsigned long long) i*LFACTOR1+ (unsigned long long) j * 10 + k;
+  *endptr= (char*) s;
+  if (negative)
+  {
+   if (li > MAX_NEGATIVE_NUMBER)
+     goto overflow;
+   return -((long long) li);
+  }
+  return (long long) li;
+
+no_conv:
+  /* There was no number to convert.  */
+  *error= -1;
+  *endptr= (char *) nptr;
+  return 0;
+}
+
 
 }
 

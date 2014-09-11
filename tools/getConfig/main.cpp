@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
-* $Id: main.cpp 1927 2012-09-13 16:27:42Z rdempsey $
+* $Id: main.cpp 1397 2011-02-03 17:56:12Z rdempsey $
 *
 *****************************************************************************/
 #include <iostream>
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	Config* cf;
+	const Config* cf;
 	if (configFile.length() > 0)
 		cf = Config::makeConfig(configFile);
 	else

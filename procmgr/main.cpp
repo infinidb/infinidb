@@ -1,5 +1,5 @@
 /*****************************************************************************************
-* $Id: main.cpp 2205 2013-07-08 20:14:08Z bpaul $
+* $Id: main.cpp 1674 2012-04-19 19:42:54Z dhill $
 *
 *****************************************************************************************/
 
@@ -7,9 +7,6 @@
 #include <clocale>
 
 #include "processmanager.h"
-#include "installdir.h"
-
-#include "utils_utf8.h"
 
 using namespace std;
 using namespace logging;
@@ -23,17 +20,9 @@ using namespace config;
 
 bool runStandby = false;
 bool runCold = false;
+bool gsharedNothingFlag;
 string systemName = "system";
 string iface_name;
-string cloud;
-string PMInstanceType;
-string UMInstanceType;
-string GlusterConfig = "n";
-bool rootUser = true;
-string USER = "root";
-
-typedef   map<string, int>	moduleList;
-moduleList	moduleInfoList;
 
 extern HeartBeatProcList hbproclist;
 extern pthread_mutex_t THREAD_LOCK;
@@ -44,7 +33,6 @@ extern vector<string> downModuleList;
 extern bool startFailOver;
 extern bool gOAMParentModuleFlag;
 
-static void messageThread(Configuration config);
 static void sigUser1Handler(int sig);
 static void startMgrProcessThread();
 //static void pingDeviceThread();
@@ -59,25 +47,20 @@ static void startMgrProcessThread();
 *****************************************************************************************/
 int main(int argc, char **argv)
 {
-#ifndef _MSC_VER
-    setuid(0); // set effective ID to root; ignore return status
-#endif
 	// get and set locale language
 	string systemLang = "C";
 
 	Oam oam;
-	systemLang = funcexp::utf8::idb_setlocale();
+	try
+	{
+		oam.getSystemConfig("SystemLang", systemLang);
+	}
+	catch(...)
+	{
+		systemLang = "C";
+	}
 
-	//check if root-user
-	int user;
-	user = getuid();
-	if (user != 0)
-		rootUser = false;
-
-	char* p= getenv("USER");
-	if (p && *p)
-   		USER = p;
-
+	setlocale(LC_ALL, systemLang.c_str());
 
 	ProcessLog log;
 	Configuration config;
@@ -87,15 +70,6 @@ int main(int argc, char **argv)
 	log.writeLog(__LINE__, " ");
 	log.writeLog(__LINE__, "**********Process Manager Started**********");
 
-	//Ignore SIGPIPE signals
-	signal(SIGPIPE, SIG_IGN);
-
-	//Ignore SIGHUP signals
-	signal(SIGHUP, SIG_IGN);
-
-	//create SIGUSR1 handler to get configuration updates
-	signal(SIGUSR1, sigUser1Handler);
-
 	// Get System Name
 	try{
 		oam.getSystemConfig("SystemName", systemName);
@@ -103,26 +77,20 @@ int main(int argc, char **argv)
 	catch(...)
 	{}
 
-	//get cloud setting
-	try {
-		oam.getSystemConfig( "Cloud", cloud);
-	}
-	catch(...) {}
+	// Get Shared-Nothing Storage Type
+	try{
+		string sharedNothing;
+		oam.getSystemConfig("SharedNothing", sharedNothing);
 
-	//get amazon parameters
-	if ( cloud == "amazon" )
-	{
-		oam.getSystemConfig("PMInstanceType", PMInstanceType);
-		oam.getSystemConfig("UMInstanceType", UMInstanceType);
-	}
-
-	//get gluster config
-	try {
-		oam.getSystemConfig( "GlusterConfig", GlusterConfig);
+		if ( sharedNothing == "y" )
+			gsharedNothingFlag = true;
+		else
+			gsharedNothingFlag = false;
 	}
 	catch(...)
 	{
-		GlusterConfig = "n";
+		cout << endl << "**** Failed : Failed to read SharedNothing Name" << endl;
+		exit(-1);
 	}
 
 	// get system uptime and alarm if this is a restart after module outage
@@ -172,7 +140,16 @@ int main(int argc, char **argv)
 		{
 			log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemStatus: Caught unknown exception!", LOG_TYPE_ERROR);
 		}
-	}
+		
+/*		if (systemstatus.SystemOpState == oam::ACTIVE ) {
+			//set system setup of auto-offline
+			processManager.setSystemState(oam::AUTO_OFFLINE);
+
+			//issue alarm
+			string s = "System";			
+			aManager.sendAlarmReport(s.c_str(), SYSTEM_DOWN_AUTO, SET);
+		}
+*/	}
 	else
 	{
 		log.writeLog(__LINE__, "Running Standby");
@@ -205,7 +182,7 @@ int main(int argc, char **argv)
 		}
 	}
 	freeifaddrs(addrs);
-	log.writeLog(__LINE__, "Main Ethernet Port = " + iface_name, LOG_TYPE_DEBUG);
+	log.writeLog(__LINE__, "Main Etherner Port = " + iface_name, LOG_TYPE_DEBUG);
 
 	//
 	//start a thread to ping all system modules
@@ -226,11 +203,8 @@ int main(int argc, char **argv)
 			log.writeLog(__LINE__, "EXCEPTION ERROR on processInitComplete: Caught unknown exception!", LOG_TYPE_ERROR);
 		}
 
-		// create message thread
-		pthread_t MessageThread;
-		int ret = pthread_create (&MessageThread, NULL, (void*(*)(void*)) &messageThread, &config);
-		if ( ret != 0 )
-			log.writeLog(__LINE__, "pthread_create failed, return code = " + oam.itoa(ret), LOG_TYPE_ERROR);
+		//create SIGHUP handler to get configuration updates
+		signal(SIGUSR1, sigUser1Handler);
 
 		//monitor OAM Parent Module for failover
 		while(true)
@@ -251,7 +225,6 @@ int main(int argc, char **argv)
 	{ //running active after startup
 		//Update DBRM section of Calpont.xml
 		processManager.updateWorkerNodeconfig();
-		processManager.distributeConfigFile("system");
 
 		pthread_t srvThread;
 		int status = pthread_create (&srvThread, NULL, (void*(*)(void*)) &pingDeviceThread, NULL);
@@ -297,46 +270,6 @@ int main(int argc, char **argv)
 		{
 			log.writeLog(__LINE__, "EXCEPTION ERROR on processInitComplete: Caught unknown exception!", LOG_TYPE_ERROR);
 		}
-
-		//make sure ProcMgr IP Address is configured correctly
-		try
-		{
-			Config* sysConfig = Config::makeConfig();
-		
-			// get Standby IP address
-			ModuleConfig moduleconfig;
-			oam.getSystemConfig(config.moduleName(), moduleconfig);
-			HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-			string IPaddr = (*pt1).IPAddr;
-	
-			sysConfig->setConfig("ProcMgr", "IPAddr", IPaddr);
-	
-			log.writeLog(__LINE__, "set ProcMgr IPaddr to " + IPaddr, LOG_TYPE_DEBUG);
-			//update Calpont Config table
-			try {
-				sysConfig->write();
-			}
-			catch(...)
-			{
-				log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
-			}
-		}
-		catch(...)
-		{
-			log.writeLog(__LINE__, "ERROR: makeConfig failed", LOG_TYPE_ERROR);
-		}
-	
-		try {
-			oam.distributeConfigFile();
-		}
-		catch(...) 
-		{}
-
-		// create message thread
-		pthread_t MessageThread;
-		int ret = pthread_create (&MessageThread, NULL, (void*(*)(void*)) &messageThread, &config);
-		if ( ret != 0 )
-			log.writeLog(__LINE__, "pthread_create failed, return code = " + oam.itoa(ret), LOG_TYPE_ERROR);
 	}
 
 	//
@@ -351,44 +284,45 @@ int main(int argc, char **argv)
 //	pthread_t heartMsgThread;
 //	pthread_create (&heartMsgThread, NULL, (void*(*)(void*)) &heartbeatMsgThread, NULL);
 
-	// suspend forever
-	while(true)
+	//make sure ProcMgr IP Address is configured correctly
+	try
 	{
-		sleep(1000);
+		Config* sysConfig = Config::makeConfig();
+	
+		// get Standby IP address
+		ModuleConfig moduleconfig;
+		oam.getSystemConfig(config.moduleName(), moduleconfig);
+		HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
+		string IPaddr = (*pt1).IPAddr;
+
+		sysConfig->setConfig("ProcMgr", "IPAddr", IPaddr);
+
+		log.writeLog(__LINE__, "set ProcMgr IPaddr to " + IPaddr, LOG_TYPE_DEBUG);
+		//update Calpont Config table
+		try {
+			sysConfig->write();
+		}
+		catch(...)
+		{
+			log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
+		}
 	}
-}
-
-/******************************************************************************************
-* @brief	messageThread
-*
-* purpose:	Read incoming messages
-*
-******************************************************************************************/
-static void messageThread(Configuration config)
-{
-	ProcessLog log;
-	ProcessManager processManager(config, log);
-	Oam oam;
-
-	//check for running active, then launch
-	while(true)
+	catch(...)
 	{
-		if ( !runStandby)
-			break;
-		sleep (1);
+		log.writeLog(__LINE__, "ERROR: makeConfig failed", LOG_TYPE_ERROR);
 	}
 
-	log.writeLog(__LINE__, "Message Thread started ..", LOG_TYPE_DEBUG);
+	try {
+		oam.distributeConfigFile();
+	}
+	catch(...) 
+	{}
 
 	//read and cleanup port before trying to use
 	try {
 		Config* sysConfig = Config::makeConfig();
 		string port = sysConfig->getConfig("ProcMgr", "Port");
 		string cmd = "fuser -k " + port + "/tcp >/dev/null 2>&1";
-		if ( !rootUser)
-			cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
-
-
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -419,7 +353,6 @@ static void messageThread(Configuration config)
 				}
 				catch(...)
 				{}
-
 			}
 		}
         catch (exception& ex)
@@ -438,11 +371,11 @@ static void messageThread(Configuration config)
 			sleep(60);
         }
 	}
-	return;
+	return 0;
 }
 
 /******************************************************************************************
-* @brief	sigUser1Handler
+* @brief	sigHupHandler
 *
 * purpose:	Handler SIGUSER1 signal and initial failover
 *
@@ -453,10 +386,11 @@ static void sigUser1Handler(int sig)
 	Configuration config;
 	ProcessManager processManager(config, log);
 	Oam oam;
-	log.writeLog(__LINE__, "SIGUSER1 received, set startFailOver = true", LOG_TYPE_DEBUG);
+	log.writeLog(__LINE__, "SIGUSER1 Thread started ..", LOG_TYPE_DEBUG);
 
 	startFailOver = true;
 }
+
 
 /*****************************************************************************************
 * @brief	Start Mgr Process by module Thread
@@ -609,7 +543,7 @@ static void startMgrProcessThread()
 	//now wait until all procmons are up and validate rpms on each module
 	int status = API_SUCCESS;
 	int k = 0;
-	for( ; k < 1200 ; k++ )
+	for( ; k < 100 ; k++ )
 	{
 		if ( startsystemthreadStop ) {
 			processManager.setSystemState(oam::MAN_OFFLINE);
@@ -676,26 +610,27 @@ static void startMgrProcessThread()
 						//skip
 						continue;
 
-					//validate the software release and version of that module
-					ByteStream msg;
-					ByteStream::byte requestID = GETSOFTWAREINFO;
-					msg << requestID;
-	
-					string moduleSoftwareInfo = processManager.sendMsgProcMon1( moduleName, msg, requestID );
-					if ( moduleSoftwareInfo == "FAILED" ) {
-						status = API_FAILURE;
-						break;
-					}
+					if ( moduleName.find("xm") != 0 ) {
+						//validate the software release and version of that module
+						ByteStream msg;
+						ByteStream::byte requestID = GETSOFTWAREINFO;
+						msg << requestID;
+		
+						string moduleSoftwareInfo = processManager.sendMsgProcMon1( moduleName, msg, requestID );
+						if ( moduleSoftwareInfo == "FAILED" )
+							continue;
 
-					if ( localSoftwareInfo != moduleSoftwareInfo ) {
-						// module not running on same Calpont Software build as this local Director
-						// alarm and fail the module
-						log.writeLog(__LINE__, "Software Info mismatch : " + moduleName + "/" + localSoftwareInfo + "/" + moduleSoftwareInfo, LOG_TYPE_ERROR);	
+						if ( localSoftwareInfo != moduleSoftwareInfo ) {
+							// module not running on same Calpont Software build as this local Director
+							// alarm and fail the module
+							log.writeLog(__LINE__, "Software Info mismatch : " + moduleName + "/" + localSoftwareInfo + "/" + moduleSoftwareInfo, LOG_TYPE_ERROR);	
 
-						aManager.sendAlarmReport(moduleName.c_str(), INVALID_SW_VERSION, SET);
-						processManager.setModuleState(moduleName, oam::FAILED);
-						status = API_FAILURE;
-						break;
+							aManager.sendAlarmReport(moduleName.c_str(), INVALID_SW_VERSION, SET);
+							processManager.setModuleState(moduleName, oam::FAILED);
+							continue;
+						}
+//						else
+//							aManager.sendAlarmReport(moduleName.c_str(), INVALID_SW_VERSION, CLEAR);
 					}
 				}
 				catch (exception& ex)
@@ -729,13 +664,12 @@ static void startMgrProcessThread()
 		}
 	}
 
-	if ( k == 1200 || status == API_FAILURE) {
+	if ( k == 100 || status == API_FAILURE) {
 		// system didn't successfull restart
 		processManager.setSystemState(oam::FAILED);
 		// exit thread
 		log.writeLog(__LINE__, "startMgrProcessThread Exit with a failure, not all ProcMons ACTIVE", LOG_TYPE_CRITICAL);
-		system("/etc/init.d/infinidb stop");
-		exit(1);
+		pthread_exit(0);
 	}
 	else
 	{
@@ -789,7 +723,6 @@ void pingDeviceThread()
 	Oam oam;
 	ModuleTypeConfig moduletypeconfig;
 	SNMPManager aManager;
-	BRM::DBRM dbrm;
 
 	log.writeLog(__LINE__, "pingDeviceThread launched", LOG_TYPE_DEBUG);
 
@@ -815,6 +748,9 @@ void pingDeviceThread()
 	{
 		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
 	}
+
+	typedef   map<string, int>	moduleList;
+	moduleList	moduleInfoList;
 
 	//Build the initial list, clear module state 
 
@@ -893,12 +829,13 @@ void pingDeviceThread()
 
 	bool LANOUTAGEACTIVE = false;
 	bool HOTSTANDBYACTIVE = false;
-	bool downActiveOAMModule = false;
 
 	// monitor module and external device loop
 
 	while (true)
 	{
+//		pthread_mutex_lock(&THREAD_LOCK);
+
 		//check if license has expired
 		oam::LicenseKeyChecker keyChecker;
 
@@ -970,7 +907,7 @@ void pingDeviceThread()
 		}
 		else
 		{
-			if ( !enableModuleMonitor && moduleInfoList.size() > 1 )
+			if ( !enableModuleMonitor )
 				log.writeLog(__LINE__, "ModuleHeartbeatPeriod set to enabled", LOG_TYPE_DEBUG);
 			enableModuleMonitor = true;
 		}
@@ -1062,14 +999,12 @@ void pingDeviceThread()
 				for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
 				{
 					string moduleName = (*pt).DeviceName;
-					string ipAddr;
-					string hostName;
 					int moduleState = oam::INITIAL;
 					HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
 					for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
 					{
-						ipAddr = (*pt1).IPAddr;
-						hostName = (*pt1).HostName;
+						string ipAddr = (*pt1).IPAddr;
+						string hostName = (*pt1).HostName;
 	
 						if (enableModuleMonitor)
 						{
@@ -1161,9 +1096,8 @@ void pingDeviceThread()
 					}
 	
 					// skip module check if not inuse or in FAILED state
-					if (opState == oam::MAN_OFFLINE || 
-						opState == oam::MAN_DISABLED ||
-						opState == oam::FAILED)
+					if (opState == oam::MAN_OFFLINE || opState == oam::MAN_DISABLED
+						|| opState == oam::FAILED)
 						continue;
 	
 					//fast track a restart of a downed failover modules
@@ -1171,7 +1105,6 @@ void pingDeviceThread()
 						moduleInfoList[moduleName] = ModuleHeartbeatCount-1;
 						gdownActiveOAMModule.clear();
 						moduleState = oam::DOWN;
-						downActiveOAMModule = true;
 					}
 	
 					vector<string>::iterator pt2 = downModuleList.begin();
@@ -1187,19 +1120,15 @@ void pingDeviceThread()
 					}
 	
 					switch (moduleState){
-						case oam::DEGRADED:
-							// do nothing for now
-							break;
 						case oam::UP:
-// comment out, only come up when both nic are up, if not the pms list will not have the second nic in there
-//						case oam::DEGRADED:
+						case oam::DEGRADED:
 							if (opState == oam::DOWN || opState == oam::INITIAL
 								|| opState == oam::AUTO_DISABLED)
 							{
 								//Set the module state to up
 								processManager.setModuleState(moduleName, moduleState);
 							}
-
+		
 							if ( moduleName == config.OAMStandbyName() )
 								HOTSTANDBYACTIVE = true;
 	
@@ -1211,134 +1140,20 @@ void pingDeviceThread()
 								opState == oam::DOWN || opState == oam::AUTO_DISABLED)
 							{
 								log.writeLog(__LINE__, "Module alive, bring it back online: " + moduleName, LOG_TYPE_DEBUG);
-
-								// skip module check if DMLProc is BUSY_INIT (rollback)
-								SystemProcessStatus systemprocessstatus;
-								ProcessStatus processstatus;
-
-								bool busy = false;
-								try {
-									oam.getProcessStatus(systemprocessstatus);
-								
-									for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
-									{
-										if ( systemprocessstatus.processstatus[i].ProcessName == "DMLProc" &&
-											systemprocessstatus.processstatus[i].ProcessOpState == oam::BUSY_INIT) {
-											log.writeLog(__LINE__, "DMLProc in BUSY_INIT, skip bringing module online " + moduleName, LOG_TYPE_DEBUG);
-											busy = true;
-											break;
-										}
-									}
-								}
-								catch(...)
-								{}
-
-								if (busy)
-									break;
-
-								processManager.reinitProcessType("cpimport");
-
-								// halt the dbrm
-								oam.dbrmctl("halt");
-								log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
-
 								aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, CLEAR);
 				
+								int status;
+
 								//send notification
 								oam.sendDeviceNotification(config.moduleName(), MODULE_UP);
 
 								//set module to enable state
 								processManager.enableModule(moduleName, oam::AUTO_OFFLINE);
 
-								int status;
-	
-								// if pm, move dbroots back to pm
-								if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
-									( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
-									downActiveOAMModule = false;
-									try {
-										log.writeLog(__LINE__, "Call autoUnMovePmDbroot", LOG_TYPE_DEBUG);
-										oam.autoUnMovePmDbroot(moduleName);
-
-										//check if any dbroots got assigned back to this module
-										// they could not be moved if there were busy on other pms
-										DBRootConfigList dbrootConfigList;
-										try
-										{
-											int moduleID = atoi(moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-											oam.getPmDbrootConfig(moduleID, dbrootConfigList);
-							
-											if (  dbrootConfigList.size() == 0 )
-											{
-												// no dbroots, fail module
-												log.writeLog(__LINE__, "autoUnMovePmDbroot left no dbroots mounted, failing module restart: " + moduleName, LOG_TYPE_WARNING);
-		
-												//Issue an alarm 				
-												aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, SET);
-						
-												//set module to disable state
-												processManager.disableModule(moduleName, true);
-		
-												//call dbrm control
-												oam.dbrmctl("reload");
-												log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
-	
-												// resume the dbrm
-												oam.dbrmctl("resume");
-												log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-
-												//clear count
-												moduleInfoList[moduleName] = 0;
-	
-												break;
-											}
-										}
-										catch(...)
-										{}
-
-										log.writeLog(__LINE__, "autoUnMovePmDbroot success", LOG_TYPE_DEBUG);
-
-										//distribute config file
-										processManager.distributeConfigFile("system");	
-									}
-									catch(...)
-									{
-										log.writeLog(__LINE__, "autoUnMovePmDbroot: Failed. Fail Module", LOG_TYPE_WARNING);
-
-										//Issue an alarm 				
-										aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, SET);
-				
-										//set module to disable state
-										processManager.disableModule(moduleName, true);
-
-										//call dbrm control
-										oam.dbrmctl("reload");
-										log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
-	
-										// resume the dbrm
-										oam.dbrmctl("resume");
-										log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-
-										//clear count
-										moduleInfoList[moduleName] = 0;
-
-										break;
-									}
-								}
-
 								//restart module processes
 								int retry = 0;
 								bool stopSuccess = false;
-
-								int ModuleProcMonWaitCount = 30;
-								try{
-									oam.getSystemConfig("ModuleProcMonWaitCount", ModuleProcMonWaitCount);
-								}
-								catch(...) {
-									ModuleProcMonWaitCount = 30;
-								}
-
-								for ( ; retry < ModuleProcMonWaitCount ; retry ++ )
+								for ( ; retry < 30 ; retry ++ )
 								{
 									// first, wait until module's ProcMon is ACTIVE
 									int opState;
@@ -1367,47 +1182,9 @@ void pingDeviceThread()
 										continue;
 									}
 
-									//check and assign Elastic IP Address
-									int AmazonElasticIPCount = 0;
-									try{
-										oam.getSystemConfig("AmazonElasticIPCount", AmazonElasticIPCount);
-									}
-									catch(...) {
-										AmazonElasticIPCount = 0;
-									}
-					
-									for ( int id = 1 ; id < AmazonElasticIPCount+1 ; id++ )
-									{
-										string AmazonElasticModule = "AmazonElasticModule" + oam.itoa(id);
-										string ELmoduleName;
-										try{
-											oam.getSystemConfig(AmazonElasticModule, ELmoduleName);
-										}
-										catch(...) {}
-					
-										if ( ELmoduleName == moduleName )
-										{	//match found assign Elastic IP Address
-											string AmazonElasticIPAddr = "AmazonElasticIPAddr" + oam.itoa(id);
-											string ELIPaddress;
-											try{
-												oam.getSystemConfig(AmazonElasticIPAddr, ELIPaddress);
-											}
-											catch(...) {}
-					
-											try{
-												oam.assignElasticIP(hostName, ELIPaddress);
-												log.writeLog(__LINE__, "Set Elastic IP Address: " + hostName + "/" + ELIPaddress, LOG_TYPE_DEBUG);
-											}
-											catch(...) {
-												log.writeLog(__LINE__, "Failed to Set Elastic IP Address: " + hostName + "/" + ELIPaddress, LOG_TYPE_ERROR);
-											}
-											break;
-										}
-									}
-
 									// next, stopmodule to start up clean
-//									if (!stopSuccess)
-//									{
+									if (!stopSuccess)
+									{
 										status = processManager.stopModule(moduleName, oam::FORCEFUL, false);
 										if ( status == oam::API_SUCCESS ) {
 											stopSuccess = true;
@@ -1428,9 +1205,14 @@ void pingDeviceThread()
 											sleep(5);
 											continue;
 										}
-//									}
+									}
 
 									// next, startmodule
+
+									// halt the dbrm
+									oam.dbrmctl("halt");
+									log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
+
 									status = processManager.startModule(moduleName, oam::FORCEFUL, oam::AUTO_OFFLINE);
 									if ( status == oam::API_SUCCESS )
 										break;
@@ -1441,23 +1223,20 @@ void pingDeviceThread()
 
 									log.writeLog(__LINE__, "startModule, failed will retry: " + moduleName, LOG_TYPE_DEBUG);
 
+									// resume the dbrm
+									oam.dbrmctl("resume");
+									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
+
 									//sleep and retry all over again
 									sleep (5);
-								} // end of the retry loop
+								} // end of the 30 retry loop
 
-								if ( retry < ModuleProcMonWaitCount )
+								if ( retry < 30 )
 								{	// module successfully started
 
 									//distribute config file
 									processManager.distributeConfigFile("system");	
-									sleep(1);
-
-									// if a PM module was started successfully, restart ACTIVE ExeMgr(s) / mysqld
-									if( moduleName.find("pm") == 0 ) {
-										processManager.restartProcessType("ExeMgr");
-										processManager.restartProcessType("mysql");
-									}
-
+	
 									//call dbrm control
 									oam.dbrmctl("reload");
 									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
@@ -1466,17 +1245,14 @@ void pingDeviceThread()
 									oam.dbrmctl("resume");
 									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
 
-									// if a PM module was started successfully, DMLProc/DDLProc
-									if( moduleName.find("pm") == 0 ) {
-										processManager.restartProcessType("DDLProc");
-										sleep(1);
-										processManager.restartProcessType("DMLProc");
-									}
-
-									processManager.setSystemState(oam::ACTIVE);
-
-									//clear count
 									moduleInfoList[moduleName] = 0;
+	
+									// if a PM module was started successfully, re-init ACTIVE ExeMgr(s)/DMLProc/DDLProc
+									if( moduleName.find("pm") == 0 ) {
+										processManager.reinitProcessType("ExeMgr");
+										processManager.reinitProcessType("DMLProc");
+										processManager.reinitProcessType("DDLProc");
+									}
 								}
 								else
 								{	// module failed to restart, place back in disabled state
@@ -1485,32 +1261,12 @@ void pingDeviceThread()
 
 									//Issue an alarm 				
 									aManager.sendAlarmReport(moduleName.c_str(), MODULE_DOWN_AUTO, SET);
-
-									// if pm, move dbroots back to pm
-									if ( ( moduleName.find("pm") == 0 && cloud != "amazon" ) ||
-										( moduleName.find("pm") == 0 && cloud == "amazon" && downActiveOAMModule ) ) {
-										//move dbroots to other modules
-										try {
-											log.writeLog(__LINE__, "Call autoMovePmDbroot", LOG_TYPE_DEBUG);
-											oam.autoMovePmDbroot(moduleName);
-											log.writeLog(__LINE__, "autoMovePmDbroot success", LOG_TYPE_DEBUG);
-											//distribute config file
-											processManager.distributeConfigFile("system");	
-										}
-										catch (exception& ex)
-										{
-											string error = ex.what();
-											log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: " + error, LOG_TYPE_DEBUG);
-										}
-										catch(...)
-										{
-											log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: Caught unknown exception!", LOG_TYPE_ERROR);
-										}
-									}
-
+				
 									//set module to disable state
-									processManager.disableModule(moduleName, true);
+									processManager.disableModule(moduleName, false);
 
+									processManager.setModuleState(moduleName, oam::FAILED);
+		
 									//call dbrm control
 									oam.dbrmctl("reload");
 									log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
@@ -1520,23 +1276,16 @@ void pingDeviceThread()
 									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
 
 									log.writeLog(__LINE__, "Module failed to auto start: " + moduleName, LOG_TYPE_CRITICAL);
-
-									if ( cloud == "amazon" )
-										processManager.setSystemState(oam::FAILED);
-									else
-										processManager.setSystemState(oam::ACTIVE);
-
-									//clear count
-									moduleInfoList[moduleName] = 0;
 								}
 							}
-
+							else
+								moduleInfoList[moduleName] = 0;
+		
 							break;
 		
 						case oam::DOWN:
-							// if disabled or initial state, skip
-							if (opState == oam::AUTO_DISABLED ||
-								opState == oam::INITIAL)
+							// if already in disabled state, skip
+							if (opState == oam::AUTO_DISABLED)
 								break;
 	
 							log.writeLog(__LINE__, "module failed to respond to pings: " + moduleName, LOG_TYPE_WARNING);
@@ -1556,17 +1305,6 @@ void pingDeviceThread()
 								//Log failure, issue alarm, set moduleOpState 
 								Configuration config;
 								log.writeLog(__LINE__, "module is down: " + moduleName, LOG_TYPE_CRITICAL);
-				
-								processManager.reinitProcessType("cpimport");
-
-								// halt the dbrm
-								oam.dbrmctl("halt");
-								log.writeLog(__LINE__, "'dbrmctl halt' done", LOG_TYPE_DEBUG);
-
-								processManager.setSystemState(oam::BUSY_INIT);
-// TEST CODE
-string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
-system(cmd.c_str());
 
 								//send notification
 								oam.sendDeviceNotification(moduleName, MODULE_DOWN);
@@ -1579,328 +1317,35 @@ system(cmd.c_str());
 	
 								//set module to disable state
 								processManager.disableModule(moduleName, false);
-
-								//call dbrm control
-								oam.dbrmctl("reload");
-								log.writeLog(__LINE__, "'dbrmctl reload' done", LOG_TYPE_DEBUG);
-
-								// if Cloud Instance
-								// state = running, then instance is rebooting, monitor for recovery
-								// state = stopped, then try starting, if fail, remove/addmodule to launch new instance
-								// state = terminate or nothing, remove/addmodule to launch new instance
-								if ( cloud == "amazon" ) {
-
-									if ( moduleName.find("um") == 0 )
-									{
-										// resume the dbrm
-										oam.dbrmctl("resume");
-										log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-		
-										//set recycle process
-										processManager.recycleProcess(moduleName);
-									}
-
-									string currentIPAddr = oam.getEC2InstanceIpAddress(hostName);
-									if (currentIPAddr == "stopped")
-									{ // start instance
-										log.writeLog(__LINE__, "Instance in stopped state, try starting it: " + hostName, LOG_TYPE_DEBUG);
-
-										int retryCount = 6;		// 1 minutes
-										if( moduleName.find("pm") == 0 )
-										{
-											if ( PMInstanceType == "m2.4xlarge" )
-												retryCount = 15;		// 2.5 minutes
-										}
-										else
-										{
-											if( moduleName.find("um") == 0 )
-												if ( UMInstanceType == "m2.4xlarge" )
-													retryCount = 15;		// 2.5 minutes
-										}
-
-										int retry = 0;
-										for (  ; retry < retryCount ; retry++ )
-										{
-											if ( oam.startEC2Instance(hostName) )
-											{
-												log.writeLog(__LINE__, "Instance started, sleep for 30 seconds to allow it to fully come up: " + hostName, LOG_TYPE_DEBUG);
 	
-												//delay then get new IP Address
-												sleep(30);
-												string currentIPAddr = oam.getEC2InstanceIpAddress(hostName);
-												if (currentIPAddr == "stopped" || currentIPAddr == "terminated") {
-													log.writeLog(__LINE__, "Instance failed to start (no ip-address), retry: " + hostName, LOG_TYPE_DEBUG);
-												}
-												else
-												{
-													// update the Calpont.xml with the new IP Address
-													string cmd = "sed -i s/" + ipAddr + "/" + currentIPAddr + "/g " + startup::StartUp::installDir() + "/etc/Calpont.xml";
-													system(cmd.c_str());
-													break;
-												}
-											}
-											else
-											{
-												log.writeLog(__LINE__, "Instance failed to start, retry: " + hostName, LOG_TYPE_DEBUG);
-
-												sleep(10);
-											}
-										}
-
-										if ( retry >= retryCount )
-										{
-											log.writeLog(__LINE__, "Instance failed to start, restart a new instance: " + hostName, LOG_TYPE_DEBUG);
-											currentIPAddr = "terminated";
-										}
-									}
-
-									if ( currentIPAddr == "terminated" || currentIPAddr == "running")
-									{
-										//check if down module was Standby OAM, if so find another one
-										if ( moduleName == config.OAMStandbyName() ) {
-			
-											//set down module ProcessManager to AOS
-											processManager.setProcessState(moduleName, "ProcessManager", oam::AUTO_OFFLINE, 0);
-			
-											//get another standby OAM module
-											string newStandbyModule = processManager.getStandbyModule();
-										
-											//send message to start new Standby Process-Manager, if needed
-											if ( !newStandbyModule.empty() && newStandbyModule != "NONE") {
-												processManager.setStandbyModule(newStandbyModule);
-											}
-											else
-											{
-												Config* sysConfig = Config::makeConfig();
-			
-												// clear Standby OAM Module
-												sysConfig->setConfig("SystemConfig", "StandbyOAMModuleName", oam::UnassignedName);
-												sysConfig->setConfig("ProcStatusControlStandby", "IPAddr", oam::UnassignedIpAddr);
-										
-												//update Calpont Config table
-												try {
-													sysConfig->write();
-												}
-												catch(...)
-												{
-													log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
-												}
-											}
-										}
-
- 										// remove/addmodule 
-										log.writeLog(__LINE__, "Instance terminated, re-launching: " + hostName, LOG_TYPE_DEBUG);
-
-										// if pm, get assigned dbroots and deattach EBS
-										DBRootConfigList dbrootConfigList;
-										int moduleID = atoi(moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-										if( moduleName.find("pm") == 0 ) {
-											//get dbroots ids for to PM
-											try
-											{
-												oam.getPmDbrootConfig(moduleID, dbrootConfigList);
-											}
-											catch (exception& e)
-											{
-												log.writeLog(__LINE__, "ERROR: getPmDbrootConfig error: " + moduleName, LOG_TYPE_DEBUG);
-											}
-										}
-
-										DeviceNetworkList devicenetworklist;
-										DeviceNetworkConfig devicenetworkconfig;
-										HostConfig hostconfig;
-
-										devicenetworkconfig.DeviceName = moduleName;
-										hostconfig.IPAddr = oam::UnassignedName;
-										hostconfig.HostName = oam::UnassignedName;
-										hostconfig.NicID = 1;
-										devicenetworkconfig.hostConfigList.push_back(hostconfig);
-
-										devicenetworklist.push_back(devicenetworkconfig);
-
-										bool pass = true;
-										for ( int addRetry = 0 ; addRetry < 5 ; addRetry++ )
-										{
-											//remove module
-											int ret = processManager.removeModule(devicenetworklist, false);
-											if ( ret != oam::API_SUCCESS )
-											{
-												log.writeLog(__LINE__, "Instance failed to remove, retry: " + moduleName, LOG_TYPE_DEBUG);
-											}
-											else
-											{
-												pass = true;
-												log.writeLog(__LINE__, "Instance removed, module: " + moduleName, LOG_TYPE_DEBUG);
-											}
-
-											// add module
-											string password = oam::UnassignedName;
-											try
-											{
-												oam.getSystemConfig("rpw", password);
-											}
-											catch(...)
-											{
-												password = oam::UnassignedName;
-											}
+								//check if down module was Standby OAM, if so find another one
+								if ( moduleName == config.OAMStandbyName() ) {
 	
-											ret = processManager.addModule(devicenetworklist, password, false);
-											if ( ret != oam::API_SUCCESS )
-											{
-												log.writeLog(__LINE__, "Instance failed to add, retry: " + moduleName, LOG_TYPE_CRITICAL);
-												pass = false;
-											}
-											else
-											{
-												pass = true;
-												log.writeLog(__LINE__, "New Instance Launched for " + moduleName, LOG_TYPE_DEBUG);
-
-												// if pm, config and attach EBS
-												if( moduleName.find("pm") == 0 && !dbrootConfigList.empty() ) {
-													try
-													{
-														oam.setPmDbrootConfig(moduleID, dbrootConfigList);
-
-														std::vector<std::string> dbrootList;
-														DBRootConfigList::iterator pt1 = dbrootConfigList.begin();
-														for( ; pt1 != dbrootConfigList.end() ; pt1++)
-														{
-															dbrootList.push_back(oam.itoa(*pt1));
-														}
-
-														//attach EBS
-														try
-														{
-															oam.amazonReattach(moduleName, dbrootList, true);
-															pass = true;
-															break;
-														}
-														catch (exception& e)
-														{
-															log.writeLog(__LINE__, "ERROR: amazonReattach error on " + moduleName, LOG_TYPE_ERROR);
-															pass = false;
-														}
-													}
-													catch (exception& e)
-													{
-														log.writeLog(__LINE__, "ERROR: setPmDbrootConfig error on " + moduleName, LOG_TYPE_ERROR);
-														pass = false;
-													}
-												}
-												else
-												{
-													pass = true;
-													break;
-												}
-											}
-
-											if (pass)
-												break;
-										}
-
-										if (pass)
-											//Set the module state so it will be brought back up
-											processManager.setModuleState(moduleName, oam::AUTO_DISABLED);
-										else
-										{
-											//new instance failed to get added
-											//remove and try auto moving dbroots to other pms
-											processManager.removeModule(devicenetworklist, false);
-
-											// if pm, move dbroots to other pms
-											if( moduleName.find("pm") == 0 ) {
-												try {
-													log.writeLog(__LINE__, "Call autoMovePmDbroot", LOG_TYPE_DEBUG);
-													oam.autoMovePmDbroot(moduleName);
-													log.writeLog(__LINE__, "autoMovePmDbroot success", LOG_TYPE_DEBUG);
-													//distribute config file
-													processManager.distributeConfigFile("system");	
-												}
-												catch (exception& ex)
-												{
-													string error = ex.what();
-													log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: " + error, LOG_TYPE_DEBUG);
-												}
-												catch(...)
-												{
-													log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: Caught unknown exception!", LOG_TYPE_ERROR);
-												}
-											}
-
-											//set recycle process
-											processManager.recycleProcess(moduleName);
-		
-											processManager.setSystemState(oam::ACTIVE);
-										}
+									//set down module ProcessManager to AOS
+									processManager.setProcessState(moduleName, "ProcessManager", oam::AUTO_OFFLINE, 0);
+	
+									//get another standby OAM module
+									string newStandbyModule = processManager.getStandbyModule();
+								
+									//send message to start new Standby Process-Manager, if needed
+									if ( !newStandbyModule.empty() && newStandbyModule != "NONE") {
+										processManager.setStandbyModule(newStandbyModule);
 									}
-
-									if ( moduleName.find("pm") == 0 )
+									else
 									{
-										// resume the dbrm
-										oam.dbrmctl("resume");
-										log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-									}
-								}
-								else
-								{  // non-amazon
-									// if pm, move dbroots to other pms
-									if( moduleName.find("pm") == 0 ) {
+										Config* sysConfig = Config::makeConfig();
+	
+										// clear Standby OAM Module
+										sysConfig->setConfig("SystemConfig", "StandbyOAMModuleName", oam::UnassignedName);
+										sysConfig->setConfig("ProcStatusControlStandby", "IPAddr", oam::UnassignedIpAddr);
+								
+										//update Calpont Config table
 										try {
-											log.writeLog(__LINE__, "Call autoMovePmDbroot", LOG_TYPE_DEBUG);
-											oam.autoMovePmDbroot(moduleName);
-											log.writeLog(__LINE__, "autoMovePmDbroot success", LOG_TYPE_DEBUG);
-											//distribute config file
-											processManager.distributeConfigFile("system");	
-										}
-										catch (exception& ex)
-										{
-											string error = ex.what();
-											log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: " + error, LOG_TYPE_DEBUG);
+											sysConfig->write();
 										}
 										catch(...)
 										{
-											log.writeLog(__LINE__, "EXCEPTION ERROR on autoMovePmDbroot: Caught unknown exception!", LOG_TYPE_ERROR);
-										}
-									}
-	
-									// resume the dbrm
-									oam.dbrmctl("resume");
-									log.writeLog(__LINE__, "'dbrmctl resume' done", LOG_TYPE_DEBUG);
-	
-									//set recycle process
-									processManager.recycleProcess(moduleName);
-
-									processManager.setSystemState(oam::ACTIVE);
-
-									//check if down module was Standby OAM, if so find another one
-									if ( moduleName == config.OAMStandbyName() ) {
-		
-										//set down module ProcessManager to AOS
-										processManager.setProcessState(moduleName, "ProcessManager", oam::AUTO_OFFLINE, 0);
-		
-										//get another standby OAM module
-										string newStandbyModule = processManager.getStandbyModule();
-									
-										//send message to start new Standby Process-Manager, if needed
-										if ( !newStandbyModule.empty() && newStandbyModule != "NONE") {
-											processManager.setStandbyModule(newStandbyModule);
-										}
-										else
-										{
-											Config* sysConfig = Config::makeConfig();
-		
-											// clear Standby OAM Module
-											sysConfig->setConfig("SystemConfig", "StandbyOAMModuleName", oam::UnassignedName);
-											sysConfig->setConfig("ProcStatusControlStandby", "IPAddr", oam::UnassignedIpAddr);
-									
-											//update Calpont Config table
-											try {
-												sysConfig->write();
-											}
-											catch(...)
-											{
-												log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
-											}
+											log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
 										}
 									}
 								}
@@ -1993,6 +1438,9 @@ system(cmd.c_str());
 
 			//stop snmptrap daemon process
 			processManager.stopProcess(config.moduleName(), "SNMPTrapDaemon", oam::FORCEFUL, false);
+
+			//set dbroots to read-write
+			processManager.remountDbroots("ro");
 		}
 		else
 		{
@@ -2011,12 +1459,25 @@ system(cmd.c_str());
 				string parentOAMModule = processManager.sendMsgProcMon1( config.OAMStandbyName(), msg, requestID );
 				if ( parentOAMModule == config.moduleName() || 
 						parentOAMModule == "FAILED" ) {
+					//I'm still the Active OAM Module, go back to read-write mounts
+//					processManager.remountDbroots("rw");
 
 					//send sighup to these guys incase they marked any PrimProcs offline
 					processManager.reinitProcessType("ExeMgr");
-					processManager.reinitProcessType("DDLProc");
 					processManager.reinitProcessType("DMLProc");
-				}
+					processManager.reinitProcessType("DDLProc");
+
+					//do a startSystem to kick start things for cover a Ethernet Switch Outage
+/*					try
+					{
+						oam.startSystem(oam::ACK_YES);
+					}
+					catch (...)
+					{
+						// system didn't successfull restart
+						processManager.setSystemState(oam::FAILED);
+					}
+*/				}
 				else
 				{
 					//send message to local Process Monitor to run coldStandby
@@ -2027,6 +1488,9 @@ system(cmd.c_str());
 				
 					int returnStatus = processManager.sendMsgProcMon( config.moduleName(), msg, requestID );	
 					log.writeLog(__LINE__, "sent OAM Parent Cold message to local Process-Monitor, status: " + oam.itoa(returnStatus) , LOG_TYPE_DEBUG);
+
+					//set dbrootsto read-write
+					processManager.remountDbroots("ro");
 
 					//request stop of local module		
 					int status = processManager.stopModule(config.moduleName(), oam::INSTALL, false);
@@ -2114,108 +1578,71 @@ system(cmd.c_str());
 		} //end of for loop
 
 		// double check to make sure the system status is ACTIVE if all module status's are ACTIVE
-        if (dbrm.isDBRMReady())
-        {
-            int systemReady = dbrm.getSystemReady();    // -1 == fail, 0 == not ready, 1 == ready
-            if (systemReady > 0)
-            {
-                bool updateActive = true;
-                for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
-                {
-                    int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
-                    if ( moduleCount == 0)
-                        continue;
+		bool updateActive = true;
+		for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
+		{
+			int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
+			if( moduleCount == 0)
+				continue;
 
-                    DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
-                    for ( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-                    {
-                        string moduleName = (*pt).DeviceName;
+			DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
+			for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
+			{
+				string moduleName = (*pt).DeviceName;
 
-                        int opState;
-                        try
-                        {
-                            bool degraded;
-                            oam.getModuleStatus(moduleName, opState, degraded);
-                            if (opState == oam::ACTIVE || 
-                                opState == oam::MAN_DISABLED || 
-                                opState == oam::AUTO_DISABLED )
-                                continue;
-                            updateActive = false;
-                        } 
-                        catch (exception& ex)
-                        {
-                            string error = ex.what();
-                            log.writeLog(__LINE__, "EXCEPTION ERROR on : " + error, LOG_TYPE_ERROR);
-                        } 
-                        catch (...)
-                        {
-                            log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": Caught unknown exception!", LOG_TYPE_ERROR);
-                        }
-                    }
-                }
+				int opState;
+				try{
+					bool degraded;
+					oam.getModuleStatus(moduleName, opState, degraded);
 
-                if (updateActive)
-                {
-					string PrimaryUMModuleName;
-					try {
-						oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-					}
-					catch(...) {}
+					if (opState == oam::ACTIVE || 
+						opState == oam::MAN_DISABLED || 
+						opState == oam::AUTO_DISABLED )
+						continue;
+					updateActive = false;
+				}
+				catch (exception& ex)
+				{
+					string error = ex.what();
+					log.writeLog(__LINE__, "EXCEPTION ERROR on : " + error, LOG_TYPE_ERROR);
+				}
+				catch(...)
+				{
+					log.writeLog(__LINE__, "EXCEPTION ERROR on getModuleStatus on module " + moduleName + ": Caught unknown exception!", LOG_TYPE_ERROR);
+				}
+			}
+		}
 
-					ProcessStatus DMLprocessstatus;
-					ProcessStatus DDLprocessstatus;
-					try {
-						oam.getProcessStatus("DMLProc", PrimaryUMModuleName, DMLprocessstatus);
-						oam.getProcessStatus("DDLProc", PrimaryUMModuleName, DDLprocessstatus);
-					}
-					catch (exception& ex)
-					{
-						string error = ex.what();
-						log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: " + error, LOG_TYPE_ERROR);
-					}
-					catch(...)
-					{
-						log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-					}
+		if (updateActive) {
+			//set the system status if a change has occurred
+			SystemStatus systemstatus;
 		
-					if (DMLprocessstatus.ProcessOpState == oam::ACTIVE &&
-						DDLprocessstatus.ProcessOpState == oam::ACTIVE) {
-
-						//set the system status if a change has occurred
-						SystemStatus systemstatus;
+			try {
+				oam.getSystemStatus(systemstatus);
+			}
+			catch (exception& ex)
+			{
+				string error = ex.what();
+				log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemStatus: " + error, LOG_TYPE_ERROR);
+			}
+			catch(...)
+			{
+				log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemStatus: Caught unknown exception!", LOG_TYPE_ERROR);
+			}
 	
-						try
-						{
-							oam.getSystemStatus(systemstatus);
-						} 
-						catch (exception& ex)
-						{
-							string error = ex.what();
-							log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemStatus: " + error, LOG_TYPE_ERROR);
-						} 
-						catch (...)
-						{
-							log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-						}
-	
-						if ( systemstatus.SystemOpState != oam::ACTIVE )
-						{
-							processManager.setSystemState(oam::ACTIVE);
-						}
-					}
-                }
-            }
-        }
+			if ( systemstatus.SystemOpState != oam::ACTIVE )
+				processManager.setSystemState(oam::ACTIVE);
+		}
 
-        //go sleep for a bit
-        int sleepTime = ModuleHeartbeatPeriod / 10;
+		//go sleep for a bit
+		int sleepTime = ModuleHeartbeatPeriod / 10;
 
-        if (!enableModuleMonitor && systemextdeviceconfig.Count == 0)
-            sleep(60);
-        else
-            sleep(sleepTime);
+		if (!enableModuleMonitor && systemextdeviceconfig.Count == 0)
+			sleep(6000);
+		else
+			sleep(sleepTime);
 
-    }
+	}
 
 	return;
 }
@@ -2393,4 +1820,3 @@ static void heartbeatProcessThread()
 	} // end of while forever loop
 }
 */
-// vim:ts=4 sw=4:

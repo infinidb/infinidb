@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: serversocket.h 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: serversocket.h 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -62,7 +62,7 @@ public:
 	 *
 	 * bind this ServerSocket to the address/port specified in serv_addr
 	 */
-	inline virtual void bind(const struct sockaddr* serv_addr);
+	inline virtual void bind(const struct sockaddr_in* serv_addr);
 
 	/** setup to listen for incoming connections
 	 *
@@ -93,7 +93,7 @@ public:
 	/** get the socket params
 	 *
 	 */
-	inline virtual const SocketParms socketParms() const;
+	inline virtual const SocketParms& socketParms() const;
 
 	/** set the socket params
 	 *
@@ -123,13 +123,13 @@ private:
 	Socket* fSocket;
 };
 
-inline void ServerSocket::bind(const struct sockaddr* serv_addr) { fSocket->bind(serv_addr); }
+inline void ServerSocket::bind(const struct sockaddr_in* serv_addr) { fSocket->bind(serv_addr); }
 inline void ServerSocket::listen(int backlog) { fSocket->listen(backlog); }
 inline const IOSocket ServerSocket::accept(const struct timespec* timeout) { return fSocket->accept(timeout); }
 inline void ServerSocket::open() { fSocket->open(); }
 inline void ServerSocket::close() { fSocket->close(); }
 inline bool ServerSocket::isOpen() const { return fSocket->isOpen(); }
-inline const SocketParms ServerSocket::socketParms() const { return fSocket->socketParms(); }
+inline const SocketParms& ServerSocket::socketParms() const { return fSocket->socketParms(); }
 inline void ServerSocket::socketParms(const SocketParms& socketParms) { fSocket->socketParms(socketParms); }
 inline void ServerSocket::setSocketImpl(Socket* socket) { delete fSocket; fSocket = socket; }
 inline void ServerSocket::syncProto(bool use) { fSocket->syncProto(use); }

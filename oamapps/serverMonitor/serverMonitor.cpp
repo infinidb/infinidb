@@ -5,7 +5,6 @@
  ***************************************************************************/
 
 #include "serverMonitor.h"
-#include "installdir.h"
 
 using namespace std;
 using namespace oam;
@@ -239,7 +238,7 @@ string ServerMonitor::StripWhitespace(string value)
 * purpose:	send a trap and log the process information
 *
 ******************************************************************************************/
-bool ServerMonitor::sendResourceAlarm(string alarmItem, ALARMS alarmID, int action, int usage)
+void ServerMonitor::sendResourceAlarm(string alarmItem, ALARMS alarmID, int action, int usage)
 {
 	ServerMonitor serverMonitor;
 	Oam oam;
@@ -264,20 +263,8 @@ bool ServerMonitor::sendResourceAlarm(string alarmItem, ALARMS alarmID, int acti
 		moduleName = "Unknown Server";
 	}
 
-	// check if there is an active alarm above the reporting theshold 
-	// that needs to be cleared
-
-	if (alarmItem == "CPU")
-		serverMonitor.checkCPUAlarm(alarmItem, alarmID);
-	else if (alarmItem == "Local Disk" || alarmItem == "External")
-			serverMonitor.checkDiskAlarm(alarmItem, alarmID);
-	else if (alarmItem == "Local Memory")
-			serverMonitor.checkMemoryAlarm(alarmItem, alarmID);
-	else if (alarmItem == "Local Swap")
-			serverMonitor.checkSwapAlarm(alarmItem, alarmID);
-
 	// don't issue an alarm on thge dbroots is already issued by this or another server
-	if ( alarmItem.find(startup::StartUp::installDir() + "/data") == 0 ) {
+	if ( alarmItem.find("/usr/local/Calpont/data") == 0 ) {
 		// check if Alarm is already active from any module, don't resend
 		if ( !( oam.checkActiveAlarm(alarmID, "*", alarmItem)) ) {
 	
@@ -287,12 +274,7 @@ bool ServerMonitor::sendResourceAlarm(string alarmItem, ALARMS alarmID, int acti
 	
 			args.add(", Alarm set: ");
 			args.add(alarmID);
-			msg.format(args);
-			ml.logInfoMessage(msg);
-			return true;
 		}
-		else
-			return false;
 	}
 	else
 	{
@@ -305,15 +287,26 @@ bool ServerMonitor::sendResourceAlarm(string alarmItem, ALARMS alarmID, int acti
 	
 			args.add(", Alarm set: ");
 			args.add(alarmID);
-			msg.format(args);
-			ml.logInfoMessage(msg);
-			return true;
 		}
-		else
-			return false;
 	}
 
-	return true;
+	// output log
+	msg.format(args);
+	ml.logInfoMessage(msg);
+
+	// check if there is an active alarm above the reporting theshold 
+	// that needs to be cleared
+
+	if (alarmItem == "CPU")
+		serverMonitor.checkCPUAlarm(alarmItem, alarmID);
+	else if (alarmItem == "Local Disk" || alarmItem == "RAID")
+			serverMonitor.checkDiskAlarm(alarmItem, alarmID);
+	else if (alarmItem == "Local Memory")
+			serverMonitor.checkMemoryAlarm(alarmItem, alarmID);
+	else if (alarmItem == "Local Swap")
+			serverMonitor.checkSwapAlarm(alarmItem, alarmID);
+
+	return;
 }
 
 

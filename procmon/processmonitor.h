@@ -1,5 +1,5 @@
 /***************************************************************************
-* $Id: processmonitor.h 1918 2012-11-29 21:09:52Z dhill $
+* $Id: processmonitor.h 1610 2012-02-28 21:25:08Z dhill $
 *
  ***************************************************************************/
 
@@ -23,6 +23,11 @@ namespace processmonitor {
 
 #define MAXARGUMENTS 15
 #define MAXDEPENDANCY 6
+//#define MAX_PROC_RESTART_COUNT 10
+
+//const unsigned int MAX_PROC_RESTART_WINDOW=120;
+const std::string  POWERON_TEST_RESULTS_FILE = "/usr/local/Calpont/post/st_status";
+const std::string  POWERON_SYSTEM_CONFIG_FILE = "/usr/local/Calpont/post/calpont_config";
 
 /**
  * @brief processStructure Process Config Structure
@@ -53,7 +58,7 @@ typedef   std::vector<processInfo>		processList;
  */
 struct shmProcessStatus
 {
-	pid_t     	ProcessID;                    //!< Process ID number
+	uint16_t    ProcessID;                    //!< Process ID number
 	char 		StateChangeDate[24];          //!< Last time/date state change
 	uint16_t 	ProcessOpState;               //!< Process Operational State
 };
@@ -307,11 +312,6 @@ public:
 						uint16_t actIndicator = oam::FORCEFUL);
 
     /**
-     * get Alarm Data and send to requester
-     */
-	int getAlarmData(messageqcpp::IOSocket mq, int type, std::string date);
-
-    /**
      * Stop a process
      */
     int		stopProcess(pid_t processID, std::string processName, std::string processLocation, int actionIndicator, bool manualFlag);
@@ -372,6 +372,11 @@ public:
 	void 	checkPowerOnResults();
 
     /**
+     *@brief  take action on Syslog process
+     */
+//	void syslogAction( std::string action);
+
+    /**
      *@brief  update Config
      */
 	int  updateConfig();
@@ -397,10 +402,21 @@ public:
 	int checkMateModuleState();
 
     /**
+     *@brief  Set Data Mounts
+     */
+	int setDataMount( std::string option );
+
+    /**
      *@brief  Create the Calpont Data directories
      */
 
-	int createDataDirs(std::string cloud);
+	int createDataDirs(std::string option);
+
+    /**
+     *@brief  setup the PM mount
+     */
+
+	int setupPMmount();
 
     /**
      *@brief  Process Restarted, inform Process Mgr
@@ -466,36 +482,6 @@ public:
      *@brief run upgrade script
      */
 	int runUpgrade(std::string mysqlpw);
-
-    /**
-     *@brief Amazon Instance and IP check
-     */
-	bool amazonIPCheck();
-
-    /**
-     *@brief UnMOunt any extra dbroots
-     */
-	void unmountExtraDBroots();
-
-    /**
-     *@brief Calculate TotalUmMemory
-     */
-	void calTotalUmMemory();
-
-    /**
-     *@brief Amazon Volume check
-     */
-	bool amazonVolumeCheck(int dbrootID = 0);
-
-    /**
-     *@brief  Check Data Mounts
-     */
-	int checkDataMount();
-
-	/** @brief flush inode cache
-		*/
-	void flushInodeCache();
-
 
 	/**
 	* return the process list

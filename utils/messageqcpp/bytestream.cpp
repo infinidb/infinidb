@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: bytestream.cpp 3294 2012-09-19 18:12:52Z pleblanc $
+*   $Id: bytestream.cpp 2488 2011-04-06 21:23:32Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -114,9 +114,6 @@ void ByteStream::growBuf(uint32_t toSize)
 		else
 			toSize = ((toSize + BlockSize - 1) / BlockSize) * BlockSize;
 		fBuf = new byte[toSize + ISSOverhead];
-#ifdef ZERO_ON_NEW
-		memset(fBuf, 0, (toSize+ISSOverhead));
-#endif
 		fMaxLen = toSize;
 		fCurInPtr =
 			fCurOutPtr = fBuf + ISSOverhead;
@@ -137,9 +134,6 @@ void ByteStream::growBuf(uint32_t toSize)
 		uint32_t curOutOff = fCurOutPtr - fBuf;
 		uint32_t curInOff = fCurInPtr - fBuf;
 		memcpy(t, fBuf, fCurInPtr - fBuf);
-#ifdef ZERO_ON_NEW
-		memset(t+(fCurInPtr-fBuf), 0, (toSize+ISSOverhead)-(fCurInPtr-fBuf));
-#endif
 		delete [] fBuf;
 		fBuf = t;
 		fMaxLen = toSize;
@@ -307,16 +301,20 @@ void ByteStream::peek(string& s) const
 		cerr << endl;
 	}
 #endif
-	if (length() < len + 4)
+	if (length() < len)
 	{
 #if DEBUG_DUMP_STRINGS_LESS_THAN > 0
-		cerr << "bs: wanted " << len + 4 << " bytes, but there are only " << length() << " remaining" << endl;
+		cerr << "bs: wanted " << len << " bytes, but there are only " << length() << " remaining" << endl;
 #endif
 		// "put back" the qbyte we just read for strong exception guarantee
 		throw underflow_error("ByteStream>string: not enough data in stream to fill datatype");
 	}
 
-	s.assign((char *) &fCurOutPtr[4], len);
+	scoped_array<char> buf(new char[len + 1]);
+	memcpy(buf.get(), &fCurOutPtr[4], len);
+	buf[len] = 0;
+
+	s.assign(buf.get(), buf.get() + len);
 }
 
 void ByteStream::load(const byte* bp, uint32_t len)
@@ -436,36 +434,5 @@ ByteStream& ByteStream::operator>>(uint& ui)
 }
 #endif
 #endif
-
-ByteStream& ByteStream::operator<<(const ByteStream& bs)
-{
-	quadbyte len = bs.length();
-
-	*this << len;
-
-	append(bs.buf(), len);
-
-	return *this;
-}
-
-ByteStream& ByteStream::operator>>(ByteStream& bs)
-{
-	peek(bs);
-	fCurOutPtr += 4 + bs.length();
-	return *this;
-}
-
-void ByteStream::peek(ByteStream& bs) const
-{
-	quadbyte len;
-
-	peek(len);
-
-	if (length() < len)
-		throw underflow_error("ByteStream>ByteStream: not enough data in stream to fill datatype");
-
-	bs.load(&fCurOutPtr[4], len);
-}
-
 }//namespace messageqcpp
 

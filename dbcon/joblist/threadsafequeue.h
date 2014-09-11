@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: threadsafequeue.h 8436 2012-04-04 18:18:21Z rdempsey $
+* $Id: threadsafequeue.h 7636 2011-04-13 02:42:27Z pleblanc $
 */
 
 /** @file */
@@ -64,7 +64,7 @@ public:
 	 * @warning this class takes ownership of the passed-in pointers.
 	 */
 	ThreadSafeQueue(boost::mutex* pimplLock=0, boost::condition* pimplCond=0) :
-		fShutdown(false), bytes(0), zeroCount(0)
+		fShutdown(false), bytes(0)
 	{
 		fPimplLock.reset(pimplLock);
 		fPimplCond.reset(pimplCond);
@@ -144,7 +144,7 @@ public:
 		bytes += v->lengthWithHdrOverhead();
 		fPimplCond->notify_one();
 		ret.size = bytes;
-		ret.count = static_cast<uint>(fImpl.size());
+		ret.count = fImpl.size();
 		return ret;
 	}
 	/** @brief remove the front item in the queue
@@ -182,7 +182,7 @@ public:
 		}
 		fImpl.pop();
 		ret.size = bytes;
-		ret.count = static_cast<uint>(fImpl.size());
+		ret.count = fImpl.size();
 		return ret;
 	}
 

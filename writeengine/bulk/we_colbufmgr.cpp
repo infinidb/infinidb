@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: we_colbufmgr.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colbufmgr.cpp 3403 2011-12-21 16:58:13Z xlou $
  *
  ****************************************************************************/
 
@@ -79,26 +79,13 @@ ColumnBufferManager::~ColumnBufferManager() {
 // startRowId (in) - starting RID for the rows to be stored in this section
 // nRowsIn    (in) - desired number of rows to be stored in this section
 // secRowCnt (out) - number of rows that the returned ColumnBufferSection can
-//                   hold.  This may be smaller than nRowsIn (for dictionary
-//                   column) if the rows cross an extent boundary.
-//                   The application code will need to make a second call
-//                   later, to create a section to handle the remaining rows
-//                   that this section could not hold.
+//                   hold.  This may be smaller than nRowsIn if the rows cross
+//                   an extent boundary.  The application code will need to
+//                   make a second call later, to create a section to handle
+//                   the remaining rows that this section could not hold.
 // cbs (out)       - reserved section pointer
 // lastInputRowInExtent(out) - last input Row number (relative to start of job)
 //                   that can go into the current extent we are loading.
-//
-// Basic algorithm:
-// 1. Wait to ensure that ColumnBufferSection allocations are made in input
-//    row order
-// 2. Wait for any pending output buffer expansion to be completed
-// 3. If buffer does not have enough room to contain nRowsIn of data, then
-//    a. If there are any ColumnBufferSections in use, then
-//         wait for these ColumnBufferSections to be released
-//    b. If there is any data in the output buffer, then
-//         flush the data (rounded down to nearest 8192-byte block)
-//    c. Expand the output buffer, and
-//         copy the remaining data to the front of the newly expanded buffer
 //
 //    @bug 3456
 //    Note that when determining whether the output buffer has enough room or
@@ -109,8 +96,6 @@ ColumnBufferManager::~ColumnBufferManager() {
 //    If we allow output buffer to get exactly full, then we end up
 //    losing track of data because we will think the buffer is empty.
 //
-// 6. Allocate new ColumnBufferSection
-// 7. Update fBufFreeOffset, fSectionsInUse, fMaxRowId
 //------------------------------------------------------------------------------
 int ColumnBufferManager::reserveSection(
     RID startRowId,
@@ -125,46 +110,8 @@ int ColumnBufferManager::reserveSection(
     boost::posix_time::seconds wait_seconds(COND_WAIT_SECONDS);
 
     boost::mutex::scoped_lock lock(fColInfo->colMutex());
-
-    //..Ensure that ColumnBufferSection allocations are made in input row order
-    bool bWaitedForInSequence = false;
-    while (1) {
-        RID startRowTest = (std::numeric_limits<WriteEngine::RID>::max() ==
-                            fMaxRowId) ? 0 : fMaxRowId + 1;
-
-        if (startRowTest == startRowId)  
-            break;
-
-        if (fLog->isDebug( DEBUG_3 )) {
-            bWaitedForInSequence = true;
-            std::ostringstream oss;
-            oss << "OID-" << fColInfo->curCol.dataFile.fid <<
-                "; Waiting for in-sequence";
-            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-
-        fOutOfSequence.timed_wait(lock, wait_seconds);
-
-        // See if JobStatus has been set to terminate by another thread
-        if (BulkStatus::getJobStatus() == EXIT_FAILURE)
-        {
-            throw SecondaryShutdownException( "ColumnBufferManager::"
-                "reserveSection(1) responding to job termination");
-        }
-    }
-
-    if (fLog->isDebug( DEBUG_3 )) {
-        if (bWaitedForInSequence) {
-            std::ostringstream oss;
-            oss << "OID-" << fColInfo->curCol.dataFile.fid <<
-                "; Resume after waiting for in-sequence";
-            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-        }
-    }
-
-    //..Check/wait for any pending output buffer expansion to be completed
     bool bWaitedForResize = false;
-    while (fResizePending) {
+    while(fResizePending) {
         if (fLog->isDebug( DEBUG_3 )) {
             bWaitedForResize = true;
             std::ostringstream oss;
@@ -172,14 +119,14 @@ int ColumnBufferManager::reserveSection(
                "; Waiting for pending resize";
             fLog->logMsg( oss.str(), MSGLVL_INFO2 );
         }
-
+        // Internal buffer resize in progress. Wait until resize is complete
         fResizeInProgress.timed_wait(lock, wait_seconds);
 
         // See if JobStatus has been set to terminate by another thread
         if (BulkStatus::getJobStatus() == EXIT_FAILURE)
         {
-            throw SecondaryShutdownException( "ColumnBufferManager::"
-                "reserveSection(2) responding to job termination");
+            throw SecondaryShutdownExcept( "ColumnBufferManager::"
+                "reserveSection(1) responding to job termination");
         }
     }
 
@@ -192,15 +139,49 @@ int ColumnBufferManager::reserveSection(
         }
     }
 
+    bool bWaitedForInSequence = false;
+    while (1)
+    {
+        RID startRowTest = (std::numeric_limits<WriteEngine::RID>::max() ==
+                            fMaxRowId) ? 0 : fMaxRowId + 1;
+
+        if (startRowTest == startRowId)  
+            break;
+
+        //Making sure that allocation are made in order
+        if (fLog->isDebug( DEBUG_3 )) {
+            bWaitedForInSequence = true;
+            std::ostringstream oss;
+            oss << "OID-" << fColInfo->curCol.dataFile.fid <<
+                "; Waiting for in-sequence";
+            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+        }
+        fOutOfSequence.timed_wait(lock, wait_seconds);
+
+        // See if JobStatus has been set to terminate by another thread
+        if (BulkStatus::getJobStatus() == EXIT_FAILURE)
+        {
+            throw SecondaryShutdownExcept( "ColumnBufferManager::"
+                "reserveSection(2) responding to job termination");
+        }
+    }
+
+    if (fLog->isDebug( DEBUG_3 )) {
+        if (bWaitedForInSequence) {
+            std::ostringstream oss;
+            oss << "OID-" << fColInfo->curCol.dataFile.fid <<
+                "; Resume after waiting for in-sequence";
+            fLog->logMsg( oss.str(), MSGLVL_INFO2 );
+        }
+    }
+
 #ifdef PROFILE
     Stats::stopParseEvent(WE_STATS_WAIT_TO_RESERVE_OUT_BUF);
 #endif
 
-    // Through the use of the mutex lock and the fResizePending flag, nobody
-    // should be changing the buffer size out from under us; so okay to save in
-    // local variable till we call resizeColumnBuffer() to expand the buffer.
     int bufferSize = fCBuf->getSize();
     int remainingSpace = 0;
+    int spaceRequired = 0;
 
     if(bufferSize > 0) {
         //Calculate remaining space
@@ -214,11 +195,9 @@ int ColumnBufferManager::reserveSection(
     int nRows = 0;
     RETURN_ON_ERROR( rowsExtentCheck( nRowsIn, nRows ) );
 
-    int spaceRequired = nRows * fColWidth;
+    spaceRequired = nRows * fColWidth;
 
     if (nRows > 0) {
-        //..If not enough room to add nRows to output buffer, wait for pending
-        //  sections to be released, so that we can flush and resize the buffer.
         //..@bug 3456: compare to remainingSpace-1 and not remainingSpace.
         //  See note in function description that precedes this function.
         if (spaceRequired > (remainingSpace-1)) {
@@ -227,10 +206,9 @@ int ColumnBufferManager::reserveSection(
 //#endif
             fResizePending = true;
             bool bWaitedForSectionsInUse = false;
-
-            // Wait for all other threads to finish writing pending sections
-            // to the output buffer, before we resize the buffer
             while(fSectionsInUse.size() > 0) {
+                // Wait for all other threads to finish and
+                // write to the dirty data to disk
                 if (fLog->isDebug( DEBUG_3 )) {
                     bWaitedForSectionsInUse = true;
                     std::ostringstream oss;
@@ -245,7 +223,7 @@ int ColumnBufferManager::reserveSection(
                 // See if JobStatus has been set to quit by another thread
                 if (BulkStatus::getJobStatus() == EXIT_FAILURE)
                 {
-                    throw SecondaryShutdownException( "ColumnBufferManager::"
+                    throw SecondaryShutdownExcept( "ColumnBufferManager::"
                         "reserveSection(3) responding to job termination");
                 }
             }
@@ -272,8 +250,7 @@ int ColumnBufferManager::reserveSection(
             }
 
             resizeColumnBuffer(spaceRequired);
-            bufferSize = fCBuf->getSize(); // update bufferSize after resize-
-                                           // ColumnBuffer() expanded the buffer
+            bufferSize = fCBuf->getSize();
             fResizePending = false;
             fResizeInProgress.notify_all();
 //#ifdef PROFILE
@@ -289,7 +266,7 @@ int ColumnBufferManager::reserveSection(
 
         fMaxRowId = startRowId + nRows - 1;
         fOutOfSequence.notify_all();
-    } // (nRows > 0)
+    }
 
     secRowCnt = nRows;
 
@@ -352,8 +329,8 @@ int ColumnBufferManager::releaseSection(ColumnBufferSection* cbs) {
 void ColumnBufferManager::resizeColumnBuffer(int spaceRequired) {
     int bufferSize = fCBuf->getSize();
     int bufferSizeOld = bufferSize;
-    int dataRemaining = (bufferSize > 0) ?
-        ((fBufFreeOffset - fBufWriteOffset + bufferSize) % bufferSize) : 0;
+    int dataRemaining = bufferSize > 0 ?
+        (fBufFreeOffset - fBufWriteOffset + bufferSize) % bufferSize : 0;
 
     int resizeAction = 0;
 
@@ -414,11 +391,10 @@ void ColumnBufferManager::resizeColumnBuffer(int spaceRequired) {
 
 //------------------------------------------------------------------------------
 // Writes data from our output buffer starting at fBufWriteOffset, through the
-// "endOffset" that is specified (rounded down to nearest 8192-byte block).
-// Trailing data (less than 1 block) is left in the output buffer.
-// Keep in mind that the output buffer is a circular buffer, so if the
-// applicable bytes "wrap-around" in the buffer, then this function will
-// perform 2 I/O operations to write the 2 noncontiguous chunks of data.
+// "endOffset" that is specified.  Keep in mind that the output buffer is a
+// circular buffer, so if the applicable bytes "wrap-around" in the buffer, then
+// this function will perform 2 I/O operations to write the 2 noncontiguous
+// chunks of data.
 //------------------------------------------------------------------------------
 int ColumnBufferManager::writeToFile(int endOffset) {
     int bufferSize = fCBuf->getSize();
@@ -436,7 +412,7 @@ int ColumnBufferManager::writeToFile(int endOffset) {
     if (writeSize < BLOCK_SIZE)
         return NO_ERROR;
 
-    writeSize = writeSize - writeSize%BLOCK_SIZE; //round down to mult of blksiz
+    writeSize = writeSize - writeSize%BLOCK_SIZE;
     endOffset = (fBufWriteOffset + writeSize - 1) % bufferSize;
 
     if (fLog->isDebug( DEBUG_3 )) {
@@ -638,7 +614,7 @@ int ColumnBufferManager::intermediateFlush() {
         // See if JobStatus has been set to terminate by another thread
         if (BulkStatus::getJobStatus() == EXIT_FAILURE)
         {
-            throw SecondaryShutdownException( "ColumnBufferManager::"
+            throw SecondaryShutdownExcept( "ColumnBufferManager::"
                 "intermediateFlush() responding to job termination");
         }
     }
@@ -671,11 +647,11 @@ int ColumnBufferManager::rowsExtentCheck( int nRows, int& nRows2 ) {
 // ColumnBufferManager; hence the need for this function to be called to employ
 // a mutex lock around the call to extendColumn().
 //------------------------------------------------------------------------------
-int ColumnBufferManager::extendTokenColumn( )
+int ColumnBufferManager::extendTokenColumn( bool saveLBIDForCP )
 {
     boost::mutex::scoped_lock lock(fColInfo->colMutex());
 
-    return fColInfo->extendColumn( false );
+    return fColInfo->extendColumn( saveLBIDForCP );
 }
 
 }

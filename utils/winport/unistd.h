@@ -43,7 +43,6 @@ extern unsigned int sleep(unsigned int);
 #define F_OK 00
 #define W_OK 02
 #define R_OK 04
-#define X_OK 00
 #endif
 #ifndef F_RDLCK
 #define F_RDLCK 1
@@ -121,22 +120,6 @@ extern int usleep(unsigned int);
 extern int fork();
 
 extern int getpagesize();
-
-extern int pipe(int[2]);
-extern pid_t getppid();
-extern pid_t waitpid(pid_t, int*, int);
-
-#define WIFEXITED(x) 0
-#define WEXITSTATUS(x) 0
-
-#define WNOHANG 0x01
-#define WUNTRACED 0x02
-#define WCONTINUED 0x04
-
-extern int kill(pid_t, int);
-extern int setuid(uid_t);
-
-#define snprintf _snprintf
 
 #ifdef __cplusplus
 }

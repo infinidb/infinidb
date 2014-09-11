@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: command-jl.h 8476 2012-04-25 22:28:15Z xlou $
+// $Id: command-jl.h 8272 2012-01-19 16:28:34Z xlou $
 // C++ Interface: command
 //
 // Description: 
@@ -39,8 +39,6 @@
 namespace joblist
 {
 
-class BatchPrimitiveProcessorJL;
-
 class CommandJL
 {
 // #warning got CommandJL definition
@@ -49,7 +47,7 @@ class CommandJL
 		CommandJL(const CommandJL &);
 		virtual ~CommandJL();
 		
-		virtual void setLBID(uint64_t data, uint dbroot) = 0;		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
+		virtual void setLBID(uint64_t data) = 0;		// converts a rid or dictionary token to an LBID.  For ColumnCommandJL it's a RID, for a DictStep it's a token.
 		virtual uint8_t getTableColumnType() = 0;
 		virtual std::string toString() = 0;
 		virtual void createCommand(messageqcpp::ByteStream &) const;

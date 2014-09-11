@@ -22,7 +22,6 @@
 
 #include "liboamcpp.h"
 #include "configcpp.h"
-#include "installdir.h"
 
 using namespace std;
 using namespace oam;
@@ -52,7 +51,6 @@ int main(int argc, char **argv)
 {
 	string command;
 	Oam oam;
-	BRM::DBRM dbrm;
 
 	char c;
 	
@@ -73,31 +71,17 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if ( command == "suspend" ) 
-	{
-		try
-		{
-            std::vector<BRM::TableLockInfo> tableLocks = dbrm.getAllTableLocks();
-            if (!tableLocks.empty())
-            {
-                oam.DisplayLockedTables(tableLocks, &dbrm);
-            }
+	if ( command == "suspend" ) {
+		try{
+			oam.stopDDLProcessing();
+			oam.stopDMLProcessing();
+			
+			sleep(5);
+			int rtnCode = system("/usr/local/Calpont/bin/save_brm  > /var/log/Calpont/save_brm.log1 2>&1");
+			if (rtnCode == 0)
+				cout << endl << "Suspend Calpont Database Writes Request successfully completed" << endl;
 			else
-			{
-				dbrm.setSystemSuspended(true);
-				sleep(5);
-				string cmd = startup::StartUp::installDir() + "/bin/save_brm  > /var/log/Calpont/save_brm.log1 2>&1";
-				int rtnCode = system(cmd.c_str());
-				if (rtnCode == 0)
-				{
-					cout << endl << "Suspend Calpont Database Writes Request successfully completed" << endl;
-				}
-				else
-				{
-					cout << endl << "Suspend Calpont Database Writes Failed: save_brm Failed" << endl;
-					dbrm.setSystemSuspended(false);
-				}
-			}
+				cout << endl << "Suspend Calpont Database Writes Failed: save_brm Failed" << endl;
 		}
 		catch (exception& e)
 		{
@@ -110,10 +94,10 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		if ( command == "resume" ) 
-		{
+		if ( command == "resume" ) {
 			try{
-				dbrm.setSystemSuspended(false);
+				oam.resumeDDLProcessing();
+				oam.resumeDMLProcessing();
 				cout << endl << "Resume Calpont Database Writes Request successfully completed" << endl;
 			}
 			catch (exception& e)

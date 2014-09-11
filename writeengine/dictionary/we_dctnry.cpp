@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_dctnry.cpp 4213 2012-09-28 13:04:51Z dcathey $
+* $Id: we_dctnry.cpp 3771 2012-04-17 14:46:49Z chao $
 *
 *******************************************************************************/
 /** @we_dctnry.cpp
@@ -32,10 +32,9 @@
 #include <sstream>
 #ifndef _MSC_VER
 #include <inttypes.h>
-#endif
-#include <iostream>
 using namespace std;
 
+#endif
 #include "bytestream.h"
 #include "brmtypes.h"
 #include "extentmap.h"    // for DICT_COL_WIDTH
@@ -178,9 +177,10 @@ int  Dctnry::init()
  *        segment   - segment number associated with the file
  *        startLbid - (out) starting LBID of the newly allocated extent
  *        flag      - "true" indicates we are adding the first block and the
- *                    file needs to be created with an abbreviated extent.
+ *                    file needs to be created.
  *                    "false" indicates we just want to add an extent to
- *                    an existing file, and the file has already been opened.
+ *                    an existing column, and the file has already been
+ *                    opened.
  *
  * RETURN:
  *    success    - successfully created file and/or extent
@@ -208,7 +208,8 @@ int  Dctnry::createDctnry( const OID& dctnryOID, int colWidth,
             m_dbRoot, m_partition, m_segment ) ) );
         m_segFileName = fileName;
 
-        // if obsolete file exists, "w+b" will truncate and write over
+        if( exists( fileName ) )
+            return ERR_FILE_EXIST;
         m_dFile = createDctnryFile(fileName, colWidth, "w+b", DEFAULT_BUFSIZ);
     }
     else
@@ -236,7 +237,7 @@ int  Dctnry::createDctnry( const OID& dctnryOID, int colWidth,
         totalSize = NUM_BLOCKS_PER_INITIAL_EXTENT;
     }
 
-    if ( !isDiskSpaceAvail(Config::getDBRootByNum(m_dbRoot), totalSize) )
+    if ( !isDiskSpaceAvail(Config::getDBRoot(m_dbRoot-1), totalSize) )
     {
         if (flag)
         {
@@ -271,7 +272,7 @@ int  Dctnry::createDctnry( const OID& dctnryOID, int colWidth,
         closeDctnryFile(true, oids);
         m_numBlocks = totalSize;
         m_hwm = 0;
-        rc = BRMWrapper::getInstance()->setLocalHWM(
+        rc = BRMWrapper::getInstance()->setLocalHWM_HWMt(
             m_dctnryOID, m_partition, m_segment, m_hwm);
     }
     else
@@ -309,7 +310,7 @@ int  Dctnry::expandDctnryExtent()
     int blksToAdd = ( ((int)BRMWrapper::getInstance()->getExtentRows() -
         INITIAL_EXTENT_ROWS_TO_DISK)/BYTE_PER_BLOCK ) *  PSEUDO_COL_WIDTH;
 
-    if ( !isDiskSpaceAvail(Config::getDBRootByNum(m_dbRoot), blksToAdd) )
+    if ( !isDiskSpaceAvail(Config::getDBRoot(m_dbRoot-1), blksToAdd) )
     {
         return ERR_FILE_DISK_SPACE;
     }
@@ -369,8 +370,8 @@ int Dctnry::closeDctnry()
     closeDctnryFile(true, oids);
 
     m_hwm = (HWM)m_lastFbo;
-    idbassert(m_dctnryOID>=0);
-    rc = BRMWrapper::getInstance()->setLocalHWM(
+    assert(m_dctnryOID>=0);
+    rc = BRMWrapper::getInstance()->setLocalHWM_HWMt(
         m_dctnryOID, m_partition, m_segment, m_hwm);
     if (rc != NO_ERROR)
         return rc;
@@ -456,23 +457,7 @@ int Dctnry::openDctnry(const OID& dctnryOID,
 
     m_dFile = openDctnryFile();
     if( m_dFile == NULL )
-	{
-		ostringstream oss;
-		oss << "oid:partition:segment " << dctnryOID <<":"<<partition<<":"<<segment;
-		logging::Message::Args args;
-		logging::Message message(1);
-		args.add("Error opening dictionary file ");
-		args.add(oss.str());
-		args.add("");
-		args.add("");
-		message.format(args);
-		logging::LoggingID lid(21);
-        logging::MessageLog ml(lid);
-
-        ml.logErrorMessage( message );
         return ERR_FILE_OPEN;
-		
-	}
 
     m_numBlocks = numOfBlocksInFile();
 	std::map<FID,FID> oids;
@@ -480,7 +465,7 @@ int Dctnry::openDctnry(const OID& dctnryOID,
     //Initialize other misc member variables
     init();
 
-    rc=BRMWrapper::getInstance()->getLocalHWM(dctnryOID,
+    rc=BRMWrapper::getInstance()->getLocalHWM_HWMt(dctnryOID,
         m_partition, m_segment, m_hwm);
     if (rc!=NO_ERROR)
     {
@@ -624,66 +609,51 @@ void Dctnry::insertDctnry2(Signature& sig)
 int Dctnry::insertDctnry(const char* buf,
                          ColPosPair ** pos,
                          const int totalRow, const int col,
-                         char* tokenBuf,
-                         long long& truncCount)
+                         char* tokenBuf)
 {
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_PARSE_DCT);
 #endif
-    int startPos     = 0;
-    int totalUseSize = 0;
-
-    int outOffset    = 0;
-    const char* pIn;
-    char* pOut       = tokenBuf;
+    int startPos =0;
+    int totalUseSize =0;
+    //new
+    int outOffset = 0;
+    char* pIn;
+    char* pOut = tokenBuf;
     Signature curSig;
-    bool found       = false;
-    bool next        = false;
+    bool found = false;
+    bool next = false;
     CommBlock cb;
-    cb.file.oid      = m_dctnryOID;
-    cb.file.pFile    = m_dFile;
-    WriteEngine::Token nullToken;
+    cb.file.oid = m_dctnryOID;
+    cb.file.pFile = m_dFile;
 
     //...Loop through all the rows for the specified column
     while(startPos < totalRow)
     {
         found = false;
+        int start = pos[startPos][col].start;
+        pIn = (char*)buf + start;
         memset(&curSig, 0, sizeof(curSig));
+        curSig.signature =(unsigned char*)pIn;
         curSig.size = pos[startPos][col].offset;
+
+        // @Bug 2565: Truncate any strings longer than schema's column width
+        if (curSig.size > m_colWidth)
+            curSig.size = m_colWidth;
 
         // Read thread should validate against max size so that the entire row
         // can be rejected up front.  Once we get here in the parsing thread,
         // it is too late to reject the row.  However, as a precaution, we
-        // still check against max size & set to null token if needed.
+        // still check against max size & set to null token if we needed.
         if ((curSig.size == 0) ||
             (curSig.size == COLPOSPAIR_NULL_TOKEN_OFFSET) ||
-            (curSig.size >  MAX_SIGNATURE_SIZE))
+            (curSig.size > MAX_SIGNATURE_SIZE))
         {
-            if (m_defVal.length() > 0) // use default string if available
-            {
-                pIn = m_defVal.c_str();
-                curSig.signature = (unsigned char*)pIn;
-                curSig.size      = m_defVal.length();
-            }
-            else
-            {
-                memcpy( pOut + outOffset, &nullToken, 8 );
-                outOffset += 8;
-                startPos++;
-                continue;
-            }
-        }
-        else
-        {
-            pIn = (char*)buf + pos[startPos][col].start;
-            curSig.signature =(unsigned char*)pIn;
-        }
-
-        // @Bug 2565: Truncate any strings longer than schema's column width
-        if (curSig.size > m_colWidth)
-        {
-            curSig.size = m_colWidth;
-            ++truncCount;
+            WriteEngine::Token nullToken;
+            memcpy( pOut + outOffset, &nullToken, 8 );
+            outOffset += 8;
+            startPos++;
+            continue;
         }
 
         //...Search for the string in our string cache
@@ -926,8 +896,8 @@ int Dctnry::insertDctnry(const int& sgnature_size,
             if (m_curOp < (MAX_OP_COUNT-1))
                 return NO_ERROR;
         }//end Found
-		
-		//@bug 3832. check error code
+
+        //@bug 3832. check error code
         RETURN_ON_ERROR( writeDBFile(cb, &m_curBlock, m_curLbid) );
         memset( m_curBlock.data, 0, sizeof(m_curBlock.data));
         memcpy( m_curBlock.data, &m_dctnryHeader2, m_totalHdrBytes);
@@ -970,10 +940,9 @@ int Dctnry::insertDctnry(const int& sgnature_size,
                                false) ;
             if ( rc != NO_ERROR )
             {
-                //roll back the extent             
+                //roll back the extent
 				BRMWrapper::getInstance()->deleteEmptyDictStoreExtents(dictExtentInfo);
-				return rc;
-            }
+				return rc;            }
         }
         RETURN_ON_ERROR( BRMWrapper::getInstance()->getBrmInfo(m_dctnryOID,
                                                     m_partition, m_segment,
@@ -1063,7 +1032,7 @@ void  Dctnry::getBlockOpCount( const DataBlock &fileBlock, int & op_count)
     bs >> dbyte;
     bs >> dbyte;
     bs >> dbyte;
-    idbassert(dbyte == BYTE_PER_BLOCK);
+    assert(dbyte == BYTE_PER_BLOCK);
     bs >> offset;
 
     while (offset < 0xffff)
@@ -1577,11 +1546,7 @@ int  Dctnry::deleteDctnryValue( Token& token, int& sigSize,
     {
         return ERR_FILE_NULL;
     }
-    long long fileSizeBytes;
-    rc = getFileSize2(m_dFile,fileSizeBytes)
-    if (rc != NO_ERROR)
-        return rc;
-    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    m_numBlocks = getFileSize( m_dFile )/BYTE_PER_BLOCK ;
     //get max lbid
 
     if ((int)token.fbo <0)
@@ -1668,11 +1633,7 @@ int Dctnry::initDctnryHdr(FILE* dFile)
     cb.file.oid = m_dctnryOID;
     cb.file.pFile = m_dFile;
 
-    long long fileSizeBytes;
-    rc = getFileSize2(dFile,fileSizeBytes)
-    if (rc != NO_ERROR)
-        return rc;
-    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    m_numBlocks = getFileSize( dFile )/BYTE_PER_BLOCK ;
     //initialization
     bool oldUseVb = BRMWrapper::getUseVb();
     BRMWrapper::setUseVb( false );
@@ -1682,7 +1643,7 @@ int Dctnry::initDctnryHdr(FILE* dFile)
     memcpy(&fileBlock,&m_dctnryHeader2,m_totalHdrBytes);
     for (i=m_lastFbo; i< m_numBlocks; i++)
     {
-        BRM::LBID_t lbid;
+        i64 lbid;
         BRMWrapper::getInstance()->getBrmInfo( m_dctnryOID,
             m_partition, m_segment,
             i, lbid );
@@ -1719,11 +1680,7 @@ int  Dctnry::findTokenValue (FILE* dFile, Token& token,
     cb.file.oid = m_dctnryOID;
     cb.file.pFile = dFile;
     m_dFile = dFile;
-    long long fileSizeBytes;
-    rc = getFileSize2(m_dFile,fileSizeBytes)
-    if (rc != NO_ERROR)
-        return rc;
-    m_numBlocks = fileSizeBytes / BYTE_PER_BLOCK;
+    m_numBlocks = getFileSize( m_dFile )/BYTE_PER_BLOCK ;
     memset( fileBlock.data, 0, sizeof(fileBlock.data));
     memset(m_dctnryHeader,0,sizeof(m_dctnryHeader));
 
@@ -1787,7 +1744,7 @@ void  Dctnry::getBlockHdr( FILE* dFile, int fbo, int & op_count,
 
     int       rc;
     m_dFile = dFile;
-    BRM::LBID_t lbid;
+    i64 lbid;
     CommBlock cb;
     cb.file.oid = m_dctnryOID;
     cb.file.pFile = dFile;

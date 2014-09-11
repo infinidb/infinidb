@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: message.cpp 3280 2012-09-13 16:27:28Z rdempsey $
+* $Id: message.cpp 2394 2011-02-08 14:36:22Z rdempsey $
 *
 ******************************************************************************************/
 #include <iostream>
@@ -38,7 +38,9 @@ using namespace boost;
 using namespace config;
 #include "messageobj.h"
 
-#include "installdir.h"
+#ifdef _MSC_VER
+#include "idbregistry.h"
+#endif
 
 namespace {
 
@@ -51,10 +53,14 @@ CatMap catmap;
 
 void loadCatalog()
 {
-	Config* cf = Config::makeConfig();
+	const Config* cf = Config::makeConfig();
 	string configFile(cf->getConfig("MessageLog", "MessageLogFile"));
 	if (configFile.length() == 0)
-		configFile = startup::StartUp::installDir() + "/etc/MessageFile.txt";
+#ifdef _MSC_VER
+		configFile = IDBreadRegistry("") + "\\etc\\MessageFile.txt";
+#else
+		configFile = "/usr/local/Calpont/etc/MessageFile.txt";
+#endif
 	ifstream msgFile(configFile.c_str());
 	while (msgFile.good())
 	{

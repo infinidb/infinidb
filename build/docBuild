@@ -6,4 +6,4 @@ if [ -f buildFlags ]; then
 	echo "Build Flags: `cat buildFlags`"
 fi
 
-git log -1 | head -3 | egrep "^(commit|Date)"
+git log HEAD~1..HEAD | egrep "(commit|Date)"

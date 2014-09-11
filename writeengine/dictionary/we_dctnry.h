@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_dctnry.h 4195 2012-09-19 18:12:27Z dcathey $
+//  $Id: we_dctnry.h 3403 2011-12-21 16:58:13Z xlou $
 
 /** @we_dctnry.h
  *  Defines the Dctnry class
@@ -27,6 +27,7 @@
 #ifndef _WE_DCTNRY_H_
 #define _WE_DCTNRY_H_
 
+#include <sys/timeb.h>
 #include <cstdlib>
 #include <cstddef>
 #include <iostream>
@@ -87,11 +88,8 @@ public:
     EXPORT int   closeDctnryOnly();
 
     /**
-     * @brief Create a dictionary extent
-     * 
-     * If 'flag' is true, a new file is created with an abbreviated extent.
-     * If 'flag' is false, then function adds a full exent to an already open
-     * file, basically assuming that the file already has 1 or more extents.
+     * @brief Create dictionary store with initial extent (if flag is true).  If
+     * flag is false, then function just adds an exent to an already open file.
      *
      * @param dctnryOID - dictionary file OID
      * @param colWidth  - dictionary string width (not the token width)
@@ -148,8 +146,7 @@ public:
     EXPORT int   insertDctnry(const char* buf,
                       ColPosPair ** pos,
                       const int totalRow, const int col,
-                      char* tokenBuf,
-                      long long& truncCount);
+                      char* tokenBuf);
 
     /**
      * @brief Update dictionary store with tokenized strings (for DDL/DML use)
@@ -176,7 +173,7 @@ public:
     /**
      * @brief copy the dictionary header to buffer
      */
-    void         copyDctnryHeader(void* buf);
+    virtual void copyDctnryHeader(void* buf);
 
     /**
      * @brief Set logger that can be used for logging (primarily by bulk load)
@@ -187,11 +184,6 @@ public:
      * @brief Set dictionary column width for this column
      */
     void         setColWidth(int colWidth) { m_colWidth = colWidth; }
-
-    /**
-     * @brief Set dictionary default for this column
-     */
-    void         setDefault(const std::string& defVal) { m_defVal = defVal; }
 
 #if 0
     //--------------------------------------------------------------------------
@@ -327,11 +319,10 @@ protected:
     i16          m_freeSpace;        // free space (bytes) within current block
     int          m_curOp;            // current ordinal pointer within m_curFbo
     int          m_curFbo;           // current "raw" (uncompressed) FBO
-    BRM::LBID_t  m_curLbid;          // LBID associated with m_curFbo
+    i64          m_curLbid;          // LBID associated with m_curFbo
     DataBlock    m_curBlock;         // current "raw" (uncompressed) data block
     Log*         m_logger;           // logger, mainly for bulk load
     int          m_colWidth;         // width of this dictionary column
-    std::string  m_defVal;           // optional default string value
 
 };//end of class
 

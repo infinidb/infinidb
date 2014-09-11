@@ -1,24 +1,14 @@
 #
-# $Id: functions 2937 2012-05-30 18:17:09Z rdempsey $
+# $Id: functions 2279 2011-03-24 18:26:31Z dhill $
 #
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-PATH=$INFINIDB_INSTALL_DIR/bin:$PATH
+PATH=/usr/local/Calpont/bin:$PATH
 export PATH
 
 module_type()
 {
 (
-	sed -r 's/[0-9]+$//' $INFINIDB_INSTALL_DIR/local/module
+	sed -r 's/[0-9]+$//' /usr/local/Calpont/local/module
 ) 2>/dev/null
 }
 
@@ -38,13 +28,13 @@ oidbitmapfile()
 module_name()
 {
 (
-	cat $INFINIDB_INSTALL_DIR/local/module
+	cat /usr/local/Calpont/local/module
 ) 2>/dev/null
 }
 
 module_id()
 {
 (
-	sed -r 's/[a-zA-Z]//g' $INFINIDB_INSTALL_DIR/local/module
+	sed -r 's/[a-zA-Z]//g' /usr/local/Calpont/local/module
 ) 2>/dev/null
 }

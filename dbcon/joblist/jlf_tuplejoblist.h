@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_tuplejoblist.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: jlf_tuplejoblist.h 7805 2011-06-21 23:59:13Z xlou $
 
 
 /** @file */
@@ -35,7 +35,6 @@ struct JoinInfo
 {
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	std::string               fAlias;
-	std::string               fSchema;
 	std::string               fView;
 	AnyDataListSPtr           fDl;       // output data list
 	rowgroup::RowGroup        fRowGroup; // rowgroup meta data for the data list
@@ -64,9 +63,7 @@ struct DictionaryScanInfo
 struct TableInfo
 {
 	execplan::CalpontSystemCatalog::OID fTableOid;
-	std::string               fName;
 	std::string               fAlias;
-	std::string               fSchema;
 	std::string               fView;
 	uint64_t                  fSubId;
 	JobStepVector             fQuerySteps;

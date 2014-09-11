@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_hex.cpp 3551 2013-02-05 22:14:40Z rdempsey $
+* $Id: func_hex.cpp 2717 2011-06-21 20:48:14Z zzhu $
 *
 *
 ****************************************************************************/
@@ -39,7 +39,7 @@ using namespace execplan;
 namespace funcexp
 {
 
-extern const char* convNumToStr(int64_t val,char *dst,int radix);
+extern char* convNumToStr(int64_t val,char *dst,int radix);
 extern char digit_upper[];
 
 void octet2hex(char *to, const char *str, uint len)
@@ -66,6 +66,7 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 	string arg, retval;
 	uint64_t dec;
 	char ans[65];
+	char* ptr;
 
 	switch (parm[0]->data()->resultType().colDataType)
 	{
@@ -90,7 +91,8 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 				dec=  ~(int64_t) 0;
 			else
 				dec= (uint64_t) (val + (val > 0 ? 0.5 : -0.5));
-			retval = convNumToStr(dec, ans, 16);
+			ptr= convNumToStr(dec, ans, 16);
+			retval.append(ans, 0, (uint)(ptr-ans));
 			break;
 		}
 		case CalpontSystemCatalog::VARBINARY:
@@ -104,7 +106,8 @@ string Func_hex::getStrVal(rowgroup::Row& row,
 		default:
 		{
 			dec= (uint64_t)parm[0]->data()->getIntVal(row, isNull);
-			retval = convNumToStr(dec, ans, 16);
+			ptr= convNumToStr(dec, ans, 16);
+			retval.append(ans, 0, (uint)(ptr-ans));
 			if (retval.length() > (uint)ct.colWidth)
 				retval = retval.substr(retval.length()-ct.colWidth, ct.colWidth);
 		}

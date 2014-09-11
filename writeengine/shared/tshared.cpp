@@ -118,7 +118,7 @@ public:
       char           fileName[40];
 
       for( int k = 0; k < 273; k++ ) {
-         snprintf( fileName, sizeof(fileName), "testwr%d.tst", k );
+         sprintf( fileName, "testwr%d.tst", k );
          pFile = fopen( fileName, "w+b" );
          if( pFile != NULL ) {
             setvbuf ( pFile , diskBuf , _IOFBF , 81920 );

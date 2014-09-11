@@ -22,7 +22,6 @@
 #include "snmpmanager.h"
 #undef SNMPMANAGER_DLLEXPORT
 
-#include <unistd.h>
 #include <cstdio>
 #include <algorithm>
 #include <vector>
@@ -31,7 +30,7 @@
 #include "messagequeue.h"
 #include "snmpglobal.h"
 #include "liboamcpp.h"
-#include "installdir.h"
+
 
 using namespace std;
 using namespace oam;
@@ -105,7 +104,7 @@ void SNMPManager::sendAlarmReport (const char* componentID, int alarmID, int sta
 	Message::Args args;
 
 	//Log receiving of Alarm report
-	if (CALPONT_SNMP_DEBUG)
+	if (DEBUG)
 	{
 		args.add("sendAlarmReport: alarm #");
 		args.add(alarmID);
@@ -189,7 +188,7 @@ void SNMPManager::sendAlarmReport (const char* componentID, int alarmID, int sta
 	string ComponentID = componentID;
 	// send Trap
 
-	string cmd = startup::StartUp::installDir() + "/bin/sendtrap " + ComponentID + " " + oam.itoa(alarmID) + " " + oam.itoa(state) + " " + ModuleName + " " + processName + " " + oam.itoa(pid) + " " + oam.itoa(tid) + " " + SNMPManager::parentOAMModuleName;
+	string cmd = "/usr/local/Calpont/bin/sendtrap " + ComponentID + " " + oam.itoa(alarmID) + " " + oam.itoa(state) + " " + ModuleName + " " + processName + " " + oam.itoa(pid) + " " + oam.itoa(tid) + " " + SNMPManager::parentOAMModuleName;
 
 	system(cmd.c_str());
 
@@ -213,7 +212,11 @@ void SNMPManager::getActiveAlarm(AlarmList& alarmList) const
 
    	if (fd == -1) {
      	// file may being deleted temporarily by trapHandler
+#ifdef _MSC_VER
+		Sleep(1 * 1000);
+#else
 	 	sleep (1);
+#endif
    		fd = open(fileName.c_str(),O_RDONLY);
    		if (fd == -1) {
 			// no active alarms, return
@@ -249,7 +252,7 @@ void SNMPManager::getActiveAlarm(AlarmList& alarmList) const
 
 	close(fd);
 
-	if (CALPONT_SNMP_DEBUG)
+	if (DEBUG)
 	{
 		AlarmList :: iterator i;
 		for (i = alarmList.begin(); i != alarmList.end(); ++i)
@@ -352,7 +355,7 @@ void SNMPManager::getAlarm(std::string date, AlarmList& alarmList) const
      	throw runtime_error ("Release lock active alarm log file error");
 	}
 	
-	if (CALPONT_SNMP_DEBUG)
+	if (DEBUG)
 	{
 		AlarmList :: iterator i;
 		for (i = alarmList.begin(); i != alarmList.end(); ++i)
@@ -479,12 +482,12 @@ void SNMPManager::setSNMPConfig (const string ModuleName, const std::string agen
 	string processName;
 	makeProcessName (agentName, processName);
 
-/*	try {
+	try {
 		oam.reinitProcessType(processName);
 	}
 	catch(...)
 	{}
-*/
+
 }
 
 /*****************************************************************************************
@@ -622,8 +625,6 @@ void SNMPManager::setSNMPModuleName ()
 *****************************************************************************************/
 void SNMPManager::makeFileName (const std::string agentName, std::string& fileName)
 {
-	string defaultPath = startup::StartUp::installDir() + "/etc/";
-	string localPath = startup::StartUp::installDir() + "/local/";
 	if (agentName.compare (MASTER_AGENT) == 0) {
 		fileName = defaultPath;
 		fileName += "snmpd.conf";
@@ -665,7 +666,11 @@ void SNMPManager::makeProcessName (const std::string agentName, std::string& pro
 *****************************************************************************************/
 void SNMPManager::updateSNMPD(std::string oldIPAddr, std::string parentOAMModuleIPAddr)
 {
-	string fileName = startup::StartUp::installDir() + "/etc/snmpd.conf";
+#ifdef _MSC_VER
+	string fileName = "C:\\Calpont\\etc\\snmpd.conf";
+#else
+	string fileName = "/usr/local/Calpont/etc/snmpd.conf";
+#endif
 
 	ifstream oldFile (fileName.c_str());
 	if (!oldFile) return;

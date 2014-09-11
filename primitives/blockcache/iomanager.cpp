@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: iomanager.cpp 2089 2013-05-06 17:56:34Z pleblanc $
+// $Id: iomanager.cpp 2054 2013-02-08 14:58:38Z rdempsey $
 //
 // C++ Implementation: iomanager
 //
@@ -89,12 +89,15 @@ using namespace logging;
 
 #include "fsutils.h"
 
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
+
 typedef tr1::unordered_set<BRM::OID_t> USOID;
 
 namespace primitiveprocessor
 {
 extern Logger* mlp;
-extern int directIOFlag;
 #ifdef _MSC_VER
 extern CRITICAL_SECTION preadCSObject;
 #else
@@ -116,6 +119,9 @@ using namespace compress;
 
 #ifndef O_BINARY
 #  define O_BINARY 0
+#endif
+#ifndef O_DIRECT
+#  define O_DIRECT 0
 #endif
 #ifndef O_LARGEFILE
 #  define O_LARGEFILE 0
@@ -237,47 +243,51 @@ public:
 	}
 };
 
-struct fdCacheMapLessThan
+struct fdCacheMapCompare // lt operator
 {
 	bool operator()(const FdEntry& lhs, const FdEntry& rhs) const
 	{
-		if (lhs.oid < rhs.oid)
+		if( lhs.oid < rhs.oid ) {
 		  return true;
-
-		if (lhs.oid==rhs.oid && lhs.dbroot < rhs.dbroot)
+		}
+		if(lhs.oid==rhs.oid && lhs.dbroot < rhs.dbroot ) {
 		  return true;
-
-		if (lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum < rhs.partNum)
+		}
+		if(lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum < rhs.partNum ) {
 		  return true;
-
-		if (lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum==rhs.partNum && lhs.segNum < rhs.segNum)
+		}
+		if(lhs.oid==rhs.oid && lhs.dbroot==rhs.dbroot && lhs.partNum==rhs.partNum && lhs.segNum < rhs.segNum ) {
 		  return true;
+		}
 
 		return false;
 
-	}
-};
+	} // operator
+}; // struct
 
-struct fdMapEqual
+struct fdMapEqual // lt operator
 {
 	bool operator()(const FdEntry& lhs, const FdEntry& rhs) const
 	{
-	   return (lhs.oid == rhs.oid &&
+	   if(lhs.oid == rhs.oid &&
 		   lhs.dbroot == rhs.dbroot &&
 		   lhs.partNum == rhs.partNum &&
-		   lhs.segNum == rhs.segNum);
-	}
+		   lhs.segNum == rhs.segNum)
+		 return true;
+	  else
+		return false;
 
-};
+	} // operatordd
+
+}; // struct fdMapEqual
 
 typedef boost::shared_ptr<FdEntry> SPFdEntry_t;
-typedef std::map<FdEntry, SPFdEntry_t, fdCacheMapLessThan> FdCacheType_t;
+typedef std::map<FdEntry, SPFdEntry_t, fdCacheMapCompare> FdCacheType_t;
 
 struct FdCountEntry
 {
 	FdCountEntry() {}
-	FdCountEntry(const BRM::OID_t o, const uint16_t d, const uint32_t p, const uint16_t s, const uint32_t c,
-		const FdCacheType_t::iterator it) : oid(o), dbroot(d), partNum(p), segNum(s), cnt(c), fdit(it) {}
+	FdCountEntry(const BRM::OID_t o, const uint16_t d, const uint32_t p, const uint16_t s, const uint32_t c, const FdCacheType_t::iterator it) : oid(o), dbroot(d), partNum(p), segNum(s), cnt(c), fdit(it) {}
 	~FdCountEntry() {}
 
 	BRM::OID_t oid;
@@ -315,6 +325,13 @@ typedef multiset<FdCountEntry_t, fdCountCompare> FdCacheCountType_t;
 FdCacheType_t fdcache;
 boost::mutex fdMapMutex;
 rwlock::RWLock_local localLock;
+boost::mutex remountMutex;
+//boost::condition remountCondition;
+//std::set<SPFdEntry_t> fdsToOpen;
+bool remounting = false;
+
+//update is protected by rwlock
+int remountSleepTime;
 
 void pause_(unsigned secs)
 {
@@ -374,6 +391,278 @@ const vector<pair<string, string> > getDBRootList()
 	return ret;
 }
 
+#ifdef __linux__
+// this can't throw anything
+void remount_dbroots() throw()
+{
+try {
+	vector<pair<string, string> > dbrlist = getDBRootList();
+	vector<pair<string, string> >::iterator iter = dbrlist.begin();
+	vector<pair<string, string> >::iterator end = dbrlist.end();
+	int rc, fd;
+	unsigned long mntflags = MS_MGC_VAL | MS_DIRSYNC | MS_NOATIME |
+		MS_NODIRATIME | MS_RDONLY | MS_SYNCHRONOUS;
+
+	for (; iter != end; ++iter) {
+//		rc = ::umount2(iter->second.c_str(), MNT_FORCE);
+		rc = ::umount(iter->second.c_str());
+		if (rc != 0) {
+			char buf[80] = {'\0'};
+			cerr << "unmounting " << iter->second.c_str() << " failed: ";
+#if STRERROR_R_CHAR_P
+			const char* msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << msg << endl;
+#else
+			int msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << buf << endl;
+#endif
+{
+cerr << "My open fds are:" << endl;
+for (long l = 0; l < sysconf(_SC_OPEN_MAX); l++)
+{
+	struct stat st;
+	if (fstat((int)l, &st) == 0)
+	{
+		cout << l << '\t' << st.st_dev << '\t' << st.st_ino << '\t' << st.st_size << endl;
+	}
+}
+}
+			continue;
+		}
+		cerr << "successfully unmounted " << iter->second.c_str() << endl;
+	}
+
+	cerr << "Dropping inode cache\n";
+	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
+	//RHEL 4 doesn't have this node, so just ignore open() errors :-(
+	if (fd < 0) {
+		char buf[80] = {'\0'};
+		cerr << "Failed to open /proc/sys/vm/drop_caches: ";
+#if STRERROR_R_CHAR_P
+		const char* msg;
+		msg = strerror_r(errno, buf, 80);
+		cerr << msg << endl;
+#else
+		int msg;
+		msg = strerror_r(errno, buf, 80);
+		cerr << buf << endl;
+#endif
+	}
+	else {
+		if (write(fd, "3\n", 2) == 2)
+			cerr << "drop successful\n";
+		else {
+			char buf[80] = {'\0'}, *msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << "Failed to write to /proc/sys/vm/drop_caches: " << msg << endl;
+		}
+		close(fd);
+	}
+	cout << "waiting " << remountSleepTime << " seconds...\n";
+	sleep(remountSleepTime);
+
+	string devname;
+
+	for (iter = dbrlist.begin(); iter != end; ++iter) {
+		devname = fsutils::symname2devname(iter->first);
+		if (devname.empty())
+			devname = iter->first;
+		rc = ::mount(devname.c_str(), iter->second.c_str(), "ext2", mntflags, "");
+		if (rc != 0) {
+			char buf[80] = {'\0'};
+			cerr << "remounting " << iter->first << " at " << iter->second << " failed: ";
+#if STRERROR_R_CHAR_P
+			const char* msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << msg << endl;
+#else
+			int msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << buf << endl;
+#endif
+			continue;
+		}
+		cerr << "successfully remounted " << iter->first << " at " <<
+			iter->second << endl;
+	}
+
+}
+catch(exception& e) {
+	cerr << "remount_dbroots() caught: " << e.what() << endl;
+}
+catch (...) {
+	cerr << "remount_dbroots() caught an exception" << endl;
+}
+
+}
+
+int remount_trick(char *filename, BRM::OID_t oid, uint16_t dbroot, uint32_t partNum,
+	uint16_t segNum, int compType, bool toCache)
+{
+	int fd = -1, retries = 0;
+	struct timespec tm1, tm2;
+	clock_gettime(CLOCK_REALTIME, &tm1);
+
+	cout << "remount_trick was called" << endl;
+
+remountRetry:
+	// do remount only if the filesystem remounting is not in progress
+	bool doRemount = false;
+	remountMutex.lock();
+	if (remounting == false)
+		doRemount = remounting = true;
+	remountMutex.unlock();
+
+	if (doRemount == true) {
+
+		localLock.upgrade_to_write();
+
+		cout << "RT got the write lock, starting\n";
+		//no reads are ongoing at this point.  All other threads are
+		//either blocked waiting for a request or the read_lock grab.
+		fdcache.clear();
+		retries = 0;
+		while (fd < 0 && retries < 30) {
+			if (retries == 0)
+				remountSleepTime = 1;
+			else if (retries < 10)
+				remountSleepTime = 2;
+			else
+				remountSleepTime = 10;
+
+			remount_dbroots();
+
+			fd = open(filename, O_RDONLY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+			++retries;
+
+			if (fd < 0) {
+				char buf[80] = {'\0'};
+				cerr << "RT: reopening file " << filename << " failed: ";
+#if STRERROR_R_CHAR_P
+				const char* msg;
+				msg = strerror_r(errno, buf, 80);
+				cerr << msg << endl;
+#else
+				int msg;
+				msg = strerror_r(errno, buf, 80);
+				cerr << buf << endl;
+#endif
+				cerr << "   ... retry " << retries << "/30" << endl;
+				sleep(1);
+			}
+		}
+
+		remountMutex.lock();
+		remounting = false;
+		remountMutex.unlock();
+
+		double elapsedTime;
+		clock_gettime(CLOCK_REALTIME, &tm2);
+		timespec_sub(tm1, tm2, elapsedTime);
+		Message::Args args;
+		args.add(std::string(filename));
+		args.add(oid);
+		args.add(retries);
+		args.add(elapsedTime);
+
+		if (fd < 0) {
+			char buf[80] = {'\0'};
+			cerr << "RT: reopening file " << filename << " failed: ";
+#if STRERROR_R_CHAR_P
+			const char* msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << msg << endl;
+#else
+			int msg;
+			msg = strerror_r(errno, buf, 80);
+			cerr << buf << endl;
+#endif
+			args.add(std::string("FAILED"));
+			primitiveprocessor::mlp->logInfoMessage(logging::M0077, args);
+			localLock.downgrade_to_read();
+
+			return -1;
+		}
+
+		args.add(std::string("SUCCESS"));
+		primitiveprocessor::mlp->logInfoMessage(logging::M0077, args);
+
+		cout << "RT: reopen successful\n";
+		if (toCache)
+		{
+			SPFdEntry_t fe(new FdEntry(oid, dbroot, partNum, segNum, compType, fd));
+			fdcache[FdEntry(oid, dbroot, partNum, segNum, compType, -1)] = fe;
+			fe->inUse++;
+		}
+		remountSleepTime = 0;
+		localLock.downgrade_to_read();
+	}
+	else
+	{
+		// let the remounting thread upgrade_to_write()
+		localLock.read_unlock();
+
+		// will be notified by downgrade_to_read()
+		localLock.read_lock();
+
+		FdEntry fdKey(oid, dbroot, partNum, segNum, compType, -1);
+		// The facache is cleared by the remount block above,
+		// but, the fdKey may be the same as the remount thread.
+		if (toCache)
+		{
+			fdMapMutex.lock();
+			FdCacheType_t::iterator it = fdcache.find(fdKey);
+			if (it == fdcache.end()) {
+				fd = open(filename, O_RDONLY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+				if (fd >= 0) {
+					SPFdEntry_t fe(new FdEntry(oid, dbroot, partNum, segNum, compType, fd));
+					fdcache[fdKey] = fe;
+					fe->inUse++;
+				}
+			}
+			else {
+				fd = it->second->fd;
+			}
+			fdMapMutex.unlock();
+		}
+		else // case: txn > 0 && ver == txn && !vbFlag
+		{
+			fd = open(filename, O_RDONLY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+		}
+
+		if (fd < 0) {
+			double elapsedTime;
+			clock_gettime(CLOCK_REALTIME, &tm2);
+			timespec_sub(tm1, tm2, elapsedTime);
+			if (elapsedTime < 120 || retries < 30)
+			{
+				++retries;
+				goto remountRetry;
+			}
+
+			Message::Args args;
+			args.add(std::string(filename));
+			args.add(oid);
+			args.add(retries);
+			args.add(elapsedTime);
+			args.add(std::string("FAILED"));
+			primitiveprocessor::mlp->logInfoMessage(logging::M0077, args);
+		}
+	}
+
+	return fd;
+}
+
+#else //!__linux__
+int remount_trick(char *filename, BRM::OID_t oid, uint16_t dbroot, uint32_t partNum,
+	uint16_t segNum, int compType, bool toCache)
+{
+	return -1;
+}
+#endif //__linux__
+
 char* alignTo(const char* in, int av)
 {
 		ptrdiff_t inx = reinterpret_cast<ptrdiff_t>(in);
@@ -389,8 +678,14 @@ char* alignTo(const char* in, int av)
 
 void waitForRetry(long count)
 {
-	usleep(5000 * count); 
-	return;
+	timespec ts;
+	ts.tv_sec = 5L*count/10L;
+	ts.tv_nsec = (5L*count%10L)*100000000L;
+#ifdef _MSC_VER
+	Sleep(ts.tv_sec * 1000 + ts.tv_nsec / 1000 / 1000);
+#else
+	nanosleep(&ts, 0);
+#endif
 }
 
 
@@ -399,7 +694,6 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 {
 	ssize_t i;
 	struct stat statbuf;
-	ssize_t progress;
 
 	// ptr is taken from buffer, already been checked: realbuff.get() == 0
 	if (ptr == 0)
@@ -428,7 +722,6 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 		i = bytesRead;
 	else
 		i = -1;
-	progress = i;
 #else
 	int fd = fdit->second->fd;
 	if (fd < 0)
@@ -441,15 +734,9 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	//We need to read one extra block because we need the first ptr in the 3rd block
 	// to know if we're done.
 	//FIXME: re-work all of this so we don't have to re-read the 3rd block.
-	progress = 0;
-	while (progress < 4096 * 3) {
-		i = pread(fd, &ptr[progress], (4096 * 3) - progress, progress);
-		if (i <= 0)
-			break;
-		progress += i;
-	}
+	i = pread(fd, ptr, 4096 * 3, 0);
 #endif
-	if (progress != 4096 * 3)
+	if (i != 4096 * 3)
 		return -4;   // let it retry. Not likely, but ...
 
 #ifdef _MSC_VER
@@ -491,19 +778,9 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 			i = bytesRead;
 		else
 			i = -1;
-		progress = i;
 #else
-		progress = 0;
-		while (progress < numHdrs * 4096) {
-			i = pread(fd, &nextHdrBufPtr[progress], (numHdrs * 4096) - progress, 
-			  (4096 * 2) + progress);
-			if (i <= 0)
-				break;
-			progress += i;
-		}
+		i = pread(fd, &nextHdrBufPtr[0], numHdrs * 4096, 4096 * 2);
 #endif
-		if (progress != numHdrs * 4096)
-			return -8;
 		CompChunkPtrList nextPtrList;
 		gplRc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
 		if (gplRc != 0)
@@ -515,8 +792,9 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	return 0;
 }
 
-void* thr_popper(ioManager *arg) {
-	ioManager* iom = arg;
+void* thr_popper(void* arg) {
+	ioManager* iom = ((IOMThreadArg*)arg)->iom;
+	int32_t iomThdId = ((IOMThreadArg*)arg)->thdId;
 	FileBufferMgr* fbm;
 	int totalRqst=0;
 	fileRequest* fr=0;
@@ -557,10 +835,14 @@ void* thr_popper(ioManager *arg) {
 	double tm3;
 	double rqst3;
 	bool locked = false;
+	bool gotEOF = false;
 	SPFdEntry_t fe;
 	IDBCompressInterface decompressor;
 	vector<CacheInsert_t> cacheInsertOps;
 	bool copyLocked = false;
+
+	//don't bother locking here...every thread when it starts will set this to the same value
+	remountSleepTime = 0;
 
 	if (iom->IOTrace())
 	{
@@ -576,9 +858,9 @@ void* thr_popper(ioManager *arg) {
 
 	FdCacheType_t::iterator fdit;
 #ifdef _MSC_VER
-	HANDLE fd = INVALID_HANDLE_VALUE;
+	HANDLE fd;
 #else
-	int fd = -1;
+	int fd;
 #endif
 	//usually iom->blocksPerRead = 512, so adding 87 is giving us 117% room for decomp expansion
 	uint32_t readBufferSz=((iom->blocksPerRead+87)*BLOCK_SIZE)+pageSize;
@@ -714,7 +996,7 @@ if (compType != 0) cout << boldStop;
 			if (compType != 0)
 			{
 				char* ptr = strrchr(fileNamePtr, '.');
-				idbassert(ptr);
+				assert(ptr);
 				strcpy(ptr, ".cmp");
 			}
 #endif
@@ -807,17 +1089,18 @@ if (compType != 0) cout << boldStop;
 				} // if (fdcache.size()...
 			}
 
+			bool remounted = false;
 #if defined(EM_AS_A_TABLE_POC__)
 			if (oid == 1084)
 				fd = numeric_limits<int>::max();
 			else
-				fd = open(fileNamePtr, O_RDONLY|primitiveprocessor::directIOFlag|O_LARGEFILE|O_NOATIME);
+				fd = open(fileNamePtr, O_RDONLY|O_DIRECT|O_LARGEFILE|O_NOATIME);
 #elif defined(_MSC_VER)
 			//FIXME: What does FILE_SHARE_DELETE do?
 			fd = CreateFile(fileNamePtr, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, 0,
 				OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL|FILE_FLAG_NO_BUFFERING, 0);
 #else
-			fd = open(fileNamePtr, O_RDONLY|O_BINARY|O_LARGEFILE|O_NOATIME|primitiveprocessor::directIOFlag);
+			fd = open(fileNamePtr, O_RDONLY|O_BINARY|O_DIRECT|O_LARGEFILE|O_NOATIME);
 #endif
 #ifdef _MSC_VER
 			if (fd == INVALID_HANDLE_VALUE)
@@ -826,29 +1109,72 @@ if (compType != 0) cout << boldStop;
 #endif
 			{
 				int saveErrno = errno;
-				Message::Args args;
-				fdit = fdcache.end();
+				//TODO: does it matter to unlock & lock? We don't do it in later calls to try_remount().
 				fdMapMutex.unlock();
-				args.add(oid);
-				args.add(string(fileNamePtr) + ":" + strerror(saveErrno));
-				primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
-				ostringstream errMsg;
-				errMsg << "thr_popper: Error opening file for OID " << oid << "; "
-						<< fileNamePtr << "; " << strerror(saveErrno);
-				int errorCode = fileRequest::FAILED;
-				if (saveErrno == EINVAL)
-					errorCode = fileRequest::FS_EINVAL;
-				else if (saveErrno == ENOENT)
-					errorCode = fileRequest::FS_ENOENT;
-				iom->handleBlockReadError(fr, errMsg.str(), &copyLocked, errorCode);
-				continue;
+				string writePM, localModuleName;
+#ifdef _MSC_VER
+				remounted = false;
+#else
+				remounted = try_remount(fileNamePtr, oid, dbroot, partNum, segNum, compType,
+										fd, writePM, localModuleName, true);
+#endif
+				// remounting not performed
+				if (!remounted) {
+					// error out without remounting
+					Message::Args args;
+					args.add(oid);
+					args.add(string(strerror(saveErrno)));
+					primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
+					ostringstream errMsg;
+					errMsg << "thr_popper: Error opening file on R/W mount PM or single PM "
+							<< writePM << " for OID " << oid << "; "
+							<< fileNamePtr << "; " << strerror(saveErrno);
+					iom->handleBlockReadError( fr, errMsg.str(), &copyLocked );
+					continue;
+				}
+
+				// after remounting
+				saveErrno = errno;
+
+				// fdcache iters now invalid
+				fdMapMutex.lock();
+				fdit = fdcache.find(fdKey);
+#ifdef _MSC_VER
+				if (fd == INVALID_HANDLE_VALUE)
+#else
+				if (fd < 0)
+#endif
+				{
+					Message::Args args;
+					fdit = fdcache.end();
+					fdMapMutex.unlock();
+					args.add(oid);
+					args.add(string(strerror(saveErrno)));
+					primitiveprocessor::mlp->logMessage(logging::M0053, args, true);
+					ostringstream errMsg;
+					errMsg << "thr_popper: Error opening file for OID " << oid << "; "
+							<< fileNamePtr << "; " << strerror(saveErrno);
+					iom->handleBlockReadError( fr, errMsg.str(), &copyLocked );
+					continue;
+				}
+				else {
+					Message::Args args;
+					args.add(oid);
+					ostringstream errMsg;
+					errMsg << "remount successfully on " << localModuleName
+							<< ". filename:" << fileNamePtr;
+					args.add(errMsg.str());
+					primitiveprocessor::mlp->logMessage(logging::M0053, args, false);
+				}
 			}
 
-			fe.reset( new FdEntry(oid, dbroot, partNum, segNum, compType, fd) );
-			fe->inUse++;
-			fdcache[fdKey] = fe;
-			fdit = fdcache.find(fdKey);
-			fe.reset();
+			if (!remounted) {
+				fe.reset( new FdEntry(oid, dbroot, partNum, segNum, compType, fd) );
+				fe->inUse++;
+				fdcache[fdKey] = fe;
+				fdit = fdcache.find(fdKey);
+				fe.reset();
+			}
 		}
 
 		else {
@@ -931,7 +1257,6 @@ decompRetry:
 			}
 			else
 				i = pread(fd, &alignedbuff[acc], readSize - acc, longSeekOffset);
-
 #elif defined(_MSC_VER)
 				DWORD bytesRead;
 				OVERLAPPED ovl;
@@ -1096,7 +1421,42 @@ retryReadHeaders:
 
 						if (++retryReadHeadersCount < 30)
 						{
-							waitForRetry(retryReadHeadersCount);
+							// @bug3808, try remount
+							if (retryReadHeadersCount == 5)
+							{
+								string writePM, localModuleName;
+								close(fd);
+								fd = -1;
+								if (try_remount(fileNamePtr, oid, dbroot, partNum, segNum, compType,
+													 fd, writePM, localModuleName, true) == true)
+								{
+									// fdcache iters now invalid
+									fdMapMutex.lock();
+									fdit = fdcache.find(fdKey);
+									fdMapMutex.unlock();
+								}
+								else
+								{
+									// remount not performed
+									fd = open(fileNamePtr,
+												O_RDONLY|O_BINARY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+									fdit->second->fd = fd;
+								}
+
+								if (fd < 0)
+								{
+									// not valid fd
+									errorOccurred = true;
+									errMsg << "No valid fd after remount";
+									errorString = errMsg.str();
+									break;
+								}
+							}
+							else
+							{
+								waitForRetry(retryReadHeadersCount);
+							}
+
 							fdit->second->cmpMTime = 0;
 							goto retryReadHeaders;
 						}
@@ -1104,7 +1464,7 @@ retryReadHeaders:
 						{
 							// still fail after all the retries.
 							errorOccurred = true;
-							errMsg << "Error reading compression header. rc=" << updatePtrsRc << ", idx="
+							errMsg << "Error update header ptr. rc=" << updatePtrsRc << ", idx="
 									<< idx << ", ptr.size=" << fdit->second->ptrList.size();
 							errorString = errMsg.str();
 							break;
@@ -1150,7 +1510,42 @@ cout << boldStart << "pread1.1(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbu
 
 						if (++retryReadHeadersCount < 30)
 						{
-							waitForRetry(retryReadHeadersCount);
+							// @bug3808, try remount
+							if (retryReadHeadersCount == 5)
+							{
+								string writePM, localModuleName;
+								close(fd);
+								fd = -1;
+								if (try_remount(fileNamePtr, oid, dbroot, partNum, segNum, compType,
+													 fd, writePM, localModuleName, true) == true)
+								{
+									// fdcache iters now invalid
+									fdMapMutex.lock();
+									fdit = fdcache.find(fdKey);
+									fdMapMutex.unlock();
+								}
+								else
+								{
+									// remount not performed
+									fd = open(fileNamePtr,
+												O_RDONLY|O_BINARY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+									fdit->second->fd = fd;
+								}
+
+								if (fd < 0)
+								{
+									// not valid fd
+									errorOccurred = true;
+									errMsg << "No valid fd after remount";
+									errorString = errMsg.str();
+									break;
+								}
+							}
+							else
+							{
+								waitForRetry(retryReadHeadersCount);
+							}
+
 							fdit->second->cmpMTime = 0;
 							goto retryReadHeaders;
 						}
@@ -1178,6 +1573,11 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 #endif
 				}
 #endif
+
+				// reset the gotEOF flag, it signifies the remount worked if there was one
+				if (i != 0)
+					gotEOF = false;
+
 				if (i < 0 && errno == EINTR)
 				{
 					continue;
@@ -1203,11 +1603,64 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 				else if (i == 0)
 				{
 					iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
-					errorString   = "early EOF";
-					errorOccurred = true;
-					errMsg << "thr_popper: Early EOF reading file for OID " <<
-						oid << "; " << fileNamePtr;
-					break; // break from "while(acc..." loop
+					if (gotEOF) {  // already tried the remount hack
+						errorString   = "early EOF";
+						errorOccurred = true;
+						errMsg << "thr_popper: Early EOF reading file for OID " <<
+							oid << "; " << fileNamePtr;
+						gotEOF = false;
+						break; // break from "while(acc..." loop
+					}
+					else {
+						gotEOF = true;
+
+						// try to remount
+						string writePM, localModuleName;
+#ifdef _MSC_VER
+						bool remounted = false;
+#else
+						bool remounted = try_remount(fileNamePtr, oid, dbroot, partNum, segNum,
+													compType, fd, writePM, localModuleName, true);
+#endif
+						// remounting not performed
+						if (!remounted) {
+							errorOccurred = true;
+							errorString = "No remount performed";
+							errMsg << "thr_popper: Error opening file on R/W mount PM"
+									<< " or single PM system " << writePM << " for OID " << oid <<
+									"; " << fileNamePtr << "; " << strerror(errno);
+							break;
+						}
+						else {
+							//fdcache iters now invalid
+							fdit = fdcache.end();
+						}
+#ifdef _MSC_VER
+						if (fd == INVALID_HANDLE_VALUE)
+#else
+						if (fd < 0)
+#endif
+						{
+							errorOccurred = true;
+							errorString = "Remount failed";
+							errMsg << "thr_popper: remount trick failed to reopen "
+								<< fileNamePtr << " OID is " << oid;
+							break;
+						}
+						else {
+							Message::Args args;
+							args.add(oid);
+							ostringstream msg;
+							msg << "remount successfully on " << localModuleName
+								<< ". filename:" << fileNamePtr;
+							args.add(msg.str());
+							primitiveprocessor::mlp->logMessage(logging::M0053, args, false);
+						}
+						fdMapMutex.lock();
+						fdit = fdcache.find(fdKey);
+						fdMapMutex.unlock();
+						//continue as normal
+					}
 				}
 				acc += i;
 				longSeekOffset += (uint64_t)i;
@@ -1262,19 +1715,55 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 #endif
 						if (++decompRetryCount < 30)
 						{
+#ifndef _MSC_VER
+							// @bug3808, try remount
+							if (decompRetryCount == 5)
+							{
+								string writePM, localModuleName;
+								close(fd);
+								fd = -1;
+								if (try_remount(fileNamePtr, oid, dbroot, partNum, segNum, compType,
+													 fd, writePM, localModuleName, true) == true)
+								{
+									// fdcache iters now invalid
+									fdMapMutex.lock();
+									fdit = fdcache.find(fdKey);
+									fdMapMutex.unlock();
+								}
+								else
+								{
+									// remount not performed
+									fd = open(fileNamePtr,
+												O_RDONLY|O_BINARY|O_DIRECT|O_LARGEFILE|O_NOATIME);
+									fdit->second->fd = fd;
+								}
+
+								if (fd < 0)
+								{
+									// not valid fd
+									errorOccurred = true;
+									errMsg << "No valid fd after remount";
+									errorString = errMsg.str();
+									break;
+								}
+
+								fdit->second->fd = fd;
+							}
+#endif
+
 							blocksRead -= blocksThisRead;
 							waitForRetry(decompRetryCount);
 
 							// log an info message every 10 retries
-							if (decompRetryCount == 1)
+							if (decompRetryCount == 0)
 							{
 								Message::Args args;
 								args.add(oid);
 								ostringstream infoMsg;
 								iom->buildOidFileName(oid, dbroot, partNum, segNum, fileNamePtr);
-								infoMsg << "decompress retry for " << fileNamePtr
-										<< " decompRetry chunk " << cmpOffFact.quot
-										<< " code=" << dcrc;
+								infoMsg << "decompress retry for " << fileNamePtr << ". count="
+										<< decompRetryCount << " decompRetry chunk "
+										<< cmpOffFact.quot << " code=" << dcrc;
 								args.add(infoMsg.str());
 								primitiveprocessor::mlp->logInfoMessage(logging::M0061, args);
 							}
@@ -1407,6 +1896,7 @@ cout << "pread1.2(" << fd << ", 0x" << hex << (ptrdiff_t)&alignedbuff[acc] << de
 				<< left  << setw(5) << setfill(' ') << oid
 				<< right << setw(5) << setfill(' ') << offset/extentSize << " "
 				<< right << setw(11) << setfill(' ') << lbid << " "
+				<< right << setw(3)	<< iomThdId << " "
 				<< right << setw(9) << bytesRead/(readCount << 13) << " "
 				<< right << setw(9)	<< blocksRequested << " "
 				<< right << setw(10) << fixed << tm3 << " "
@@ -1443,6 +1933,34 @@ void setReadLock()
 void releaseReadLock()
 {
 	localLock.read_unlock();
+}
+
+bool try_remount(char *filename, BRM::OID_t oid, uint16_t dbroot, uint32_t partNum,
+	uint16_t segNum, int compType, int& fd, string& writePM, string& localModuleName,
+	bool toCache)
+{
+	// @bug 2114. Check R/W mode of this PM. only do remount when PM is on RO mode.
+	// If this is the only PM on the system, don't do remount at all.
+	oam::Oam oam;
+	writePM = oam.getWritablePM();
+	oam::oamModuleInfo_t t;
+	//get local module info
+	t = oam.getModuleInfo();
+	localModuleName = boost::get<0>(t);
+	if (writePM == localModuleName ) {
+		return false;
+	}
+	else {
+		// this PM has the read-only mount
+		oam::ModuleTypeConfig moduletypeconfig;
+		oam.getSystemConfig("pm", moduletypeconfig);
+		if ( moduletypeconfig.ModuleCount == 1) {
+			return false;
+		}
+	}
+
+	fd = remount_trick(filename, oid, dbroot, partNum, segNum, compType, toCache);
+	return true;
 }
 
 void dropFDCache()
@@ -1509,6 +2027,11 @@ ioManager::ioManager(FileBufferMgr& fbm,
 	}
 
 	fThreadCount=thrCount;
+#ifdef SHARED_NOTHING_DEMO_2
+	val = fConfig->getConfig("PrimitiveServers", "Count");
+	if (val.length() > 0)
+		pmCount = static_cast<uint>(Config::fromText(val));
+#endif
 	go();
 }
 
@@ -1541,28 +2064,36 @@ const int ioManager::localLbidLookup(BRM::LBID_t lbid,
 	return rc;
 }
 
-struct LambdaKludge {
-	LambdaKludge(ioManager *i) : iom(i) { }
-	~LambdaKludge() { iom = NULL; }
-	ioManager *iom;
-	void operator()() { thr_popper(iom); }
-};
-
-void ioManager::createReaders() {
-	int idx;
-
-	for (idx = 0; idx < fThreadCount; idx++){
-		try {
-			fThreadArr.create_thread(LambdaKludge(this));
-		}
-		catch (exception &e) {
-			cerr << "IOM::createReaders() caught " << e.what() << endl;
-			idx--;
-			sleep(1);
-			continue;
-		}
+int ioManager::createReaders() {
+	//FIXME: make fThdArgArr a std::vector
+	if (fThreadCount > 256)
+	{
+		Message::Args args;
+		args.add("ThreadCount is greater than 256.");
+		primitiveprocessor::mlp->logMessage(logging::M0006, args, true);
+		throw runtime_error("ThreadCount is greater than 256.");
 	}
+
+	int realCnt=0;
+	static IOMThreadArg_t fThdArgArr[256];
+	for (int idx=0; idx<fThreadCount; idx++){
+		fThdArgArr[realCnt].iom = this;
+		fThdArgArr[realCnt].thdId = realCnt;
+#if 0
+		int ret = pthread_create(&fThreadArr[realCnt], 0, thr_popper, &fThdArgArr[realCnt]);
+ 		if (ret!=0)
+ 			perror("createReaders::pthread_create");
+		else
+			realCnt++;
+#endif
+		boost::thread t(thr_popper, &fThdArgArr[realCnt]);
+		fThreadArr[realCnt].swap(t);
+		realCnt++;
+	}
+	fThreadCount=realCnt;
+	return fThreadCount;
 }
+
 
 ioManager::~ioManager()
 {

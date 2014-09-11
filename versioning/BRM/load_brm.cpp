@@ -16,17 +16,15 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: load_brm.cpp 1941 2013-07-15 15:54:10Z rdempsey $
+ * $Id: load_brm.cpp 1756 2012-11-09 21:54:39Z rdempsey $
  *
  ****************************************************************************/
-#include <unistd.h>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 using namespace std;
 
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
 namespace bi=boost::interprocess;
 
 #include "blockresolutionmanager.h"
@@ -42,11 +40,6 @@ void usage()
 	cout << "   -h display this help" << endl;
 	cout << "   -f possibly fix a corrupted Free List" << endl;
 }
-
-struct CtlShmImage
-{
-	bi::interprocess_mutex controlFifoMutex;
-};
 
 }
 
@@ -97,19 +90,6 @@ int main(int argc, char **argv)
 	ShmKeys shmkeys;
 	string key_name = ShmKeys::keyToName(shmkeys.DECOMSVRMUTEX_SYSVKEY);
 	bi::shared_memory_object::remove(key_name.c_str());
-	try {
-#if BOOST_VERSION < 104500
-		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write);
-#else
-		bi::permissions perms;
-		perms.set_unrestricted();
-		bi::shared_memory_object shm(bi::create_only, key_name.c_str(), bi::read_write, perms);
-#endif
-		shm.truncate(sizeof(CtlShmImage));
-		bi::mapped_region region(shm, bi::read_write);
-		(void)new (region.get_address()) CtlShmImage;
-	} catch (...) {
-	}
 
 	/* An OAM friendly success msg */
 	cout << "OK.\n";

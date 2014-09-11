@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmonitor.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: sessionmonitor.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  ****************************************************************************/
 
@@ -145,14 +145,14 @@ SessionMonitor::~SessionMonitor()
 		unlock();
 	}
 
-	//delete [] fCurrentSegment;
-	//delete [] fSessionMonitorData.activeTxns;
-	//delete [] fPrevSegment.activeTxns;
+	delete [] fCurrentSegment;
+	delete [] fSessionMonitorData.activeTxns;
+	delete [] fPrevSegment.activeTxns;
 }
 
 void SessionMonitor::detachSegment()
 {
-	//delete [] fSessionManagerData;
+	delete [] sessionManagerData();
 
 	fIsAttached=false;
 }
@@ -396,9 +396,9 @@ void SessionMonitor::saveAsMonitorData(const std::string)
 
 void SessionMonitor::copyCurrentSegment()
 {
-	const int cpsize = 4*sizeof(int) + 2*sizeof(boost::interprocess::interprocess_semaphore) + maxTxns()*sizeof(SIDTIDEntry);
+	const int cpsize = 2*sizeof(int) + maxTxns()*sizeof(SIDTIDEntry);
 
-	delete [] reinterpret_cast<char*>(fCurrentSegment);
+	delete [] fCurrentSegment;
 
 	fCurrentSegment = reinterpret_cast<SessionManagerData_t *>(new char[cpsize]);
 	lock();

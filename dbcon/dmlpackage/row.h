@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: row.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: row.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -28,7 +28,7 @@
 #include "dmlobject.h"
 #include "bytestream.h"
 #include "dmlcolumn.h"
-#include "we_typeext.h"
+#include "we_type.h"
 
 #if defined(_MSC_VER) && defined(xxxDMLPKGROW_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -83,7 +83,7 @@ public:
 
     /** @brief  get the number of columns
       */
-    inline unsigned int get_NumberOfColumns() const { return static_cast<unsigned int>(fColumnList.size()); }
+    inline unsigned int get_NumberOfColumns() const { return fColumnList.size(); }
 
     /** @brief  get the column at the specified index
       *

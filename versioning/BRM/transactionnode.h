@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: transactionnode.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: transactionnode.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -33,7 +33,7 @@
 #include "brmtypes.h"
 #include "rgnode.h"
 
-#if defined(_MSC_VER) && defined(xxxTRANSACTIONNODE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(TRANSACTIONNODE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

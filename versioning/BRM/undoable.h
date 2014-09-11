@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: undoable.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: undoable.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -32,7 +32,7 @@
 
 #include "brmtypes.h"
 
-#if defined(_MSC_VER) && defined(xxxUNDOABLE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(UNDOABLE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

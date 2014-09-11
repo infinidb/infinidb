@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id$
+# $Id: system_installer.sh 995 2008-09-13 01:57:47Z dhill $
 #
 # Install RPM on system
 # Argument 1 - Package name being installed
@@ -8,12 +8,11 @@
 # Argument 3 - Root Password of External Mode
 
 set timeout 10
+set USERNAME root
 set RPMPACKAGE " "
 set PASSWORD " "
 set CONFIGFILE " "
 set DEBUG 0
-set USERNAME "root"
-set INSTALLDIR "/usr/local/Calpont"
 
 spawn -noecho /bin/bash
 
@@ -36,23 +35,24 @@ while true {
 		send_user "		config-file - Optional: Calpont.xml config file with directory location, i.e. /root/Calpont.xml\n"
 		send_user "		-d 			- Debug flag\n"
 		exit
-	} elseif { $arg($i) == "-r" } {
+	}
+	if { $arg($i) == "-r" } {
 		incr i
 		set RPMPACKAGE $arg($i)
-	} elseif { $arg($i) == "-p" } {
-		incr i
-		set PASSWORD $arg($i)
-	} elseif { $arg($i) == "-c" } {
-		incr i
-		set CONFIGFILE $arg($i)
-	} elseif { $arg($i) == "-d" } {
-		set DEBUG 1
-	} elseif { $arg($i) == "-i" } {
-		incr i
-		set INSTALLDIR $arg($i)
-	} elseif { $arg($i) == "-u" } {
-		incr i
-		set USERNAME $arg($i)
+	} else {
+		if { $arg($i) == "-p" } {
+			incr i
+			set PASSWORD $arg($i)
+		} else {
+			if { $arg($i) == "-c" } {
+				incr i
+				set CONFIGFILE $arg($i)
+			} else {
+				if { $arg($i) == "-d" } {
+					set DEBUG 1
+				}
+			}
+		}
 	}
 	incr i
 }
@@ -62,7 +62,7 @@ log_user $DEBUG
 if { $RPMPACKAGE == " " || $PASSWORD == " "} {puts "please enter both RPM and password, enter ./postInstaller.sh -h for additional info"; exit -1}
 
 if { $CONFIGFILE == " " } {
-	set CONFIGFILE $INSTALLDIR/etc/Calpont.xml.rpmsave
+	set CONFIGFILE /usr/local/Calpont/etc/Calpont.xml.rpmsave
 }
 if { [catch { open $CONFIGFILE "r"} handle ] } {
 	puts "Calpont Config file not found: $CONFIGFILE"; exit -1
@@ -76,10 +76,20 @@ send_user "\nPerforming Calpont RPM System Install\n\n"
 #
 send_user "Stop Calpont System                             "
 expect -re "# "
-send "$INSTALLDIR/bin/calpontConsole stopSystem INSTALL y\n"
+send "/usr/local/Calpont/bin/calpontConsole stopSystem INSTALL y\n"
 expect {
 	-re "# "                  	{ send_user "DONE" } abort
 	-re "**** stopSystem Failed" { send_user "INFO: System not running" } abort
+}
+send_user "\n"
+# 
+# unmount disk
+#
+send_user "Unmount disk                                    "
+expect -re "# "
+send "umount /usr/local/Calpont/data*\n"
+expect {
+	-re "# "                  { send_user "DONE" } abort
 }
 send_user "\n"
 # 
@@ -113,8 +123,8 @@ expect {
 }
 expect -re "# "
 log_user 0
-exec mv -f $INSTALLDIR/etc/Calpont.xml $INSTALLDIR/etc/Calpont.xml.new  > /dev/null 2>&1
-exec mv -f $CONFIGFILE  $INSTALLDIR/etc/Calpont.xml  > /dev/null 2>&1
+exec mv -f /usr/local/Calpont/etc/Calpont.xml /usr/local/Calpont/etc/Calpont.xml.new  > /dev/null 2>&1
+exec mv -f $CONFIGFILE  /usr/local/Calpont/etc/Calpont.xml  > /dev/null 2>&1
 
 send_user "\n"
 set timeout 380
@@ -122,7 +132,7 @@ set timeout 380
 # Run installer
 #
 send_user "Run System Installer                            "
-send "$INSTALLDIR/bin/installer $RPMPACKAGE initial $PASSWORD n 0\n"
+send "/usr/local/Calpont/bin/installer $RPMPACKAGE initial $PASSWORD n 0\n"
 expect {
 	-re "reboot request successful" 			{ } abort
 	-re "error"   								{ send_user "FAILED" ; exit -1 }

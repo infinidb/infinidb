@@ -321,21 +321,6 @@ nobase_include_HEADERS = \
 	boost/asio.hpp \
 	boost/assert.hpp \
 	boost/assign.hpp \
-	boost/assign/list_inserter.hpp \
-	boost/assign/ptr_list_inserter.hpp \
-	boost/assign/list_of.hpp \
-	boost/assign/assignment_exception.hpp \
-	boost/assign/std.hpp \
-	boost/assign/ptr_list_of.hpp \
-	boost/assign/ptr_map_inserter.hpp \
-	boost/assign/std/list.hpp \
-	boost/assign/std/stack.hpp \
-	boost/assign/std/set.hpp \
-	boost/assign/std/slist.hpp \
-	boost/assign/std/vector.hpp \
-	boost/assign/std/map.hpp \
-	boost/assign/std/deque.hpp \
-	boost/assign/std/queue.hpp \
 	boost/bimap.hpp \
 	boost/bind.hpp \
 	boost/bind/apply.hpp \
@@ -2997,15 +2982,6 @@ nobase_include_HEADERS = \
 	boost/units/units_fwd.hpp \
 	boost/unordered_map.hpp \
 	boost/unordered_set.hpp \
-	boost/unordered/unordered_set.hpp \
-	boost/unordered/unordered_set_fwd.hpp \
-	boost/unordered/unordered_map_fwd.hpp \
-	boost/unordered/detail/allocator_helpers.hpp \
-	boost/unordered/detail/move.hpp \
-	boost/unordered/detail/config.hpp \
-	boost/unordered/detail/hash_table_impl.hpp \
-	boost/unordered/detail/hash_table.hpp \
-	boost/unordered/unordered_map.hpp \
 	boost/utility.hpp \
 	boost/utility/addressof.hpp \
 	boost/utility/base_from_member.hpp \
@@ -3022,38 +2998,6 @@ nobase_include_HEADERS = \
 	boost/utility/typed_in_place_factory.hpp \
 	boost/utility/value_init.hpp \
 	boost/variant.hpp \
-	boost/variant/variant.hpp \
-	boost/variant/visitor_ptr.hpp \
-	boost/variant/static_visitor.hpp \
-	boost/variant/recursive_variant.hpp \
-	boost/variant/get.hpp \
-	boost/variant/variant_fwd.hpp \
-	boost/variant/bad_visit.hpp \
-	boost/variant/detail/substitute.hpp \
-	boost/variant/detail/enable_recursive_fwd.hpp \
-	boost/variant/detail/cast_storage.hpp \
-	boost/variant/detail/make_variant_list.hpp \
-	boost/variant/detail/backup_holder.hpp \
-	boost/variant/detail/bool_trait_undef.hpp \
-	boost/variant/detail/apply_visitor_unary.hpp \
-	boost/variant/detail/generic_result_type.hpp \
-	boost/variant/detail/variant_io.hpp \
-	boost/variant/detail/substitute_fwd.hpp \
-	boost/variant/detail/forced_return.hpp \
-	boost/variant/detail/apply_visitor_binary.hpp \
-	boost/variant/detail/move.hpp \
-	boost/variant/detail/enable_recursive.hpp \
-	boost/variant/detail/visitation_impl.hpp \
-	boost/variant/detail/has_trivial_move.hpp \
-	boost/variant/detail/config.hpp \
-	boost/variant/detail/initializer.hpp \
-	boost/variant/detail/bool_trait_def.hpp \
-	boost/variant/detail/over_sequence.hpp \
-	boost/variant/detail/has_nothrow_move.hpp \
-	boost/variant/detail/apply_visitor_delayed.hpp \
-	boost/variant/apply_visitor.hpp \
-	boost/variant/recursive_wrapper.hpp \
-	boost/variant/recursive_wrapper_fwd.hpp \
 	boost/version.hpp \
 	boost/visit_each.hpp \
 	boost/wave.hpp \
@@ -3274,7 +3218,7 @@ distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
 distdir: $(DISTFILES)
-	$(mkdir_p) $(distdir)/boost $(distdir)/boost/algorithm $(distdir)/boost/algorithm/string $(distdir)/boost/algorithm/string/detail $(distdir)/boost/algorithm/string/std $(distdir)/boost/assign $(distdir)/boost/assign/std $(distdir)/boost/bind $(distdir)/boost/concept $(distdir)/boost/concept/detail $(distdir)/boost/config $(distdir)/boost/config/abi $(distdir)/boost/config/compiler $(distdir)/boost/config/no_tr1 $(distdir)/boost/config/platform $(distdir)/boost/config/stdlib $(distdir)/boost/date_time $(distdir)/boost/date_time/gregorian $(distdir)/boost/date_time/local_time $(distdir)/boost/date_time/posix_time $(distdir)/boost/detail $(distdir)/boost/exception $(distdir)/boost/exception/detail $(distdir)/boost/filesystem $(distdir)/boost/filesystem/v2 $(distdir)/boost/format $(distdir)/boost/format/detail $(distdir)/boost/function $(distdir)/boost/function/detail $(distdir)/boost/functional $(distdir)/boost/functional/detail $(distdir)/boost/functional/hash $(distdir)/boost/functional/hash/detail $(distdir)/boost/integer $(distdir)/boost/interprocess $(distdir)/boost/interprocess/allocators $(distdir)/boost/interprocess/allocators/detail $(distdir)/boost/interprocess/containers $(distdir)/boost/interprocess/containers/container $(distdir)/boost/interprocess/containers/container/detail $(distdir)/boost/interprocess/detail $(distdir)/boost/interprocess/indexes $(distdir)/boost/interprocess/ipc $(distdir)/boost/interprocess/mem_algo $(distdir)/boost/interprocess/mem_algo/detail $(distdir)/boost/interprocess/smart_ptr $(distdir)/boost/interprocess/smart_ptr/detail $(distdir)/boost/interprocess/streams $(distdir)/boost/interprocess/sync $(distdir)/boost/interprocess/sync/emulation $(distdir)/boost/interprocess/sync/posix $(distdir)/boost/interprocess/sync/xsi $(distdir)/boost/io $(distdir)/boost/iterator $(distdir)/boost/iterator/detail $(distdir)/boost/mpl $(distdir)/boost/mpl/aux_ $(distdir)/boost/mpl/aux_/config $(distdir)/boost/mpl/aux_/preprocessed/bcc $(distdir)/boost/mpl/aux_/preprocessed/bcc551 $(distdir)/boost/mpl/aux_/preprocessed/bcc_pre590 $(distdir)/boost/mpl/aux_/preprocessed/dmc $(distdir)/boost/mpl/aux_/preprocessed/gcc $(distdir)/boost/mpl/aux_/preprocessed/msvc60 $(distdir)/boost/mpl/aux_/preprocessed/msvc70 $(distdir)/boost/mpl/aux_/preprocessed/mwcw $(distdir)/boost/mpl/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/aux_/preprocessed/no_ttp $(distdir)/boost/mpl/aux_/preprocessed/plain $(distdir)/boost/mpl/aux_/preprocessor $(distdir)/boost/mpl/aux_/range_c $(distdir)/boost/mpl/aux_/test $(distdir)/boost/mpl/limits $(distdir)/boost/mpl/list $(distdir)/boost/mpl/list/aux_ $(distdir)/boost/mpl/list/aux_/preprocessed/plain $(distdir)/boost/mpl/map $(distdir)/boost/mpl/map/aux_ $(distdir)/boost/mpl/map/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/map/aux_/preprocessed/plain $(distdir)/boost/mpl/map/aux_/preprocessed/typeof_based $(distdir)/boost/mpl/math $(distdir)/boost/mpl/multiset $(distdir)/boost/mpl/multiset/aux_ $(distdir)/boost/mpl/set $(distdir)/boost/mpl/set/aux_ $(distdir)/boost/mpl/set/aux_/preprocessed/plain $(distdir)/boost/mpl/vector $(distdir)/boost/mpl/vector/aux_ $(distdir)/boost/mpl/vector/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/vector/aux_/preprocessed/plain $(distdir)/boost/mpl/vector/aux_/preprocessed/typeof_based $(distdir)/boost/optional $(distdir)/boost/preprocessor $(distdir)/boost/preprocessor/arithmetic $(distdir)/boost/preprocessor/arithmetic/detail $(distdir)/boost/preprocessor/array $(distdir)/boost/preprocessor/comparison $(distdir)/boost/preprocessor/config $(distdir)/boost/preprocessor/control $(distdir)/boost/preprocessor/control/detail $(distdir)/boost/preprocessor/control/detail/dmc $(distdir)/boost/preprocessor/control/detail/edg $(distdir)/boost/preprocessor/control/detail/msvc $(distdir)/boost/preprocessor/debug $(distdir)/boost/preprocessor/detail $(distdir)/boost/preprocessor/detail/dmc $(distdir)/boost/preprocessor/facilities $(distdir)/boost/preprocessor/iteration $(distdir)/boost/preprocessor/iteration/detail $(distdir)/boost/preprocessor/iteration/detail/bounds $(distdir)/boost/preprocessor/iteration/detail/iter $(distdir)/boost/preprocessor/list $(distdir)/boost/preprocessor/list/detail $(distdir)/boost/preprocessor/list/detail/dmc $(distdir)/boost/preprocessor/list/detail/edg $(distdir)/boost/preprocessor/logical $(distdir)/boost/preprocessor/punctuation $(distdir)/boost/preprocessor/repetition $(distdir)/boost/preprocessor/repetition/detail $(distdir)/boost/preprocessor/repetition/detail/dmc $(distdir)/boost/preprocessor/repetition/detail/edg $(distdir)/boost/preprocessor/repetition/detail/msvc $(distdir)/boost/preprocessor/selection $(distdir)/boost/preprocessor/seq $(distdir)/boost/preprocessor/seq/detail $(distdir)/boost/preprocessor/slot $(distdir)/boost/preprocessor/slot/detail $(distdir)/boost/preprocessor/tuple $(distdir)/boost/ptr_container $(distdir)/boost/ptr_container/detail $(distdir)/boost/range $(distdir)/boost/range/algorithm $(distdir)/boost/range/detail $(distdir)/boost/range/detail/vc6 $(distdir)/boost/regex $(distdir)/boost/regex/config $(distdir)/boost/regex/pending $(distdir)/boost/regex/v4 $(distdir)/boost/smart_ptr $(distdir)/boost/smart_ptr/detail $(distdir)/boost/system $(distdir)/boost/thread $(distdir)/boost/thread/detail $(distdir)/boost/thread/pthread $(distdir)/boost/thread/win32 $(distdir)/boost/tuple $(distdir)/boost/tuple/detail $(distdir)/boost/type_traits $(distdir)/boost/type_traits/detail $(distdir)/boost/type_traits/msvc $(distdir)/boost/units $(distdir)/boost/units/base_units/angle $(distdir)/boost/units/base_units/astronomical $(distdir)/boost/units/base_units/cgs $(distdir)/boost/units/base_units/imperial $(distdir)/boost/units/base_units/metric $(distdir)/boost/units/base_units/si $(distdir)/boost/units/base_units/temperature $(distdir)/boost/units/base_units/us $(distdir)/boost/units/detail $(distdir)/boost/units/physical_dimensions $(distdir)/boost/units/systems $(distdir)/boost/units/systems/angle $(distdir)/boost/units/systems/cgs $(distdir)/boost/units/systems/detail $(distdir)/boost/units/systems/si $(distdir)/boost/units/systems/si/codata $(distdir)/boost/units/systems/temperature $(distdir)/boost/unordered $(distdir)/boost/unordered/detail $(distdir)/boost/utility $(distdir)/boost/utility/detail $(distdir)/boost/variant $(distdir)/boost/variant/detail
+	$(mkdir_p) $(distdir)/boost $(distdir)/boost/algorithm $(distdir)/boost/algorithm/string $(distdir)/boost/algorithm/string/detail $(distdir)/boost/algorithm/string/std $(distdir)/boost/bind $(distdir)/boost/concept $(distdir)/boost/concept/detail $(distdir)/boost/config $(distdir)/boost/config/abi $(distdir)/boost/config/compiler $(distdir)/boost/config/no_tr1 $(distdir)/boost/config/platform $(distdir)/boost/config/stdlib $(distdir)/boost/date_time $(distdir)/boost/date_time/gregorian $(distdir)/boost/date_time/local_time $(distdir)/boost/date_time/posix_time $(distdir)/boost/detail $(distdir)/boost/exception $(distdir)/boost/exception/detail $(distdir)/boost/filesystem $(distdir)/boost/filesystem/v2 $(distdir)/boost/format $(distdir)/boost/format/detail $(distdir)/boost/function $(distdir)/boost/function/detail $(distdir)/boost/functional $(distdir)/boost/functional/detail $(distdir)/boost/functional/hash $(distdir)/boost/functional/hash/detail $(distdir)/boost/integer $(distdir)/boost/interprocess $(distdir)/boost/interprocess/allocators $(distdir)/boost/interprocess/allocators/detail $(distdir)/boost/interprocess/containers $(distdir)/boost/interprocess/containers/container $(distdir)/boost/interprocess/containers/container/detail $(distdir)/boost/interprocess/detail $(distdir)/boost/interprocess/indexes $(distdir)/boost/interprocess/ipc $(distdir)/boost/interprocess/mem_algo $(distdir)/boost/interprocess/mem_algo/detail $(distdir)/boost/interprocess/smart_ptr $(distdir)/boost/interprocess/smart_ptr/detail $(distdir)/boost/interprocess/streams $(distdir)/boost/interprocess/sync $(distdir)/boost/interprocess/sync/emulation $(distdir)/boost/interprocess/sync/posix $(distdir)/boost/interprocess/sync/xsi $(distdir)/boost/io $(distdir)/boost/iterator $(distdir)/boost/iterator/detail $(distdir)/boost/mpl $(distdir)/boost/mpl/aux_ $(distdir)/boost/mpl/aux_/config $(distdir)/boost/mpl/aux_/preprocessed/bcc $(distdir)/boost/mpl/aux_/preprocessed/bcc551 $(distdir)/boost/mpl/aux_/preprocessed/bcc_pre590 $(distdir)/boost/mpl/aux_/preprocessed/dmc $(distdir)/boost/mpl/aux_/preprocessed/gcc $(distdir)/boost/mpl/aux_/preprocessed/msvc60 $(distdir)/boost/mpl/aux_/preprocessed/msvc70 $(distdir)/boost/mpl/aux_/preprocessed/mwcw $(distdir)/boost/mpl/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/aux_/preprocessed/no_ttp $(distdir)/boost/mpl/aux_/preprocessed/plain $(distdir)/boost/mpl/aux_/preprocessor $(distdir)/boost/mpl/aux_/range_c $(distdir)/boost/mpl/aux_/test $(distdir)/boost/mpl/limits $(distdir)/boost/mpl/list $(distdir)/boost/mpl/list/aux_ $(distdir)/boost/mpl/list/aux_/preprocessed/plain $(distdir)/boost/mpl/map $(distdir)/boost/mpl/map/aux_ $(distdir)/boost/mpl/map/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/map/aux_/preprocessed/plain $(distdir)/boost/mpl/map/aux_/preprocessed/typeof_based $(distdir)/boost/mpl/math $(distdir)/boost/mpl/multiset $(distdir)/boost/mpl/multiset/aux_ $(distdir)/boost/mpl/set $(distdir)/boost/mpl/set/aux_ $(distdir)/boost/mpl/set/aux_/preprocessed/plain $(distdir)/boost/mpl/vector $(distdir)/boost/mpl/vector/aux_ $(distdir)/boost/mpl/vector/aux_/preprocessed/no_ctps $(distdir)/boost/mpl/vector/aux_/preprocessed/plain $(distdir)/boost/mpl/vector/aux_/preprocessed/typeof_based $(distdir)/boost/optional $(distdir)/boost/preprocessor $(distdir)/boost/preprocessor/arithmetic $(distdir)/boost/preprocessor/arithmetic/detail $(distdir)/boost/preprocessor/array $(distdir)/boost/preprocessor/comparison $(distdir)/boost/preprocessor/config $(distdir)/boost/preprocessor/control $(distdir)/boost/preprocessor/control/detail $(distdir)/boost/preprocessor/control/detail/dmc $(distdir)/boost/preprocessor/control/detail/edg $(distdir)/boost/preprocessor/control/detail/msvc $(distdir)/boost/preprocessor/debug $(distdir)/boost/preprocessor/detail $(distdir)/boost/preprocessor/detail/dmc $(distdir)/boost/preprocessor/facilities $(distdir)/boost/preprocessor/iteration $(distdir)/boost/preprocessor/iteration/detail $(distdir)/boost/preprocessor/iteration/detail/bounds $(distdir)/boost/preprocessor/iteration/detail/iter $(distdir)/boost/preprocessor/list $(distdir)/boost/preprocessor/list/detail $(distdir)/boost/preprocessor/list/detail/dmc $(distdir)/boost/preprocessor/list/detail/edg $(distdir)/boost/preprocessor/logical $(distdir)/boost/preprocessor/punctuation $(distdir)/boost/preprocessor/repetition $(distdir)/boost/preprocessor/repetition/detail $(distdir)/boost/preprocessor/repetition/detail/dmc $(distdir)/boost/preprocessor/repetition/detail/edg $(distdir)/boost/preprocessor/repetition/detail/msvc $(distdir)/boost/preprocessor/selection $(distdir)/boost/preprocessor/seq $(distdir)/boost/preprocessor/seq/detail $(distdir)/boost/preprocessor/slot $(distdir)/boost/preprocessor/slot/detail $(distdir)/boost/preprocessor/tuple $(distdir)/boost/ptr_container $(distdir)/boost/ptr_container/detail $(distdir)/boost/range $(distdir)/boost/range/algorithm $(distdir)/boost/range/detail $(distdir)/boost/range/detail/vc6 $(distdir)/boost/regex $(distdir)/boost/regex/config $(distdir)/boost/regex/pending $(distdir)/boost/regex/v4 $(distdir)/boost/smart_ptr $(distdir)/boost/smart_ptr/detail $(distdir)/boost/system $(distdir)/boost/thread $(distdir)/boost/thread/detail $(distdir)/boost/thread/pthread $(distdir)/boost/thread/win32 $(distdir)/boost/tuple $(distdir)/boost/tuple/detail $(distdir)/boost/type_traits $(distdir)/boost/type_traits/detail $(distdir)/boost/type_traits/msvc $(distdir)/boost/units $(distdir)/boost/units/base_units/angle $(distdir)/boost/units/base_units/astronomical $(distdir)/boost/units/base_units/cgs $(distdir)/boost/units/base_units/imperial $(distdir)/boost/units/base_units/metric $(distdir)/boost/units/base_units/si $(distdir)/boost/units/base_units/temperature $(distdir)/boost/units/base_units/us $(distdir)/boost/units/detail $(distdir)/boost/units/physical_dimensions $(distdir)/boost/units/systems $(distdir)/boost/units/systems/angle $(distdir)/boost/units/systems/cgs $(distdir)/boost/units/systems/detail $(distdir)/boost/units/systems/si $(distdir)/boost/units/systems/si/codata $(distdir)/boost/units/systems/temperature $(distdir)/boost/utility $(distdir)/boost/utility/detail
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \

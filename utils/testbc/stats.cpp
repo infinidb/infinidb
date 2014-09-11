@@ -237,7 +237,7 @@ void Stats::touchedLBID(uint64_t lbid, pthread_t thdid, uint32_t session)
 	{
 		traceFileMap[session] = TraceFileInfo(session);
 		iter = traceFileMap.find(session);
-		idbassert(iter != traceFileMap.end());
+		assert(iter != traceFileMap.end());
 	}
 	iter->second.log(lbid2oid(lbid), lbid, thdid);
 }
@@ -252,7 +252,7 @@ void Stats::markEvent(const uint64_t lbid, const pthread_t thdid, const uint32_t
 	{
 		traceFileMap[session] = TraceFileInfo(session, fName);
 		iter = traceFileMap.find(session);
-		idbassert(iter != traceFileMap.end());
+		assert(iter != traceFileMap.end());
 	}
 	iter->second.log(lbid2oid(lbid), lbid, thdid, event);
 }

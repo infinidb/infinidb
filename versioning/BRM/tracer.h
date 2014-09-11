@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: tracer.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: tracer.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -32,7 +32,7 @@
 #include <vector>
 #include <stdint.h>
 
-#if defined(_MSC_VER) && defined(xxxTRACER_DLLEXPORT)
+#if defined(_MSC_VER) && defined(TRACER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

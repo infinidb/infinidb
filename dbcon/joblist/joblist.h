@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: joblist.h 9227 2013-01-28 22:58:06Z xlou $
+//  $Id: joblist.h 8272 2012-01-19 16:28:34Z xlou $
 
 
 /** @file */
@@ -29,9 +29,9 @@
 #include <boost/shared_ptr.hpp>
 
 #include "calpontsystemcatalog.h"
-#include "querystats.h"
 
 #include "jobstep.h"
+#include "tableband.h"
 #include "bytestream.h"
 
 #ifndef __GNUC__
@@ -54,6 +54,49 @@ typedef std::map<execplan::CalpontSystemCatalog::OID, SJSTEP> DeliveredTableMap;
 
 class DistributedEngineComm;
 
+// bug3438, move stats to joblist to cover subqueries
+struct QueryStats
+{
+	uint64_t fMaxMemPct;        // peak memory percentage used during a query
+	uint64_t fNumFiles;         // number of temp files used for a query
+	uint64_t fFileBytes;        // number of bytes in temp files
+	uint64_t fPhyIO;           	// physical block count for a query
+	uint64_t fCacheIO;          // cache block count for a query
+	uint64_t fMsgRcvCnt;        // msg (block) receive count for a query
+	uint64_t fCPBlocksSkipped;  // Casual Partition blks skipped for a query
+	uint64_t fMsgBytesIn;       // number of input msg bytes for a query
+	uint64_t fMsgBytesOut;      // number of output msg bytes for a query
+
+	QueryStats() { reset(); }
+	void reset()
+	{
+		fMaxMemPct       = 0;
+		fNumFiles        = 0;
+		fFileBytes       = 0;
+		fPhyIO           = 0;
+		fCacheIO         = 0;
+		fMsgRcvCnt       = 0;
+		fCPBlocksSkipped = 0;
+		fMsgBytesIn      = 0;
+		fMsgBytesOut     = 0;
+	}
+
+	QueryStats operator+=(const QueryStats& rhs)
+	{
+		fNumFiles        += rhs.fNumFiles;
+		fFileBytes       += rhs.fFileBytes;
+		fPhyIO           += rhs.fPhyIO;
+		fCacheIO         += rhs.fCacheIO;
+		fMsgRcvCnt       += rhs.fMsgRcvCnt;
+		fCPBlocksSkipped += rhs.fCPBlocksSkipped;
+		fMsgBytesIn      += rhs.fMsgBytesIn;
+		fMsgBytesOut     += rhs.fMsgBytesOut;
+
+		return *this;
+	}
+
+};
+
 /** @brief class JobList
  *
  */
@@ -66,9 +109,11 @@ public:
 	explicit JobList(bool isEM=false);
 	virtual ~JobList();
 	virtual int doQuery();
+	virtual const TableBand projectTable(execplan::CalpontSystemCatalog::OID tableOID);
 
 	/* returns row count */
-	virtual uint projectTable(execplan::CalpontSystemCatalog::OID, messageqcpp::ByteStream&) = 0;
+	virtual uint projectTable(execplan::CalpontSystemCatalog::OID tableOID,
+		messageqcpp::ByteStream &bs);
 	virtual int  putEngineComm(DistributedEngineComm*);
 
 	virtual void addQuery(const JobStepVector& query) { fQuery = query; }
@@ -96,8 +141,8 @@ public:
 	 */
 	virtual void validate() const;
 
-	querystats::QueryStats& queryStats() { return fStats; }
-	void queryStats(const querystats::QueryStats& stats) { fStats = stats; }
+	const QueryStats& queryStats() const { return fStats; }
+	void queryStats(const QueryStats& stats) { fStats = stats; }
 	const std::string& extendedInfo() const { return fExtendedInfo; }
 	void extendedInfo(const std::string& extendedInfo) { fExtendedInfo = extendedInfo; }
 	const std::string& miniInfo() const { return fMiniInfo; }
@@ -119,14 +164,6 @@ public:
 	{ return fAborted; }
 #endif
 
-	std::string toString() const;
-
-	void priority(uint p) { _priority = p; }
-	uint priority() { return _priority; }
-
-	// @bug4848, enhance and unify limit handling.
-	EXPORT virtual void abortOnLimit(JobStep* js);
-
 protected:
 	//defaults okay
 	//JobList(const JobList& rhs);
@@ -142,7 +179,7 @@ protected:
 	JobStepVector fProject;
 
 	// @bug3438, get stats/trace from subqueries
-	querystats::QueryStats fStats;
+	QueryStats fStats;
 	std::string fExtendedInfo;
 	std::string fMiniInfo;
 	std::vector<SJLP> subqueryJoblists;
@@ -152,8 +189,6 @@ protected:
 #else
 	volatile bool fAborted;
 #endif
-
-	uint _priority;   //higher #s = higher priority
 };
 
 class TupleJobList : public JobList
@@ -187,8 +222,6 @@ private:
 };
 
 typedef boost::shared_ptr<TupleJobList> STJLP;
-
-EXPORT void init_mysqlcl_idb();
 
 }
 

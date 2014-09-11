@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ddlpkg.h 8926 2012-09-25 21:56:32Z zzhu $
+*   $Id: ddlpkg.h 7657 2011-04-20 13:49:05Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -41,11 +41,9 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <set>
 #include <utility>
 #include <iostream>
 #include "bytestream.h"
-#include "logicalpartition.h"
 
 #if defined(_MSC_VER) && defined(xxxDDLPKG_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -326,6 +324,8 @@ enum DDL_SERIAL_TYPE {
     DDL_DROP_TABLE_STATEMENT,
     DDL_ATA_DROP_COLUMNS,
     DDL_NULL,
+    DDL_STOP,
+    DDL_RESUME,
     DDL_INVALID_SERIAL_TYPE,
     DDL_TRUNC_TABLE_STATEMENT,
 	DDL_MARK_PARTITION_STATEMENT,
@@ -408,6 +408,7 @@ struct SqlStatement
     */
     std::string fOwner;
 
+	uint32_t fPartition; // partition number
 	
 	uint32_t fTableWithAutoi; // has autoincrement column? 
 	
@@ -794,7 +795,7 @@ struct AtaRenameColumn : public AlterTableAction
     virtual int serialize(messageqcpp::ByteStream& bs);
 
     /** @brief Ctor for deserialization */
-    AtaRenameColumn() : fNewType(0), fDefaultValue(0) { }
+    AtaRenameColumn() : fNewType(0) { }
 
     AtaRenameColumn(const char* name, const char* newName, ColumnType* newType,  const char * comment=NULL) :
             fName(name),
@@ -803,28 +804,8 @@ struct AtaRenameColumn : public AlterTableAction
     {
 		if (comment)
 			fComment = comment;
-		fDefaultValue = 0;
 	}
 
-	AtaRenameColumn(const char* name, const char* newName, ColumnType* newType, ColumnConstraintList *constraint_list,
-              ColumnDefaultValue *defaultValue, const char * comment=NULL) :
-            fName(name),
-            fNewName(newName),
-            fNewType(newType),
-			fDefaultValue(defaultValue)
-    {
-		if (constraint_list)
-			fConstraints = *constraint_list;
-			
-		//if (defaultValue)
-		//{
-			//fDefaultValue = defaultValue;
-		//}
-			
-		if (comment)
-			fComment = comment;
-	}
-	
     AtaRenameColumn(QualifiedName *qualifiedName);
 
     /** @brief Dump to stdout. */
@@ -835,11 +816,6 @@ struct AtaRenameColumn : public AlterTableAction
     std::string fName; ///< current column name
     std::string fNewName; ///< new column name
     ColumnType* fNewType;
-	 /** @brief Zero or more constraints. */
-    ColumnConstraintList fConstraints;
-
-    /** @brief NULL if there was no DEFAULT clause */
-    ColumnDefaultValue *fDefaultValue;
     std::string fComment;
 };
 
@@ -1461,29 +1437,29 @@ struct TruncTableStatement : public SqlStatement
  */
 struct MarkPartitionStatement : public SqlStatement
 {
-	/** @brief Deserialize from ByteStream */
-	EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
+    /** @brief Deserialize from ByteStream */
+    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
 
-	/** @brief Serialize to ByteStream */
-	EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+    /** @brief Serialize to ByteStream */
+    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
 
-	/** @brief Ctor for deserialization */
+    /** @brief Ctor for deserialization */
 	MarkPartitionStatement() : fTableName(0)
-	{}
+    {}
+    /** @brief You can't have a CreateTableStatement without a
+    	table defintion */
+    EXPORT MarkPartitionStatement(QualifiedName *qualifiedName);
 
-	/** @brief You can't have a CreateTableStatement without a table defintion */
-	EXPORT MarkPartitionStatement(QualifiedName *qualifiedName);
-
-	/** @brief Dump to stdout. */
-	EXPORT virtual std::ostream& put(std::ostream& os) const;
+    /** @brief Dump to stdout. */
+    EXPORT virtual std::ostream& put(std::ostream& os) const;
 
 	virtual ~MarkPartitionStatement()
-	{
-		delete fTableName;
-	}
+    {
+        delete fTableName;
+    }
+	
+    QualifiedName *fTableName; ///< The table defintion
 
-	QualifiedName *fTableName; ///< The table defintion
-	std::set<BRM::LogicalPartition> fPartitions; // partition numbers
 };
 
 /** @brief Represents the mark partition out of service statement
@@ -1491,28 +1467,28 @@ struct MarkPartitionStatement : public SqlStatement
  */
 struct RestorePartitionStatement : public SqlStatement
 {
-	/** @brief Deserialize from ByteStream */
-	EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
+    /** @brief Deserialize from ByteStream */
+    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
 
-	/** @brief Serialize to ByteStream */
-	EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+    /** @brief Serialize to ByteStream */
+    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+
+    /** @brief Ctor for deserialization */
+    RestorePartitionStatement() : fTableName(0)
+    {}
+
+    EXPORT RestorePartitionStatement(QualifiedName *qualifiedName);
+
+    /** @brief Dump to stdout. */
+    EXPORT virtual std::ostream& put(std::ostream& os) const;
 	
-	/** @brief Ctor for deserialization */
-	RestorePartitionStatement() : fTableName(0)
-	{}
-
-	EXPORT RestorePartitionStatement(QualifiedName *qualifiedName);
-	
-	/** @brief Dump to stdout. */
-	EXPORT virtual std::ostream& put(std::ostream& os) const;
-
 	virtual ~RestorePartitionStatement()
-	{
-		delete fTableName;
-	}
+    {
+        delete fTableName;
+    }
+	
+    QualifiedName *fTableName; ///< The table name.
 
-	QualifiedName *fTableName; ///< The table name.
-	std::set<BRM::LogicalPartition> fPartitions; // partition numbers
 };
 
 /** @brief Represents the mark partition out of service statement
@@ -1520,28 +1496,28 @@ struct RestorePartitionStatement : public SqlStatement
  */
 struct DropPartitionStatement : public SqlStatement
 {
-	/** @brief Deserialize from ByteStream */
-	EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
+    /** @brief Deserialize from ByteStream */
+    EXPORT virtual int unserialize(messageqcpp::ByteStream& bs);
 
-	/** @brief Serialize to ByteStream */
-	EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
+    /** @brief Serialize to ByteStream */
+    EXPORT virtual int serialize(messageqcpp::ByteStream& bs);
 
-	/** @brief Ctor for deserialization */
-	DropPartitionStatement() : fTableName(0)
-	{}
+    /** @brief Ctor for deserialization */
+    DropPartitionStatement() : fTableName(0)
+    {}
 
-	EXPORT DropPartitionStatement(QualifiedName *qualifiedName);
+    EXPORT DropPartitionStatement(QualifiedName *qualifiedName);
 
-	/** @brief Dump to stdout. */
-	EXPORT virtual std::ostream& put(std::ostream& os) const;
+    /** @brief Dump to stdout. */
+    EXPORT virtual std::ostream& put(std::ostream& os) const;
 
 	virtual ~DropPartitionStatement()
-	{
-		delete fTableName;
-	}
+    {
+        delete fTableName;
+    }
+	
+    QualifiedName *fTableName; ///< The table name.
 
-	QualifiedName *fTableName; ///< The table name.
-	std::set<BRM::LogicalPartition> fPartitions; // partition numbers
 };
 
 }

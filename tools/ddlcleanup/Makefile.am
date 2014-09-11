@@ -24,8 +24,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = ddlcleanup
 ddlcleanup_SOURCES = ddlcleanup.cpp
-ddlcleanup_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-ddlcleanup_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) -lddlcleanuputil $(AM_LDFLAGS)
+ddlcleanup_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+ddlcleanup_LDFLAGS = @idb_common_ldflags@ @idb_write_libs@ $(AM_LDFLAGS)
 
 test:
 

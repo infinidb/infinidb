@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleaggregatestep.h 8810 2012-08-13 17:01:37Z zzhu $
+//  $Id: tupleaggregatestep.h 8808 2012-08-13 16:59:37Z zzhu $
 
 
 #ifndef JOBLIST_TUPLEAGGREGATESTEP_H
@@ -30,9 +30,6 @@
 namespace joblist
 {
 
-// forward reference
-struct JobInfo;
-
 /** @brief class TupleAggregateStep
  *
  */
@@ -46,7 +43,7 @@ public:
 	TupleAggregateStep(
 			const JobStepAssociation& inputJobStepAssociation,
 			const JobStepAssociation& outputJobStepAssociation,
-			boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
+			execplan::CalpontSystemCatalog* syscat,
 			uint32_t sessionId,
 			uint32_t txnId,
 			uint32_t statementId,
@@ -144,7 +141,7 @@ private:
 
 	JobStepAssociation fInputJobStepAssociation;
 	JobStepAssociation fOutputJobStepAssociation;
-	boost::shared_ptr<execplan::CalpontSystemCatalog>fCatalog;
+	execplan::CalpontSystemCatalog *fCatalog;
 	uint32_t fSessionId;
 	uint32_t fTxnId;
 	uint16_t fStepId;

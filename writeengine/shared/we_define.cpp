@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_define.cpp 4681 2013-06-18 17:31:02Z dcathey $
+* $Id: we_define.cpp 4282 2012-10-29 16:31:57Z chao $
 *
 *******************************************************************************/
 /** @file" **/
@@ -41,8 +41,20 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_UNKNOWN] = " a Generic (unknown) error";
     fErrorCodes[ERR_INVALID_PARAM] = " due to Invalid parameters";
     fErrorCodes[ERR_STRUCT_EMPTY] = " because the Structure is empty";
+    fErrorCodes[ERR_SIZE_NOT_MATCH] = " because the Size does not match";
     fErrorCodes[ERR_VALUE_OUTOFRANGE] = " because a Value is out of range";
+    fErrorCodes[ERR_LOCK_FAIL] = " a Lock failure";
+    fErrorCodes[ERR_UNLOCK_FAIL] = " an Unlock failure ";
     fErrorCodes[ERR_PARSING] =  " a Value is out of range.";
+    fErrorCodes[ERR_NOT_NULL] = " a Not null error";
+
+    // Memory level error
+    fErrorCodes[ERR_MAX_SEM] = " that the Maximum semaphores have been reached";
+    fErrorCodes[ERR_SEM_EXIST] =  " that the semaphore exist";
+    fErrorCodes[ERR_SEM_NOT_EXIST] = " that the Semaphore does not exist";
+    fErrorCodes[ERR_NO_SEM_RESOURCE] = " that the Semaphore resource exhausted";
+    fErrorCodes[ERR_NO_SEM_LOCK] = " that there is No semaphore lock";
+    fErrorCodes[ERR_NO_MEM] = "Failed to allocate memory";
 
     // File level error
     fErrorCodes[ERR_FILE_CREATE] = " The column file could not be created; it may already exist or be inaccessible.";
@@ -51,12 +63,13 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_FILE_EXIST] =  " The File already exists. ";
     fErrorCodes[ERR_FILE_NOT_EXIST] = " The File does not exist. " ;
     fErrorCodes[ERR_FILE_NULL] =  " The FILE pointer is null." ;
-    fErrorCodes[ERR_FILE_WRITE] = " Error writing to a database file. ";
-    fErrorCodes[ERR_FILE_READ] = " Error reading from a database file. ";
+    fErrorCodes[ERR_FILE_WRITE] = " Error in writing to a database file. ";
+    fErrorCodes[ERR_FILE_READ] = " Error in reading from a database file. ";
     fErrorCodes[ERR_FILE_SEEK] = " Error in positioning file handle. ";
-    fErrorCodes[ERR_FILE_READ_IMPORT] = " Error reading import source file. ";
+    fErrorCodes[ERR_FILE_NEED_EXTEND] = " The File needs to be extended. ";
     fErrorCodes[ERR_DIR_CREATE] = " Error in creating a directory. ";
-    fErrorCodes[ERR_FILE_NEW_EXTENT_FBO] = " New extent FBO too high for current file. ";
+    fErrorCodes[ERR_DIR_REMOVE] = " Error in removing a directory. ";
+    fErrorCodes[ERR_FILE_FBO_TOO_BIG] = " The File FBO is more than 2**36. ";
     fErrorCodes[ERR_FILE_FBO_NEG] = " Specified file FBO is negative. ";
     fErrorCodes[ERR_FILE_TRUNCATE] = " Error truncating db file. ";
     fErrorCodes[ERR_FILE_DISK_SPACE] = "Not able to add extent; adding extent "
@@ -64,7 +77,6 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_FILE_STAT] = " Error getting stats on db file. ";
     fErrorCodes[ERR_VB_FILE_NOT_EXIST] = " Version buffer file  does not exists.";
     fErrorCodes[ERR_FILE_FLUSH] = " Error flushing db file. ";
-    fErrorCodes[ERR_FILE_GLOBBING] = " Error globbing a file name. ";
 
     // XML level error
     fErrorCodes[ERR_XML_FILE] = " An xml file error, usually because the file does not exist";
@@ -72,19 +84,19 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_XML_EMPTY] =  " An Empty XML file ";
     fErrorCodes[ERR_XML_PARSE] = " An XML Parsing error";
 
-    // table lock level error
-    fErrorCodes[ERR_TBLLOCK_LOCK_NOT_FOUND]= "Table is not locked.";
-    fErrorCodes[ERR_TBLLOCK_GET_LOCK]      = "Error getting table lock.";
-    fErrorCodes[ERR_TBLLOCK_GET_LOCK_LOCKED]="Table locked by another user.";
-    fErrorCodes[ERR_TBLLOCK_RELEASE_LOCK]  = "Error releasing table lock.";
-    fErrorCodes[ERR_TBLLOCK_CHANGE_STATE]  = "Error changing table lock state.";
-    fErrorCodes[ERR_TBLLOCK_GET_INFO]      = "Error getting table lock info.";
-    fErrorCodes[ERR_TBLLOCK_LOCKID_CONFLICT]="Table LockID for different table than expected.";
+    // table level error
+    fErrorCodes[ERR_TBL_ROW_NOT_FOUND] = " a Row not found";
+    fErrorCodes[ERR_TBL_TABLE_HAS_VALID_CPIMPORT_LOCK] = "Table is locked by a cpimport process.";
+    fErrorCodes[ERR_TBL_TABLE_HAS_VALID_DML_DDL_LOCK]  = "Table is locked by DDL or DML process.";
+    fErrorCodes[ERR_TBL_TABLE_LOCK_NOT_FOUND]          = "Table is not locked.";
+	fErrorCodes[ERR_TBL_SYSCAT_ERROR]          		   = "Error occured when querying systemcatalog.";
 
     // DDL/DML Interface level error
+    fErrorCodes[ERR_COL_SIZE_NOT_MATCH] = " the number of column definitions and values are not match";
     fErrorCodes[ERR_STRUCT_VALUE_NOT_MATCH] = " the number of structs does not match with the number of value sets";
     fErrorCodes[ERR_ROWID_VALUE_NOT_MATCH] = " the number of rowids does not match with the number of values";
-	fErrorCodes[ERR_TBL_SYSCAT_ERROR]      = "Error occured when querying systemcatalog.";
+    fErrorCodes[ERR_INVALID_CHAR_LEN] = " the len of a char tuple exceeds 8 bytes";
+    fErrorCodes[ERR_INVALID_DATETIME] = " an Invalid Date Time value in bulk load";
 
     // index error
     fErrorCodes[ERR_IDX_TREE_MOVE_ENTRY] = " an error in moving part of an index tree to a new subblock";
@@ -123,23 +135,31 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_IDX_LIST_INVALID_ADD_LIST] = " an invalid add Index List";
     fErrorCodes[ERR_IDX_LIST_INVALID_UP] = " an invalid Update Index List";
 
-    //freemgr error
+   //freemgr error
     fErrorCodes[ERR_FM_ASSIGN_ERR] = " in an assignment";
     fErrorCodes[ERR_FM_RELEASE_ERR] = " in a release";
     fErrorCodes[ERR_FM_BAD_FBO] = " an invalid File Block Offset";
     fErrorCodes[ERR_FM_BAD_TYPE] = "an invalid type that must be pointer or list";
+    fErrorCodes[ERR_FM_NO_SB_SPACE] = " that no subblocks are available";
     fErrorCodes[ERR_FM_NO_SPACE] = " that No blocks are available";
     fErrorCodes[ERR_FM_EXTEND] = " while extending a file";
    
     // Dictionary error
+    fErrorCodes[ERR_DICT_INVALID_INSERT] = " an invalid dictionary insert";
+    fErrorCodes[ERR_DICT_INVALID_DELETE] = " an invalid dictionary Delete"; 
     fErrorCodes[ERR_DICT_NO_SPACE_INSERT] = " no space for a dictionary insert";
     fErrorCodes[ERR_DICT_SIZE_GT_8000] = " the dictionary size was  >8000";
     fErrorCodes[ERR_DICT_NO_OP_DELETE] = " in the dictionary no op delete";
+    fErrorCodes[ERR_DICT_NO_FBO_DELETE] = " in the dictionary FBO delete";
     fErrorCodes[ERR_DICT_NO_OFFSET_DELETE] = " a dictionary bad Delete offset";
     fErrorCodes[ERR_DICT_INVALID_HDR] = " a dictionary bad Delete Hdr";
     fErrorCodes[ERR_DICT_ZERO_LEN] = " a dictionary zero len";
+    fErrorCodes[ERR_DICT_INVALID_INIT_HDR] = " a dictionary invalid init header";
     fErrorCodes[ERR_DICT_TOKEN_NOT_FOUND] = " a dictionary token not found"; 
     fErrorCodes[ERR_DICT_FILE_NOT_FOUND] = " a dictionary file not found";
+    fErrorCodes[ERR_DICT_SIGVALUE_LT_8B] = " a dictionary sig value less than 8B";
+    fErrorCodes[ERR_DICT_DROP_WRONG_OID] = " a dictionary drop wrong OID";
+    fErrorCodes[ERR_DICT_BAD_TOKEN_ARRAY] = " a dictionary bad token array";
     fErrorCodes[ERR_DICT_BAD_TOKEN_LBID] = " a dictionary token lbid is bad";
     fErrorCodes[ERR_DICT_BAD_TOKEN_OP] = " a dictionary token op is bad";
 
@@ -150,9 +170,6 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BULK_MISSING_EXTENT_ENTRY] = " missing Extent Entry when trying to save LBID info for CP";
     fErrorCodes[ERR_BULK_MISSING_EXTENT_ROW] = " missing Extent Row when trying to save LBID info for CP";
     fErrorCodes[ERR_BULK_ROW_FILL_BUFFER] = " Single row fills read buffer; try larger read buffer.";
-    fErrorCodes[ERR_BULK_DBROOT_CHANGE] = " Local PM DBRoot settings changed during bulk load.";
-    fErrorCodes[ERR_BULK_ROLLBACK_MISS_ROOT] = " Mode3 automatic rollback not performed. DBRoot missing.";
-    fErrorCodes[ERR_BULK_ROLLBACK_SEG_LIST] = " Error building segment file list in a directory.";
 
     // BRM error
     fErrorCodes[ERR_BRM_LOOKUP_LBID] = " a BRM Lookup LBID error.";
@@ -178,6 +195,8 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BRM_VB_OVERFLOW] = "BRM block version buffer overflow error.";
     fErrorCodes[ERR_BRM_READ_ONLY]   = "BRM is in read-only state.";
     fErrorCodes[ERR_BRM_GET_READ_WRITE] = "BRM error getting read-write state.";
+    fErrorCodes[ERR_BRM_GET_TABLE_LOCK] = "BRM error getting table lock information.";
+    fErrorCodes[ERR_BRM_SET_TABLE_LOCK] = "BRM error setting a table lock.";
     fErrorCodes[ERR_BRM_BULK_RB_COLUMN] = "BRM error performing bulk rollback of column extents.";
     fErrorCodes[ERR_BRM_BULK_RB_DCTNRY] = "BRM error performing bulk rollback of dictionary store extents.";
     fErrorCodes[ERR_BRM_DELETE_EXTENT_COLUMN] = "BRM error deleting column extents.";
@@ -191,16 +210,7 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_BRM_LOOKUP_LBID_RANGES] = " BRM error getting LBID ranges.";
     fErrorCodes[ERR_BRM_HWMS_NOT_EQUAL] = " HWMs for same width columns not equal. ";
     fErrorCodes[ERR_BRM_HWMS_OUT_OF_SYNC] = " HWMs for different width columns not in sync. ";
-    fErrorCodes[ERR_BRM_DBROOT_HWMS] = " BRM error getting HWMs for DBRoots. ";
 	fErrorCodes[ERR_BRM_NETWORK] = " Network error in DBRM call. ";
-	fErrorCodes[ERR_BRM_READONLY] = " DBRM is read only. ";
-	fErrorCodes[ERR_INVALID_VBOID] = " The VB oid is invalid ";
-	fErrorCodes[ERR_BRM_SET_EXTENTS_CP] = " BRM error setting extents min/max ";
-    fErrorCodes[ERR_BRM_SHUTDOWN] = " The system is being shutdown ";
-    fErrorCodes[ERR_BRM_GET_SHUTDOWN] = " BRM error get the system shutdown flag ";
-    fErrorCodes[ERR_BRM_SUSPEND] = " The system is in write suspended mode";
-    fErrorCodes[ERR_BRM_GET_SUSPEND] = " BRM error get the system suspend flag ";
-    fErrorCodes[ERR_BRM_BAD_STRIPE_CNT] = " Incorrect number of column extents allocated in stripe";
 
     // DM error
     fErrorCodes[ERR_DM_CONVERT_OID] = " a DM Conversion error";
@@ -241,11 +251,6 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_AUTOINC_INIT1] = " Unable to initialize auto-increment value. ";
     fErrorCodes[ERR_AUTOINC_INIT2] = " Unable to initialize auto-increment value. Unknown exception. ";
     fErrorCodes[ERR_AUTOINC_RID] = " Failed to get row information from calpontsystemcatalog.";
-    fErrorCodes[ERR_AUTOINC_START_SEQ] = " Unable to setup AI sequence in BRM.";
-    fErrorCodes[ERR_AUTOINC_GET_RANGE] = " Unable to reserve AI range from BRM.";
-    fErrorCodes[ERR_AUTOINC_GET_LOCK]  = " Unable to lock AI column in BRM.";
-    fErrorCodes[ERR_AUTOINC_REL_LOCK]  = " Unable to release AI column in BRM.";
-    fErrorCodes[ERR_AUTOINC_UPDATE] = " Unable to update nextValue in system catalog.";
 
     // Block cache flush error
     fErrorCodes[ERR_BLKCACHE_FLUSH_LIST] = " Failed to flush list of blocks from PrimProc cache. ";
@@ -254,7 +259,7 @@ WErrorCodes::WErrorCodes() : fErrorCodes()
     fErrorCodes[ERR_METADATABKUP_FILE_RENAME]         = " Unable to rename temporary bulk meta data file. ";
     fErrorCodes[ERR_METADATABKUP_COMP_PARSE_HDRS]     = " Error parsing compression headers in bulk backup file. ";
     fErrorCodes[ERR_METADATABKUP_COMP_VERIFY_HDRS]    = " Error verifying compression headers in bulk backup file. ";
-    fErrorCodes[ERR_METADATABKUP_COMP_CHUNK_NOT_FOUND]= " Error searching for compressed chunk in db file being backed up. ";
+    fErrorCodes[ERR_METADATABKUP_COMP_CHUNK_NOT_FOUND]= " Error searching for a compressed chunk in bulk backup file. ";
     fErrorCodes[ERR_METADATABKUP_COMP_OPEN_BULK_BKUP] = " Error opening compressed chunk in bulk backup file. ";
     fErrorCodes[ERR_METADATABKUP_COMP_WRITE_BULK_BKUP]= " Error writing compressed chunk to bulk backup file. ";
     fErrorCodes[ERR_METADATABKUP_COMP_READ_BULK_BKUP] = " Error reading compressed chunk from bulk backup file. ";

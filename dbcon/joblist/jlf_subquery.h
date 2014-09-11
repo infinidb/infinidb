@@ -50,8 +50,6 @@ void preprocessHavingClause(execplan::CalpontSelectExecutionPlan*, JobInfo&);
 
 void preprocessSelectSubquery(execplan::CalpontSelectExecutionPlan*, JobInfo&);
 
-SJSTEP doUnionSub(execplan::CalpontExecutionPlan*, JobInfo&);
-
 }
 
 #endif  // JLF_SUBQUERY_H

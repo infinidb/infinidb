@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: distributedenginecomm.cpp 9469 2013-05-01 18:38:43Z pleblanc $
+// $Id: distributedenginecomm.cpp 7759 2011-06-09 13:57:36Z dhill $
 //
 // C++ Implementation: distributedenginecomm
 //
@@ -35,8 +35,13 @@
 #include <ctime>
 #include <algorithm>
 #include <unistd.h>
-#ifdef _MSC_VER
+#ifndef _MSC_VER
+#include <arpa/inet.h>
+#else
 #include <intrin.h>
+#endif
+#if __FreeBSD__
+#include <sys/socket.h>
 #endif
 using namespace std;
 
@@ -92,24 +97,24 @@ namespace
         MessageLog ml(lid);
         Message::Args args;
         Message m(0);
-        args.add(file);
+        args.add(file); 
         args.add("@");
         args.add(line);
         args.add(msg);
-        m.format(args);
+        m.format(args); 
 	switch (logto)
 	{
-        	case LOG_TYPE_DEBUG:	ml.logDebugMessage(m); break;
-        	case LOG_TYPE_INFO: 	ml.logInfoMessage(m); break;
-        	case LOG_TYPE_WARNING:	ml.logWarningMessage(m); break;
-        	case LOG_TYPE_ERROR:	ml.logWarningMessage(m); break;
-        	case LOG_TYPE_CRITICAL:	ml.logCriticalMessage(m); break;
+        	case LOG_TYPE_DEBUG:	ml.logDebugMessage(m); break;		
+        	case LOG_TYPE_INFO: 	ml.logInfoMessage(m); break;	
+        	case LOG_TYPE_WARNING:	ml.logWarningMessage(m); break;	
+        	case LOG_TYPE_ERROR:	ml.logWarningMessage(m); break;	
+        	case LOG_TYPE_CRITICAL:	ml.logCriticalMessage(m); break;	
 	}
   }
- 
+  
   // @bug 1463. this function is added for PM failover. for dual/more nic PM,
   // this function is used to get the module name
-  string getModuleNameByIPAddr(oam::ModuleTypeConfig moduletypeconfig,
+  string getModuleNameByIPAddr(oam::ModuleTypeConfig moduletypeconfig, 
 				 string ipAddress)
   {
   	string modulename = "";
@@ -170,7 +175,7 @@ namespace
 	switch (Command) {
 		case BATCH_PRIMITIVE_RUN:
 		case DICT_TOKEN_BY_SCAN_COMPARE:
-			return MsgIn->Interleave;
+			return MsgIn->Reserve;
 		case COL_BY_SCAN: {
 			ColByScanRequestHeader * CRH;
 			CRH = (ColByScanRequestHeader *) (MsgIn+1);
@@ -259,6 +264,23 @@ struct QueueShutdown : public unary_function<T&, void>
 	}
 };
 
+#ifdef _MSC_VER
+mutex inet_ntoa_mutex;
+#endif
+
+inline const string sin_addr2String(const in_addr src)
+{
+	string s;
+#ifdef _MSC_VER
+	mutex::scoped_lock lk(inet_ntoa_mutex);
+	s = inet_ntoa(src);
+#else
+	char dst[INET_ADDRSTRLEN];
+	s = inet_ntop(AF_INET, &src, dst, INET_ADDRSTRLEN);
+#endif
+	return s;
+}
+
 }
 
 /** Debug macro */
@@ -272,7 +294,7 @@ struct QueueShutdown : public unary_function<T&, void>
 namespace joblist
 {
   DistributedEngineComm* DistributedEngineComm::fInstance = 0;
- 
+  
   /*static*/
   DistributedEngineComm* DistributedEngineComm::instance(ResourceManager& rm)
   {
@@ -282,14 +304,7 @@ namespace joblist
     return fInstance;
   }
 
-  /*static*/
-  void DistributedEngineComm::reset()
-  {
-    delete fInstance;
-	fInstance = 0;
-  }
-
-  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm) :
+  DistributedEngineComm::DistributedEngineComm(ResourceManager& rm) : 
 	fRm(rm),
 	fLBIDShift(fRm.getPsLBID_Shift()),
 	pmCount(0),
@@ -302,7 +317,6 @@ namespace joblist
   DistributedEngineComm::~DistributedEngineComm()
   {
     Close();
-	fInstance = 0;
   }
 
 void DistributedEngineComm::Setup()
@@ -315,7 +329,8 @@ void DistributedEngineComm::Setup()
     tbpsThreadCount = fRm.getJlNumScanReceiveThreads();
     unsigned numConnections = newPmCount * cpp;
     oam::Oam oam;
-    ModuleTypeConfig moduletypeconfig;
+    string ipAddress;
+    ModuleTypeConfig moduletypeconfig; 
 	try {
     	oam.getSystemConfig("pm", moduletypeconfig);
 	} catch (...) {
@@ -323,17 +338,14 @@ void DistributedEngineComm::Setup()
 		throw runtime_error("Setup failed");
 	}
 
-	if (newPmCount == 0) 
-		writeToLog(__FILE__, __LINE__, "Got a config file with 0 PMs",
-		  LOG_TYPE_CRITICAL);
-
     //This needs to make sense when compared to the extent size
     //     fLBIDShift = static_cast<unsigned>(config::Config::uFromText(fConfig->getConfig(section, "LBID_Shift")));
 
+    char buff[25];
+
     for (unsigned i = 0; i < numConnections; i++) {
-		ostringstream oss;
-		oss << "PMS" << (i+1);
-        string fServer (oss.str());
+        sprintf(buff, "PMS%u",i+1);
+        string fServer (buff);
 
         boost::shared_ptr<MessageQueueClient>
 			cl(new MessageQueueClient(fServer, fRm.getConfig()));
@@ -342,7 +354,8 @@ void DistributedEngineComm::Setup()
             if (cl->connect()) {
                 newClients.push_back(cl);
                 // assign the module name
-				cl->moduleName(getModuleNameByIPAddr(moduletypeconfig, cl->addr2String()));
+                ipAddress = sin_addr2String(cl->serv_addr().sin_addr);
+				cl->moduleName(getModuleNameByIPAddr(moduletypeconfig, ipAddress));
                 newLocks.push_back(nl);
                 StartClientListener(cl, i);
             } else {
@@ -370,7 +383,8 @@ void DistributedEngineComm::Setup()
         uint j;
 #endif
         for (j = 0; j < pmCount; j++) {
-            if (newClients[i]->isSameAddr(*fPmConnections[j]))
+            if (newClients[i]->serv_addr().sin_addr.s_addr ==
+			  fPmConnections[j]->serv_addr().sin_addr.s_addr)
                 break;
         }
         if (j == pmCount)
@@ -385,7 +399,7 @@ void DistributedEngineComm::Setup()
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
     __sync_synchronize();
 #elif defined(_MSC_VER)
-	MemoryBarrier();
+	_InterlockedOr(&pmCount, 0);
 #endif
     pmCount = newPmCount;
 
@@ -403,6 +417,7 @@ int DistributedEngineComm::Close()
     fPmReader.clear();
     return 0;
   }
+
 
 void DistributedEngineComm::Listen ( boost::shared_ptr<MessageQueueClient> client, uint connIndex)
 {
@@ -471,15 +486,11 @@ Error:
 		pmCount = (pmCount == 0 ? 0 : pmCount - 1);
 		//cout << "PMCOUNT=" << pmCount << endl;
 
-		// send alarm & log it
+		// send alarm
 		SNMPManager alarmMgr;
-		string alarmItem = client->addr2String();
+		string alarmItem = sin_addr2String(client->serv_addr().sin_addr);
 		alarmItem.append(" PrimProc");
 		alarmMgr.sendAlarmReport(alarmItem.c_str(), oam::CONN_FAILURE, SET);
-		
-		ostringstream os;
-		os << "DEC: lost connection to " << client->addr2String();
-		writeToLog(__FILE__, __LINE__, os.str(), LOG_TYPE_CRITICAL);
 	}
 	return;
 }
@@ -491,11 +502,11 @@ void DistributedEngineComm::addQueue(uint32_t key, bool sendACKs)
 	mutex* lock = new mutex();
 	condition* cond = new condition();
 	boost::shared_ptr<MQE> mqe(new MQE(pmCount));
-
+	
 	mqe->queue = StepMsgQueue(lock, cond);
 	mqe->sendACKs = sendACKs;
 	mqe->throttled = false;
-
+	
 	mutex::scoped_lock lk ( fMlock );
 	b = fSessionMessages.insert(pair<uint32_t, boost::shared_ptr<MQE> >(key, mqe)).second;
 	if (!b) {
@@ -529,7 +540,7 @@ void DistributedEngineComm::addQueue(uint32_t key, bool sendACKs)
 void DistributedEngineComm::read(uint32_t key, SBS &bs)
 {
 	boost::shared_ptr<MQE> mqe;
-
+	
 	//Find the StepMsgQueueList for this session
     mutex::scoped_lock lk(fMlock);
     MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
@@ -540,13 +551,13 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
       os << "DEC: attempt to read(bs) from a nonexistent queue\n";
       throw runtime_error(os.str());
     }
-
+	
     mqe = map_tok->second;
  	lk.unlock();
 
     //this method can block: you can't hold any locks here...
     TSQSize_t queueSize = mqe->queue.pop(&bs);
-
+	
 	if (bs && mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		if (mqe->throttled && !mqe->hasBigMsgs && queueSize.size <= disableThreshold)
@@ -563,7 +574,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
   {
 	SBS sbs;
 	boost::shared_ptr<MQE> mqe;
-
+	
     //Find the StepMsgQueueList for this session
     mutex::scoped_lock lk(fMlock);
     MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
@@ -574,12 +585,12 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
       os << "DEC: read(): attempt to read from a nonexistent queue\n";
       throw runtime_error(os.str());
     }
-
+	
     mqe = map_tok->second;
  	lk.unlock();
 
     TSQSize_t queueSize = mqe->queue.pop(&sbs);
-
+	
 	if (sbs && mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		if (mqe->throttled && !mqe->hasBigMsgs && queueSize.size <= disableThreshold)
@@ -596,7 +607,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
   void DistributedEngineComm::read_all(uint32_t key, vector<SBS> &v)
   {
 	boost::shared_ptr<MQE> mqe;
-
+	
 	mutex::scoped_lock lk(fMlock);
 	MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
     if(map_tok == fSessionMessages.end())
@@ -605,7 +616,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
       os << "DEC: read_all(): attempt to read from a nonexistent queue\n";
       throw runtime_error(os.str());
     }
-
+ 
 	mqe = map_tok->second;
  	lk.unlock();
 
@@ -616,11 +627,11 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 		sendAcks(key, v, mqe, 0);
 	}
   }
-
+	
   void DistributedEngineComm::read_some(uint32_t key, uint divisor, vector<SBS> &v)
   {
 	boost::shared_ptr<MQE> mqe;
-
+	
 	mutex::scoped_lock lk(fMlock);
 	MessageQueueMap::iterator map_tok = fSessionMessages.find(key);
     if(map_tok == fSessionMessages.end())
@@ -630,7 +641,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
       os << "DEC: read_some(): attempt to read from a nonexistent queue\n";
       throw runtime_error(os.str());
     }
-
+	
 	mqe = map_tok->second;
 	lk.unlock();
 
@@ -639,7 +650,7 @@ void DistributedEngineComm::read(uint32_t key, SBS &bs)
 	if (mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		if (mqe->throttled && !mqe->hasBigMsgs && queueSize.size <= disableThreshold)
-			setFlowControl(false, key, mqe);
+			setFlowControl(false, key, mqe);	
 		sendAcks(key, v, mqe, queueSize.size);
 	}
   }
@@ -659,7 +670,7 @@ void DistributedEngineComm::sendAcks(uint32_t uniqueID, const vector<SBS> &msgs,
 		uint32_t dummy32;
 		while (l_msgCount > 0) {
 			nextPMToACK(mqe, l_msgCount, &dummy32, &dummy16);
-			idbassert(dummy16 <= l_msgCount);
+			assert(dummy16 <= l_msgCount);
 			l_msgCount -= dummy16;
 		}
 		return;
@@ -668,7 +679,7 @@ void DistributedEngineComm::sendAcks(uint32_t uniqueID, const vector<SBS> &msgs,
 	size_t totalMsgSize = 0;
 	for (uint i = 0; i < msgs.size(); i++)
 		totalMsgSize += msgs[i]->lengthWithHdrOverhead();
-
+	
 	if (queueSize + totalMsgSize > mqe->targetQueueSize) {
 		/* update unackedwork for the overage that will never be acked */
 		int64_t overage = queueSize + totalMsgSize - mqe->targetQueueSize;
@@ -682,64 +693,36 @@ void DistributedEngineComm::sendAcks(uint32_t uniqueID, const vector<SBS> &msgs,
 		l_msgCount = msgs.size() - msgsToIgnore;  // this num gets acked
 		while (msgsToIgnore > 0) {
 			nextPMToACK(mqe, msgsToIgnore, &dummy32, &dummy16);
-			idbassert(dummy16 <= msgsToIgnore);
+			assert(dummy16 <= msgsToIgnore);
 			msgsToIgnore -= dummy16;
 		}
 	}
-
+	
 	if (l_msgCount > 0) {
 		ByteStream msg(sizeof(ISMPacketHeader));
 		uint16_t *toAck;
-		vector<bool> pmAcked(pmCount, false);
-
+		
 		ism = (ISMPacketHeader *) msg.getInputPtr();
 		// The only var checked by ReadThread is the Command var.  The others
-		// are wasted space.  We hijack the Size, & Flags fields for the
+		// are wasted space.  We hijack the Size, Reserve, & Flags fields for the 
 		// params to the ACK msg.
-
-		ism->Interleave = uniqueID;
+		
+		*((uint32_t *) &ism->Reserve) = uniqueID;
 		ism->Command = BATCH_PRIMITIVE_ACK;
 		toAck = &ism->Size;
 
 		msg.advanceInputPtr(sizeof(ISMPacketHeader));
-
+		
 		while (l_msgCount > 0) {
 			/* could have to send up to pmCount ACKs */
 			uint32_t sockIndex;
-
+		
 			/* This will reset the ACK field in the Bytestream directly, and nothing
 			 * else needs to change if multiple msgs are sent. */
 			nextPMToACK(mqe, l_msgCount, &sockIndex, toAck);
-			idbassert(*toAck <= l_msgCount);
+			assert(*toAck <= l_msgCount);
 			l_msgCount -= *toAck;
-			pmAcked[sockIndex] = true;
 			writeToClient(sockIndex, msg);
-		}
-
-		// @bug4436, when no more unacked work, send an ack to all PMs that haven't been acked.
-		// This is apply to the big message case only.  For small messages, the flow control is
-		// disabled when the queue size is below the disableThreshold.
-		if (mqe->hasBigMsgs)
-		{
-			uint64_t totalUnackedWork = 0;
-#ifdef _MSC_VER
-			for (LONG i = 0; i < pmCount; i++)
-#else
-			for (uint i = 0; i < pmCount; i++)
-#endif
-				totalUnackedWork += mqe->unackedWork[i];
-
-			if (totalUnackedWork == 0) {
-				*toAck = 1;
-#ifdef _MSC_VER
-				for (LONG i = 0; i < pmCount; i++) {
-#else
-				for (uint i = 0; i < pmCount; i++) {
-#endif
-					if (!pmAcked[i])
-						writeToClient(i, msg);
-				}
-			}
 		}
 	}
 }
@@ -754,11 +737,11 @@ void DistributedEngineComm::nextPMToACK(boost::shared_ptr<MQE> mqe, uint16_t max
 	uint i;
 	uint32_t &nextIndex = mqe->ackSocketIndex;
 #endif
-
-	/* Other threads can be touching mqe->unackedWork at the same time, but because of
+		
+	/* Other threads can be touching mqe->unackedWork at the same time, but because of 
 	 * the locking env, mqe->unackedWork can only grow; whatever gets latched in this fcn
 	 * is a safe minimum at the point of use. */
-
+	
 	if (mqe->unackedWork[nextIndex] >= maxAck) {
 #ifdef _MSC_VER
 		InterlockedAdd(&mqe->unackedWork[nextIndex], -maxAck);
@@ -811,20 +794,11 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 	ByteStream msg(sizeof(ISMPacketHeader));
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.getInputPtr();
 
-	ism->Interleave = uniqueID;
+	*((uint32_t *) &ism->Reserve) = uniqueID;
 	ism->Command = BATCH_PRIMITIVE_ACK;
 	ism->Size = (enabled ? 0 : -1);
-	
-#ifdef VALGRIND
-	/* XXXPAT: For testing in valgrind, init the vars that don't get used */
-	ism->Flags = 0;
-	ism->Type = 0;
-	ism->MsgCount = 0;
-	ism->Status = 0;
-#endif	
-
 	msg.advanceInputPtr(sizeof(ISMPacketHeader));
-
+	
 	for (uint i = 0; i < mqe->pmCount; i++)
 		writeToClient(i, msg);
 }
@@ -832,12 +806,13 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 #ifdef SHARED_NOTHING_DEMO
   void DistributedEngineComm::write(ByteStream& msg, BRM::OID_t oid)
 #else
-  void DistributedEngineComm::write(uint32_t senderID, ByteStream& msg)
+  void DistributedEngineComm::write(ByteStream& msg)
 #endif
   {
 	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
-	uint dest;
+	uint64_t idx;
 	uint numConn = fPmConnections.size();
+	int connectionIndex;
 
     if (numConn > 0) {
 		switch (ism->Command) {
@@ -866,8 +841,8 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 					uint i;
 #endif
 					for (i = 0; i < pmCount; i++)
-						writeToClient(i, msg, senderID);
-					return;
+						writeToClient(i, msg);
+					
 				}
 				else {
 					/* XXXPAT: This relies on the assumption that the first pmCount "PMS*"
@@ -878,37 +853,39 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 					uint i;
 #endif
 					for (i = 0; i < pmCount; i++)
-						writeToClient(i, msg, senderID);
+						writeToClient(i, msg);
 					return;
 				}
 			case BATCH_PRIMITIVE_RUN:
 			case DICT_TOKEN_BY_SCAN_COMPARE:
-				// for efficiency, writeToClient() grabs the interleaving factor for the caller,
-				// and decides the final connection index because it already grabs the 
-				// caller's queue information
-				dest = ism->Interleave;
-				writeToClient(dest, msg, senderID, true);
-				return;
+				idx = getInterleaveData(ism);
+				connectionIndex = idx % numConn;
+ 				THROTTLEDEBUG << "DEC: sending BPR for idx " << idx << " to PM " << connectionIndex << endl;
+				break;
 			default:
-				idbassert_s(0, "Unknown message type");
+				idx = getInterleaveData(ism);
+				connectionIndex = (idx >> fLBIDShift) % numConn;
 		}
+#ifdef SHARED_NOTHING_DEMO
+		if (oid == 0)
+		{
+			uint32_t fbo;
+			BRM::DBRM brm;
+			brm.lookup(idx, 2000000000, false, oid, fbo);
+		}
+		connectionIndex = oid % pmCount;
+		//cout << "DEC: " << pmCount << ' ' << oid << ' ' << connectionIndex << endl;
+#endif
+        writeToClient(connectionIndex, msg);
     }
 	else
 	{
-		writeToLog(__FILE__, __LINE__, "No PrimProcs are running", LOG_TYPE_DEBUG);
 		throw IDBExcept(ERR_NO_PRIMPROC);
 	}
   }
 
-void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
+void DistributedEngineComm::write(const messageqcpp::ByteStream &msg, uint connection)
 {
-	ISMPacketHeader *ism = (ISMPacketHeader *) msg.buf();
-
-	if (ism->Command == BATCH_PRIMITIVE_CREATE) 
-	{
-		/* Disable flow control initially */
-		msg << (uint32_t) -1;
-	}
 	newClients[connection]->write(msg);
 }
 
@@ -924,7 +901,7 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
     PrimitiveHeader *p = (PrimitiveHeader *)(hdr+1);
 	uint32_t uniqueId = p->UniqueID;
 	boost::shared_ptr<MQE> mqe;
-
+ 
     mutex::scoped_lock lk(fMlock);
     MessageQueueMap::iterator map_tok = fSessionMessages.find(uniqueId);
     if(map_tok == fSessionMessages.end())
@@ -935,7 +912,7 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
     }
  	mqe = map_tok->second;
 	lk.unlock();
-
+    
 	if (pmCount > 0) {
 #ifdef _MSC_VER
 		InterlockedIncrement(&mqe->unackedWork[connIndex % pmCount]);
@@ -944,7 +921,7 @@ void DistributedEngineComm::write(messageqcpp::ByteStream &msg, uint connection)
 #endif
 	}
 	TSQSize_t queueSize = mqe->queue.push(sbs);
-
+	
 	if (mqe->sendACKs) {
 		mutex::scoped_lock lk(ackLock);
 		uint64_t msgSize = sbs->lengthWithHdrOverhead();
@@ -963,27 +940,14 @@ void DistributedEngineComm::doHasBigMsgs(boost::shared_ptr<MQE> mqe, uint64_t ta
 		mqe->targetQueueSize = targetSize;
 }
 
-int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uint32_t sender, bool doInterleaving)
+int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs)
 {
-	mutex::scoped_lock lk(fMlock, defer_lock_t());
-	MessageQueueMap::iterator it;
-	uint interleaver = 0;
-
-	if (fPmConnections.size() == 0)
-		return 0;
-	
-	if (doInterleaving && sender != numeric_limits<uint32_t>::max()) {
-		lk.lock();
-		it = fSessionMessages.find(sender);
-		if (it != fSessionMessages.end()) 
-			interleaver = it->second->interleaver[index % it->second->pmCount]++; 
-		lk.unlock();
-	}
-
 	try
 	{
-		if (doInterleaving) 
-			index = (index + (interleaver * pmCount)) % fPmConnections.size();
+		MessageQueueMap::iterator recvQueue = fSessionMessages.end();
+		
+		// @bug 488. fPmConnections may be shrinked already due to PM node failure.
+		if (index >= fPmConnections.size() ) return 0;
 		ClientList::value_type client = fPmConnections[index];
 		if (!client->isAvailable()) return 0;
 
@@ -993,7 +957,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 	}
 	catch(...)
 	{
-		// @bug 488. error out under such condition instead of re-trying other connection,
+		// @bug 488. error out under such condition instead of re-trying other connection, 
 		// by pushing 0 size bytestream to messagequeue and throw excpetion
 		SBS sbs;
 		mutex::scoped_lock lk(fMlock);
@@ -1015,7 +979,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 		lk.unlock();
 
 		// reconfig the connection array
-		ClientList tempConns;
+		ClientList tempConns;		
 		{
 			//cout << "WARNING: DEC WRITE BROKEN PIPE " << fPmConnections[index]->otherEnd()<< endl;
 			mutex::scoped_lock onErrLock(fOnErrMutex);
@@ -1025,7 +989,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 
 			for (uint i = 0; i < fPmConnections.size(); i++)
 			{
-				if (moduleName != fPmConnections[i]->moduleName())
+				if (moduleName != fPmConnections[i]->moduleName())              
 					tempConns.push_back(fPmConnections[i]);
 			}
 			if (tempConns.size() == fPmConnections.size()) return 0;
@@ -1037,9 +1001,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
 		SNMPManager alarmMgr;
 		string alarmItem("UNKNOWN");
 		if (index < fPmConnections.size())
-		{
-			alarmItem = fPmConnections[index]->addr2String();
-		}
+			alarmItem = sin_addr2String(fPmConnections[index]->serv_addr().sin_addr);
 		alarmItem.append(" PrimProc");
 		alarmMgr.sendAlarmReport(alarmItem.c_str(), oam::CONN_FAILURE, SET);
 		throw runtime_error("DistributedEngineComm::write: Broken Pipe error");
@@ -1074,22 +1036,6 @@ void DistributedEngineComm::removeDECEventListener(DECEventListener *l)
 		if (eventListeners[i] != l)
 			newListeners.push_back(eventListeners[i]);
 	eventListeners.swap(newListeners);
-}
-
-DistributedEngineComm::MQE::MQE(uint pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
-				targetQueueSize(targetRecvQueueSize)
-{
-#ifdef _MSC_VER
-	unackedWork.reset(new volatile long[pmCount]);
-	interleaver.reset(new long[pmCount]);
-	memset((void *) unackedWork.get(), 0, pmCount * sizeof(long));
-	memset((void *) interleaver.get(), 0, pmCount + sizeof(long));
-#else
-	unackedWork.reset(new volatile uint32_t[pmCount]);
-	interleaver.reset(new uint[pmCount]);
-	memset((void *) unackedWork.get(), 0, pmCount * sizeof(uint32_t));
-	memset((void *) interleaver.get(), 0, pmCount * sizeof(uint));
-#endif
 }
 
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: predicateoperator.h 9669 2013-07-08 19:49:36Z bpaul $
+*   $Id: predicateoperator.h 7657 2011-04-20 13:49:05Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -39,7 +39,6 @@
 #include "expressionparser.h"
 #include "returnedcolumn.h"
 #include "dataconvert.h"
-#include "utils_utf8.h"
 
 namespace messageqcpp {
 class ByteStream;
@@ -129,25 +128,13 @@ inline bool PredicateOperator::getBoolVal(rowgroup::Row& row, bool& isNull, Retu
 
 		if (regex)
 		{
-#ifdef _MSC_VER
 			bool ret = boost::regex_match(vv, *regex);
-#else
-			bool ret = regexec(regex.get(), vv.c_str(), 0, NULL, 0) == 0;
-#endif
-			return (((fOp == OP_LIKE) ? ret : !ret) && !isNull);
+			return (ret && !isNull);
 		}
 		else
 		{
-#ifdef _MSC_VER
 			boost::regex regex(dataconvert::DataConvert::constructRegexp(rop->getStrVal(row, isNull)));
 			bool ret = boost::regex_match(vv, regex);
-#else
-			regex_t regex;
-			std::string str=dataconvert::DataConvert::constructRegexp(rop->getStrVal(row, isNull));
-			regcomp(&regex, str.c_str(), REG_NOSUB | REG_EXTENDED);
-			bool ret = regexec(&regex, vv.c_str(), 0, NULL, 0) == 0;
-			regfree(&regex);
-#endif
 			return (((fOp == OP_LIKE) ? ret : !ret) && !isNull);
 		}
 	}						
@@ -377,17 +364,17 @@ inline bool PredicateOperator::strCompare(std::string op1, std::string op2)
 	switch (fOp)
 	{
 		case OP_EQ:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) == 0;
+			return strcoll(op1.c_str(), op2.c_str()) == 0;
 		case OP_NE:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) != 0;
+			return strcoll(op1.c_str(), op2.c_str()) != 0;
 		case OP_GT:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) > 0;
+			return strcoll(op1.c_str(), op2.c_str()) > 0;
 		case OP_GE:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) >= 0;
+			return strcoll(op1.c_str(), op2.c_str()) >= 0;
 		case OP_LT:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) < 0;
+			return strcoll(op1.c_str(), op2.c_str()) < 0;
 		case OP_LE:
-			return funcexp::utf8::idb_strcoll(op1.c_str(), op2.c_str()) <= 0;
+			return strcoll(op1.c_str(), op2.c_str()) <= 0;
 		default:
 		{
 			std::ostringstream oss;

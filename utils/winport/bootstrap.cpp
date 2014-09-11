@@ -23,7 +23,6 @@
 #include <idbregistry.h>
 #include <direct.h>
 #include <malloc.h>
-#include <fstream>
 using namespace std;
 
 #include "syncstream.h"
@@ -97,7 +96,7 @@ namespace
 		int rc;
 		char* cmdLine = (char*)_malloca(cmdLineLen);
 		sprintf_s(cmdLine, cmdLineLen,
-			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root --force < %s\\etc\\win_setup_mysql_part2.sql > nul 2>&1",
+			"%s\\bin\\mysql.exe --defaults-file=%s\\my.ini --user=root < %s\\etc\\win_setup_mysql_part2.sql",
 			installDir.c_str(), installDir.c_str(), installDir.c_str());
 		rc = system(cmdLine);
 		_freea(cmdLine);
@@ -210,9 +209,6 @@ out:
 	{
 		int rc = 0;
 
-		//We'll just have to blast these changes in...
-		installIDBConn();
-
 		//Add new enterprise functions & new syscolumn columns
 		rc = installIDBConnStep2();
 		if (rc)
@@ -256,19 +252,6 @@ int main(int argc, char** argv)
 	cout << "Running InfiniDB bootstrap installer..." << endl;
 
 	cout << "Tuning configuration..." << endl;
-
-	string moduleFile = installDir + "\\local\\module";
-	if (_access(moduleFile.c_str(), F_OK) != 0)
-	{
-		ofstream mfs(moduleFile.c_str());
-		if (!mfs.good())
-		{
-			cerr << "Something went wrong creating the module file" << endl;
-			return 1;
-		}
-		mfs << "pm1" << endl;
-		mfs.close();
-	}
 
 	if (fixupConfig(installDir, mysqlPort))
 	{

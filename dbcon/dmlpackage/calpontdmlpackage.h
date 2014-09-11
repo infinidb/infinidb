@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontdmlpackage.h 8817 2012-08-15 18:52:12Z dhall $
+ *   $Id: calpontdmlpackage.h 7680 2011-05-09 14:28:29Z chao $
  *
  *
  ***********************************************************************/
@@ -102,7 +102,7 @@ namespace dmlpackage
              *
              * @param statement the dml statement to set
              */
-            inline void set_DMLStatement( const std::string& statement )
+            inline void set_DMLStatement( std::string& statement )
                 { fDMLStatement = statement; }
 
             /** @brief get the DML statement (the parsed statement)
@@ -113,7 +113,7 @@ namespace dmlpackage
              *
              * @param statement the SQL statement to set (the original SQL statement with quotes)
              */
-            inline void set_SQLStatement( const std::string& statement )
+            inline void set_SQLStatement( std::string& statement )
                 { fSQLStatement = statement; }
 
             /** @brief get the SQL statement (the original SQL statement)
@@ -221,23 +221,19 @@ namespace dmlpackage
             inline WriteEngine::ChunkManager* get_ChunkManager() const { return fCM; }
 	    /** @brief get the ExecutionPlan associated with this package
 	     */
-	    inline boost::shared_ptr<messageqcpp::ByteStream> get_ExecutionPlan()
+	    inline execplan::CalpontSelectExecutionPlan* get_ExecutionPlan()
 	    { 
-			return fPlan;
+		if(!fPlan)
+		{
+		    fPlan = new execplan::CalpontSelectExecutionPlan();
+		} 
+		return fPlan;
 	    }
 	    
     inline bool get_isInsertSelect() { return fIsInsertSelect; }
     inline void set_isInsertSelect( const bool isInsertSelect ) { fIsInsertSelect = isInsertSelect; }
 
-	inline bool get_isBatchInsert() { return fIsBatchInsert; }
-    inline void set_isBatchInsert( const bool isBatchInsert ) { fIsBatchInsert = isBatchInsert; }
-	
-	inline bool get_isAutocommitOn() { return fIsAutocommitOn; }
-    inline void set_isAutocommitOn( const bool isAutocommitOn ) { fIsAutocommitOn = isAutocommitOn; }
 
-	inline uint32_t getTableOid() { return fTableOid; }
-    inline void setTableOid( const uint32_t tableOid ) { fTableOid = tableOid; }
-	
         protected:
 
             void initializeTable();
@@ -245,11 +241,11 @@ namespace dmlpackage
             std::string fSchemaName;
             std::string fTableName;
             std::string fDMLStatement;
-            std::string fSQLStatement;
+	    std::string fSQLStatement;
             std::string fQueryString;
             int fSessionID;
 			execplan::CalpontSystemCatalog::SCN		fTxnId;
-	    	boost::shared_ptr<messageqcpp::ByteStream> fPlan;
+	    execplan::CalpontSelectExecutionPlan *fPlan;
             DMLTable    *fTable;
             bool fHasFilter;
 			bool fLogging;
@@ -257,9 +253,6 @@ namespace dmlpackage
 			bool fIsFromCol;
             std::string StripLeadingWhitespace( std::string value );
       bool fIsInsertSelect;
-	  bool fIsBatchInsert;
-	  bool fIsAutocommitOn;
-	  uint32_t fTableOid;
 	  WriteEngine::ChunkManager* fCM;
     };
 }

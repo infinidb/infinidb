@@ -1,13 +1,9 @@
 /***************************************************************************
-* $Id: processmonitor.cpp 2024 2013-06-25 18:25:49Z dhill $
+* $Id: processmonitor.cpp 1978 2013-02-08 20:10:28Z dhill $
 *
  ***************************************************************************/
 
 #include "processmonitor.h"
-#include "installdir.h"
-#include "cacheutils.h"
-#include "ddlcleanuputil.h"
-using namespace cacheutils;
 
 using namespace std;
 using namespace oam;
@@ -19,12 +15,9 @@ using namespace config;
 extern string systemOAM;
 extern string dm_server;
 extern bool runStandby;
+extern bool gsharedNothingFlag;
 extern bool processInitComplete;
 extern int fmoduleNumber;
-extern string cloud;
-extern string GlusterConfig;
-extern bool rootUser;
-extern string USER;
 
 //std::string gOAMParentModuleName;
 bool gOAMParentModuleFlag;
@@ -509,43 +502,42 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					if (processstatus.ProcessOpState != oam::ACTIVE) {
 
 						int initType = oam::STANDBY_INIT;
-						if ( actIndicator == oam::GRACEFUL_STANDBY) {
-							//this module running Parent OAM Standby
+						if ( actIndicator != oam::GRACEFUL_STANDBY) {
+							//Check for SIMPLEX runtype processes
+							initType = checkSpecialProcessState( processconfig.ProcessName, processconfig.RunType, processconfig.ModuleType );
+	
+							if ( initType == oam::COLD_STANDBY) {
+								//there is a mate active, skip
+								config.buildList(processconfig.ModuleType,
+													processconfig.ProcessName,
+													processconfig.ProcessLocation, 
+													processconfig.ProcessArgs, 
+													processconfig.LaunchID,
+													0, 
+													oam::COLD_STANDBY, 
+													processconfig.BootLaunch,
+													processconfig.RunType,
+													processconfig.DepProcessName, 
+													processconfig.DepModuleName,
+													processconfig.LogFile);
+		
+								requestStatus = API_SUCCESS;
+								ackMsg << (ByteStream::byte) ACK;
+								ackMsg << (ByteStream::byte) START;
+								ackMsg << (ByteStream::byte) requestStatus;
+								mq.write(ackMsg);
+								//sleep(1);	
+								break;
+							}
+						}
+						else
+						{
+							//this module going Parent OAM Standby
 							runStandby = true;
-							log.writeLog(__LINE__,  "ProcMon Running Hot-Standby");
+							log.writeLog(__LINE__,  "ProcMon Running going Hot-Standby");
 
 							// delete any old active alarm log file
 							unlink ("/var/log/Calpont/activeAlarms");
-						}
-
-						//Check for SIMPLEX runtype processes
-						initType = checkSpecialProcessState( processconfig.ProcessName, processconfig.RunType, processconfig.ModuleType );
-
-						if ( initType == oam::COLD_STANDBY) {
-							//there is a mate active, skip
-							config.buildList(processconfig.ModuleType,
-												processconfig.ProcessName,
-												processconfig.ProcessLocation, 
-												processconfig.ProcessArgs, 
-												processconfig.LaunchID,
-												0, 
-												oam::COLD_STANDBY, 
-												processconfig.BootLaunch,
-												processconfig.RunType,
-												processconfig.DepProcessName, 
-												processconfig.DepModuleName,
-												processconfig.LogFile);
-	
-							requestStatus = API_SUCCESS;
-							ackMsg << (ByteStream::byte) ACK;
-							ackMsg << (ByteStream::byte) START;
-							ackMsg << (ByteStream::byte) requestStatus;
-							mq.write(ackMsg);
-							//sleep(1);	
-
-							log.writeLog(__LINE__, "START: process left STANDBY " + processName);
-							log.writeLog(__LINE__, "START: ACK back to ProcMgr, return status = " + oam.itoa((int) requestStatus));
-							break;
 						}
 
 						pid_t processID = startProcess(processconfig.ModuleType,
@@ -564,8 +556,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							processID = oam::API_SUCCESS;
 						requestStatus = processID;
 					}
-					else
-						log.writeLog(__LINE__, "START: process already active " + processName);
 
 					//Inform Process Manager that Process restart
 					processRestarted(processName);
@@ -575,8 +565,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					ackMsg << (ByteStream::byte) requestStatus;
 					mq.write(ackMsg);
 	
-					log.writeLog(__LINE__, "START: ACK back to ProcMgr, return status = " + oam.itoa((int) requestStatus));
-
 					break;
 				}
 				case RESTART:
@@ -684,37 +672,30 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					msg >> manualFlag;
 					int requestStatus = API_SUCCESS;
 					log.writeLog(__LINE__, "MSG RECEIVED: Re-Init process request on: " + processName);
-
-					if ( processName == "cpimport" )
+		
+					processList::iterator listPtr;
+					processList* aPtr = config.monitoredListPtr();
+					listPtr = aPtr->begin();
+		
+					for (; listPtr != aPtr->end(); ++listPtr)
 					{
-						system("pkill -sighup cpimport");
-					}
-					else
-					{
-						processList::iterator listPtr;
-						processList* aPtr = config.monitoredListPtr();
-						listPtr = aPtr->begin();
-			
-						for (; listPtr != aPtr->end(); ++listPtr)
-						{
-							if ((*listPtr).ProcessName == processName) {
-								if ( (*listPtr).processID <= 1 ) {
-									log.writeLog(__LINE__,  "ERROR: process not active" , LOG_TYPE_DEBUG );
-									requestStatus = API_SUCCESS;
-									break;
-								}
-	
-								reinitProcess((*listPtr).processID, (*listPtr).ProcessName, actIndicator);
+						if ((*listPtr).ProcessName == processName) {
+							if ( (*listPtr).processID <= 1 ) {
+								log.writeLog(__LINE__,  "ERROR: process not active" , LOG_TYPE_DEBUG );
 								requestStatus = API_SUCCESS;
 								break;
 							}
+
+							reinitProcess((*listPtr).processID, (*listPtr).ProcessName, actIndicator);
+							requestStatus = API_SUCCESS;
+							break;
 						}
-	
-						if (listPtr == aPtr->end())
-						{
-							log.writeLog(__LINE__,  "ERROR: No such process: " + processName, LOG_TYPE_ERROR );
-							requestStatus = API_FAILURE;
-						}
+					}
+
+					if (listPtr == aPtr->end())
+					{
+						log.writeLog(__LINE__,  "ERROR: No such process: " + processName, LOG_TYPE_ERROR );
+						requestStatus = API_FAILURE;
 					}
 
 					ackMsg << (ByteStream::byte) ACK;
@@ -806,10 +787,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					//reset BRM locks
 					if ( requestStatus == oam::API_SUCCESS ) {
-						string logdir("/var/log/Calpont");
-						if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-						string cmd = startup::StartUp::installDir() + "/bin/reset_locks > " + logdir + "/reset_locks.log1 2>&1";
-						system(cmd.c_str());
+						system("/usr/local/Calpont/bin/reset_locks  > /var/log/Calpont/reset_locks.log1 2>&1");
 						log.writeLog(__LINE__, "BRM reset_locks script run", LOG_TYPE_DEBUG);
 
 						//stop the mysql daemon
@@ -823,17 +801,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 						oam.sendDeviceNotification(config.moduleName(), MODULE_DOWN);
 					}
 
-					if ( config.moduleType() == "pm" ) {
-						//clearout auto move dbroots files
-						string cmd = "rm -f " + startup::StartUp::installDir() + "/local/moveDbrootTransactionLog";
-						system(cmd.c_str());
-						cmd = "touch " + startup::StartUp::installDir() + "/local/moveDbrootTransactionLog";
-						system(cmd.c_str());
-
-						//go unmount disk NOT assigned to this pm
-						unmountExtraDBroots();
-					}
-
 					ackMsg << (ByteStream::byte) ACK;
 					ackMsg << (ByteStream::byte) STOPALL;
 					ackMsg << (ByteStream::byte) requestStatus;
@@ -843,30 +810,30 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					//Remove Calpont RPM on REMOVE option
 					if ( actIndicator == oam::REMOVE ) {
-						log.writeLog(__LINE__,  "STOPALL: uninstall Calpont RPMs", LOG_TYPE_DEBUG);
-						if ( config.moduleType() == "um" ) {
-							system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
-							system("dpkg -P calpont calpont-mysqld calpont-mysql");
+						if ( config.moduleType() != "xm" ) {
+							log.writeLog(__LINE__,  "STOPALL: uninstall Calpont RPMs", LOG_TYPE_DEBUG);
+							if ( config.moduleType() == "um" ) {
+								system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
+								system("dpkg -P calpont calpont-mysqld calpont-mysql");
+							}
+							else	// pm
+							{
+								system("umount /usr/local/Calpont/data* -l > /dev/null 2>&1");
+								sleep(1);
+		
+								system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
+								system("dpkg -P calpont calpont-mysqld calpont-mysql");
+							}
+							// should get here is packages get removed correctly
+							system("/etc/init.d/infinidb stop > /dev/null 2>&1");
+							exit (0);
 						}
-						else	// pm
+						else
 						{
-							//Flush the cache
-							cacheutils::flushPrimProcCache();
-							cacheutils::dropPrimProcFdCache();
-							flushInodeCache();
+							log.writeLog(__LINE__, "STOPALL: REMOVE OPTION - removing XM ProcMon setup", LOG_TYPE_DEBUG);
 
-							string cmd = "umount " + startup::StartUp::installDir() + "/data* -l > /dev/null 2>&1";
-
-							system(cmd.c_str());
-							sleep(1);
-	
-							system("rpm -e calpont calpont-mysqld calpont-mysql --nodeps");
-							system("dpkg -P calpont calpont-mysqld calpont-mysql");
+							requestStatus = removeXMProcMon();
 						}
-						// should get here is packages get removed correctly
-						string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
-						system(cmd.c_str());
-						exit (0);
 					}
 
 					break;
@@ -877,35 +844,36 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 					int requestStatus = oam::API_SUCCESS;
 					log.writeLog(__LINE__,  "MSG RECEIVED: Start All process request...");
 
-					//start the mysql daemon 
-					try {
-						oam.actionMysqlCalpont(MYSQL_START);
-					}
-					catch(...)
-					{}
+					//if non parent PM module, remount as read-only to flush the cache
+					if ( config.moduleType() == "pm" && !gOAMParentModuleFlag && !gsharedNothingFlag) {
+						int ret = setDataMount("ro");
+						if ( ret == oam::API_FAILURE ) {
+							//send notification about the mount setup failure
+							oam.sendDeviceNotification(config.moduleName(), DBROOT_MOUNT_FAILURE);
 
-					if( config.moduleType() == "pm" )
-					{
-						//setup dbroot mounts
-						createDataDirs(cloud);
-						int ret = checkDataMount();
-						if (ret != oam::API_SUCCESS)
-						{
-							int ret_status = oam::API_FAILURE;
-
-							log.writeLog(__LINE__, "checkDataMount error, startmodule failed", LOG_TYPE_CRITICAL);
-	
 							ackMsg << (ByteStream::byte) ACK;
 							ackMsg << (ByteStream::byte) STARTALL;
-							ackMsg << (ByteStream::byte) ret_status;
+							ackMsg << (ByteStream::byte) oam::API_FAILURE;
 							mq.write(ackMsg);
-		
-							log.writeLog(__LINE__, "STARTALL: ACK back to ProcMgr, return status = " + oam.itoa((int) oam::API_FAILURE));
-			
 							break;
 						}
 					}
+		
+					// parent PM Module, remount read-write
+					if ( gOAMParentModuleFlag ) {
+						int ret = setDataMount("rw");
+						if ( ret == oam::API_FAILURE ) {
+							//send notification about the mount setup failure
+							oam.sendDeviceNotification(config.moduleName(), DBROOT_MOUNT_FAILURE);
 
+							ackMsg << (ByteStream::byte) ACK;
+							ackMsg << (ByteStream::byte) STARTALL;
+							ackMsg << (ByteStream::byte) oam::API_FAILURE;
+							mq.write(ackMsg);
+							break;
+						}
+					}
+		
 					//Loop through all Process belong to this module	
 					processList::iterator listPtr;
 					processList* aPtr = config.monitoredListPtr();
@@ -1005,22 +973,18 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 								requestStatus = processID;
 
 								if ( requestStatus != oam::API_SUCCESS )
-								{
-									// error in launching a process
-									if ( requestStatus == oam::API_FAILURE &&
-										(*listPtr).RunType == SIMPLEX)
-										checkProcessFailover((*listPtr).ProcessName);
-									else
-										break;
-								}
+								// error in launching a process
+									break;
 								else
 								{
 									//run startup test script to perform basic DB sanity testing
-									if ( gOAMParentModuleFlag 
-											&& (*listPtr).ProcessName == "DBRMWorkerNode" ) {
-										if ( runStartupTest() != oam::API_SUCCESS ){
-											requestStatus = oam::API_FAILURE_DB_ERROR;
-											break;
+									if ( config.moduleType() != "xm" ) {
+										if ( config.moduleName() == config.OAMParentName() 
+												&& (*listPtr).ProcessName == "DBRMWorkerNode" ) {
+											if ( runStartupTest() != oam::API_SUCCESS ){
+												requestStatus = oam::API_FAILURE_DB_ERROR;
+												break;
+											}
 										}
 									}
 								}
@@ -1028,7 +992,7 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 							}
 							else
 							{	// if DBRMWorkerNode and ACTIVE, run runStartupTest
-								if ( gOAMParentModuleFlag 
+								if ( config.moduleName() == config.OAMParentName() 
 										&& (*listPtr).ProcessName == "DBRMWorkerNode" 
 										&& (*listPtr).state == oam::ACTIVE) {
 									if ( runStartupTest() != oam::API_SUCCESS ){
@@ -1037,10 +1001,17 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 									}
 								}
 							}
-						}
+						}	
 					}
 
 					if ( requestStatus == oam::API_SUCCESS ) {
+
+						//start the mysql daemon 
+						try {
+							oam.actionMysqlCalpont(MYSQL_START);
+						}
+						catch(...)
+						{}
 
 						//check and send noitification
 						MonitorConfig config;
@@ -1114,13 +1085,11 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 
 					//sleep to give time for process-manager to finish up
 					sleep(5);
-					string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
-					system(cmd.c_str());
+					system("/etc/init.d/infinidb stop > /dev/null 2>&1");
 					exit (0);
 
 					break;
 				}
-
 
 				default:
 					break;
@@ -1272,11 +1241,12 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 				system("rpm -ivh /root/calpont-mysql-*rpm /root/calpont-mysqld-*rpm > /tmp/rpminstall");
 				system("dpgk -i /root/calpont-mysql-*deb /root/calpont-mysqld-*deb >> /tmp/rpminstall");
 
-				string cmd = startup::StartUp::installDir() + "/bin/post-mysqld-install >> /tmp/rpminstall";
-				system(cmd.c_str());
-				cmd = startup::StartUp::installDir() + "/bin/post-mysql-install >> /tmp/rpminstall";
-				system(cmd.c_str());
+				system("/usr/local/Calpont/bin/post-mysqld-install >> /tmp/rpminstall");
+//				sleep(5);
+				system("/usr/local/Calpont/bin/post-mysql-install >> /tmp/rpminstall");
+//				sleep(5);
 				system("/etc/init.d/mysql-Calpont start > /tmp/mysqldstart");
+//				sleep(5);
 
 				ifstream file ("/tmp/mysqldstart");
 				if (!file) {
@@ -1334,6 +1304,31 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			mq.write(ackMsg);
 
 			log.writeLog(__LINE__, "GETSOFTWAREINFO: ACK back to ProcMgr with " + config.SoftwareVersion() + config.SoftwareRelease());
+
+			break;
+		}
+
+		case UPDATEEXPORTS:
+		{
+			log.writeLog(__LINE__,  "MSG RECEIVED: Update exports file");
+
+			string IPAddress;
+
+			msg >> IPAddress;
+
+			uint16_t rtnCode = API_SUCCESS;
+			int requestStatus = API_SUCCESS;
+
+			if (rtnCode)
+				// error in updating log
+				requestStatus = API_FAILURE;
+
+			ackMsg << (ByteStream::byte) ACK;
+			ackMsg << (ByteStream::byte) UPDATEEXPORTS;
+			ackMsg << (ByteStream::byte) requestStatus;
+			mq.write(ackMsg);
+
+			log.writeLog(__LINE__, "UPDATEEXPORTS: ACK back to ProcMgr");
 
 			break;
 		}
@@ -1481,163 +1476,6 @@ void ProcessMonitor::processMessage(messageqcpp::ByteStream msg, messageqcpp::IO
 			break;
 		}
 
-		case PROCUNMOUNT:
-		{
-			string dbrootID;
-			msg >> dbrootID;
-
-			log.writeLog(__LINE__,  "MSG RECEIVED: Unmount dbroot: " + dbrootID);
-
-			//Flush the cache
-			cacheutils::flushPrimProcCache();
-			cacheutils::dropPrimProcFdCache();
-			flushInodeCache();
-
-			int return_status = API_SUCCESS;
-			if (GlusterConfig == "n")
-			{
-				int retry = 1; 
-				for ( ; retry < 5 ; retry++)
-				{
-					//if dbroot1, stop syslog
-					if ( dbrootID == "1")
-						oam.syslogAction("stop");
-
-					string cmd = "umount " + startup::StartUp::installDir() + "/data" + dbrootID + " > /tmp/umount.txt 2>&1";
-
-					system(cmd.c_str());
-		
-					return_status = API_SUCCESS;
-					if (!oam.checkLogStatus("/tmp/umount.txt", "busy"))
-						break;
-
-					if ( rootUser) {
-						cmd = "lsof " + startup::StartUp::installDir() + "/data" + dbrootID + " >> /tmp/umount.txt 2>&1";
-						system(cmd.c_str());
-						cmd = "fuser -muvf " + startup::StartUp::installDir() + "/data" + dbrootID + " >> /tmp/umount.txt 2>&1";
-						system(cmd.c_str());	
-					}
-					else
-					{
-						cmd = "sudo lsof " + startup::StartUp::installDir() + "/data" + dbrootID + " >> /tmp/umount.txt 2>&1";
-						system(cmd.c_str());
-						cmd = "sudo fuser -muvf " + startup::StartUp::installDir() + "/data" + dbrootID + " >> /tmp/umount.txt 2>&1";
-						system(cmd.c_str());
-					}
-
-					sleep(2);
-					//Flush the cache
-					cacheutils::flushPrimProcCache();
-					cacheutils::dropPrimProcFdCache();
-					flushInodeCache();
-				}
-
-				//if dbroot1, stop syslog
-				if ( dbrootID == "1")
-					oam.syslogAction("start");
-
-				if ( retry >= 5 )
-				{
-					log.writeLog(__LINE__, "Unmount failed, device busy, dbroot: " + dbrootID, LOG_TYPE_ERROR);
-					return_status = API_FAILURE;
-				}
-			}
-			else
-			{
-				try {
-					string moduleid = oam.itoa(config.moduleID());
-					string errmsg;
-					int ret = oam.glusterctl(oam::GLUSTER_UNASSIGN, dbrootID, moduleid, errmsg);
-					if ( ret != 0 )
-						log.writeLog(__LINE__, "Error unassigning gluster dbroot# " + dbrootID + ", error: " + errmsg, LOG_TYPE_ERROR);
-					else
-						log.writeLog(__LINE__, "Gluster unassign gluster dbroot# " + dbrootID);
-				}
-				catch (...)
-				{
-					log.writeLog(__LINE__, "Exception unassigning gluster dbroot# " + dbrootID, LOG_TYPE_ERROR);
-				}
-			}
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) PROCUNMOUNT;
-			ackMsg << (ByteStream::byte) return_status;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "PROCUNMOUNT: ACK back to ProcMgr, status: " + oam.itoa(return_status));
-
-			break;
-		}
-
-		case PROCMOUNT:
-		{
-			string dbrootID;
-			msg >> dbrootID;
-
-			log.writeLog(__LINE__,  "MSG RECEIVED: Mount dbroot: " + dbrootID);;
-
-			int return_status = API_SUCCESS;
-			if (GlusterConfig == "n")
-			{
-				string cmd = "mount " + startup::StartUp::installDir() + "/data" + dbrootID + " > /tmp/mount.txt 2>&1";
-				system(cmd.c_str());
-	
-				if ( !rootUser) {
-					cmd = "sudo chown -R " + USER + ":" + USER + " " + startup::StartUp::installDir() + "/data" + dbrootID + " > /dev/null";
-					system(cmd.c_str());
-				}
-
-				return_status = API_SUCCESS;
-				ifstream in("/tmp/mount.txt");
-		
-				in.seekg(0, std::ios::end);
-				int size = in.tellg();
-				if ( size != 0 )
-				{
-					if (!oam.checkLogStatus("/tmp/mount.txt", "already")) {
-						log.writeLog(__LINE__, "mount failed, dbroot: " + dbrootID, LOG_TYPE_ERROR);
-						return_status = API_FAILURE;
-					}
-				}
-			}
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) PROCMOUNT;
-			ackMsg << (ByteStream::byte) return_status;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "PROCMOUNT: ACK back to ProcMgr, status: " + oam.itoa(return_status));
-
-			break;
-		}
-
-		case PROCFSTABUPDATE:
-		{
-			string entry;
-			msg >> entry;
-
-			string cmd = "echo " + entry + " >> /etc/fstab";
-			system(cmd.c_str());
-
-			log.writeLog(__LINE__, "Add line entry to /etc/fstab : " + entry);
-
-			//mkdir on entry directory
-			string::size_type pos = entry.find(" ",0);
-			string::size_type pos1 = entry.find(" ",pos+1);
-			string directory = entry.substr(pos+1,pos1-pos);
-			cmd = "mkdir " + directory;
-			system(cmd.c_str());
-			log.writeLog(__LINE__, "create directory: " + directory);
-
-			ackMsg << (ByteStream::byte) ACK;
-			ackMsg << (ByteStream::byte) PROCFSTABUPDATE;
-			ackMsg << (ByteStream::byte) API_SUCCESS;
-			mq.write(ackMsg);
-
-			log.writeLog(__LINE__, "PROCFSTABUPDATE: ACK back to ProcMgr");
-
-			break;
-		}
 
 		default:
 			break;
@@ -1703,12 +1541,17 @@ int ProcessMonitor::stopProcess(pid_t processID, std::string processName, std::s
 		}
 	}
 
-	//now do a pkill on process just to make sure all is clean
-	string::size_type pos = processLocation.find("bin/",0);
-	string procName = processLocation.substr(pos+4, 15) + "\\*";
-	string cmd = "pkill -9 " + procName;
-	system(cmd.c_str());
-	log.writeLog(__LINE__, "Pkill Process just to make sure: " + procName, LOG_TYPE_DEBUG);
+	if ( config.moduleType() != "xm" ) {
+		//now do a pkill on process just to make sure all is clean
+		string::size_type pos = processLocation.find("bin/",0);
+		string procName = processLocation.substr(pos+4, 80);
+		string cmd = "pkill -9 " + procName;
+		system(cmd.c_str());
+		log.writeLog(__LINE__, "Pkill Process just to make sure: " + procName, LOG_TYPE_DEBUG);
+	}
+
+	if (processName == "PrimProc")
+		system("pkill DecomSvr >/dev/null 2>&1");
 
 	return status;
 }
@@ -1737,17 +1580,9 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 	log.writeLog(__LINE__, "Process location: " + processLocation, LOG_TYPE_DEBUG);
 
 	//check process location
-	if (access(processLocation.c_str(), X_OK) != 0) {
+	ifstream file (processLocation.c_str());
+	if (!file) {
 		log.writeLog(__LINE__, "Process location: " + processLocation + " not found", LOG_TYPE_ERROR);
-
-		//record the process information into processList 
-		config.buildList(processModuleType, processName, processLocation, arg_list, 
-							launchID, newProcessID, FAILED, BootLaunch, RunType,
-							DepProcessName, DepModuleName, LogFile);
-
-		//Update ProcessConfig.xml: Mark Process INIT state 
-		updateProcessInfo(processName, FAILED, newProcessID);
-
 		return oam::API_FAILURE;
 	}
 
@@ -1874,15 +1709,6 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			
 						if (state == oam::FAILED) {
 							log.writeLog(__LINE__, "Dependent Process is FAILED state, Hard Failed Restoral", LOG_TYPE_DEBUG);
-
-							//record the process information into processList 
-							config.buildList(processModuleType, processName, processLocation, arg_list, 
-												launchID, newProcessID, FAILED, BootLaunch, RunType,
-												DepProcessName, DepModuleName, LogFile);
-					
-							//Update ProcessConfig.xml: Mark Process INIT state 
-							updateProcessInfo(processName, FAILED, newProcessID);
-
 							return oam::API_FAILURE;
 						}
 
@@ -1920,7 +1746,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 						bool degraded;
 						oam.getModuleStatus(DepModuleName[i], opState, degraded);
 						if (opState == oam::MAN_DISABLED || opState == oam::AUTO_DISABLED || 
-							opState == oam::AUTO_OFFLINE)
+							opState == oam::AUTO_OFFLINE )
 							continue;
 
 						if (state != oam::ACTIVE) {
@@ -1935,7 +1761,9 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 
 	//Don't start certain processes if local module isn't Parent OAM PM
 	if ( processName == "SNMPTrapDaemon" || 
-			processName == "DBRMControllerNode" ) {
+			processName == "DBRMControllerNode" ||
+			processName == "DDLProc" ||
+			processName == "DMLProc" ) {
 		if (!gOAMParentModuleFlag) {
 			log.writeLog(__LINE__, "Fail Restoral, not on Parent OAM module", LOG_TYPE_ERROR);
 			//local PM doesn't have the read/write mount
@@ -1954,24 +1782,13 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			try {
 				int slavenodeID = oam.getLocalDBRMID(config.moduleName());
 				arg_list[i] = "DBRM_Worker" + oam.itoa(slavenodeID);
-				log.writeLog(__LINE__, "*** getLocalDBRMID Worker Node ID = " + oam.itoa(slavenodeID), LOG_TYPE_DEBUG);
 			}
 			catch(...)
 			{
 				log.writeLog(__LINE__, "EXCEPTION ERROR on getLocalDBRMID: no DBRM for module", LOG_TYPE_ERROR);
-
-				//record the process information into processList 
-				config.buildList(processModuleType, processName, processLocation, arg_list, 
-									launchID, newProcessID, FAILED, BootLaunch, RunType,
-									DepProcessName, DepModuleName, LogFile);
-		
-				//Update ProcessConfig.xml: Mark Process INIT state 
-				updateProcessInfo(processName, FAILED, newProcessID);
-
 				return oam::API_FAILURE;
 			}
 		}
-
 
 		argList[i] = new char[arg_list[i].length()+1];
 
@@ -1984,10 +1801,9 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 
 	//run load-brm script before brm processes started
 	if ( actIndicator != oam::GRACEFUL ) {
-		if ( ( gOAMParentModuleFlag && processName == "DBRMControllerNode") ||
-				( !gOAMParentModuleFlag && processName == "DBRMWorkerNode") ) {
+		if ( processName == "DBRMWorkerNode" ) {
 			string DBRMDir;
-			string tempDBRMDir = startup::StartUp::installDir() + "/data/dbrm";
+			string tempDBRMDir = "/usr/local/Calpont/data/dbrm";
 	
 			// get DBRMroot config setting
 			string DBRMroot;
@@ -2000,15 +1816,6 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 			else 
 			{
 				log.writeLog(__LINE__, "Error: /BRM_saves not found in DBRMRoot config setting", LOG_TYPE_CRITICAL);
-
-				//record the process information into processList 
-				config.buildList(processModuleType, processName, processLocation, arg_list, 
-									launchID, newProcessID, FAILED, BootLaunch, RunType,
-									DepProcessName, DepModuleName, LogFile);
-		
-				//Update ProcessConfig.xml: Mark Process INIT state 
-				updateProcessInfo(processName, FAILED, newProcessID);
-
 				return oam::API_FAILURE;
 			}
 	
@@ -2024,15 +1831,15 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 				system(cmd.c_str());
 	
 				//setup softlink for editem on the 'um' or shared-nothing non active pm
-/*				if( config.moduleType() == "um" || 
-					(config.moduleType() == "pm") ) {
+				if( config.moduleType() == "um" || 
+					(config.moduleType() == "pm" && gsharedNothingFlag) ) {
 					cmd = "mv -f " + DBRMDir + " /root/ > /dev/null 2>&1";
 					system(cmd.c_str());
 		
 					cmd = "ln -s " + tempDBRMDir + " " + DBRMDir + " > /dev/null 2>&1";
 					system(cmd.c_str());
 				}
-*/	
+	
 				//change DBRMDir to temp DBRMDir
 				DBRMDir = tempDBRMDir;
 
@@ -2040,15 +1847,13 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 				cmd = "rm -f " + DBRMDir + "/*";
 				system(cmd.c_str());
 
-				// go request files from parent OAM module
+				// go request files for parent OAM module
 				if ( getDBRMdata() != oam::API_SUCCESS ) {
 					log.writeLog(__LINE__, "Error: getDBRMdata failed", LOG_TYPE_ERROR);
 					sendAlarm("DBRM", DBRM_LOAD_DATA_ERROR, SET);	
-					return oam::API_MINOR_FAILURE;
+					return oam::API_FAILURE;
 				}
-
-				sendAlarm("DBRM", DBRM_LOAD_DATA_ERROR, CLEAR);	
-				// change DBRMroot to temp DBRMDir path
+				// change DBRMroot tot temp DBRMDir path
 				DBRMroot = tempDBRMDir + "/BRM_saves";
 			}
 	
@@ -2072,44 +1877,30 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 						dbrmFile = tempDBRMDir + dbrmFile.substr(pos,80);;
 				}
 	
-				string logdir("/var/log/Calpont");
-				if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-				string cmd = startup::StartUp::installDir() + "/bin/reset_locks > " + logdir + "/reset_locks.log1 2>&1";
-				system(cmd.c_str());
+				system("/usr/local/Calpont/bin/reset_locks  > /var/log/Calpont/reset_locks.log1 2>&1");
 				log.writeLog(__LINE__, "BRM reset_locks script run", LOG_TYPE_DEBUG);
 	
-//				cmd = startup::StartUp::installDir() + "/bin/clearShm -c  > /dev/null 2>&1";
-//				system(cmd.c_str());
-//				log.writeLog(__LINE__, "Clear Shared Memory script run", LOG_TYPE_DEBUG);
+				system("/usr/local/Calpont/bin/clearShm -c  > /dev/null 2>&1");
+				log.writeLog(__LINE__, "Clear Shared Memory script run", LOG_TYPE_DEBUG);
 	
-				cmd = startup::StartUp::installDir() + "/bin/" + loadScript + " " + dbrmFile + " > " + logdir + "/load_brm.log1 2>&1";
+				string cmd = "/usr/local/Calpont/bin/" + loadScript + " " + dbrmFile + " > /var/log/Calpont/load_brm.log1 2>&1";
 				log.writeLog(__LINE__, loadScript + " cmd = " + cmd, LOG_TYPE_DEBUG);
 				system(cmd.c_str());
 				
-				cmd = logdir + "/load_brm.log1";
-				if (oam.checkLogStatus(cmd, "OK"))
+				if (oam.checkLogStatus("/var/log/Calpont/load_brm.log1", "OK"))
 					log.writeLog(__LINE__, "Successfully return from " + loadScript, LOG_TYPE_DEBUG);
 				else {
 					log.writeLog(__LINE__, "Error return DBRM " + loadScript, LOG_TYPE_ERROR);
 					sendAlarm("DBRM", DBRM_LOAD_DATA_ERROR, SET);
-
-					//record the process information into processList 
-					config.buildList(processModuleType, processName, processLocation, arg_list, 
-										launchID, newProcessID, FAILED, BootLaunch, RunType,
-										DepProcessName, DepModuleName, LogFile);
-			
-					//Update ProcessConfig.xml: Mark Process INIT state 
-					updateProcessInfo(processName, FAILED, newProcessID);
-
 					return oam::API_FAILURE;
 				}
 	
 				// now delete the dbrm data from local disk
-//				if ( !gOAMParentModuleFlag) {
-//					string cmd = "rm -f " + tempDBRMDir + "/*";
-//					system(cmd.c_str());
-//					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
-//				}
+				if ( !gOAMParentModuleFlag) {
+					string cmd = "rm -f " + tempDBRMDir + "/*";
+					system(cmd.c_str());
+					log.writeLog(__LINE__, "removed DBRM file with command: " + cmd, LOG_TYPE_DEBUG);
+				}
 			}
 			else
 				log.writeLog(__LINE__, "No DBRM files exist, must be a initial startup", LOG_TYPE_DEBUG);
@@ -2118,12 +1909,14 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		sendAlarm("DBRM", DBRM_LOAD_DATA_ERROR, CLEAR);
 	}
 
-	//do a pkill on process just to make sure there is no rouge version running
-	string::size_type pos = processLocation.find("bin/",0);
-	string procName = processLocation.substr(pos+4, 15) + "\\*";
-	string cmd = "pkill -9 " + procName;
-	system(cmd.c_str());
-	log.writeLog(__LINE__, "Pkill Process just to make sure: " + procName, LOG_TYPE_DEBUG);
+	if ( config.moduleType() != "xm" ) {
+		//do a pkill on process just to make sure there is no rouge version running
+		string::size_type pos = processLocation.find("bin/",0);
+		string procName = processLocation.substr(pos+4, 80);
+		string cmd = "pkill -9 " + procName;
+		system(cmd.c_str());
+		log.writeLog(__LINE__, "Pkill Process just to make sure: " + procName, LOG_TYPE_DEBUG);
+	}
 
 	//Update Process Status: Mark Process INIT state
 	updateProcessInfo(processName, initType, 0);
@@ -2146,10 +1939,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 	char timestamp[200];
 	strftime (timestamp, 200, "%m:%d:%y-%H:%M:%S", &tm);
 
-	string logdir("/var/log/Calpont");
-	if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-	string outFileName = logdir + "/" + processName + ".out";
-	string errFileName = logdir + "/" + processName + ".err";
+	string outFileName = "/var/log/Calpont/" + processName + ".out";
+	string errFileName = "/var/log/Calpont/" + processName + ".err";
 
 	string saveoutFileName = outFileName + "." + timestamp + ".log1";
 	string saveerrFileName = errFileName + "." + timestamp + ".log1";
@@ -2181,19 +1972,6 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		{
 			log.writeLog(__LINE__, "New Process ID = -1, failed StartProcess", LOG_TYPE_DEBUG);
 			return oam::API_MINOR_FAILURE;
-		}
-
-		if (processLocation.find("DecomSvr") != string::npos)
-		{	// DecomSvr app is special
-
-			sleep(1);
-			//record the process information into processList 
-			config.buildList(processModuleType, processName, processLocation, arg_list, 
-								launchID, newProcessID, oam::ACTIVE, BootLaunch, RunType,
-								DepProcessName, DepModuleName, LogFile);
-	
-			//Update Process Status: Mark Process oam::ACTIVE state 
-			updateProcessInfo(processName, oam::ACTIVE, newProcessID);
 		}
 
 		if (processLocation.find("snmp") != string::npos)
@@ -2258,13 +2036,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		sendAlarm(processName, PROCESS_INIT_FAILURE, CLEAR);
 
 		//give time to get status updates from process before starting next process
-		//only for certain process on single-server system
-		if ( processName == "DBRMWorkerNode" || processName == "ExeMgr" )
-			sleep(3);
-		else
-			if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM )
-				if ( processName == "PrimProc" || processName == "WriteEngineServer")
-					sleep(3);
+		//if not, ExeMgr will fail since the previous started PrimProc is not ACTIVE
+		sleep(1);
 
 		for (i=0; i < numAugs; i++)
 		{
@@ -2285,9 +2058,8 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
    			close(i);
 		}
 
- 		// open STDIN, STDOUT & STDERR for trapDaemon and DecomSvr
-		if (processName == "SNMPTrapDaemon" ||
-			processName == "DecomSvr" )
+ 		// open STDIN, STDOUT & STDERR for trapDaemon
+		if (processName == "SNMPTrapDaemon")
 		{
 			open("/dev/null", O_RDONLY); //Should be fd 0
 			open("/dev/null", O_WRONLY); //Should be fd 1
@@ -2339,15 +2111,6 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
 		//give time to get INIT status updated in shared memory
 		sleep(1);
 		execv(processLocation.c_str(), argList);
-
-		//record the process information into processList 
-		config.buildList(processModuleType, processName, processLocation, arg_list, 
-							launchID, newProcessID, FAILED, BootLaunch, RunType,
-							DepProcessName, DepModuleName, LogFile);
-
-		//Update ProcessConfig.xml: Mark Process INIT state 
-		updateProcessInfo(processName, FAILED, newProcessID);
-
 		exit(oam::API_FAILURE);
 	} 
 
@@ -2433,6 +2196,9 @@ void	ProcessMonitor::sendAlarm(string alarmItem, ALARMS alarmID, int action)
 {
 	MonitorLog log;
 	Oam oam;
+
+	if ( config.moduleType() == "xm" )
+		return;
 
 //        cout << "sendAlarm" << endl;
 //       cout << alarmItem << endl;
@@ -2520,7 +2286,7 @@ bool ProcessMonitor::updateProcessInfo(std::string processName, int state, pid_t
 	MonitorLog log;
 	Oam oam;
 
-	log.writeLog(__LINE__, "StatusUpdate of Process " + processName + " State = " + oam.itoa(state) + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
+	log.writeLog(__LINE__, "StatusUpdate of Process " + processName + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 	sendProcessInfo_t *t1 = new sendProcessInfo_t;
 	*t1 = boost::make_tuple(processName, state, PID);
@@ -2561,7 +2327,7 @@ void sendProcessThread(sendProcessInfo_t* t)
 	pid_t PID = boost::get<2>(*t);
 
 	try {
-		oam.setProcessStatus(processName, config.moduleName(), state, PID);
+		oam.setProcessStatus(processName, config.moduleName(), state, (int) PID);
 	}
 	catch(...)
 	{
@@ -2612,12 +2378,6 @@ int ProcessMonitor::updateLog(std::string action, std::string level)
 		// no file found
 		log.writeLog(__LINE__, "ERROR: syslog file not found at " + fileName, LOG_TYPE_ERROR );
 		return -1;
-	}
-
-	//if non-root, change file permissions so we can update it
-	if ( !rootUser) {
-		string cmd = "sudo chmod 666 " + fileName + " > /dev/null";
-		system(cmd.c_str());
 	}
 
 	char line[200];
@@ -2840,12 +2600,61 @@ int ProcessMonitor::updateLog(std::string action, std::string level)
 		oam.syslogAction("sighup");
 	}
 
-	//update file priviledges
+	//restart syslog and update file priviledges
 	changeModLog();
 
 	return 0;
 }
 
+/******************************************************************************************
+* @brief	syslogAction
+*
+* purpose:	Take Action on Syslog Process
+*
+******************************************************************************************/
+/*void ProcessMonitor::syslogAction( std::string action)
+{
+	MonitorLog log;
+	Oam oam;
+
+	string systemlog = "syslog";
+
+	string fileName;
+	oam.getSystemConfig("SystemLogConfigFile", fileName);
+	if (fileName == oam::UnassignedName ) {
+		// unassigned
+		log.writeLog(__LINE__, "ERROR: syslog file not configured ", LOG_TYPE_ERROR );
+		return;
+	}
+
+	string::size_type pos = fileName.find("syslog-ng",0);
+	if (pos != string::npos)
+		systemlog = "syslog-ng";
+	else
+	{
+		pos = fileName.find("rsyslog",0);
+		if (pos != string::npos)
+			systemlog = "rsyslog";	
+	}
+
+	string cmd;
+	if ( action == "sighup" ) {
+		if ( systemlog == "syslog" || systemlog == "rsyslog")
+			systemlog = systemlog + "d";
+		cmd = "pkill -hup " + systemlog + " > /dev/null 2>&1";
+	}
+	else
+		cmd = "/etc/init.d/" + systemlog + " " + action + " > /dev/null 2>&1";
+
+	// take action on syslog service to make sure it running
+	system(cmd.c_str());
+
+	// if start/restart, delay to give time for syslog to get up and going
+	pos = action.find("start",0);
+	if (pos != string::npos)
+		sleep(2);
+}
+*/
 /******************************************************************************************
 * @brief	changeModLog
 *
@@ -2966,7 +2775,6 @@ int ProcessMonitor::getConfigLog()
 ******************************************************************************************/
 void ProcessMonitor::checkPowerOnResults()
 {
-	string  POWERON_TEST_RESULTS_FILE = startup::StartUp::installDir() + "/post/st_status";
 	MonitorLog log;
 
 	ifstream oldFile (POWERON_TEST_RESULTS_FILE.c_str());
@@ -3152,7 +2960,7 @@ int ProcessMonitor::updateConfig()
 	{
 		if (systemprocessconfig.processconfig[i].ModuleType == systemModuleType
 			|| systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule"
-			|| ( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" )
+			|| ( systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" && config.moduleType() != "xm" )
 			|| (systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
 				systemModuleType == OAMParentModuleType) )
 		{
@@ -3207,10 +3015,7 @@ int ProcessMonitor::buildSystemTables()
 
 	ifstream oldFile (fileName.c_str());
 	if (!oldFile) {
-		string logdir("/var/log/Calpont");
-		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-		string cmd = startup::StartUp::installDir() + "/bin/dbbuilder 7 > " + logdir + "/dbbuilder.log &";
-		system(cmd.c_str());
+		system("/usr/local/Calpont/bin/dbbuilder 7 > /var/log/Calpont/dbbuilder.log &");
 
 		log.writeLog(__LINE__, "buildSystemTables: dbbuilder 7 Successfully Launched" , LOG_TYPE_DEBUG);
 		return API_SUCCESS;
@@ -3229,10 +3034,9 @@ int ProcessMonitor::buildSystemTables()
 int ProcessMonitor::reconfigureModule(std::string reconfigureModuleName)
 {
 	Oam oam;
-	string installDir = startup::StartUp::installDir();
 
-	//create custom files 
-	string dir = installDir + "/local/etc/" + reconfigureModuleName;
+	//create custom fstab into /usr/local/Calpont/local/etc/"modulename"
+	string dir = "/usr/local/Calpont/local/etc/" + reconfigureModuleName;
 
 	string cmd = "mkdir " + dir + " > /dev/null 2>&1";
 	system(cmd.c_str());
@@ -3242,32 +3046,60 @@ int ProcessMonitor::reconfigureModule(std::string reconfigureModuleName)
 
 	if ( reconfigureModuleName.find("um") != string::npos) {
 
-		cmd = "cp " + installDir + "/local/etc/um1/* " + dir + "/.";
+		//check if /um1/fstab exist, error out if it doesn't
+		ifstream file ("/usr/local/Calpont/local/etc/um1/fstab.calpont");
+		if (!file) {
+			log.writeLog(__LINE__, "reconfigureModule - FAILED: missing um1 fstab file", LOG_TYPE_ERROR);
+			return API_FAILURE;
+		}
+
+		cmd = "cp /usr/local/Calpont/local/etc/um1/* " + dir + "/.";
 		system(cmd.c_str());
 	}
 	else
 	{
-		cmd = "cp " + installDir + "/local/etc/pm1/* " + dir + "/.";
+		ifstream file ("/usr/local/Calpont/local/etc/pm1/fstab.calpont");
+		if (!file) {
+			log.writeLog(__LINE__, "reconfigureModule - FAILED: missing pm1 fstab file", LOG_TYPE_ERROR);
+			return API_FAILURE;
+		}
+
+		cmd = "cp /usr/local/Calpont/local/etc/pm1/* " + dir + "/.";
 		system(cmd.c_str());
 	}
 
-	//copy and apply new rc.local.calpont from dm1
-	cmd = "rm -f " + installDir + "/local/rc.local.calpont";
+	log.writeLog(__LINE__, "reconfigureModule - custom fstab created for " +  reconfigureModuleName, LOG_TYPE_DEBUG);
+
+	//apply new fstab.calpont
+	cmd = "rm -f /tmp/fstab.calpont";
 	system(cmd.c_str());
-	cmd = "cp " + installDir + "/local/etc/" + reconfigureModuleName + "/rc.local.calpont " + installDir + "/local/.";
+	cmd = "cp /usr/local/Calpont/local/etc/" + reconfigureModuleName + "/fstab.calpont /usr/local/Calpont/local/.";
+	system(cmd.c_str());
+	cmd = "rm -f /etc/fstab";
+	system(cmd.c_str());
+	cmd = "cp /etc/fstab.calpontSave /etc/fstab";
+	system(cmd.c_str());
+	cmd = "cat /usr/local/Calpont/local/fstab.calpont >> /etc/fstab";
+	system(cmd.c_str());
+	cmd = "mount -al > /dev/null 2>&1";
+	system(cmd.c_str());
+
+	//copy and apply new rc.local.calpont from dm1
+	cmd = "rm -f /usr/local/Calpont/local/rc.local.calpont";
+	system(cmd.c_str());
+	cmd = "cp /usr/local/Calpont/local/etc/" + reconfigureModuleName + "/rc.local.calpont /usr/local/Calpont/local/.";
 	system(cmd.c_str());
 	cmd = "rm -f /etc/rc.d/rc.local";
 	system(cmd.c_str());
-	cmd = "cp /etc/rc.d/rc.local.calpontSave /etc/rc.d/rc.local >/dev/null 2>&1";
+	cmd = "cp /etc/rc.d/rc.local.calpontSave /etc/rc.d/rc.local";
 	system(cmd.c_str());
-	if (geteuid() == 0)
-		cmd = "cat " + installDir + "/local/rc.local.calpont >> /etc/rc.d/rc.local >/dev/null 2>&1";
+	cmd = "cat /usr/local/Calpont/local/rc.local.calpont >> /etc/rc.d/rc.local";
 	system(cmd.c_str());
-	cmd = "/etc/rc.d/rc.local >/dev/null 2>&1";
+	cmd = "/etc/rc.d/rc.local";
 	system(cmd.c_str());
 
 	//update module file
-	string fileName = installDir + "/local/module";
+	string fileName = "/usr/local/Calpont/local/module";
 
 	unlink (fileName.c_str());
    	ofstream newFile (fileName.c_str());
@@ -3302,80 +3134,65 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 
 		if ( runType == SIMPLEX && gOAMParentModuleFlag )
 			retStatus = oam::MAN_INIT;
-		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && 
-				( gOAMParentModuleFlag || !runStandby ) )
-			retStatus = oam::MAN_INIT;
-		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && config.OAMStandbyParentFlag() )
-			retStatus = oam::STANDBY;
-		else if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" )
-			retStatus = oam::COLD_STANDBY;
 		else
-		{
-			//simplex on a non um1 or non-parent-pm
-			if ( processName == "DMLProc" || processName == "DDLProc" ) {
-				string PrimaryUMModuleName;
-				try {
-					oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-				}
-				catch(...) {}
-
-				if ( PrimaryUMModuleName != config.moduleName() ) {
-					retStatus = oam::COLD_STANDBY;
-				}
-			}
-
-			if ( retStatus != oam::COLD_STANDBY )
-			{
-				try
-				{
-					oam.getProcessStatus(systemprocessstatus);
-			
-					for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
-					{
-						if ( systemprocessstatus.processstatus[i].ProcessName == processName  &&
-								systemprocessstatus.processstatus[i].Module != config.moduleName() ) {
-							if ( systemprocessstatus.processstatus[i].ProcessOpState == ACTIVE || 
-									systemprocessstatus.processstatus[i].ProcessOpState == MAN_INIT ||
-									systemprocessstatus.processstatus[i].ProcessOpState == AUTO_INIT ||
-							//		systemprocessstatus.processstatus[i].ProcessOpState == MAN_OFFLINE ||
-							//		systemprocessstatus.processstatus[i].ProcessOpState == INITIAL ||
-									systemprocessstatus.processstatus[i].ProcessOpState == BUSY_INIT) {
-	
-								// found a ACTIVE or going ACTIVE mate
-								if ( runType == oam::SIMPLEX )
-									// SIMPLEX
-									retStatus = oam::COLD_STANDBY;
-								else
-								{ // ACTIVE_STANDBY
-									for( unsigned int j = 0 ; j < systemprocessstatus.processstatus.size(); j++)
+			if ( runType == SIMPLEX && !gOAMParentModuleFlag )
+				retStatus = oam::COLD_STANDBY;
+				else
+					if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && gOAMParentModuleFlag )
+						retStatus = oam::MAN_INIT;
+					else
+						if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" && config.OAMStandbyParentFlag() )
+							retStatus = oam::STANDBY;
+						else
+							if ( runType == ACTIVE_STANDBY && processModuleType == "ParentOAMModule" )
+								retStatus = oam::COLD_STANDBY;
+							else
+								try
+								{
+									oam.getProcessStatus(systemprocessstatus);
+							
+									for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
 									{
-										if ( systemprocessstatus.processstatus[j].ProcessName == processName  &&
-												systemprocessstatus.processstatus[j].Module != config.moduleName() ) {
-											if ( systemprocessstatus.processstatus[j].ProcessOpState == STANDBY ||
-													systemprocessstatus.processstatus[j].ProcessOpState == STANDBY_INIT)
-												// FOUND ACTIVE AND STANDBY
-												retStatus = oam::COLD_STANDBY;
+										if ( systemprocessstatus.processstatus[i].ProcessName == processName  &&
+												systemprocessstatus.processstatus[i].Module != config.moduleName() ) {
+											if ( systemprocessstatus.processstatus[i].ProcessOpState == ACTIVE ||
+													systemprocessstatus.processstatus[i].ProcessOpState == MAN_INIT ||
+													systemprocessstatus.processstatus[i].ProcessOpState == AUTO_INIT ||
+													systemprocessstatus.processstatus[i].ProcessOpState == BUSY_INIT) {
+	
+												// found a ACTIVE or going ACTIVE mate
+												if ( runType == oam::SIMPLEX )
+													// SIMPLEX
+													retStatus = oam::COLD_STANDBY;
+												else
+												{ // ACTIVE_STANDBY
+													for( unsigned int j = 0 ; j < systemprocessstatus.processstatus.size(); j++)
+													{
+														if ( systemprocessstatus.processstatus[j].ProcessName == processName  &&
+																systemprocessstatus.processstatus[j].Module != config.moduleName() ) {
+															if ( systemprocessstatus.processstatus[j].ProcessOpState == STANDBY ||
+																	systemprocessstatus.processstatus[j].ProcessOpState == STANDBY_INIT)
+																// FOUND ACTIVE AND STANDBY
+																retStatus = oam::COLD_STANDBY;
+														}
+													}
+													// FOUND AN ACTIVE, BUT NO STANDBY
+													log.writeLog(__LINE__, "checkSpecialProcessState, set STANDBY on " + processName, LOG_TYPE_DEBUG);
+													retStatus = oam::STANDBY;
+												}
+											}
 										}
 									}
-									// FOUND AN ACTIVE, BUT NO STANDBY
-									log.writeLog(__LINE__, "checkSpecialProcessState, set STANDBY on " + processName, LOG_TYPE_DEBUG);
-									retStatus = oam::STANDBY;
 								}
-							}
-						}
-					}
-				}
-				catch (exception& ex)
-				{
-					string error = ex.what();
-					log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: " + error, LOG_TYPE_ERROR);
-				}
-				catch(...)
-				{
-					log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-				}
-			}
-		}
+								catch (exception& ex)
+								{
+									string error = ex.what();
+									log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: " + error, LOG_TYPE_ERROR);
+								}
+								catch(...)
+								{
+									log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
+								}
 	}
 
 	if ( retStatus == oam::COLD_STANDBY || retStatus == oam::STANDBY ) {
@@ -3385,8 +3202,6 @@ int ProcessMonitor::checkSpecialProcessState( std::string processName, std::stri
 		sendAlarm(processName, PROCESS_DOWN_AUTO, CLEAR);
 		sendAlarm(processName, PROCESS_INIT_FAILURE, CLEAR);
 	}
-
-	log.writeLog(__LINE__, "checkSpecialProcessState status return : " + oam.itoa(retStatus), LOG_TYPE_DEBUG);
 
 	return retStatus;
 }
@@ -3442,109 +3257,251 @@ int ProcessMonitor::checkMateModuleState()
 *
 *
 ******************************************************************************************/
-int ProcessMonitor::createDataDirs(std::string cloud)
+int ProcessMonitor::createDataDirs(std::string option)
 {
 	MonitorLog log;
 	Oam oam;
 
-	log.writeLog(__LINE__, "createDataDirs called", LOG_TYPE_DEBUG);
+	log.writeLog(__LINE__, "createDataDirs called with option " + option, LOG_TYPE_DEBUG);
 
-	if ( config.moduleType() == "um" && cloud == "amazon")
-	{
-		string UMStorageType;
-		try {
-			oam.getSystemConfig( "UMStorageType", UMStorageType);
-		}
-		catch(...) {}
-	
-		if (UMStorageType == "external")
-		{
-			if(!amazonVolumeCheck()) {
-				//Set the alarm
-				sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
-				return API_FAILURE;
-			}
-		}
-	}
-
-	if ( config.moduleType() == "pm" )
-	{
-		DBRootConfigList dbrootConfigList;
-	
-		string DBRootStorageType;
-		try {
-			oam.getSystemConfig( "DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-	
-		try
-		{
-			systemStorageInfo_t t;
-			t = oam.getStorageConfig();
-	
-			if ( boost::get<1>(t) == 0 ) {
-				log.writeLog(__LINE__, "No dbroots are configured in Calpont.xml file at proc mon startup time", LOG_TYPE_WARNING);
-				return API_INVALID_PARAMETER;
-			}
-	
-			DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-	
-			DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-			for( ; pt != moduledbrootlist.end() ; pt++)
+	if ( option == "storage" ) {
+		// create data directories on mounted disk
+		if ( config.moduleType() == "pm" || config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM ) {
+			string fileName = "/etc/fstab";
+		
+			ifstream file (fileName.c_str());
+		
+			vector <string> lines;
+			char line[200];
+			string buf;
+		
+			while (file.getline(line, 200))
 			{
-				int moduleID = (*pt).DeviceID;
-	
-				DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-				for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
-				{
-					int id = *pt1;
-	
+				buf = line;
 		
-					string DBRootName = startup::StartUp::installDir() + "/data" + oam.itoa(id);
-		
-					string cmd = "mkdir " + DBRootName + " > /dev/null 2>&1";
+				string::size_type pos = buf.find("/usr/local/Calpont/data",0);
+				if (pos != string::npos) {
+					//found one, read path and create
+					string::size_type pos1 = buf.find(" ",pos);
+					string directory = buf.substr(pos,pos1-pos);
+					string cmd = "mkdir " + directory + " > /dev/null 2>&1";
 					int rtnCode = system(cmd.c_str());
 					if (rtnCode == 0)
-						log.writeLog(__LINE__, "Successful created directory " + DBRootName, LOG_TYPE_DEBUG);
-		
-					cmd = "chmod 1777 " + DBRootName + " > /dev/null 2>&1";
-					system(cmd.c_str());
-
-					if ( id == 1 )
-					{
-						cmd = "mkdir -p " + startup::StartUp::installDir() + "/data1/systemFiles/dbrm > /dev/null 2>&1";
-						system(cmd.c_str());
-
-						cmd = "mkdir -p " + startup::StartUp::installDir() + "/data1/systemFiles/dataTransaction > /dev/null 2>&1";
-						system(cmd.c_str());
-					}
-
-					if (cloud == "amazon" && DBRootStorageType == "external" && 
-						config.moduleID() == moduleID)
-					{
-						if(!amazonVolumeCheck(id)) {
-							//Set the alarm
-							sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
-							return API_FAILURE;
-						}
-					}
+						log.writeLog(__LINE__, "Successful created directory " + directory, LOG_TYPE_DEBUG);
 				}
 			}
+			file.close();
 		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
+	}
+	else	// local
+	{
+		int DBRootCount;
+		try{
+			oam.getSystemConfig("DBRootCount", DBRootCount);
 		}
 		catch(...)
 		{
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
+			log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig, DBRootCount", LOG_TYPE_ERROR);
+			return API_FAILURE;
+		}
+
+		for ( int i = 1 ; i < DBRootCount+1 ; i++)
+		{
+			string DBRootName;
+			string DBroot = "DBRoot" + oam.itoa(i);
+
+			try{
+				oam.getSystemConfig(DBroot, DBRootName);
+			}
+			catch(...)
+			{
+				log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig, " + DBRootName, LOG_TYPE_ERROR);
+				return API_FAILURE;
+			}
+
+			string cmd = "mkdir " + DBRootName + " > /dev/null 2>&1";;
+			int rtnCode = system(cmd.c_str());
+			if (rtnCode == 0)
+				log.writeLog(__LINE__, "Successful created directory " + DBRootName, LOG_TYPE_DEBUG);
+
+			cmd = "chmod 1777 " + DBRootName + " > /dev/null 2>&1";
+			system(cmd.c_str());
 		}
 	}
 
 	return API_SUCCESS;
 }
 
+/******************************************************************************************
+* @brief	createPMDirs
+*
+* purpose:	Create the PM mount directories
+*
+*
+******************************************************************************************/
+int ProcessMonitor::setupPMmount()
+{
+/*	Oam oam;
+
+	// setup actPM path
+	string parentOAMModule;
+	oam.getSystemConfig("ParentOAMModuleName", parentOAMModule);
+
+	if ( parentOAMModule == oam::UnassignedName )
+		// default pm1
+		parentOAMModule = "pm1";
+
+	system("rm -f /mnt/actPM_systemFiles");
+	string cmd = "ln -s /mnt/" + parentOAMModule + "_systemFiles /mnt/actPM_systemFiles > /dev/null 2>&1";
+	system(cmd.c_str());
+
+	system("rm -fr /usr/local/Calpont/data1/systemFiles/dbrm");
+	cmd = "ln -s /mnt/actPM_systemFiles/dbrm /usr/local/Calpont/data1/systemFiles/dbrm";
+	system(cmd.c_str());
+
+	system("rm -fr /usr/local/Calpont/etc");
+	cmd = "ln -s /mnt/actPM_systemFiles/etc/ /usr/local/Calpont/etc";
+	system(cmd.c_str());
+*/
+	return API_SUCCESS;
+}
+
+/******************************************************************************************
+* @brief	setDataMount
+*
+* purpose:	Set Data Mounts, option = rw for read/write , ro for read-only
+*
+*
+******************************************************************************************/
+int ProcessMonitor::setDataMount( std::string option )
+{
+	MonitorLog log;
+//	MonitorConfig config;
+//	ProcessMonitor aMonitor(config, log);
+	ModuleConfig moduleconfig;
+	Oam oam;
+
+	//check/update the pmMount files
+
+	log.writeLog(__LINE__, "setDataMount called with option "  + option, LOG_TYPE_DEBUG);
+
+	string DBRootStorageType = "local";
+	vector <string> dbrootList;
+
+	// get dbroot list and storage type from config file
+	for ( int id = 1 ;; id++ )
+	{
+		string dbroot = "DBRoot" + oam.itoa(id);
+
+		string dbootDir;
+		try{
+			oam.getSystemConfig(dbroot, dbootDir);
+		}
+		catch(...) {}
+
+		if ( dbootDir.empty() || dbootDir == "" )
+			break;
+
+		dbrootList.push_back(dbootDir);
+	}
+
+	if ( dbrootList.size() == 0 ) {
+		log.writeLog(__LINE__, "ERROR: No dbroots are configured in Calpont.xml file", LOG_TYPE_CRITICAL);
+		//Set the alarm 
+		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
+		return API_FAILURE;
+	}
+
+	try{
+		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
+	}
+	catch(...) {}
+ 
+	if ( DBRootStorageType != "storage" ) {
+		if ( option == "rw" ) {
+			//create OAM-Test-Flag
+			vector<string>::iterator p = dbrootList.begin();
+			while ( p != dbrootList.end() )
+			{
+				string dbroot = *p;
+				p++;
+		
+				string fileName = dbroot + "/OAMdbrootCheck";
+				ofstream fout(fileName.c_str());
+				if (!fout) {
+					log.writeLog(__LINE__, "ERROR: Failed test write to dbroot: "  + dbroot, LOG_TYPE_ERROR);
+	
+					return API_FAILURE;
+				}
+			}
+
+			//setup TransactionLog on mounted Performance Module
+			setTransactionLog(true);
+		}
+		else
+			//clear TransactionLog on mounted Performance Module
+			setTransactionLog(false);
+
+		return API_SUCCESS;
+	}
+
+	// update mount type
+	system("/usr/local/Calpont/bin/syslogSetup.sh uninstall  > /dev/null 2>&1");
+	oam.syslogAction("sighup");
+
+	string tmpFileName = "/etc/fstab";
+
+	vector<string>::iterator p = dbrootList.begin();
+	while ( p != dbrootList.end() )
+	{
+		string dbroot = *p;
+		p++;
+
+		string mountcmd = "umount " + dbroot + " > /dev/null 2>&1";
+		system(mountcmd.c_str());
+
+		mountcmd = "mount -o " + option + " " + dbroot + " > /tmp/mount 2>&1";
+		system(mountcmd.c_str());
+
+		if (oam.checkLogStatus("/tmp/mount", "not exist") ||
+			oam.checkLogStatus("/tmp/mount", "can't find")) {
+			system("/usr/local/Calpont/bin/syslogSetup.sh install  > /dev/null 2>&1");
+			oam.syslogAction("sighup");
+			log.writeLog(__LINE__, "ERROR: dbroot mount error " + dbroot, LOG_TYPE_WARNING);
+			return oam::API_FAILURE;
+		}
+
+		//log.writeLog(__LINE__, "mount cmd performed = "  + mountcmd, LOG_TYPE_DEBUG);
+		
+		//create OAM-Test-Flag check rw mount
+		if ( option == "rw" ) {
+			string fileName = dbroot + "/OAMdbrootCheck";
+			ofstream fout(fileName.c_str());
+			if (!fout) {
+				system("/usr/local/Calpont/bin/syslogSetup.sh install  > /dev/null 2>&1");
+				oam.syslogAction("sighup");
+
+				log.writeLog(__LINE__, "ERROR: Failed test write to dbroot: "  + dbroot, LOG_TYPE_ERROR);
+
+				return API_FAILURE;
+			}
+		}
+	}
+
+	system("/usr/local/Calpont/bin/syslogSetup.sh install  > /dev/null 2>&1");
+	oam.syslogAction("sighup");
+
+	//TransactionLog
+	if ( option == "rw" ) {
+		//setup TransactionLog on mounted Performance Module
+		setTransactionLog(true);
+	}
+	else
+		//clear TransactionLog on mounted Performance Module
+		setTransactionLog(false);
+
+	return API_SUCCESS;
+}
 
 /******************************************************************************************
 * @brief	processRestarted
@@ -3735,10 +3692,7 @@ int ProcessMonitor::getDBRMdata()
 
 					//create journal file if none come across
 					if ( !journalFile)
-					{
-						string cmd = "touch " + startup::StartUp::installDir() + "/data/dbrm/BRM_saves_journal";
-						system(cmd.c_str());
-					}
+						system("touch /usr/local/Calpont/data/dbrm/BRM_saves_journal");
 
 					returnStatus = oam::API_SUCCESS;
 				}
@@ -3820,7 +3774,8 @@ int ProcessMonitor::changeCrontab()
 	
 	close(fd);
 
-	// restart the service to make sure it running
+	// restart the syslog service to make sure it running
+//	log.writeLog(__LINE__, "Start and reload crond", LOG_TYPE_DEBUG);
 	system("/etc/init.d/crond start > /dev/null 2>&1");
 	system("/etc/init.d/crond reload > /dev/null 2>&1");
 
@@ -3916,7 +3871,8 @@ int ProcessMonitor::changeTransactionLog()
 	
 	close(fd);
 
-	// restart the service to make sure it running
+	// restart the crond service to make sure it running
+//	log.writeLog(__LINE__, "Start and reload crond", LOG_TYPE_DEBUG);
 	system("/etc/init.d/crond start > /dev/null 2>&1");
 	system("/etc/init.d/crond reload > /dev/null 2>&1");
 
@@ -3937,8 +3893,7 @@ void ProcessMonitor::setTransactionLog(bool action)
 		log.writeLog(__LINE__, "setTransactionLog: setup ", LOG_TYPE_DEBUG);
 		changeTransactionLog();
 
-		string cmd = "cp " + startup::StartUp::installDir() + "/bin/transactionLog /etc/cron.d/.";
-		system(cmd.c_str());
+		system("cp /usr/local/Calpont/bin/transactionLog /etc/cron.d/.");
 		log.writeLog(__LINE__, "Successful copied transactionLog script", LOG_TYPE_DEBUG);
 
 		system("chmod 644 /etc/cron.d/transactionLog");
@@ -3953,11 +3908,69 @@ void ProcessMonitor::setTransactionLog(bool action)
 	}
 
 	// restart the crond service to make sure it running
-	log.writeLog(__LINE__, "Start and reload crond", LOG_TYPE_DEBUG);
+//	log.writeLog(__LINE__, "Start and reload crond", LOG_TYPE_DEBUG);
 	system("/etc/init.d/crond start > /dev/null 2>&1");
 	system("/etc/init.d/crond reload > /dev/null 2>&1");
 }
 
+
+/******************************************************************************************
+* @brief	removeXMProcMon
+*
+* purpose:	Remove XM ProcMon setup
+*
+*
+******************************************************************************************/
+int ProcessMonitor::removeXMProcMon()
+{
+
+	//umount from System
+	if ( umountSystem() != oam::API_SUCCESS) {
+		log.writeLog(__LINE__, "removeXMProcMon - ERROR: failed to unmount form system", LOG_TYPE_ERROR );
+		return API_FAILURE;
+	}
+
+	//remove associated /mnt/ files and directories
+	string cmd = "rm -fr /mnt/" + dm_server + "*";
+	int rtnCode = system(cmd.c_str());
+	if (rtnCode == 0) {
+		log.writeLog(__LINE__, "removeXMProcMon - Successfully removed directories", LOG_TYPE_DEBUG);
+	}
+
+	return API_SUCCESS;
+}
+
+/******************************************************************************************
+* @brief	umountSystem
+*
+* purpose:	unmount from associated system
+*
+*
+******************************************************************************************/
+int ProcessMonitor::umountSystem()
+{
+	string fileName = "/mnt/" + dm_server + "_mount";
+
+	ifstream oldFile (fileName.c_str());
+	if (!oldFile) return false;
+	
+	char line[200];
+	string buf;
+
+	while (oldFile.getline(line, 200))
+	{
+		buf = line;
+
+		string::size_type pos = buf.find("umount",0);
+		if (pos != string::npos)
+			// run found unmount command
+			system(buf.c_str());
+	}
+
+	oldFile.close();
+
+	return API_SUCCESS;
+}
 
 /******************************************************************************************
 * @brief	runStartupTest
@@ -3978,17 +3991,13 @@ int ProcessMonitor::runStartupTest()
 	int opState;
 	bool degraded;
 	oam.getModuleStatus(config.moduleName(), opState, degraded);
-	if (geteuid() != 0 || opState == oam::MAN_DISABLED || opState == oam::AUTO_DISABLED)
+	if (opState == oam::MAN_DISABLED || opState == oam::AUTO_DISABLED)
 		return oam::API_SUCCESS;
 
 	//run startup test script
-	string logdir("/var/log/Calpont");
-	if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-	string cmd = startup::StartUp::installDir() + "/bin/startupTests.sh > " + logdir + "/startupTests.log1 2>&1";
-	system(cmd.c_str());
+	system("/usr/local/Calpont/bin/startupTests.sh > /var/log/Calpont/startupTests.log1 2>&1");
 
-	cmd = logdir + "/startupTests.log1";
-	if (oam.checkLogStatus(cmd, "OK")) {
+	if (oam.checkLogStatus("/var/log/Calpont/startupTests.log1", "OK")) {
 		log.writeLog(__LINE__, "Successfully ran startupTests", LOG_TYPE_DEBUG);
 		//Clear the alarm 
 		sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, CLEAR);
@@ -4027,17 +4036,15 @@ int ProcessMonitor::updateConfigFile(messageqcpp::ByteStream msg)
 	string fileName;
 	string calpontFile;
 
-	string installDir(startup::StartUp::installDir());
-	string defaultCalpontConfigFile(installDir + "/etc/Calpont.xml");
-	string defaultCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp");
-	string tmpCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.temp1");
-	string saveCalpontConfigFileTemp(installDir + "/etc/Calpont.xml.calpontSave");
+	const string defaultCalpontConfigFile("/usr/local/Calpont/etc/Calpont.xml");
+	const string defaultCalpontConfigFileTemp("/usr/local/Calpont/etc/Calpont.xml.temp");
+	const string tmpCalpontConfigFileTemp("/usr/local/Calpont/etc/Calpont.xml.temp1");
+	const string saveCalpontConfigFileTemp("/usr/local/Calpont/etc/Calpont.xml.calpontSave");
 
 	msg >> fileName;
-	ofstream out(fileName.c_str());
-	out << msg;
+	msg >> calpontFile;
 
-/*	if ( fileName == defaultCalpontConfigFile ) {
+	if ( fileName == defaultCalpontConfigFile ) {
 		unlink (defaultCalpontConfigFileTemp.c_str());
 	
 		ofstream newFile (defaultCalpontConfigFileTemp.c_str());
@@ -4094,7 +4101,7 @@ int ProcessMonitor::updateConfigFile(messageqcpp::ByteStream msg)
 	
 		newFile.close();
 	}
-*/
+
 	return oam::API_SUCCESS;
 
 }
@@ -4182,12 +4189,15 @@ std::string ProcessMonitor::sendMsgProcMon1( std::string module, ByteStream msg,
 /******************************************************************************************
 * @brief	checkProcessFailover
 *
-* purpose:	check if process failover is needed due to a process outage
+* purpose:	check if module failover is needed due to a process outage
 *
 ******************************************************************************************/
 void ProcessMonitor::checkProcessFailover( std::string processName)
 {
-	Oam oam;
+	// only failover for processes running on the Active Parent OAM Module
+	if ( !gOAMParentModuleFlag || 
+		( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM && (fmoduleNumber-1) == 1) )
+		return;
 
 	//check if license has expired
 	oam::LicenseKeyChecker keyChecker;
@@ -4207,57 +4217,13 @@ void ProcessMonitor::checkProcessFailover( std::string processName)
 	}
 
 	//force failover on certain processes
-	if ( processName == "DDLProc" ||
-		processName == "DMLProc" ) {
-			log.writeLog(__LINE__, "checkProcessFailover: process failover, process outage of " + processName, LOG_TYPE_CRITICAL);
+	if ( processName == "DBRMControllerNode" ||
+		processName == "DDLProc" ||
+		processName == "DMLProc" ||
+		processName == "ProcessManager" ) {
+			log.writeLog(__LINE__, "checkProcessFailover: module failover, process outage of " + processName, LOG_TYPE_CRITICAL);
 
-		try
-		{
-			SystemProcessStatus systemprocessstatus;
-			oam.getProcessStatus(systemprocessstatus);
-	
-			for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
-			{
-				if ( systemprocessstatus.processstatus[i].ProcessName == processName  &&
-						systemprocessstatus.processstatus[i].Module != config.moduleName() ) {
-					if ( systemprocessstatus.processstatus[i].ProcessOpState == oam::COLD_STANDBY || 
-						systemprocessstatus.processstatus[i].ProcessOpState == oam::AUTO_OFFLINE ||
-						systemprocessstatus.processstatus[i].ProcessOpState == oam::FAILED ) {
-						// found a AVAILABLE mate, start it
-						log.writeLog(__LINE__, "start process on module " + systemprocessstatus.processstatus[i].Module, LOG_TYPE_DEBUG);
-
-						try {
-							oam.setSystemConfig("PrimaryUMModuleName", systemprocessstatus.processstatus[i].Module);
-
-							//distribute config file
-							oam.distributeConfigFile("system");
-							sleep(1);
-						}
-						catch(...) {}
-
-						try
-						{
-							oam.startProcess(systemprocessstatus.processstatus[i].Module, processName, FORCEFUL, ACK_YES);
-							log.writeLog(__LINE__, "success start process on module " + systemprocessstatus.processstatus[i].Module, LOG_TYPE_DEBUG);
-						}
-						catch (exception& e)
-						{
-							log.writeLog(__LINE__, "failed start process on module " + systemprocessstatus.processstatus[i].Module, LOG_TYPE_ERROR);
-						}
-						break;
-					}
-				}
-			}
-		}
-		catch (exception& ex)
-		{
-			string error = ex.what();
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: " + error, LOG_TYPE_ERROR);
-		}
-		catch(...)
-		{
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getProcessStatus: Caught unknown exception!", LOG_TYPE_ERROR);
-		}
+//			system("reboot");
 	}
 
 	return;
@@ -4277,19 +4243,15 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	for ( int i = 0 ; i < 10 ; i++ )
 	{
 		//run upgrade script
-		string logdir("/var/log/Calpont");
-		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-		string cmd = startup::StartUp::installDir() + "/bin/upgrade-infinidb.sh doupgrade --password=" +
-			mysqlpw + " --installdir=" +  startup::StartUp::installDir() + "  > " + logdir + "/upgrade-infinidb.log1 2>&1";
+		string cmd = "/usr/local/Calpont/bin/upgrade-infinidb.sh doupgrade --password=" + mysqlpw + "  > /var/log/Calpont/upgrade-infinidb.log1 2>&1";
 		system(cmd.c_str());
-
-		cmd = logdir + "/upgrade-infinidb.log1";
-		if (oam.checkLogStatus(cmd, "OK")) {
+	
+		if (oam.checkLogStatus("/var/log/Calpont/upgrade-infinidb.log1", "OK")) {
 			log.writeLog(__LINE__, "upgrade-infinidb.sh: Successful return", LOG_TYPE_DEBUG);
 			return oam::API_SUCCESS;
 		}
 		else {
-			if (oam.checkLogStatus(cmd, "ERROR 1045") ) {
+			if (oam.checkLogStatus("/var/log/Calpont/upgrade-infinidb.log1", "ERROR 1045") ) {
 				log.writeLog(__LINE__, "upgrade-infinidb.sh: Missing Password error, return success", LOG_TYPE_DEBUG);
 				return oam::API_SUCCESS;
 			}
@@ -4307,698 +4269,6 @@ int ProcessMonitor::runUpgrade(std::string mysqlpw)
 	return oam::API_FAILURE;
 }
 
-/******************************************************************************************
-* @brief	amazonIPCheck
-*
-* purpose:	check and setups Amazon EC2 IP Addresses
-*
-******************************************************************************************/
-bool ProcessMonitor::amazonIPCheck()
-{
-	MonitorLog log;
-	Oam oam;
-
-	log.writeLog(__LINE__, "amazonIPCheck function called", LOG_TYPE_DEBUG);
-
-	//
-	// Get Module Info
-	//
-	SystemModuleTypeConfig systemModuleTypeConfig;
-
-	try{
-		oam.getSystemConfig(systemModuleTypeConfig);
-	}
-	catch (exception& ex)
-	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-	}
-
-	//get Elastic IP Address count
-	int AmazonElasticIPCount = 0;
-	try{
-		oam.getSystemConfig("AmazonElasticIPCount", AmazonElasticIPCount);
-	}
-	catch(...) {
-		AmazonElasticIPCount = 0;
-	}
-
-	ModuleTypeConfig moduletypeconfig;
-
-	//get module/instance IDs
-	for ( unsigned int i = 0 ; i < systemModuleTypeConfig.moduletypeconfig.size(); i++)
-	{
-		int moduleCount = systemModuleTypeConfig.moduletypeconfig[i].ModuleCount;
-		if ( moduleCount == 0 )
-			// skip of no modules configured
-			continue;
-
-		DeviceNetworkList::iterator pt = systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.begin();
-		for( ; pt != systemModuleTypeConfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-		{
-			DeviceNetworkConfig devicenetworkconfig;
-			HostConfig hostconfig;
-
-			devicenetworkconfig.DeviceName = (*pt).DeviceName;
-
-			HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
-			for ( ; pt1 != (*pt).hostConfigList.end() ; pt1++ )
-			{
-				hostconfig.IPAddr = (*pt1).IPAddr;
-				hostconfig.HostName = (*pt1).HostName;
-				devicenetworkconfig.hostConfigList.push_back(hostconfig);
-			}
-			
-			moduletypeconfig.ModuleNetworkList.push_back(devicenetworkconfig);
-		}
-	}
-
-	// now loop and wait for 5 minutes for all configured Instances to be running
-	// like after a reboot
-	bool startFail = false;
-	for ( int time = 0 ; time < 30 ; time++ )
-	{
-		startFail = false;
-		DeviceNetworkList::iterator pt = moduletypeconfig.ModuleNetworkList.begin();
-		for ( ; pt != moduletypeconfig.ModuleNetworkList.end() ; pt++)
-		{
-			string moduleName = (*pt).DeviceName;
-
-			// get all ips if parent oam
-			// get just parent and local if not parent oam
-			if ( config.moduleName() == config.OAMParentName() ||
-					moduleName == config.moduleName() ||
-					moduleName == config.OAMParentName() )
-			{
-				HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
-				for( ; pt1 != (*pt).hostConfigList.end() ; pt1++)
-				{
-					string IPAddr = (*pt1).IPAddr;
-					string instanceID = (*pt1).HostName;
-	
-					log.writeLog(__LINE__, "getEC2InstanceIpAddress called to get status for Module '" + moduleName + "' / Instance " + instanceID, LOG_TYPE_DEBUG);
-					string currentIPAddr = oam.getEC2InstanceIpAddress(instanceID);
-	
-					if (currentIPAddr == "stopped") {
-						log.writeLog(__LINE__, "Module '" + moduleName + "' / Instance '" + instanceID + "' not running", LOG_TYPE_WARNING);
-						startFail = true;
-					}
-					else
-					{
-						if (currentIPAddr == "terminated") {
-							log.writeLog(__LINE__, "Module '" + moduleName + "' / Instance '" + instanceID + "' has no Private IP Address Assigned, system failed to start", LOG_TYPE_CRITICAL);
-							startFail = true;
-							break;
-						}
-						else
-						{
-							if ( currentIPAddr != IPAddr ) {
-								log.writeLog(__LINE__, "Module is Running: '" + moduleName + "' / Instance '" + instanceID + "' current IP being reconfigured in Calpont.xml. old = " + IPAddr + ", new = " + currentIPAddr, LOG_TYPE_DEBUG);
-		
-								// update the Calpont.xml with the new IP Address
-								string cmd = "sed -i s/" + IPAddr + "/" + currentIPAddr + "/g /usr/local/Calpont/etc/Calpont.xml";
-								system(cmd.c_str());
-							}
-							else
-								log.writeLog(__LINE__, "Module is Running: '" + moduleName + "' / Instance '" + instanceID + "' current IP didn't change.", LOG_TYPE_DEBUG);
-						}
-					}
-
-					//set Elastic IP Address, if configured
-					if (AmazonElasticIPCount > 0)
-					{
-						bool found = false;
-						int id = 1;
-						for (  ; id < AmazonElasticIPCount+1 ; id++ )
-						{
-							string AmazonElasticModule = "AmazonElasticModule" + oam.itoa(id);
-							string ELmoduleName;
-							string AmazonElasticIPAddr = "AmazonElasticIPAddr" + oam.itoa(id);
-							string ELIPaddress;
-							try{
-								oam.getSystemConfig(AmazonElasticModule, ELmoduleName);
-								oam.getSystemConfig(AmazonElasticIPAddr, ELIPaddress);
-							}
-							catch(...) {}
-			
-							if ( ELmoduleName == moduleName )
-							{
-								found = true;
-								try{
-									oam.assignElasticIP(instanceID, ELIPaddress);
-									log.writeLog(__LINE__, "Assign Elastic IP Address : '" + moduleName + "' / '" + ELIPaddress, LOG_TYPE_DEBUG);
-								}
-								catch(...) {
-									log.writeLog(__LINE__, "Assign Elastic IP Address failed : '" + moduleName + "' / '" + ELIPaddress, LOG_TYPE_ERROR);
-									break;
-								}
-
-								break;
-							}
-
-							if(found)
-								break;
-						}
-					}
-				}
-			}
-		}
-
-		//continue when no instances are stopped
-		if (!startFail)
-			break;
-
-		sleep(10);
-	}
-
-	//check if an instance is stopped, exit out...
-	if (startFail) {
-		log.writeLog(__LINE__, "A configured Instance isn't running. Check warning log", LOG_TYPE_CRITICAL);
-	}
-
-	log.writeLog(__LINE__, "amazonIPCheck function successfully completed", LOG_TYPE_DEBUG);
-
-	return true;
-
-}
-
-/******************************************************************************************
-* @brief	amazonVolumeCheck
-*
-* purpose:	check and setups Amazon EC2 Volume mounts
-*
-******************************************************************************************/
-bool ProcessMonitor::amazonVolumeCheck(int dbrootID)
-{
-	MonitorLog log;
-	Oam oam;
-
-	if ( config.moduleType() == "um")
-	{
-		log.writeLog(__LINE__, "amazonVolumeCheck function called for User Module", LOG_TYPE_DEBUG);
-
-		string volumeNameID = "UMVolumeName" + oam.itoa(config.moduleID());
-		string volumeName = oam::UnassignedName;
-		string deviceNameID = "UMVolumeDeviceName" + oam.itoa(config.moduleID());
-		string deviceName = oam::UnassignedName;
-		try {
-			oam.getSystemConfig( volumeNameID, volumeName);
-			oam.getSystemConfig( deviceNameID, deviceName);
-		}
-		catch(...)
-		{}
-	
-		if ( volumeName.empty() || volumeName == oam::UnassignedName ) {
-			log.writeLog(__LINE__, "amazonVolumeCheck function exiting, no volume assigned ", LOG_TYPE_WARNING);
-			return false;
-		}
-	
-		string status = oam.getEC2VolumeStatus(volumeName);
-		if ( status == "attached" ) {
-			string cmd = "mount " + deviceName + " " + startup::StartUp::installDir() + "/mysql/db -t ext2 -o defaults > /dev/null";
-			system(cmd.c_str());
-			log.writeLog(__LINE__, "mount cmd: " + cmd, LOG_TYPE_DEBUG);
-
-			log.writeLog(__LINE__, "amazonVolumeCheck function successfully completed, volume attached: " + volumeName, LOG_TYPE_DEBUG);
-			return true;
-		}
-	
-		if ( status != "available" ) {
-			log.writeLog(__LINE__, "amazonVolumeCheck function failed, volume not attached and not available: " + volumeName, LOG_TYPE_CRITICAL);
-			return false;
-		}
-		else
-		{
-			//get Module HostName / InstanceName
-			string instanceName;
-			try
-			{
-				ModuleConfig moduleconfig;
-				oam.getSystemConfig(config.moduleName(), moduleconfig);
-				HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-				instanceName = (*pt1).HostName;
-			}
-			catch(...)
-			{}
-	
-			if (oam.attachEC2Volume(volumeName, deviceName, instanceName)) {
-				string cmd = "mount " + deviceName + " " + startup::StartUp::installDir() + "/mysql/db -t ext2 -o defaults > /dev/null";
-				system(cmd.c_str());
-				log.writeLog(__LINE__, "mount cmd: " + cmd, LOG_TYPE_DEBUG);
-				return true;
-			}
-			else
-			{
-				log.writeLog(__LINE__, "amazonVolumeCheck function failed, volume failed to attached: " + volumeName, LOG_TYPE_CRITICAL);
-				return false;
-			}
-		}
-	}
-	else
-	{
-		log.writeLog(__LINE__, "amazonVolumeCheck function called for dbroot" + oam.itoa(dbrootID), LOG_TYPE_DEBUG);
-	
-		string volumeNameID = "PMVolumeName" + oam.itoa(dbrootID);
-		string volumeName = oam::UnassignedName;
-		string deviceNameID = "PMVolumeDeviceName" + oam.itoa(dbrootID);
-		string deviceName = oam::UnassignedName;
-		try {
-			oam.getSystemConfig( volumeNameID, volumeName);
-			oam.getSystemConfig( deviceNameID, deviceName);
-		}
-		catch(...)
-		{}
-	
-		if ( volumeName.empty() || volumeName == oam::UnassignedName ) {
-			log.writeLog(__LINE__, "amazonVolumeCheck function exiting, no volume assigned to dbroot " + oam.itoa(dbrootID), LOG_TYPE_WARNING);
-			return false;
-		}
-	
-		string status = oam.getEC2VolumeStatus(volumeName);
-		if ( status == "attached" ) {
-			log.writeLog(__LINE__, "amazonVolumeCheck function successfully completed, volume attached: " + volumeName, LOG_TYPE_DEBUG);
-			return true;
-		}
-	
-		if ( status != "available" ) {
-			log.writeLog(__LINE__, "amazonVolumeCheck function failed, volume not attached and not available: " + volumeName, LOG_TYPE_CRITICAL);
-			return false;
-		}
-		else
-		{
-			//get Module HostName / InstanceName
-			string instanceName;
-			try
-			{
-				ModuleConfig moduleconfig;
-				oam.getSystemConfig(config.moduleName(), moduleconfig);
-				HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-				instanceName = (*pt1).HostName;
-			}
-			catch(...)
-			{}
-	
-			if (oam.attachEC2Volume(volumeName, deviceName, instanceName)) {
-				string cmd = "mount " + startup::StartUp::installDir() + "/data" + oam.itoa(dbrootID) + " > /dev/null";
-				system(cmd.c_str());
-				return true;
-			}
-			else
-			{
-				log.writeLog(__LINE__, "amazonVolumeCheck function failed, volume failed to attached: " + volumeName, LOG_TYPE_CRITICAL);
-				return false;
-			}
-		}
-	}
-
-	log.writeLog(__LINE__, "amazonVolumeCheck function successfully completed", LOG_TYPE_DEBUG);
-
-	return true;
-
-}
-
-/******************************************************************************************
-* @brief	unmountExtraDBroots
-*
-* purpose:	unmount Extra DBroots which were left mounted during a move
-*
-*
-******************************************************************************************/
-void ProcessMonitor::unmountExtraDBroots()
-{
-	MonitorLog log;
-	ModuleConfig moduleconfig;
-	Oam oam;
-
-	string DBRootStorageType = "local";
-
-	try{
-		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
-
-		if ( DBRootStorageType == "internal" && GlusterConfig == "n")
-			return;
-	}
-	catch(...) {}
-
-	if (GlusterConfig == "y")
-		return;
-
-	try
-	{
-		systemStorageInfo_t t;
-		t = oam.getStorageConfig();
-
-		if ( boost::get<1>(t) == 0 ) {
-			return;
-		}
-
-		DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-
-		//Flush the cache
-		cacheutils::flushPrimProcCache();
-		cacheutils::dropPrimProcFdCache();
-		flushInodeCache();
-
-		DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-		for( ; pt != moduledbrootlist.end() ; pt++)
-		{
-			int moduleID = (*pt).DeviceID;
-
-			DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-			for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
-			{
-				int id = *pt1;
-
-				if (config.moduleID() != moduleID)
-				{
-					if ( GlusterConfig == "n" )
-					{
-						string cmd = "umount " + startup::StartUp::installDir() + "/data" + oam.itoa(id) + " > /dev/null 2>&1";
-						system(cmd.c_str());
-					}
-					else
-					{
-						try {
-							string moduleid = oam.itoa(config.moduleID());
-							string errmsg;
-							int ret = oam.glusterctl(oam::GLUSTER_UNASSIGN, oam.itoa(id), moduleid, errmsg);
-							if ( ret != 0 )
-							{
-								log.writeLog(__LINE__, "Error unassigning gluster dbroot# " + oam.itoa(id) + ", error: " + errmsg, LOG_TYPE_ERROR);
-							}
-						}
-						catch (...)
-						{
-							log.writeLog(__LINE__, "Exception unassigning gluster dbroot# " + oam.itoa(id), LOG_TYPE_ERROR);
-						}
-					}
-				}
-			}
-		}
-	}
-	catch(...)
-	{}
-
-	return;
-}
-
-/******************************************************************************************
-* @brief	checkDataMount
-*
-* purpose:	Check Data Mounts
-*
-*
-******************************************************************************************/
-int ProcessMonitor::checkDataMount()
-{
-	MonitorLog log;
-	ModuleConfig moduleconfig;
-	Oam oam;
-
-	//check/update the pmMount files
-
-	log.writeLog(__LINE__, "checkDataMount called ", LOG_TYPE_DEBUG);
-
-	string DBRootStorageType = "local";
-	vector <string> dbrootList;
-	string installDir(startup::StartUp::installDir());
-
-	try
-	{
-		systemStorageInfo_t t;
-		t = oam.getStorageConfig();
-
-		if ( boost::get<1>(t) == 0 ) {
-			log.writeLog(__LINE__, "No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
-			return API_INVALID_PARAMETER;
-		}
-
-		DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-
-		DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-		for( ; pt != moduledbrootlist.end() ; pt++)
-		{
-			int moduleID = (*pt).DeviceID;
-
-			DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-			for( ; pt1 != (*pt).dbrootConfigList.end() ;pt1++)
-			{
-				if (config.moduleID() == moduleID)
-				{
-					dbrootList.push_back(oam.itoa(*pt1));
-				}
-			}
-		}
-	}
-	catch (exception& ex)
-	{
-		string error = ex.what();
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: " + error, LOG_TYPE_ERROR);
-	}
-	catch(...)
-	{
-		log.writeLog(__LINE__, "EXCEPTION ERROR on getStorageConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-	}
-
-	if ( dbrootList.size() == 0 ) {
-		log.writeLog(__LINE__, "No dbroots are configured in Calpont.xml file", LOG_TYPE_WARNING);
-		return API_INVALID_PARAMETER;
-	}
-
-	try{
-		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
-	}
-	catch(...) {}
-
-	//asign dbroot is gluster
-	if (GlusterConfig == "y")
-	{
-		vector<string>::iterator p = dbrootList.begin();
-		while ( p != dbrootList.end() )
-		{
-			string dbrootID = *p;
-			p++;
-
-			try {
-				string moduleid = oam.itoa(config.moduleID());
-				string errmsg;
-				int ret = oam.glusterctl(oam::GLUSTER_ASSIGN, dbrootID, moduleid, errmsg);
-				if ( ret != 0 )
-				{
-					log.writeLog(__LINE__, "Error assigning gluster dbroot# " + dbrootID + ", error: " + errmsg, LOG_TYPE_ERROR);
-				}
-			}
-			catch (...)
-			{
-				log.writeLog(__LINE__, "Exception assigning gluster dbroot# " + dbrootID, LOG_TYPE_ERROR);
-			}
-		}
-
-	//go unmount disk NOT assigned to this pm
-	unmountExtraDBroots();
-	}
-
-	if ( DBRootStorageType == "internal" && GlusterConfig == "n") {
-		//create OAM-Test-Flag
-		vector<string>::iterator p = dbrootList.begin();
-		while ( p != dbrootList.end() )
-		{
-			string dbroot = installDir + "/data" + *p;
-			p++;
-	
-			string fileName = dbroot + "/OAMdbrootCheck";
-			ofstream fout(fileName.c_str());
-			if (!fout) {
-				log.writeLog(__LINE__, "ERROR: Failed test write to dbroot: "  + dbroot, LOG_TYPE_ERROR);
-
-				return API_FAILURE;
-			}
-		}
-
-		return API_SUCCESS;
-	}
-
-	//Flush the cache
-	cacheutils::flushPrimProcCache();
-	cacheutils::dropPrimProcFdCache();
-	flushInodeCache();
-
-	//external or gluster
-	vector<string>::iterator p = dbrootList.begin();
-	while ( p != dbrootList.end() )
-	{
-		string dbroot = installDir + "/data" + *p;
-		string fileName = dbroot + "/OAMdbrootCheck";
-
-		if ( GlusterConfig == "n" ) {
-			//remove any local check flag for starters
-			string cmd = "umount " + dbroot + " > /tmp/mount.txt 2>&1";
-			system(cmd.c_str());
-	
-			unlink(fileName.c_str());
-	
-			cmd = "mount " + dbroot + " > /tmp/mount.txt 2>&1";
-			system(cmd.c_str());
-	
-			if ( !rootUser) {
-				cmd = "sudo chown -R " + USER + ":" + USER + " " + dbroot + " > /dev/null";
-				system(cmd.c_str());
-			}
-
-			ifstream in("/tmp/mount.txt");
-	
-			in.seekg(0, std::ios::end);
-			int size = in.tellg();
-			if ( size != 0 )
-			{
-				if (!oam.checkLogStatus("/tmp/mount.txt", "already")) {
-					log.writeLog(__LINE__, "checkDataMount: mount failed, dbroot: " + dbroot, LOG_TYPE_ERROR);
-	
-					try{
-						oam.setDbrootStatus(*p, oam::AUTO_OFFLINE);
-					}
-					catch (exception& ex)
-					{}
-		
-					return API_FAILURE;
-				}
-			}
-
-			log.writeLog(__LINE__, "checkDataMount: successfull mount " + dbroot, LOG_TYPE_DEBUG);
-		}
-
-		//create OAM-Test-Flag check rw mount
-		ofstream fout(fileName.c_str());
-		if (!fout) {
-			log.writeLog(__LINE__, "ERROR: Failed test write to dbroot: "  + dbroot, LOG_TYPE_ERROR);
-
-			try{
-				oam.setDbrootStatus(*p, oam::AUTO_OFFLINE);
-			}
-			catch (exception& ex)
-			{}
-
-			return API_FAILURE;
-		}
-
-		try{
-			oam.setDbrootStatus(*p, oam::ACTIVE);
-		}
-		catch (exception& ex)
-		{}
-
-		p++;
-	}
-
-	return API_SUCCESS;
-}
-
-
-/******************************************************************************************
-* @brief	calTotalUmMemory
-*
-* purpose:	Calculate TotalUmMemory
-*
-*
-******************************************************************************************/
-void ProcessMonitor::calTotalUmMemory()
-{
-	MonitorLog log;
-	Oam oam;
-
- 	struct sysinfo myinfo; 
-
-	//check/update the pmMount files
-
-	log.writeLog(__LINE__, "calTotalUmMemory called ", LOG_TYPE_DEBUG);
-
-	try{
-		sysinfo(&myinfo);
-	}
-	catch (...) {
-		return;
-	}
-
-	//get memory stats
-	long long total = myinfo.totalram / 1024 / 1000;
-
-	// adjust max memory, 25% of total memory
-	string value;
-
-	if ( total <= 2000 )
-		value = "256M";
-	else if ( total <= 4000 )
-		value = "512M";
-	else if ( total <= 8000 )
-		value = "1G";
-	else if ( total <= 16000 )
-		value = "2G";
-	else if ( total <= 32000 )
-		value = "4G";
-	else if ( total <= 64000 )
-		value = "8G";
-	else
-		value = "16G";
-
-	try {
-		Config* sysConfig = Config::makeConfig();
-		sysConfig->setConfig("HashJoin", "TotalUmMemory", value);
-
-		//update Calpont Config table
-		try {
-			sysConfig->write();
-		}
-		catch(...)
-		{
-			log.writeLog(__LINE__, "ERROR: sysConfig->write", LOG_TYPE_ERROR);
-			return;
-		}
-
-		log.writeLog(__LINE__, "set TotalUmMemory to " + value, LOG_TYPE_DEBUG);
-	}
-	catch (...) {
-		log.writeLog(__LINE__, "Failed to set TotalUmMemory to " + value, LOG_TYPE_ERROR);
-	}
-
-	return;
-
-}
-
-/******************************************************************************************
-* @brief	flushInodeCache
-*
-* purpose:	flush cache
-*
-*
-******************************************************************************************/
-void ProcessMonitor::flushInodeCache()
-{
-	int fd;
-	ByteStream reply;
-
-#ifdef __linux__
-	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
-	if (fd >= 0) {
-		if (write(fd, "3\n", 2) == 2)
-		{
-			log.writeLog(__LINE__, "flushInodeCache successful", LOG_TYPE_DEBUG);
-		}
-		else {
-			log.writeLog(__LINE__, "flushInodeCache failed", LOG_TYPE_DEBUG);
-		}
-		close(fd);
-	}
-	else {
-		log.writeLog(__LINE__, "flushInodeCache failed to open file", LOG_TYPE_DEBUG);
-	}
-#endif
-}
-
-
 } //end of namespace
-// vim:ts=4 sw=4:
+
 

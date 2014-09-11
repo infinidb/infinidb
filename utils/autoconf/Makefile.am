@@ -29,12 +29,11 @@ all-local: bootstrap
 		$(MAKE) -C joblist install
 	cd versioning && $(MAKE) && $(MAKE) install
 	cd oam && $(MAKE) && $(MAKE) install
+	cd dmlib && $(MAKE) && $(MAKE) install
 	cd versioning && $(MAKE) dbrm tools && $(MAKE) install_dbrm install_tools
 	cd writeengine; \
-		$(MAKE) -C wrapper install; \
-		$(MAKE) -C client install; \
-		$(MAKE) -C xml install; \
-		$(MAKE) -C redistribute install
+		$(MAKE) -C wrapper install
+	cd writeengine && $(MAKE) && $(MAKE) install
 	cd dbcon; \
 		$(MAKE) -C ddlpackage install; \
 		$(MAKE) -C ddlpackageproc install; \
@@ -50,9 +49,7 @@ all-local: bootstrap
 	cd primitives && $(MAKE) && $(MAKE) install
 	cd tools && $(MAKE) && $(MAKE) install
 	cd versioning && $(MAKE) tools install_tools
-	$(MAKE) -C writeengine/server install_server
-	$(MAKE) -C writeengine/bulk install_bulk
-	$(MAKE) -C writeengine/splitter install_splitter
+	$(MAKE) -C writeengine/bulk cpinstall
 	echo $(CXXFLAGS) $(DEBUG_FLAGS) > buildFlags
 
 compile: all-local
@@ -68,12 +65,12 @@ docs:
 
 bootstrap:
 	./build/genVersion.sh --prefix=@prefix@/Calpont
-	for subdir in dbcon ddlproc dmlproc exemgr mysql net-snmp oam \
+	for subdir in dbcon ddlproc dmlib dmlproc exemgr mysql net-snmp oam \
 		oamapps decomsvr primitives snmpd tools utils versioning \
 		writeengine ; do \
 		if test -f $$subdir/Makefile; then \
 			$(MAKE) BOOTSTRAP=1 -C $$subdir bootstrap || exit $$?; \
-		fi; \
+		fi \
 	done
 
 install: install-data-am
@@ -83,11 +80,11 @@ install: install-data-am
 	$(INSTALL) -m0644 build/releasenum @prefix@/Calpont 
 
 clean: clean-am
-	for subdir in dbcon ddlproc dmlproc exemgr mysql net-snmp oam \
+	for subdir in dbcon ddlproc dmlib dmlproc exemgr mysql net-snmp oam \
 		oamapps decomsvr primitives snmpd tools utils versioning \
 		writeengine ; do \
 		if test -f $$subdir/Makefile; then \
 			$(MAKE) BOOTSTRAP=1 -C $$subdir clean || exit $$?; \
-		fi; \
+		fi \
 	done
 

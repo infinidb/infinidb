@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep.h 1855 2012-04-04 18:20:09Z rdempsey $
+// $Id: dictstep.h 1817 2012-01-17 22:19:08Z pleblanc $
 // C++ Interface: dictstep
 //
 // Description: 

@@ -23,8 +23,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libconfigcpp.la
-libconfigcpp_la_SOURCES = configcpp.cpp xmlparser.cpp configstream.cpp
-include_HEADERS = configcpp.h xmlparser.h configstream.h
+libconfigcpp_la_SOURCES = configcpp.cpp
+include_HEADERS = configcpp.h
 
 test:
 

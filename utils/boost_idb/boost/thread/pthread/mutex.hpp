@@ -50,7 +50,11 @@ namespace boost
         void lock()
         {
             int const res=pthread_mutex_lock(&m);
+#if __FreeBSD__
+            if(res && (res!=EDEADLK))
+#else
             if(res)
+#endif
             {
                 boost::throw_exception(lock_error(res));
             }

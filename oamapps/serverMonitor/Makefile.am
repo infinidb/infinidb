@@ -7,10 +7,9 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = ServerMonitor
 ServerMonitor_SOURCES = main.cpp serverMonitor.cpp cpuMonitor.cpp diskMonitor.cpp \
-memoryMonitor.cpp procmonMonitor.cpp msgProcessor.cpp dbhealthMonitor.cpp \
-UMAutoSync.cpp
-ServerMonitor_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-ServerMonitor_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+memoryMonitor.cpp procmonMonitor.cpp msgProcessor.cpp dbhealthMonitor.cpp
+ServerMonitor_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+ServerMonitor_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ $(AM_LDFLAGS)
 
 test:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: calpontselectexecutionplan.cpp 8777 2012-08-01 21:52:34Z zzhu $
+*   $Id: calpontselectexecutionplan.cpp 7646 2011-04-18 17:38:07Z xlou $
 *
 *
 ***********************************************************************/
@@ -32,7 +32,6 @@ using namespace messageqcpp;
 #include "filter.h"
 #include "returnedcolumn.h"
 #include "simplecolumn.h"
-#include "querystats.h"
 
 namespace {
 
@@ -57,20 +56,17 @@ string CalpontSelectExecutionPlan::fTableName;
 CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(const int location):
                             fFilters (0),
                             fHaving (0),
-                            fLocation (location),
-                            fDependent (false),
-                            fTraceFlags(TRACE_NONE),
-                            fStatementID(0),
-                            fDistinct(false),
-                            fOverrideLargeSideEstimate(false),
-                            fDistinctUnionNum(0),
-                            fSubType(MAIN_SELECT),
-                            fLimitStart(0),
-                            fLimitNum(-1),
-                            fHasOrderBy(false),
-                            fStringScanThreshold(ULONG_MAX),
-                            fQueryType(SELECT),
-                            fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL)
+							fLocation (location),
+							fDependent (false),
+							fTraceFlags(TRACE_NONE),
+							fStatementID(0),
+							fDistinct(false),
+							fOverrideLargeSideEstimate(false),
+							fDistinctUnionNum(0),
+							fSubType(-1),
+							fLimitStart(0),
+							fLimitNum(-1),
+	                        fStringScanThreshold(ULONG_MAX)
 {}
 
 CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(
@@ -97,13 +93,10 @@ CalpontSelectExecutionPlan::CalpontSelectExecutionPlan(
 	                         fDistinct(false),
 	                         fOverrideLargeSideEstimate(false),
 	                         fDistinctUnionNum(0),
-	                         fSubType(MAIN_SELECT),
+	                         fSubType(-1),
 	                         fLimitStart(0),
 	                         fLimitNum(-1),
-	                         fHasOrderBy(false),
-	                         fStringScanThreshold(ULONG_MAX),
-	                         fQueryType(SELECT),
-	                         fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL)
+	                         fStringScanThreshold(ULONG_MAX)
 {}
 
 CalpontSelectExecutionPlan::CalpontSelectExecutionPlan (string data) :
@@ -113,13 +106,10 @@ CalpontSelectExecutionPlan::CalpontSelectExecutionPlan (string data) :
                              fDistinct(false),
                              fOverrideLargeSideEstimate(false),
                              fDistinctUnionNum(0),
-                             fSubType(MAIN_SELECT),
+                             fSubType(-1),
                              fLimitStart(0),
                              fLimitNum(-1),
-                             fHasOrderBy(false),
-	                         fStringScanThreshold(ULONG_MAX),
-	                         fQueryType(SELECT),
-							 fPriority(querystats::DEFAULT_USER_PRIORITY_LEVEL)
+	                         fStringScanThreshold(ULONG_MAX)
 { // TODO: big parsing 
 }                             
 
@@ -277,37 +267,6 @@ ostream &operator<< (ostream &output, const CalpontSelectExecutionPlan &cep)
 	return output;
 }
 
-const std::string CalpontSelectExecutionPlan::queryType() const
-{
-	return queryTypeToString(fQueryType);
-}
-
-std::string CalpontSelectExecutionPlan::queryTypeToString(const uint queryType)
-{
-	switch (queryType)
-	{
-		case SELECT:
-			return "SELECT";
-		case UPDATE:
-			return "UPDATE";
-		case DELETE:
-			return "DELETE";
-		case INSERT_SELECT:
-			return "INSERT_SELECT";
-		case CREATE_TABLE:
-			return "CREATE_TABLE";
-		case DROP_TABLE:
-			return "DROP_TABLE";
-		case ALTER_TABLE:
-			return "ALTER_TABLE";
-		case INSERT:
-			return "INSERT";
-		case LOAD_DATA_INFILE:
-			return "LOAD_DATA_INFILE";
-	}
-	return "UNKNOWN";
-}
-
 void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 {
 	ReturnedColumnList::const_iterator rcit;
@@ -361,7 +320,7 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << fTableAlias;
 	b << static_cast<u_int32_t>(fLocation);
 	
-	b << static_cast< ByteStream::byte>(fDependent);		
+	b << static_cast< ByteStream::doublebyte>(fDependent);		
 	
 	// ? not sure if this needs to be added
 	b << fData;
@@ -370,7 +329,7 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	b << static_cast<uint32_t>(fVerID);
 	b << fTraceFlags;
 	b << fStatementID;
-	b << static_cast<const ByteStream::byte>(fDistinct);		
+	b << static_cast<const ByteStream::doublebyte>(fDistinct);		
 	b << static_cast<uint8_t>(fOverrideLargeSideEstimate);
 	
 	// for union
@@ -388,15 +347,12 @@ void CalpontSelectExecutionPlan::serialize(messageqcpp::ByteStream& b) const
 	
 	b << (uint64_t)fLimitStart;
 	b << (uint64_t)fLimitNum;
-	b << static_cast<const ByteStream::byte>(fHasOrderBy);
 	
 	b << static_cast<uint32_t>(fSelectSubList.size());
 	for (uint i = 0; i < fSelectSubList.size(); i++)
 		fSelectSubList[i]->serialize(b);
 
 	b << (uint64_t)fStringScanThreshold;
-	b << (uint32_t)fQueryType;
-	b << fPriority;
 }
 
 void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
@@ -491,7 +447,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	
 	b >> fTableAlias;
 	b >> reinterpret_cast<u_int32_t&>(fLocation);
-	b >> reinterpret_cast< ByteStream::byte&>(fDependent);		
+	b >> reinterpret_cast< ByteStream::doublebyte&>(fDependent);		
 	
 	// ? not sure if this needs to be added
 	b >> fData;
@@ -500,7 +456,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	b >> reinterpret_cast<uint32_t&>(fVerID);
 	b >> fTraceFlags;
 	b >> fStatementID;
-	b >> reinterpret_cast< ByteStream::byte&>(fDistinct);	
+	b >> reinterpret_cast< ByteStream::doublebyte&>(fDistinct);	
 	uint8_t val;
 	b >> reinterpret_cast<uint8_t&>(val);
 	fOverrideLargeSideEstimate = (val != 0);
@@ -525,8 +481,7 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	
 	b >> (uint64_t&)fLimitStart;
 	b >> (uint64_t&)fLimitNum;
-	b >> reinterpret_cast< ByteStream::byte&>(fHasOrderBy);	
-
+	
 	// for SELECT subquery
 	b >> size;
 	for (i = 0; i < size; i++)
@@ -536,8 +491,6 @@ void CalpontSelectExecutionPlan::unserialize(messageqcpp::ByteStream& b)
 	}
 
 	b >> (uint64_t&)fStringScanThreshold;
-	b >> (uint32_t&)fQueryType;
-	b >> fPriority;
 }
 
 bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t) const
@@ -619,8 +572,6 @@ bool CalpontSelectExecutionPlan::operator==(const CalpontSelectExecutionPlan& t)
 	if (fStatementID != t.fStatementID)
 		return false;
 	if (fSubType != t.fSubType)
-		return false;
-	if (fPriority != t.fPriority)
 		return false;
 
 	return true;

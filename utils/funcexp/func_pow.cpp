@@ -16,18 +16,14 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_pow.cpp 3182 2012-07-17 01:06:01Z xlou $
+* $Id: func_pow.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
 
 #include <cstdlib>
 #include <string>
-#include <cmath>
-#if defined(_MSC_VER) && !defined(isfinite)
-#include <float.h>
-#define isfinite _finite
-#endif
+#include <cerrno>
 using namespace std;
 
 #include "functor_real.h"
@@ -57,14 +53,13 @@ double Func_pow::getDoubleVal(Row& row,
 	if (!isNull)
 	{
 		double exponent = parm[1]->data()->getDoubleVal(row, isNull); 
-
 		if (!isNull)
 		{
 			errno = 0;
 			double x = pow(base, exponent);
 
-			// @bug3490, 4461, rule out domain error, pole error and overflow range error.
-			if (!isfinite(x))
+			// @bug3490, not set to NULL when x is underflow.
+			if ((errno == EDOM) || (errno == ERANGE && exponent > 0)) // display NULL
 				isNull = true;
 
 			return x;

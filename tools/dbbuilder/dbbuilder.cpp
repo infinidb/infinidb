@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: dbbuilder.cpp 1798 2012-05-08 17:59:52Z rdempsey $
+* $Id: dbbuilder.cpp 1673 2012-01-26 17:21:50Z pleblanc $
 *
 *******************************************************************************/
 #include <stdio.h>
@@ -27,6 +27,8 @@ using namespace std;
 
 #include "dbbuilder.h"
 #include "systemcatalog.h"
+#include "tpchschema.h"
+#include "tpchpopulate.h"
 #include "liboamcpp.h"
 using namespace oam;
 using namespace dmlpackageprocessor;
@@ -35,11 +37,17 @@ using namespace dmlpackage;
 #include "objectidmanager.h"
 using namespace execplan;
 
-#include "installdir.h"
-
 enum BUILD_OPTION
 {
+    PART_ONLY = 0,  // only insert 5 rows to part table
+    SMALL_SIZE = 1, // 1000 rows in lineitem
+    LARGE_SIZE = 2,  // 0.1G full database
+    SCHEMA_ONLY = 3,  // only TPCH schema, no index
+    INDEX_ONLY = 4,  // only index
+    SCHEMA_INDEX = 5, //only sigle column index
+    SCHEMA_MULTICOL_INDEX = 6, // schema with multicolumn index
     SYSCATALOG_ONLY = 7, //Create systables only
+    USER_SCHEMA = 8, //take user input schema, append to table creation
 };
 
 namespace {
@@ -67,11 +75,19 @@ void tearDown()
 
 void usage()
 {
-    cerr << "Usage: dbbuilder [-h|f] function" << endl
+    cerr << "Usage: dbbuilder [-h|f] [-u schemaname] function" << endl
          << "  -h Display this help info" << endl
          << "  -f Necessary to use any fcn other than 7" << endl
          << " fcn" << endl
+         << "  0  Build all TPCH tables. Only insert 5 rows to PART" << endl
+         << "  1  Build and insert all TPCH tables. LINEITEM has 1000 rows" << endl
+         << "  2  Build larger TPCH database, need to give data size later" << endl
+         << "  3  Build all TPCH tables without index. Don't insert any data" << endl
+         << "  4  Create index on TPCH tables only " << endl
+         << "  5  Build all TPCH tables with index. Don't insert any data" << endl
+         << "  6  Build all TPCH tables with multi column index. Don't insert any data" << endl
          << "  7  Build system tables only" << endl
+         << "  8  Build all TPCH tables with user input schema. Use -u schemaname to input schema" << endl
          << endl
          << "WARNING! Using this tool improperly can render your database unusable!" << endl
 		;
@@ -169,6 +185,41 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	if (buildOption == LARGE_SIZE)
+	{
+		(void)system("./dataGen.pl");
+	}
+
+#if 0
+	if ( buildOption == INDEX_ONLY	)
+	{
+		(void)system("rm Job_300.xml >/dev/null 2>&1");
+		TpchSchema db;
+		db.buildIndex();
+		return 0;
+	}
+	else if ( buildOption == SCHEMA_MULTICOL_INDEX )
+	{
+		try
+		{
+			setUp();
+			SystemCatalog sysCatalog;
+			sysCatalog.build();
+			TpchSchema db;
+
+			db.buildMultiColumnIndex();
+		}
+		catch (exception& ex)
+		{
+			cerr << ex.what() << endl;
+		}
+		catch (...)
+		{
+			cerr << "Caught unknown exception!" << endl;
+		}
+	}
+	else
+#endif
        if ( buildOption == SYSCATALOG_ONLY )
 	{
 		setUp();
@@ -216,7 +267,7 @@ int main(int argc, char* argv[])
 				cerr << cmd << endl;
 #endif
 
-			cmd = startup::StartUp::installDir() + "/bin/save_brm";
+			cmd = "/usr/local/Calpont/bin/save_brm";
 			if (canWrite) {
 				int err;
 
@@ -255,10 +306,117 @@ int main(int argc, char* argv[])
 			errorHandler(sysCatalogErr, "Build system catalog", err);
 		}
 	}
+	else if ( buildOption == USER_SCHEMA )
+	{
+		setUp();
+		try
+		{
+			TpchSchema db;
+
+			db.buildTpchTables( schema);
+			return 0;
+		}
+
+		catch (exception& ex)
+		{
+			cerr << ex.what() << endl;
+		}
+		catch (...)
+		{
+			cerr << "Caught unknown exception!" << endl;
+		}
+	}
 	else
 	{
-		usage();
-		return 1;
+		try
+		{
+			setUp();
+			SystemCatalog sysCatalog;
+			sysCatalog.build();
+
+			TpchSchema db;
+
+			db.build();
+
+			TpchPopulate pop;
+
+			if (buildOption == PART_ONLY)
+				pop.populate_part();
+
+			else if (buildOption == LARGE_SIZE)
+			{
+				pop.populate_tpch();
+			}
+
+			else if (buildOption == SMALL_SIZE)
+			{          
+				std::string fileName = "srcdata/parttable.csv";
+				pop.populateFromFile( "tpch.part", fileName );
+
+				fileName = "srcdata/customertable.csv";        
+				pop.populateFromFile( "tpch.customer", fileName );
+
+				fileName = "srcdata/lineitemtable.csv";
+				pop.populateFromFile( "tpch.lineitem", fileName );
+
+				fileName = "srcdata/nationtable.csv";
+				pop.populateFromFile( "tpch.nation", fileName );
+
+				fileName = "srcdata/ordertable.csv";
+				pop.populateFromFile( "tpch.orders", fileName );
+
+				fileName = "srcdata/partsupptable.csv";
+				pop.populateFromFile( "tpch.partsupp", fileName );
+
+				fileName = "srcdata/regiontable.csv";
+				pop.populateFromFile( "tpch.region", fileName );
+
+				fileName = "srcdata/suppliertable.csv";
+				pop.populateFromFile( "tpch.supplier", fileName );
+			}
+
+			else if (buildOption == SCHEMA_INDEX || buildOption == INDEX_ONLY || buildOption == SCHEMA_ONLY )
+			{
+				return 0;
+			}
+
+			else
+			{
+				cerr << "Invalid option" << endl;
+				usage();
+				return 0;
+			}
+
+			//Commit
+			std::string command("COMMIT;");
+			VendorDMLStatement dml_command(command, 1);
+			CalpontDMLPackage* dmlCommandPkgPtr = CalpontDMLFactory::makeCalpontDMLPackage(dml_command);
+
+			DMLPackageProcessor* pkgProcPtr =
+			DMLPackageProcessorFactory::makePackageProcessor(DML_COMMAND, *dmlCommandPkgPtr );
+
+			DMLPackageProcessor::DMLResult result = pkgProcPtr->processPackage( *dmlCommandPkgPtr );
+
+			if ( DMLPackageProcessor::NO_ERROR != result.result )
+			{
+				cout << "Commit failed!" << endl;
+			}
+			delete pkgProcPtr;
+			delete dmlCommandPkgPtr;   
+
+			tearDown();
+
+			return 0;
+
+		}
+		catch (exception& ex)
+		{
+			cerr << ex.what() << endl;
+		}
+		catch (...)
+		{
+			cerr << "Caught unknown exception!" << endl;
+		}
 	}
 	return 1;
 }

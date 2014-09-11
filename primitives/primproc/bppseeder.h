@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: bppseeder.h 1960 2012-09-27 17:35:56Z pleblanc $
+// $Id: bppseeder.h 1975 2012-10-25 22:16:45Z pleblanc $
 // C++ Interface: bppseeder
 //
 // Description: 
@@ -45,11 +45,10 @@
 #include "batchprimitiveprocessor.h"
 #include "primitiveserver.h"
 #include "umsocketselector.h"
-#include "prioritythreadpool.h"
 
 namespace primitiveprocessor
 {
-class BPPSeeder : public threadpool::PriorityThreadPool::Functor
+class BPPSeeder
 {
 	public:
 		BPPSeeder(const messageqcpp::SBS &,
@@ -59,7 +58,7 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 				const bool trace=false);
 		BPPSeeder(const BPPSeeder &b);
 
-		virtual ~BPPSeeder();
+		~BPPSeeder();
 
 		int operator()();
 
@@ -67,9 +66,6 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 		boost::shared_ptr<std::ofstream> spof;
 
 		uint32_t getID();
-
-		void priority(uint p) { _priority = p; }
-		uint priority() { return _priority; }
 
 	private:
 		BPPSeeder();
@@ -88,8 +84,6 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
 		boost::shared_ptr<BatchPrimitiveProcessor> bpp;
 		SBPPV bppv;
 		bool firstRun;
-
-		uint _priority;
 };
 
 };

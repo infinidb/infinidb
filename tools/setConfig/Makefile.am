@@ -24,8 +24,8 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = setConfig
 setConfig_SOURCES = main.cpp
-setConfig_CPPFLAGS = $(idb_common_includes) $(AM_CPPFLAGS)
-setConfig_LDFLAGS = $(idb_common_ldflags) $(idb_common_libs) $(idb_oam_libs) $(idb_exec_libs) $(idb_brm_libs) $(AM_LDFLAGS)
+setConfig_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
+setConfig_LDFLAGS = @idb_common_ldflags@ @idb_common_libs@ @idb_oam_libs@ $(AM_LDFLAGS)
 
 dist_bin_SCRIPTS = configxml.sh
 

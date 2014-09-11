@@ -17,7 +17,7 @@
 
 
 /******************************************************************************
- * $Id: we_colbufsec.h 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id$
  *
  *****************************************************************************/
 
@@ -40,69 +40,87 @@ enum {
 };
 
 /**
- * @brief ColumnBufferSection class represent a section of the ColumnBuffer and
- * provides functionality for writing to the ColumnBuffer.
+ * @brief ColumnBufferSection class represent a section of the ColumnBuffer and provides functionality to write to this
+ * functional transparently
  */
 class ColumnBufferSection {
+    public:
+        /* @brief Constructor
+         *
+         * @param cb Pointer to the ColumnBuffer from which this section is associated with
+         * @param startRowId Starting row-id of the column
+         * @param endRowId Ending row-id of the column
+         * @param Width Width of the underlying column
+         * @param startOffset 
+         */
+        ColumnBufferSection(ColumnBuffer* const cb, RID startRowId, RID endRowId, int colWidth, int startOffset);
 
-  public:
-    /* @brief Constructor
-     *
-     * @param cb Ptr to this section's corresponding CoulmnBuffer
-     * @param startRowId Starting row-id of the column
-     * @param endRowId Ending row-id of the column
-     * @param Width Width of the underlying column
-     * @param startOffset 
-     */
-    ColumnBufferSection(ColumnBuffer* const cb, RID startRowId,
-        RID endRowId, int colWidth, int startOffset);
+        /* @brief Default destructor
+         */
+        ~ColumnBufferSection();
 
-    /* @brief Default destructor
-     */
-    ~ColumnBufferSection();
+        /* @brief Updates the status of the section
+         *
+         * @param Status value
+         */
+        void setStatus(int status);
 
-    /* @brief Updates the status of the section
-     *
-     * @param Status value
-     */
-    void setStatus(int status);
+        /* @brief Write data into the column buffer section
+         *
+         * @param data pointer to the data
+         * @param nRows Number of rows to be written starting from the data pointer
+         */
+        void write(const void * const data, int nRows);
 
-    /* @brief Write data into the column buffer section
-     *
-     * @param data pointer to the data
-     * @param nRows Number of rows to be written, starting from data pointer
-     */
-    void write(const void * const data, int nRows);
+        /* @brief Returns the current status of the section
+         */
+        int getStatus() const;
 
-    /* @brief Returns the current status of the section
-     */
-    int getStatus() const;
+        /* @brief Returns the start offset of this section
+         */
+        int getStartOffset() const;
 
-    /* @brief Returns the start offset of this section
-     */
-    int getStartOffset() const;
+        /* @brief Returns the size of this section
+         */
+        int getSectionSize() const;
 
-    /* @brief Returns the size of this section
-     */
-    int getSectionSize() const;
+        /* @brief Returns the ending row-id of this section
+         */
+        RID endRowId()   const { return fEndRowId;   }
 
-    /* @brief Returns the ending row-id of this section
-     */
-    RID endRowId()   const { return fEndRowId;   }
+        /* @brief Returns the starting row-id of this section
+         */
+        RID startRowId() const { return fStartRowId; }
 
-    /* @brief Returns the starting row-id of this section
-     */
-    RID startRowId() const { return fStartRowId; }
+    private:
 
-  private:
+        /* @brief ColumnBuffer associated with this section
+         */
+        const ColumnBuffer* const fCBuf;
 
-    const ColumnBuffer* const fCBuf; //ColumnBuffer associated with this section
-    RID fStartRowId;        // Starting row-id for this section
-    RID fEndRowId;          // Ending row-id for this section
-    int fColWidth;          // Width of column (in bytes)
-    int fBufStartOffset;    // Starting offset of this section in ColumnBuffer
-    RID fCurrRowId;         // row-id which will be written next
-    int fStatus;            // Status of this section
+        /* @brief Starting row-id of this section
+         */
+        RID fStartRowId;
+
+        /* @brief Ending row-id of this section
+         */
+        RID fEndRowId;
+
+        /* @brief Width of the column
+         */
+        int fColWidth;
+
+        /* @brief Starting offset of this section in the ColumnBuffer
+         */
+        int fBufStartOffset;
+
+        /* @brief row-id which will be written to next
+         */
+        RID fCurrRowId;
+
+        /* @brief Status of this section
+         */
+        int fStatus;
 };
 
 }

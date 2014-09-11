@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
- * $Id: resourcemanager.cpp 9491 2013-05-06 20:57:41Z pleblanc $
+ * $Id: resourcemanager.cpp 7796 2011-06-20 22:39:00Z pleblanc $
  *
  ******************************************************************************************/
 
@@ -136,6 +136,7 @@ namespace joblist {
 	if (fNumCores > 0)
 	{
 		fHjNumThreads = fNumCores;
+		fJlProcessorThreadsPerScan = 2 * fNumCores;
 		fJlNumScanReceiveThreads = fNumCores;
 		fTwNumThreads = fNumCores;
 	}
@@ -289,38 +290,6 @@ namespace joblist {
   void	ResourceManager::zdl_MaxElementsPerBucket () { }
 
   void  ResourceManager::hbrPredicate(){ }
-
-  bool  ResourceManager::getMysqldInfo(
-			std::string& h, std::string& u, std::string& w, unsigned int& p) const
-  {
-	h = getStringVal("CrossEngineSupport", "Host", "unassigned");
-	p = getUintVal("CrossEngineSupport", "Port", 0);
-	u = getStringVal("CrossEngineSupport", "User", "unassigned");
-	w = getStringVal("CrossEngineSupport", "Password", "");
-
-	bool rc = true;
-	if ((h.compare("unassigned") == 0) ||
-		(u.compare("unassigned") == 0) ||
-		(p == 0))
-		rc = false;
-
-	return rc;
-  }
-  
-bool ResourceManager::queryStatsEnabled() const
-{
-	std::string val(getStringVal("QueryStats", "Enabled", "N" ));  
-	boost::to_upper(val); 
-	return "Y" == val; 
-}
-
-bool ResourceManager::userPriorityEnabled() const
-{
-	std::string val(getStringVal("UserPriority", "Enabled", "N" ));  
-	boost::to_upper(val); 
-	return "Y" == val; 
-}
-
 
 } //namespace 
 

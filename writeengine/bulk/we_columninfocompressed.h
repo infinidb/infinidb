@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_columninfocompressed.h 4250 2012-10-12 17:57:53Z dcathey $
+* $Id: we_columninfocompressed.h 2873 2011-02-08 14:35:57Z rdempsey $
 *
 *******************************************************************************/
 
@@ -49,9 +49,7 @@ class ColumnInfoCompressed : public ColumnInfo
     ColumnInfoCompressed(Log*   logger,
                int              id,
                const JobColumn& column,
-               DBRootExtentTracker* pDBRootExtTrk,
-               TableInfo*		pTableInfo);
-               //RBMetaWriter*    rbMetaWriter);
+               RBMetaWriter*    rbMetaWriter);
 
     /** @brief Destructor
      */
@@ -63,6 +61,14 @@ class ColumnInfoCompressed : public ColumnInfo
      *  closed without doing extra work: flushing buffer, etc.
      */
     virtual int closeColumnFile(bool bCompletingExtent, bool bAbort);
+
+    /** @brief Prepare initial compressed column seg file for importing of data.
+     *  @param oldHWM Current HWM prior to initial block skipping.  This is only
+     *         used for abbreviated extents, to detect when block skipping has
+     *         caused us to require a full expanded extent.
+     *  @param newHWM Starting point for adding data after initial blockskipping
+     */
+    virtual int setupInitialColumnFile( HWM oldHWM, HWM newHWM );
 
     /** @brief Truncate specified dictionary file.  Only applies if compressed.
      * @param dctnryOid Dictionary store OID
@@ -76,24 +82,10 @@ class ColumnInfoCompressed : public ColumnInfo
   private:
 
     virtual int resetFileOffsetsNewExtent(const char* hdr);
-
-    // Prepare initial compressed column seg file for importing of data.
-    // oldHWM - Current HWM prior to initial block skipping.  This is only
-    //     used for abbreviated extents, to detect when block skipping has
-    //     caused us to require a full expanded extent.
-    // newHWM - Starting point for adding data after initial blockskipping
-    virtual int setupInitialColumnFile( HWM oldHWM, HWM newHWM );
-
     virtual int saveDctnryStoreHWMChunk();
-    virtual int extendColumnOldExtent(
-        uint16_t dbRootNext,
-        uint32_t partitionNext,
-        uint16_t segmentNext,
-        HWM      hwmNext );
 
     RBMetaWriter* fRBMetaWriter;
     FileOp        fTruncateDctnryFileOp; // Used to truncate dctnry store file
-
 };
 
 }

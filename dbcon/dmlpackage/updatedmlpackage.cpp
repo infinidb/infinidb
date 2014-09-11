@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: updatedmlpackage.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: updatedmlpackage.cpp 7605 2011-03-31 21:33:40Z chao $
  *
  *
  ***********************************************************************/
@@ -71,8 +71,8 @@ int UpdateDMLPackage::write(messageqcpp::ByteStream& bytestream)
     }
     if(fHasFilter)
     {
-        bytestream += *(fPlan.get());
-    } 
+        fPlan->serialize(bytestream);
+    }
 
     return retval;
 }
@@ -103,9 +103,12 @@ int UpdateDMLPackage::read(messageqcpp::ByteStream& bytestream)
     retval = fTable->read(bytestream);
     if(fHasFilter)
     {
-        fPlan.reset(new messageqcpp::ByteStream(bytestream));
+        if(fPlan != 0)
+            delete fPlan;
+        fPlan = new execplan::CalpontSelectExecutionPlan();
+        if(fPlan)
+            fPlan->unserialize(bytestream);
     }
-
     return retval;
 }
 

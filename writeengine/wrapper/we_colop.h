@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colop.h 4496 2013-01-31 19:13:20Z pleblanc $
+//  $Id: we_colop.h 2908 2011-03-09 21:44:46Z chao $
 
 
 /** @file */
@@ -27,8 +27,6 @@
 
 #include "we_dbfileop.h"
 #include "brmtypes.h"
-#include "we_dbrootextenttracker.h"
-#include "we_tablemetadata.h"
 
 #if defined(_MSC_VER) && defined(WRITEENGINECOLUMNOP_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -60,21 +58,16 @@ public:
     */
    EXPORT virtual ~ColumnOp();
 
-   EXPORT virtual int allocRowId(const TxnID& txnid,
-								Column& column,
+   EXPORT virtual int allocRowId(Column& column,
                                 uint64_t totalRow,
                                 RID* rowIdArray,
-                                HWM& hwm,
+                                int& hwm,
                                 bool& newExtent,
+                                Column& newCol,
                                 uint64_t& rowsLeft,
                                 HWM& newHwm,
                                 bool& newFile,
-								ColStructList& newColStructList,
-                                DctnryStructList& newDctnryStructList,
-								std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
-                                bool insertSelect = false,
-								bool isBatchInsert = false,
-								OID tableOid = 0);
+                                bool insertSelect = false);
 
    /**
     * @brief Create column file(s)
@@ -99,14 +92,12 @@ public:
     * @param dictColWidth The dictionary string width for a dictionary column
     */
    //BUG931
-   EXPORT virtual int fillColumn(const TxnID& txnid,
-								Column& column,
+   EXPORT virtual int fillColumn(Column& column,
                                 Column& refCol,
                                 void* defaultVal,
+								long long & nextVal,
                                 const OID dictOid = 0,
-								const int dictColWidth = 0,
-								const std::string defaultValStr = "", 
-								bool autoincrement = false);
+								const int dictColWidth = 0);
 
    /**
     * @brief Create a table file
@@ -126,8 +117,7 @@ public:
    /**
     * @brief Delete file(s) for the given partition
     */
-   EXPORT virtual int dropPartitions(const std::vector<OID>& dataFids, 
-                                     const std::vector<BRM::PartitionInfo>& partitions);
+   EXPORT virtual int dropPartition(const std::vector<int32_t>& dataFids, uint32_t partition);
 
 
    EXPORT virtual int deleteOIDsFromExtentMap(const std::vector<int32_t>& dataFids);
@@ -142,69 +132,40 @@ public:
    EXPORT virtual int expandAbbrevExtent(const Column& column);
 
    /**
-    * @brief Add an extent to the specified column OID and DBRoot.
+    * @brief Add an extent to the OID specified in the column argument.
     * When this function returns, the file position will be located at the
     * end of the file.  If the applicable column segment file does not exist,
     * extendColumn() will create the new segment file.
-    * The extent must already exist in the extentmap prior to calling this fctn.
     *
     * @param column Column struct with input column attributes.
-    * @param leaveFileOpen Leave the db file open when leaving this function
-    * @param firstFileOnPM If first file on a PM, then first empty chunk is
-    *        written out (if compressed), to give us a startup file on this PM,
-    *        much like MySQL "create table" creates the very "first" file on a
-    *        selected PM.
-    * @param hwm The fbo of the column segment file where the new extent begins
-    * @param startLbid The starting LBID for the new extent.
-    * @param allocSize Number of blocks to be written for an extent
-    * @param dbRoot The DBRoot of the file with the new extent.
-    * @param partition Partition num of the file with the new extent.
-    * @param segment The segment number of the file with the new extent.
-    * @param segFile (out) Name of segment file to which the extent is added.
+    * @param isBulkLoad Is this extent being added during a bulk load.
+    *        If true, only the last block is initialized in the file,
+    *        else the entire extent will be initialized to disk.
     * @param pFile (out) FILE ptr to the file where the extent is added.
-    * @param newFile (out) Indicates if extent was added to new or existing file
-    * @param hdrs (out) Contents of headers if file is compressed.
-    * @return returns NO_ERROR if success.
-    */
-   EXPORT int extendColumn(const Column& column,
-                           bool          leaveFileOpen,
-                           bool          firstFileOnPM,
-                           HWM           hwm,
-                           BRM::LBID_t   startLbid,
-                           int           allocSize,
-                           uint16_t      dbRoot,
-                           uint32_t      partition,
-                           uint16_t      segment,
-                           std::string&  segFile,
-                           FILE*&        pFile,
-                           bool&         newFile,
-                           char*         hdrs = NULL);
-
-	/**
-    * @brief Add an extent to the OID specified in the column argument.
-    * When this function returns, the file position will be located at the
-    * end of the file. 
-    *
-    * @param column Column struct with input column attributes. 
-    * @param dbRoot (in) The DBRoot of the file with the new extent.
-    * @param partition (in) The partition num of the file with the new extent.
-    * @param segment (in) The segment number of the file with the new extent.
+    * @param dbRoot (out) The DBRoot of the file with the new extent.
+    * @param partition (out) The partition num of the file with the new extent.
+    * @param segment (out) The segment number of the file with the new extent.
     * @param segFile (out) Name of segment file to which the extent is added.
+    * @param hwm (out) The fbo of the column segment file where the new extent
+    *        begins.
     * @param startLbid (out) The starting LBID for the new extent.
-    * @param newFile (out) Indicates if extent was added to new or existing file
+    * @param newFile (out) Indicates if extent was added to new or existing file.
     * @param hdsr (out) Contents of headers if file is compressed.
 	* @param allocSize (out) number of blocks to be written for an extent
     * @return returns NO_ERROR if success.
     */
-   EXPORT int addExtent(const Column& column,
-                           uint16_t     dbRoot,
-                           uint32_t     partition,
-                           uint16_t     segment,
-                           std::string&  segFile,
-                           BRM::LBID_t&  startLbid,
-                           bool&         newFile,
-                           int&          allocSize,
-                           char*         hdrs = NULL);
+   EXPORT virtual int extendColumn(const Column& column,
+                                  bool          isbulkload,
+                                  FILE*&        pFile,
+                                  uint16_t&     dbRoot,
+                                  uint32_t&     partition,
+                                  uint16_t&     segment,
+                                  std::string&  segFile,
+                                  HWM&          hwm,
+                                  BRM::LBID_t&  startLbid,
+                                  bool&         newFile,
+								  int& 			allocSize,
+                                  char*         hdrs = NULL);
 
    /**
     * @brief Get columne data type

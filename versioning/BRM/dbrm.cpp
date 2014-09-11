@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: dbrm.cpp 1941 2013-07-15 15:54:10Z rdempsey $
+ * $Id: dbrm.cpp 1623 2012-07-03 20:17:56Z pleblanc $
  *
  ****************************************************************************/
 
@@ -30,7 +30,6 @@
 //#define NDEBUG
 #include <cassert>
 
-#include "oamcache.h"
 #include "rwlock.h"
 #include "mastersegmenttable.h"
 #include "extentmap.h"
@@ -60,7 +59,6 @@
 
 using namespace std;
 using namespace messageqcpp;
-using namespace oam;
 
 #ifdef BRM_INFO
  #include "tracer.h"
@@ -271,31 +269,6 @@ int DBRM::lookupLocal(OID_t oid, uint32_t partitionNum, uint16_t segmentNum, uin
         }
 }
 
-int DBRM::lookupLocal_DBroot(OID_t oid, uint32_t dbroot, uint32_t partitionNum, uint16_t segmentNum,
-		uint32_t fileBlockOffset, LBID_t& lbid) throw()
-{
-#ifdef BRM_INFO
-        if (fDebug)
-        {
-                TRACER_WRITELATER("lookupLocal(oid,fbo,..)");
-                TRACER_ADDINPUT(oid);
-                TRACER_ADDINPUT(partitionNum);
-                TRACER_ADDSHORTINPUT(segmentNum);
-                TRACER_ADDINPUT(fileBlockOffset);
-                TRACER_ADDOUTPUT(lbid);
-                TRACER_WRITE;
-        }
-
-#endif
-        try {
-                return em->lookupLocal_DBroot(oid, dbroot, partitionNum, segmentNum, fileBlockOffset, lbid);
-        }
-        catch (exception& e) {
-                cerr << e.what() << endl;
-                return -1;
-        }
-}
-
 // @bug 1055-
 
 //------------------------------------------------------------------------------
@@ -478,9 +451,7 @@ int DBRM::setExtentsMaxMin(const CPInfoList_t &cpInfos) DBRM_THROW
 	}
 #endif
 	ByteStream command, response;
-	uint8_t err = 0;
-	if (cpInfos.size() == 0)
-		return err;
+	uint8_t err;
 
 	if (cpInfos.empty())
 		return ERR_OK;
@@ -592,44 +563,43 @@ int DBRM::vssLookup(LBID_t lbid, VER_t& verID, VER_t txnID,
 }
 
 int DBRM::bulkVSSLookup(const std::vector<LBID_t> &lbids, VER_t verID, VER_t txnID,
-	std::vector<VSSData> *out) throw()
+    std::vector<VSSData> *out) throw()
 {
-	uint i;
-	bool locked = false;
-	//idbassert can throw an exception, but this method is marked nothrow...
-	//idbassert(out);
-	try {
-		out->resize(lbids.size());
-		vss->lock(VSS::READ);
-		locked = true;
-		if (vss->isEmpty(false)) {
-			for (i = 0; i < lbids.size(); i++) {
-				VSSData &vd = (*out)[i];
-				vd.verID = 0;
-				vd.vbFlag = false;
-				vd.returnCode = -1;
-			}
-		}
-		else {
-			for (i = 0; i < lbids.size(); i++) {
-				VSSData &vd = (*out)[i];
-				vd.verID = verID;
-				vd.returnCode = vss->lookup(lbids[i], vd.verID, txnID, vd.vbFlag, false);
-			}
-		}
-		vss->release(VSS::READ);
-		return 0;
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-	}
-	catch (...) {
-		cerr << "bulkVSSLookup: caught an exception" << endl;
-	}
-	if (locked)
-		vss->release(VSS::READ);
-	out->clear();
-	return -1;
+    uint i;
+    bool locked = false;
+    assert(out);
+    try {
+        out->resize(lbids.size());
+        vss->lock(VSS::READ);
+        locked = true;
+        if (vss->isEmpty(false)) {
+            for (i = 0; i < lbids.size(); i++) {
+                VSSData &vd = (*out)[i];
+                vd.verID = 0;
+                vd.vbFlag = false;
+                vd.returnCode = -1;
+            }
+        }
+        else {
+            for (i = 0; i < lbids.size(); i++) {
+                VSSData &vd = (*out)[i];
+                vd.verID = verID;
+                vd.returnCode = vss->lookup(lbids[i], vd.verID, txnID, vd.vbFlag, false);
+            }
+        }
+        vss->release(VSS::READ);
+        return 0;
+    }
+    catch (exception& e) {
+        cerr << e.what() << endl;
+    }
+    catch (...) {
+        cerr << "bulkVSSLookup: caught an exception" << endl;
+    }
+    if (locked)
+        vss->release(VSS::READ);
+    out->clear();
+    return -1;
 }
 
 int8_t DBRM::send_recv(const ByteStream &in, ByteStream &out) throw()
@@ -652,7 +622,7 @@ reconnect:
 				e.what() << endl;
 			msgClient = NULL;
 			mutex.unlock();
-			return ERR_NETWORK;
+			return ERR_FAILURE;
 		}
 	
 	try {
@@ -691,66 +661,11 @@ reconnect:
 }
 
 //------------------------------------------------------------------------------
-// Send a request to create a "stripe" of column extents for the specified
-// column OIDs and DBRoot.
+// Send a request to create a column extent.
 //------------------------------------------------------------------------------
-int DBRM::createStripeColumnExtents(
-	const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
-	std::vector<CreateStripeColumnExtentsArgOut>& extents) DBRM_THROW
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-	 	TRACER_WRITELATER("createStripeColumnExtents");
-		TRACER_WRITE;
-	}
-#endif
-
-	ByteStream command, response;
-	uint8_t  err;
-	uint16_t tmp16;
-	uint32_t tmp32;
-
-	command << CREATE_STRIPE_COLUMN_EXTENTS;
-	serializeInlineVector(command, cols);
-	command << dbRoot << partitionNum;
-
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
-
-	if (response.length() == 0)
-		return ERR_NETWORK;
-
-	try {
-		response >> err;
-		if (err != 0)
-			return (int) err;
-
-		response >> tmp32;
-		partitionNum = tmp32;
-		response >> tmp16;
-		segmentNum = tmp16;
-		deserializeInlineVector(response, extents);
-	}
-	catch (exception &e) {
-		cerr << e.what() << endl;
-		return ERR_FAILURE;
-	}
-	
-	CHECK_EMPTY(response);
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Send a request to create a column extent for the specified OID and DBRoot.
-//------------------------------------------------------------------------------
-int DBRM::createColumnExtent_DBroot(OID_t oid,
+int DBRM::createColumnExtent(OID_t oid,
 	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
+	u_int16_t& dbRoot,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
 	LBID_t&    lbid,
@@ -760,11 +675,11 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 #ifdef BRM_INFO
 	if (fDebug)
 	{
-	 	TRACER_WRITELATER("createColumnExtent_DBroot");
+	 	TRACER_WRITELATER("createColumnExtent");
 		TRACER_ADDINPUT(oid);
 	 	TRACER_ADDINPUT(colWidth);
-	 	TRACER_ADDSHORTINPUT(dbRoot);
-		TRACER_ADDOUTPUT(partitionNum);
+	 	TRACER_ADDSHORTOUTPUT(dbRoot);
+		TRACER_ADDINPUT(partitionNum);
 		TRACER_ADDSHORTOUTPUT(segmentNum);
 		TRACER_ADDINT64OUTPUT(lbid);
 		TRACER_ADDOUTPUT(allocdSize);
@@ -779,8 +694,8 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 	uint32_t tmp32;
 	uint64_t tmp64;
 
-	command << CREATE_COLUMN_EXTENT_DBROOT << (ByteStream::quadbyte) oid <<
-		colWidth << dbRoot << partitionNum << segmentNum;
+	command << CREATE_COLUMN_EXTENT << (ByteStream::quadbyte) oid << colWidth << dbRoot <<
+               partitionNum;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
@@ -793,75 +708,8 @@ int DBRM::createColumnExtent_DBroot(OID_t oid,
 		if (err != 0)
 			return (int) err;
 
-		response >> tmp32;
-		partitionNum = tmp32;
 		response >> tmp16;
-		segmentNum = tmp16;
-		response >> tmp64;
-		lbid = (int64_t)tmp64;
-		response >> tmp32;
-		allocdSize = (int32_t)tmp32;	
-		response >> tmp32;
-		startBlockOffset = (int32_t)tmp32;
-	}
-	catch (exception &e) {
-		cerr << e.what() << endl;
-		return ERR_FAILURE;
-	}
-	
-	CHECK_EMPTY(response);
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Send a request to create a column extent for the exact segment file
-// specified by the requested OID, DBRoot, partition, and segment.
-//------------------------------------------------------------------------------
-int DBRM::createColumnExtentExactFile(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
-	u_int32_t partitionNum,
-	u_int16_t segmentNum,
-	LBID_t&    lbid,
-	int&       allocdSize,
-	u_int32_t& startBlockOffset) DBRM_THROW
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-	 	TRACER_WRITELATER("createColumnExtentExactFile");
-		TRACER_ADDINPUT(oid);
-	 	TRACER_ADDINPUT(colWidth);
-	 	TRACER_ADDSHORTINPUT(dbRoot);
-		TRACER_ADDOUTPUT(partitionNum);
-		TRACER_ADDSHORTOUTPUT(segmentNum);
-		TRACER_ADDINT64OUTPUT(lbid);
-		TRACER_ADDOUTPUT(allocdSize);
-		TRACER_ADDOUTPUT(startBlockOffset);
-		TRACER_WRITE;
-	}
-#endif
-
-	ByteStream command, response;
-	uint8_t  err;
-	uint16_t tmp16;
-	uint32_t tmp32;
-	uint64_t tmp64;
-
-	command << CREATE_COLUMN_EXTENT_EXACT_FILE << (ByteStream::quadbyte) oid <<
-		colWidth << dbRoot << partitionNum << segmentNum;
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
-
-	if (response.length() == 0)
-		return ERR_NETWORK;
-
-	try {
-		response >> err;
-		if (err != 0)
-			return (int) err;
-
+		dbRoot = tmp16;
 		response >> tmp32;
 		partitionNum = tmp32;
 		response >> tmp16;
@@ -940,13 +788,11 @@ int DBRM::createDictStoreExtent(OID_t oid,
 }
 
 //------------------------------------------------------------------------------
-// Send a request to delete a set extents for the specified column OID and
-// DBRoot, and to return the extents to the free list.  HWMs for the last
-// stripe of extents in the specified DBRoot are updated accordingly.
+// Send a request to delete a set extents for the specified column OID,
+// and to return the extents to the free list.  HWMs for the last stripe of
+// extents are updated accordingly.
 //------------------------------------------------------------------------------
-int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
-	bool       bDeleteAll,
-	u_int16_t  dbRoot,
+int DBRM::rollbackColumnExtents(OID_t oid,
 	u_int32_t  partitionNum,
 	u_int16_t  segmentNum,
 	HWM_t      hwm) DBRM_THROW
@@ -956,8 +802,6 @@ int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
 	{
 		TRACER_WRITELATER("rollbackColumnExtents");
 		TRACER_ADDINPUT(oid);
-		TRACER_ADDBOOLINPUT(bDeleteAll);
-		TRACER_ADDSHORTINPUT(dbRoot);
 		TRACER_ADDINPUT(partitionNum);
 		TRACER_ADDSHORTINPUT(segmentNum);
 		TRACER_ADDINPUT(hwm);
@@ -968,8 +812,7 @@ int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
 	ByteStream command, response;
 	uint8_t err;
 
-	command << ROLLBACK_COLUMN_EXTENTS_DBROOT << (ByteStream::quadbyte) oid <<
-		(uint8_t)bDeleteAll << dbRoot << partitionNum <<
+	command << ROLLBACK_COLUMN_EXTENTS << (ByteStream::quadbyte) oid << partitionNum <<
 		segmentNum << hwm;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
@@ -985,13 +828,11 @@ int DBRM::rollbackColumnExtents_DBroot(OID_t oid,
 
 //------------------------------------------------------------------------------
 // Send a request to delete a set of extents for the specified dictionary store
-// OID and DBRoot, and to return the extents to the free list.  HWMs for the
-// last stripe of extents are updated accordingly.
+// OID, and to return the extents to the free list.  HWMs for the last stripe
+// of extents are updated accordingly.
 //------------------------------------------------------------------------------
-int DBRM::rollbackDictStoreExtents_DBroot(OID_t oid,
-	u_int16_t            dbRoot,
+int DBRM::rollbackDictStoreExtents(OID_t oid,
 	u_int32_t            partitionNum,
-	const vector<u_int16_t>& segNums,
 	const vector<HWM_t>& hwms) DBRM_THROW
 {
 #ifdef BRM_INFO
@@ -999,7 +840,6 @@ int DBRM::rollbackDictStoreExtents_DBroot(OID_t oid,
 	{
 		TRACER_WRITELATER("rollbackDictStoreExtents");
 		TRACER_ADDINPUT(oid);
-		TRACER_ADDSHORTINPUT(dbRoot);
 		TRACER_ADDINPUT(partitionNum);
 		TRACER_WRITE;
 	}
@@ -1008,10 +848,7 @@ int DBRM::rollbackDictStoreExtents_DBroot(OID_t oid,
 	ByteStream command, response;
 	uint8_t err;
 
-	command << ROLLBACK_DICT_STORE_EXTENTS_DBROOT <<
-		(ByteStream::quadbyte) oid <<
-		dbRoot << partitionNum;
-	serializeVector(command, segNums);
+	command << ROLLBACK_DICT_STORE_EXTENTS << (ByteStream::quadbyte) oid << partitionNum;
 	serializeVector(command, hwms);
 	err = send_recv(command, response);
 	if (err != ERR_OK)
@@ -1122,12 +959,6 @@ int DBRM::deleteOID(OID_t oid) DBRM_THROW
 
 	response >> err;
 	CHECK_EMPTY(response);
-
-	try {
-		deleteAISequence(oid);
-	}
-	catch (...) { }   // an error here means a network problem, will be caught elsewhere
-
 	return err;
 }
 
@@ -1159,13 +990,6 @@ int DBRM::deleteOIDs(const std::vector<OID_t>& oids) DBRM_THROW
 
 	response >> err;
 	CHECK_EMPTY(response);
-
-	try {
-		for (uint i = 0; i < oids.size(); i++)
-			deleteAISequence(oids[i]);
-	}
-	catch (...) { }   // an error here means a network problem, will be caught elsewhere
-
 	return err;
 }
 	
@@ -1220,39 +1044,6 @@ int DBRM::getLastLocalHWM(OID_t oid, uint16_t& dbRoot, uint32_t& partitionNum,
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
-		return ERR_FAILURE;
-	}
-	
-	return ERR_OK;
-}
-
-//------------------------------------------------------------------------------
-// Return the last local HWM for the specified OID and DBroot. The corresponding
-// partition number, and segment number are returned as well.  This function
-// can be used by cpimport for example to find out where the current "end-of-
-// data" is, so that cpimport will know where to begin adding new rows.
-//------------------------------------------------------------------------------
-int DBRM::getLastHWM_DBroot(int oid, uint16_t dbRoot, uint32_t& partitionNum,
-				 uint16_t& segmentNum, HWM_t& hwm) throw()
-{	
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-		TRACER_WRITELATER("getLastHWM_DBroot");
-		TRACER_ADDINPUT(oid);
-		TRACER_ADDSHORTOUTPUT(dbRoot);
-		TRACER_ADDOUTPUT(partitionNum);
-		TRACER_ADDSHORTOUTPUT(segmentNum);
-		TRACER_ADDOUTPUT(hwm);
-		TRACER_WRITE;
-	}
-#endif
-
-	try {
-		hwm = em->getLastHWM_DBroot(oid, dbRoot, partitionNum, segmentNum);
-	}
-	catch (exception& e) {
-		//cerr << e.what() << endl;   // it now throws ""; it's not always an error
 		return ERR_FAILURE;
 	}
 	
@@ -1325,34 +1116,6 @@ int DBRM::setLocalHWM(OID_t oid, uint32_t partitionNum, uint16_t segmentNum,
 	return err;
 }
 
-int DBRM::bulkSetHWM(const vector<BulkSetHWMArg> &v, VER_t transID) DBRM_THROW
-{
-#ifdef BRM_INFO
- 	if (fDebug)
-	{
-	 	TRACER_WRITELATER("bulkSetHWM");
-		TRACER_WRITE;
-	}
-#endif
-
-	ByteStream command, response;
-	uint8_t err;
-
-	command << BULK_SET_HWM;
-	serializeInlineVector(command, v);
-	command << (uint32_t) transID;
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
-
-	if (response.length() != 1)
-		return ERR_NETWORK;
-
-	response >> err;
-	CHECK_EMPTY(response);
-	return err;
-}
-
 int DBRM::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &v, const vector<CPInfo> &setCPDataArgs,
 		const vector<CPInfoMerge> &mergeCPDataArgs, VER_t transID) DBRM_THROW
 {
@@ -1382,63 +1145,8 @@ int DBRM::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &v, const vector<CPInfo> &
 	response >> err;
 	CHECK_EMPTY(response);
 	return err;
-}
-
-int DBRM::bulkUpdateDBRoot(const vector<BulkUpdateDBRootArg> &args)
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-	  	TRACER_WRITELATER("bulkUpdateDBRoot");
-		TRACER_WRITE;
-	}
-#endif
-
-	ByteStream command, response;
-	uint8_t err;
-
-	command << BULK_UPDATE_DBROOT;
-	serializeInlineVector(command, args);
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
-
-	if (response.length() != 1)
-		return ERR_NETWORK;
-
-	response >> err;
-	CHECK_EMPTY(response);
-	return err;
-}
 
 
-//------------------------------------------------------------------------------
-// For the specified OID and PM number, this function will return a vector
-// of objects carrying HWM info (for the last segment file) and block count
-// information about each DBRoot assigned to the specified PM.
-//------------------------------------------------------------------------------
-int DBRM::getDbRootHWMInfo(OID_t oid, uint16_t pmNumber,
-	EmDbRootHWMInfo_v& emDBRootHwmInfos) throw()
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-	  	TRACER_WRITELATER("getDbRootHWMInfo");
-		TRACER_ADDINPUT(oid);
-		TRACER_ADDSHORTINPUT(pmNumber);
-		TRACER_WRITE;
-	}	
-#endif
-
-	try {
-		em->getDbRootHWMInfo(oid, pmNumber, emDBRootHwmInfos);
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return ERR_FAILURE;
-	}
-	
-	return ERR_OK;
 }
 
 // dmc-should eventually deprecate
@@ -1480,48 +1188,22 @@ int DBRM::getExtents(int OID, std::vector<struct EMEntry>& entries,
 	return 0;
 }
 
-int DBRM::getExtents_dbroot(int OID, std::vector<struct EMEntry>& entries,
-		const uint16_t dbroot) throw()
+int DBRM::getStartExtent(OID_t oid, uint16_t& dbRoot,
+                         uint32_t& partitionNum, bool incOutOfService) throw()
 {
 #ifdef BRM_INFO
 	if (fDebug)
 	{
-  		TRACER_WRITELATER("getExtents_dbroot");
-		TRACER_ADDINPUT(OID);
-		TRACER_WRITE;
-	}	
-#endif
-
-	try {
-		em->getExtents_dbroot(OID, entries, dbroot);
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Gets the DBRoot for the specified system catalog OID.
-// Function assumes the specified System Catalog OID is fully contained on
-// a single DBRoot, as the function only searches for and returns the first
-// DBRoot entry that is found in the extent map.
-//------------------------------------------------------------------------------
-int DBRM::getSysCatDBRoot(OID_t oid, uint16_t& dbRoot) throw()
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-		TRACER_WRITELATER("getSysCatDBRoot");
+		TRACER_WRITELATER("getStartExtent");
 		TRACER_ADDINPUT(oid);
 		TRACER_ADDSHORTOUTPUT(dbRoot);
+		TRACER_ADDOUTPUT(partitionNum);
 		TRACER_WRITE;
 	}	
 #endif
 
     try {
-        em->getSysCatDBRoot(oid, dbRoot);
+        em->getStartExtent(oid, incOutOfService, dbRoot, partitionNum);
     }
     catch (exception& e) {
         cerr << e.what() << endl;
@@ -1534,18 +1216,14 @@ int DBRM::getSysCatDBRoot(OID_t oid, uint16_t& dbRoot) throw()
 // Delete all extents for the specified OID(s) and partition number.
 //------------------------------------------------------------------------------
 int DBRM::deletePartition(const std::vector<OID_t>& oids,
-      const std::set<LogicalPartition>& partitionNums, string& emsg) DBRM_THROW
+	uint32_t partitionNum) DBRM_THROW
 {
 #ifdef BRM_INFO
 	if (fDebug)
 	{
 		TRACER_WRITENOW("deletePartition");
 		std::ostringstream oss;
-		oss << "partitionNum: " 
-		std::set<LogicalPartition>::const_iterator partIt;
-		for (partIt = partitionNums.begin(); partIt != partitionNums.end(); ++partIt)
-			oss << (*it) << " "
-		oss << "; OIDS: ";
+		oss << "partitionNum: " << partitionNum << "; OIDS: ";
 		std::vector<OID_t>::const_iterator it;
 		for (it=oids.begin(); it!=oids.end(); ++it)
 		{
@@ -1557,23 +1235,21 @@ int DBRM::deletePartition(const std::vector<OID_t>& oids,
 
 	ByteStream command, response;
 	uint8_t err;
-	command << DELETE_PARTITION;
-	serializeSet<LogicalPartition>(command, partitionNums);
-	uint32_t oidSize = oids.size();
-	command << oidSize;
-	for ( unsigned i=0; i<oidSize; i++)
+	uint32_t size = oids.size();
+
+	command << DELETE_PARTITION << partitionNum << size;
+	for ( unsigned i=0; i<size; i++)
+	{
 		command << (ByteStream::quadbyte) oids[i];
+	}
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
 
-	if (response.length() == 0)
+	if (response.length() != 1)
 		return ERR_NETWORK;
 
 	response >> err;
-	if (err != 0)
-		response >> emsg;
-
 	CHECK_EMPTY(response);
 	return err;
 }
@@ -1583,18 +1259,14 @@ int DBRM::deletePartition(const std::vector<OID_t>& oids,
 // number.
 //------------------------------------------------------------------------------
 int DBRM::markPartitionForDeletion(const std::vector<OID_t>& oids,
-      const std::set<LogicalPartition>& partitionNums, string& emsg) DBRM_THROW
+	uint32_t partitionNum) DBRM_THROW
 {
 #ifdef BRM_INFO
 	if (fDebug)
 	{
 		TRACER_WRITENOW("markPartitionForDeletion");
 		std::ostringstream oss;
-		oss << "partitionNum: " 
-		std::set<LogicalPartition>::const_iterator partIt;
-		for (partIt = partitionNums.begin(); partIt != partitionNums.end(); ++partIt)
-			oss << (*it) << " "
-		oss << "; OIDS: ";
+		oss << "partitionNum: " << partitionNum << "; OIDS: ";
 		std::vector<OID_t>::const_iterator it;
 		for (it=oids.begin(); it!=oids.end(); ++it)
 		{
@@ -1606,22 +1278,21 @@ int DBRM::markPartitionForDeletion(const std::vector<OID_t>& oids,
 
 	ByteStream command, response;
 	uint8_t err;
-	command << MARK_PARTITION_FOR_DELETION;
-	serializeSet<LogicalPartition>(command, partitionNums);
-	uint32_t oidSize = oids.size();
-	command << oidSize;
-	for ( unsigned i=0; i<oidSize; i++)
+	uint32_t size = oids.size();
+
+	command << MARK_PARTITION_FOR_DELETION << partitionNum << size;
+	for ( unsigned i=0; i<size; i++)
+	{
 		command << (ByteStream::quadbyte) oids[i];
+	}
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
 
-	if (response.length() == 0)
+	if (response.length() != 1)
 		return ERR_NETWORK;
 
 	response >> err;
-	if (err)
-		response >> emsg;
 	CHECK_EMPTY(response);
 	return err;
 }
@@ -1671,18 +1342,14 @@ int DBRM::markAllPartitionForDeletion(const std::vector<OID_t>& oids) DBRM_THROW
 // Restore all extents for the specified OID(s) and partition number.
 //------------------------------------------------------------------------------
 int DBRM::restorePartition(const std::vector<OID_t>& oids,
-      const std::set<LogicalPartition>& partitionNums, string& emsg) DBRM_THROW
+	uint32_t partitionNum) DBRM_THROW
 {
 #ifdef BRM_INFO
 	if (fDebug)
 	{
 		TRACER_WRITENOW("restorePartition");
 		std::ostringstream oss;
-		oss << "partitionNum: " 
-		std::set<LogicalPartition>::const_iterator partIt;
-		for (partIt = partitionNums.begin(); partIt != partitionNums.end(); ++partIt)
-			oss << (*it) << " "
-		oss << "; OIDS: ";
+		oss << "partitionNum: " << partitionNum << "; OIDS: ";
 		std::vector<OID_t>::const_iterator it;
 		for (it=oids.begin(); it!=oids.end(); ++it)
 		{
@@ -1694,25 +1361,21 @@ int DBRM::restorePartition(const std::vector<OID_t>& oids,
 
 	ByteStream command, response;
 	uint8_t err;
+	uint32_t size = oids.size();
 
-	command << RESTORE_PARTITION;
-	serializeSet<LogicalPartition>(command, partitionNums);
-	uint32_t oidSize = oids.size();
-	command << oidSize;
-	for ( unsigned i=0; i<oidSize; i++)
+	command << RESTORE_PARTITION << partitionNum << size;
+	for ( unsigned i=0; i<size; i++)
+	{
 		command << (ByteStream::quadbyte) oids[i];
-	
+	}
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
 
-	if (response.length() == 0)
+	if (response.length() != 1)
 		return ERR_NETWORK;
 
 	response >> err;
-	if (err)
-		response >> emsg;
-
 	CHECK_EMPTY(response);
 	return err;
 }
@@ -1721,7 +1384,7 @@ int DBRM::restorePartition(const std::vector<OID_t>& oids,
 // Return all the out-of-service partitions for the specified OID.
 //------------------------------------------------------------------------------
 int DBRM::getOutOfServicePartitions(OID_t oid,
-  std::set<LogicalPartition>& partitionNums) throw()
+	std::vector<uint32_t>& partitionNums) throw()
 {
 #ifdef BRM_INFO
 	if (fDebug)
@@ -1741,67 +1404,6 @@ int DBRM::getOutOfServicePartitions(OID_t oid,
     }
 
     return ERR_OK;
-}
-
-//------------------------------------------------------------------------------
-// Delete all extents for the specified DBRoot
-//------------------------------------------------------------------------------
-int DBRM::deleteDBRoot(uint16_t dbroot) DBRM_THROW
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-		TRACER_WRITENOW("deleteDBRoot");
-		std::ostringstream oss;
-		oss << "DBRoot: " << dbroot;
-		TRACER_WRITEDIRECT(oss.str());
-	}
-#endif
-
-	ByteStream command, response;
-	uint8_t err;
-	command << DELETE_DBROOT;
-	uint32_t q = static_cast<uint32_t>(dbroot);
-	command << q;
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
-
-	if (response.length() == 0)
-		return ERR_NETWORK;
-
-	response >> err;
-	CHECK_EMPTY(response);
-	return err;
-}
-
-//------------------------------------------------------------------------------
-// Does the specified DBRoot have any extents.
-// Returns an error if extentmap shared memory is not loaded.
-//------------------------------------------------------------------------------
-int DBRM::isDBRootEmpty(uint16_t dbroot,
-	bool& isEmpty, std::string& errMsg) throw()
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-		TRACER_WRITELATER("isDBRootEmpty");
-		TRACER_ADDINPUT(dbroot);
-		TRACER_WRITE;
-	}	
-#endif
-
-	errMsg.clear();
-	try {
-		isEmpty = em->isDBRootEmpty(dbroot);
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		errMsg = e.what();
-		return ERR_FAILURE;
-	}
-	
-	return ERR_OK;
 }
 
 int DBRM::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
@@ -1834,85 +1436,6 @@ int DBRM::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 	response >> err;
 	CHECK_EMPTY(response);
 	return err;
-}
-
-struct _entry {
-	_entry(LBID_t l) : lbid(l) { };
-	LBID_t lbid;
-	inline bool operator<(const _entry &e) const {
-		return ((e.lbid >> 10) < (lbid >> 10));
-	}
-};
-
-int DBRM::getDBRootsForRollback(VER_t transID, vector<uint16_t> *dbroots) throw()
-{
-#ifdef BRM_INFO
-	if (fDebug)
-	{
-	  	TRACER_WRITELATER("getDBRootsForRollback");
-		TRACER_ADDINPUT(transID);
-		TRACER_WRITE;
-	}
-#endif
-	bool locked[2] = {false, false};
-	set<OID_t> vbOIDs;
-	set<OID_t>::iterator vbIt;
-	vector<LBID_t> lbidList;
-	uint i, size;
-	uint32_t tmp32;
-	OID_t vbOID;
-	int err;
-
-	set<_entry> lbidPruner;
-	set<_entry>::iterator it;
-
-	try {
-		vbbm->lock(VBBM::READ);
-		locked[0] = true;
-		vss->lock(VSS::READ);
-		locked[1] = true;
-
-		vss->getUncommittedLBIDs(transID, lbidList);
-
-		// prune the list; will leave at most 1 entry per 1024-lbid range
-		for (i = 0, size = lbidList.size(); i < size; i++)
-			lbidPruner.insert(_entry(lbidList[i]));
-
-		// get the VB oids
-		for (it = lbidPruner.begin(); it != lbidPruner.end(); ++it) {
-			err = vbbm->lookup(it->lbid, transID, vbOID, tmp32);
-			if (err)   // this error will be caught by DML; more appropriate to handle it there
-				continue;
-			vbOIDs.insert(vbOID);
-		}
-
-		// get the dbroots
-		for (vbIt = vbOIDs.begin(); vbIt != vbOIDs.end(); ++vbIt) {
-			err = getDBRootOfVBOID(*vbIt);
-			if (err) {
-				ostringstream os;
-				os << "DBRM::getDBRootOfVBOID() returned an error looking for vbOID " << *vbIt;
-				log(os.str());
-				return ERR_FAILURE;
-			}
-			dbroots->push_back((uint16_t) err);
-		}
-
-		vss->release(VSS::READ);
-		locked[1] = false;
-		vbbm->release(VBBM::READ);
-		locked[0] = false;
-
-		return ERR_OK;
-	}
-	catch (exception &e) {
-		if (locked[0])
-			vbbm->release(VBBM::READ);
-		if (locked[1])
-			vss->release(VSS::READ);
-		return -1;
-	}
-
 }
 		
 int DBRM::getUncommittedLBIDs(VER_t transID, vector<LBID_t>& lbidList) throw()
@@ -2013,7 +1536,7 @@ int DBRM::getUncommittedExtentLBIDs(VER_t transID, vector<LBID_t>& lbidList) thr
 }
 
 		
-int DBRM::beginVBCopy(VER_t transID, uint16_t dbRoot, const LBIDRange_v& ranges,
+int DBRM::beginVBCopy(VER_t transID, const LBIDRange_v& ranges,
 	VBRange_v& freeList) DBRM_THROW
 {
 #ifdef BRM_INFO
@@ -2028,7 +1551,7 @@ int DBRM::beginVBCopy(VER_t transID, uint16_t dbRoot, const LBIDRange_v& ranges,
 	ByteStream command, response;
 	uint8_t err;
 
-	command << BEGIN_VB_COPY << (ByteStream::quadbyte) transID << dbRoot;
+	command << BEGIN_VB_COPY << (ByteStream::quadbyte) transID;
 	serializeVector<LBIDRange>(command, ranges);
 	err = send_recv(command, response);
 	if (err != ERR_OK)
@@ -2274,53 +1797,77 @@ int DBRM::isReadWrite() throw()
 	return (err == 0 ? ERR_OK : ERR_READONLY);
 }
 
-int DBRM::dmlLockLBIDRanges(const vector<LBIDRange> &ranges, int txnID)
+int DBRM::flushInodeCaches() DBRM_THROW
 {
 #ifdef BRM_INFO
-  	if (fDebug) TRACER_WRITENOW("clear");
+  	if (fDebug) TRACER_WRITENOW("flushInodeCaches");
 #endif
 	ByteStream command, response;
 	uint8_t err;
 
-	command << LOCK_LBID_RANGES;
-	serializeVector<LBIDRange>(command, ranges);
-	command << (uint32_t) txnID;
+	command << FLUSH_INODE_CACHES;
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
-
+	
 	if (response.length() != 1)
 		return ERR_NETWORK;
 
 	response >> err;
 	CHECK_EMPTY(response);
 	return err;
+}
+
+int DBRM::dmlLockLBIDRanges(const vector<LBIDRange> &ranges, int txnID)
+{
+#ifdef BRM_INFO
+    if (fDebug) TRACER_WRITENOW("clear");
+#endif
+    ByteStream command, response;
+    uint8_t err;
+
+    command << LOCK_LBID_RANGES;
+    serializeVector<LBIDRange>(command, ranges);
+    command << (uint32_t) txnID;
+    err = send_recv(command, response);
+    if (err != ERR_OK)
+        return err;
+
+    if (response.length() != 1)
+        return ERR_NETWORK;
+
+    response >> err;
+    CHECK_EMPTY(response);
+    return err;
 }
 
 int DBRM::dmlReleaseLBIDRanges(const vector<LBIDRange> &ranges)
 {
 #ifdef BRM_INFO
-  	if (fDebug) TRACER_WRITENOW("clear");
+    if (fDebug) TRACER_WRITENOW("clear");
 #endif
-	ByteStream command, response;
-	uint8_t err;
+    ByteStream command, response;
+    uint8_t err;
 
-	command << RELEASE_LBID_RANGES;
-	serializeVector<LBIDRange>(command, ranges);
-	err = send_recv(command, response);
-	if (err != ERR_OK)
-		return err;
+    command << RELEASE_LBID_RANGES;
+    serializeVector<LBIDRange>(command, ranges);
+    err = send_recv(command, response);
+    if (err != ERR_OK)
+        return err;
 
-	if (response.length() != 1)
-		return ERR_NETWORK;
+    if (response.length() != 1)
+        return ERR_NETWORK;
 
-	response >> err;
-	CHECK_EMPTY(response);
-	return err;
+    response >> err;
+    CHECK_EMPTY(response);
+    return err;
 }
 
 int DBRM::clear() DBRM_THROW
 {
+#ifdef BRM_INFO
+  	if (fDebug) TRACER_WRITENOW("clear");
+#endif
 	ByteStream command, response;
 	uint8_t err;
 
@@ -2328,7 +1875,7 @@ int DBRM::clear() DBRM_THROW
 	err = send_recv(command, response);
 	if (err != ERR_OK)
 		return err;
-
+	
 	if (response.length() != 1)
 		return ERR_NETWORK;
 
@@ -2635,7 +2182,7 @@ const TxnID DBRM::getTxnID
 	return ret;
 }
 	
-boost::shared_array<SIDTIDEntry> DBRM::SIDTIDMap(int& len)
+const SIDTIDEntry* DBRM::SIDTIDMap(int& len)
 {
 #ifdef BRM_INFO
  	if (fDebug)
@@ -2646,28 +2193,30 @@ boost::shared_array<SIDTIDEntry> DBRM::SIDTIDMap(int& len)
 	}	
 #endif
 
-	ByteStream command, response;
+	ByteStream  command, response;
 	uint8_t err, tmp8;
 	uint32_t tmp32;
 	int i;
-	boost::shared_array<SIDTIDEntry> ret;
+	SIDTIDEntry* ret;
+	string tmpstr;
 
 	command << SID_TID_MAP;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
 		log("DBRM: error: SessionManager::SIDTIDEntry() failed (network)");
-		return ret;
+		return NULL;
 	}
 	response >> err;
 	if (err != ERR_OK) {
 		log("DBRM: error: SessionManager::SIDTIDEntry() failed (valid error code)",
 			logging::LOG_TYPE_ERROR);
-		return ret;
+		return NULL;
 	}
 	
 	response >> tmp32;
 	len = (int) tmp32;
-	ret.reset(new SIDTIDEntry[len]);
+
+	ret = new SIDTIDEntry[len];
 	
 	for (i = 0; i < len; i++) {
 		response >> tmp32 >> tmp8;
@@ -2675,9 +2224,48 @@ boost::shared_array<SIDTIDEntry> DBRM::SIDTIDMap(int& len)
 		ret[i].txnid.valid = (tmp8 == 0 ? false : true);
 		response >> tmp32;
 		ret[i].sessionid = tmp32;
+		response >> tmp32;
+		ret[i].tableOID = tmp32;
+		response >> tmp32;
+		ret[i].processID = tmp32;
+		response >> tmpstr;
+		strncpy(ret[i].processName, tmpstr.c_str(), MAX_PROCNAME-1);
 	}
 
 	CHECK_EMPTY(response);
+	return ret;
+}
+
+char * DBRM::getShmContents(int &len)
+{
+#ifdef BRM_INFO
+	if (fDebug)
+	{
+	  	TRACER_WRITELATER("getShmContents");
+		TRACER_ADDOUTPUT(len);
+		TRACER_WRITE;
+	}	
+#endif
+
+	ByteStream command, response;
+	uint8_t err;
+	char *ret;
+
+	command << GET_SHM_CONTENTS;
+	err = send_recv(command, response);
+	if (err != ERR_OK) {
+		log("DBRM: warning: SessionManager::getShmContents() failed (network error)");
+		return NULL;
+	}
+	response >> err;
+	if (err != ERR_OK) {
+		log("DBRM: warning: SessionManager::getShmContents() failed (valid error code)");
+		return NULL;
+	}
+	
+	len = response.length();
+	ret = new char[len];
+	memcpy(ret, response.buf(), len);
 	return ret;
 }
 
@@ -2694,51 +2282,9 @@ const uint32_t DBRM::getUnique32()
 	command << GET_UNIQUE_UINT32;
 	err = send_recv(command, response);
 	if (err != ERR_OK) {
-		cerr << "DBRM: getUnique32() failed (network)\n";
-		log("DBRM: getUnique32() failed (network)", logging::LOG_TYPE_ERROR);
-		throw runtime_error("DBRM: getUnique32() failed check the controllernode");
-		return 0;
-	}
-
-	/* Some jobsteps don't need the connection after this so close it to free up
-	resources on the controller node */
-	/* Comment the following 4 lines out. The DBRM instance is a singleton so no need to
-	remove the client. Plus, it may cause weird network issue when the socket is being
-	released and re-established very quickly*/
-	//pthread_mutex_lock(&mutex);
-	//delete msgClient;
-	//msgClient = NULL;
-	//pthread_mutex_unlock(&mutex);
-
-	response >> err;
-	if (err != ERR_OK) {
-		cerr << "DBRM: getUnique32() failed (got an error)\n";
-		log("DBRM: getUnique32() failed (got an error)",
-			logging::LOG_TYPE_ERROR);
-		throw runtime_error("DBRM: getUnique32() failed check the controllernode");
-		return 0;
-	}
-	response >> ret;
-// 	cerr << "DBRM returning " << ret << endl;
-	return ret;
-}
-
-const uint64_t DBRM::getUnique64()
-{
-#ifdef BRM_INFO
-  	if (fDebug) TRACER_WRITENOW("getUnique64");
-#endif
-
-	ByteStream command, response;
-	uint8_t err;
-	uint64_t ret;
-
-	command << GET_UNIQUE_UINT64;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		cerr << "DBRM: getUnique64() failed (network)\n";
-		log("DBRM: getUnique64() failed (network)", logging::LOG_TYPE_ERROR);
-		throw runtime_error("DBRM: getUnique64() failed check the controllernode");
+		cerr << "DBRM: error: SessionManager::getUnique_uint32() failed (network)\n";
+		log("DBRM: error: SessionManager::getUnique_uint32() failed (network)", logging::LOG_TYPE_ERROR);
+		throw runtime_error("DBRM: error: SessionManager::getUnique_uint32() failed check the controllernode");
 		return 0;
 	}
 
@@ -2754,10 +2300,10 @@ const uint64_t DBRM::getUnique64()
 	
 	response >> err;
 	if (err != ERR_OK) {
-		cerr << "DBRM: getUnique64() failed (got an error)\n";
-		log("DBRM: getUnique64() failed (got an error)",
+		cerr << "DBRM: error: SessionManager::getUnique_uint32() failed (got an error)\n";
+		log("DBRM: error: SessionManager::getUnique_uint32() failed (got an error)",
 			logging::LOG_TYPE_ERROR);
-		throw runtime_error("DBRM: getUnique64() failed check the controllernode");
+		throw runtime_error("DBRM: error: SessionManager::getUnique_uint32() failed check the controllernode");
 		return 0;
 	}
 	response >> ret;
@@ -2765,13 +2311,182 @@ const uint64_t DBRM::getUnique64()
 	return ret;
 }
 
-void DBRM::sessionmanager_reset()
+int8_t DBRM::setTableLock (  const OID_t tableOID, const u_int32_t sessionID,  const u_int32_t processID, const std::string processName, bool lock ) 
 {
+
+#ifdef BRM_INFO
+	if (fDebug)
+	{
+	  	TRACER_WRITELATER("setTableLock");
+		TRACER_ADDINPUT(sessionID);
+		TRACER_WRITE;
+	}	
+#endif
+
 	ByteStream command, response;
 	uint8_t err;
+    int8_t	rc = 0;
 
-	command << SM_RESET;
+	command << SET_TABLE_LOCK << (uint32_t) tableOID << (uint32_t) sessionID << (uint32_t) processID << processName << (uint8_t) lock;
 	err = send_recv(command, response);
+	if (err != ERR_OK) {
+		std::ostringstream oss;
+		oss << "DBRM: error: SessionManager::setTableLock() tolock is " << lock << " failed (network)";
+		log(oss.str(), logging::LOG_TYPE_ERROR);
+		return -1;
+	}
+	
+	response >> err;
+	if (err != ERR_OK) {
+		std::ostringstream oss;
+		oss << "DBRM: error: SessionManager::setTableLock() tolock is " << lock << " failed (got an error)";
+		log(oss.str(), logging::LOG_TYPE_ERROR);
+	}
+	else
+	{
+		response >> err;
+	}
+	rc = err;
+	return rc;
+}
+
+int8_t DBRM::updateTableLock (  const OID_t tableOID, u_int32_t&  processID, std::string & processName) 
+{
+#ifdef BRM_INFO
+	if (fDebug)
+	{
+	  	TRACER_WRITELATER("updateTableLock");
+		TRACER_ADDINPUT(tableOID);
+		TRACER_WRITE;
+	}	
+#endif
+
+	ByteStream command, response;
+	uint8_t err;
+    int8_t	rc = 0;
+
+	command << UPDATE_TABLE_LOCK << (uint32_t) tableOID << (uint32_t) processID << processName;
+	err = send_recv(command, response);
+	if (err != ERR_OK) {
+		std::ostringstream oss;
+		oss << "DBRM: error: SessionManager::updateTableLock() failed (network)";
+		log(oss.str(), logging::LOG_TYPE_ERROR);
+		return -1;
+	}
+	
+	response >> err;
+	if (err != ERR_OK) {
+		uint32_t tmp32;
+		response >> tmp32;
+		processID = tmp32;
+		response >> processName;
+		std::ostringstream oss;
+		oss << "DBRM: error: SessionManager::updateTableLock() failed (got an error)";
+		log(oss.str(), logging::LOG_TYPE_ERROR);
+	}
+	else
+	{
+		response >> err;
+		uint32_t tmp32;
+		response >> tmp32;
+		processID = tmp32;
+		response >> processName;
+	}
+	rc = err;
+	return rc;
+}
+
+int8_t DBRM::getTableLockInfo ( const OID_t tableOID, u_int32_t & processID,
+	std::string & processName, bool & lockStatus, SessionManagerServer::SID & sid )
+{
+#ifdef BRM_INFO
+	if (fDebug)
+	{
+	  	TRACER_WRITELATER("getTableLockInfo");
+		TRACER_ADDINPUT(tableOID);
+		TRACER_WRITE;
+	}	
+#endif
+
+	ByteStream command, response;
+	uint8_t err;
+    int8_t	rc = 0;
+	u_int32_t tmp32;
+	
+	command << GET_TABLE_LOCK << (uint32_t) tableOID << (uint32_t) processID << processName << (uint8_t) lockStatus;
+	err = send_recv(command, response);
+	if (err != ERR_OK) {
+		log("DBRM: error: SessionManager::getTableLockInfo() failed (network)", logging::LOG_TYPE_ERROR);
+		return -1;
+	}
+	
+	response >> err;
+	if (err != ERR_OK) {
+		log("DBRM: error: SessionManager::getTableLockInfo() failed (got an error)",
+			logging::LOG_TYPE_ERROR);
+		return -1;
+	}
+	
+	response >> err;  //bytestream only take unsigned int8
+	rc = err;
+	response >>  tmp32;
+	processID = tmp32;
+	response >> processName;
+	response >> err;
+	lockStatus = err;
+	response >> tmp32;
+	sid = tmp32;
+	return rc;	
+}
+
+void DBRM::getTableLocksInfo (std::vector< SIDTIDEntry> & sidTidEntries)
+{
+	#ifdef BRM_INFO
+	if (fDebug)
+	{
+	  	TRACER_WRITELATER("getTableLocksInfo");
+		TRACER_WRITE;
+	}	
+#endif
+
+	ByteStream command, response;
+	uint8_t err, size;
+	uint32_t tmp32;
+	string processName;
+	command << GET_TABLE_LOCKS;
+	err = send_recv(command, response);
+	if (err != ERR_OK) {
+		log("DBRM: error: SessionManager::getTableLocksInfo() failed (network)", logging::LOG_TYPE_ERROR);
+		throw runtime_error("DBRM: error: SessionManager::getTableLocksInfo() failed (network)");
+	}
+	
+	response >> err;
+	if (err != ERR_OK) {
+		log("DBRM: error: SessionManager::getTableLocksInfo() failed (got an error)",
+			logging::LOG_TYPE_ERROR);
+		throw runtime_error("DBRM: error: SessionManager::getTableLocksInfo() failed(got an error)");
+	}
+	sidTidEntries.clear();
+	SIDTIDEntry aEntry;
+	response >> size;
+	for ( uint8_t i = 0; i < size; i++ )
+	{
+		response >>  tmp32;
+		aEntry.txnid.id = tmp32;
+		response >>  err;
+		aEntry.txnid.valid = (err != 0);
+		response >>  tmp32;
+		aEntry.sessionid = tmp32;
+		response >>  tmp32;
+		aEntry.tableOID = tmp32;
+		response >> tmp32;
+		aEntry.processID = tmp32;
+		response >>  processName;
+		memcpy ( aEntry.processName, processName.c_str(), processName.length());
+		aEntry.processName[ processName.length() ] = '\0'; // add null terminator
+		sidTidEntries.push_back( aEntry );
+	}
+	
 }
 
 bool DBRM::isEMEmpty() throw()
@@ -2811,185 +2526,50 @@ int DBRM::takeSnapshot() throw ()
 	return 0;
 }
 
-int DBRM::getSystemReady() throw()
+bool DBRM::isSystemReady() throw()
 {
-	uint32_t stateFlags;
-	if (!getSystemState(stateFlags))
-	{
-		return -1;
-	}
-
-	return (stateFlags & SessionManagerServer::SS_READY);
-}
-
-int DBRM::getSystemSuspended() throw()
-{
-	uint32_t stateFlags;
-	if (getSystemState(stateFlags) < 0)
-	{
-		return -1;
-	}
-
-	return (stateFlags & SessionManagerServer::SS_SUSPENDED);
-}
-
-int DBRM::getSystemSuspendPending(bool& bRollback) throw()
-{
-	uint32_t stateFlags;
-	if (getSystemState(stateFlags) < 0)
-	{
-		return -1;
-	}
-	bRollback = stateFlags & SessionManagerServer::SS_ROLLBACK;
-
-	return (stateFlags & SessionManagerServer::SS_SUSPEND_PENDING);
-}
-
-int DBRM::getSystemShutdownPending(bool& bRollback, bool& bForce) throw()
-{
-	uint32_t stateFlags;
-	if (getSystemState(stateFlags) < 0)
-	{
-		return -1;
-	}
-	bRollback = stateFlags & SessionManagerServer::SS_ROLLBACK;
-	bForce = stateFlags & SessionManagerServer::SS_FORCE;
-
-	return (stateFlags & SessionManagerServer::SS_SHUTDOWN_PENDING);
-}
-
-int DBRM::setSystemReady(bool bReady) throw()
-{
-	if (bReady)
-	{
-		return setSystemState(SessionManagerServer::SS_READY);
-	}
-	else
-	{
-		return clearSystemState(SessionManagerServer::SS_READY);
-	}
-}
-
-int DBRM::setSystemSuspended(bool bSuspended) throw()
-{
-	uint32_t stateFlags = 0;
-
-	if (bSuspended)
-	{
-		if (setSystemState(SessionManagerServer::SS_SUSPENDED) < 0)
-		{
-			return -1;
-		}
-	}
-	else
-	{
-		stateFlags = SessionManagerServer::SS_SUSPENDED;
-	}
-	// In either case, we need to clear the pending and rollback flags
-	stateFlags |= SessionManagerServer::SS_SUSPEND_PENDING;
-	stateFlags |= SessionManagerServer::SS_ROLLBACK;
-	return clearSystemState(stateFlags);
-}
-
-int DBRM::setSystemSuspendPending(bool bPending, bool bRollback) throw()
-{
-	uint32_t stateFlags = SessionManagerServer::SS_SUSPEND_PENDING;
-	if (bPending)
-	{
-		if (bRollback)
-		{
-			stateFlags |= SessionManagerServer::SS_ROLLBACK;
-		}
-		return setSystemState(stateFlags);
-	}
-	else
-	{
-		stateFlags |= SessionManagerServer::SS_ROLLBACK;
-		return clearSystemState(stateFlags);
-	}
-}
-
-int DBRM::setSystemShutdownPending(bool bPending, bool bRollback, bool bForce) throw()
-{
-	int rtn = 0;
-	uint32_t stateFlags = SessionManagerServer::SS_SHUTDOWN_PENDING;
-	if (bPending)
-	{
-		if (bForce)
-		{
-			stateFlags |= SessionManagerServer::SS_FORCE;
-		}
-		else
-		if (bRollback)
-		{
-			stateFlags |= SessionManagerServer::SS_ROLLBACK;
-		}
-		rtn = setSystemState(stateFlags);
-	}
-	else
-	{
-		stateFlags |= SessionManagerServer::SS_ROLLBACK;
-		stateFlags |= SessionManagerServer::SS_FORCE;
-		rtn = clearSystemState(stateFlags);		// Clears the flags that are turned on in stateFlags
-	}
-
-	return rtn;
-}
-
-/* Return the shm stateflags
- */
-int DBRM::getSystemState(uint32_t& stateFlags) throw()
-{
-	try 
-	{
+	try {
 #ifdef BRM_INFO
 		if (fDebug)
 		{
-			TRACER_WRITELATER("getSystemState");
+			TRACER_WRITELATER("isSystemReady");
 			TRACER_WRITE;
 		}	
 #endif
+
 		ByteStream command, response;
 		uint8_t err;
 
 		command << GET_SYSTEM_STATE;
 		err = send_recv(command, response);
-		if (err != ERR_OK) 
-		{
+		if (err != ERR_OK) {
 			std::ostringstream oss;
 			oss << "DBRM: error: SessionManager::getSystemState() failed (network)";
 			log(oss.str(), logging::LOG_TYPE_ERROR);
-			return -1;
+			return false;
 		}
-
+		
 		response >> err;
-		if (err != ERR_OK) 
-		{
+		if (err != ERR_OK) {
 			std::ostringstream oss;
 			oss << "DBRM: error: SessionManager::getSystemState() failed (got an error)";
 			log(oss.str(), logging::LOG_TYPE_ERROR);
-			return -1;
+			return false;
 		}
-
-		response >> stateFlags;
-		return 1;
-	} 
-	catch (...) 
-	{
+		response >> err;
+		return (err == SessionManagerServer::SS_READY);
+	} catch (...) {
+		return false;
 	}
-	return -1;
 }
 
-/* Set the shm stateflags that are set in the parameter
- */
-int DBRM::setSystemState(uint32_t stateFlags) throw()
+void DBRM::systemIsReady(SessionManagerServer::SystemState state) throw()
 {
-	try 
-	{
+	try {
 #ifdef BRM_INFO
 		if (fDebug)
 		{
-			TRACER_WRITELATER("setSystemState");
+			TRACER_WRITELATER("isSystemReady");
 			TRACER_WRITE;
 		}	
 #endif
@@ -2997,114 +2577,26 @@ int DBRM::setSystemState(uint32_t stateFlags) throw()
 		ByteStream command, response;
 		uint8_t err;
 
-		command << SET_SYSTEM_STATE << static_cast<ByteStream::quadbyte>(stateFlags);
+		command << SET_SYSTEM_STATE << static_cast<ByteStream::byte>(state);
 		err = send_recv(command, response);
-		if (err != ERR_OK) 
-		{
+		if (err != ERR_OK) {
 			std::ostringstream oss;
 			oss << "DBRM: error: SessionManager::setSystemState() failed (network)";
 			log(oss.str(), logging::LOG_TYPE_ERROR);
-			stateFlags = 0;
-			return -1;
+			return;
 		}
-
+		
 		response >> err;
-		if (err != ERR_OK) 
-		{
+		if (err != ERR_OK) {
 			std::ostringstream oss;
 			oss << "DBRM: error: SessionManager::setSystemState() failed (got an error)";
 			log(oss.str(), logging::LOG_TYPE_ERROR);
-			stateFlags = 0;
-			return -1;
+			return;
 		}
-		return 1;
-	} 
-	catch (...) 
-	{
+		return;
+	} catch (...) {
+		return;
 	}
-	stateFlags = 0;
-	return -1;
-}
-
-/* Clear the shm stateflags that are set in the parameter
- */
-int DBRM::clearSystemState(uint32_t stateFlags) throw()
-{
-	try 
-	{
-#ifdef BRM_INFO
-		if (fDebug)
-		{
-			TRACER_WRITELATER("clearSystemState");
-			TRACER_WRITE;
-		}	
-#endif
-
-		ByteStream command, response;
-		uint8_t err;
-
-		command << CLEAR_SYSTEM_STATE << static_cast<ByteStream::quadbyte>(stateFlags);
-		err = send_recv(command, response);
-		if (err != ERR_OK) 
-		{
-			std::ostringstream oss;
-			oss << "DBRM: error: SessionManager::clearSystemState() failed (network)";
-			log(oss.str(), logging::LOG_TYPE_ERROR);
-			return -1;
-		}
-
-		response >> err;
-		if (err != ERR_OK) 
-		{
-			std::ostringstream oss;
-			oss << "DBRM: error: SessionManager::clearSystemState() failed (got an error)";
-			log(oss.str(), logging::LOG_TYPE_ERROR);
-			return -1;
-		}
-		return 1;
-	} 
-	catch (...) 
-	{
-	}
-	return -1;
-}
-
-/* Ping the controller node. Don't print anything.
- */
-bool DBRM::isDBRMReady() throw()
-{
-#ifdef BRM_INFO
-  	if (fDebug) TRACER_WRITENOW("isDBRMReady");
-#endif
-	boost::mutex::scoped_lock scoped(mutex);
-	
-	try
-	{
-		for (int attempt = 0; attempt < 2; ++attempt)
-		{
-			try 
-			{
-				if (msgClient == NULL)
-				{
-					msgClient = new MessageQueueClient(masterName);
-				}
-				if (msgClient->connect())
-				{
-					return true;
-				}
-			}
-			catch (...) 
-			{
-			}
-			delete msgClient;
-			msgClient = NULL;
-			sleep(1);
-		}
-	}
-	catch(...)
-	{
-	}
-	return false;
 }
 
 /* This waits for the lock up to 30 sec.  After 30 sec, the assumption is something
@@ -3174,507 +2666,6 @@ void DBRM::releaseLBIDRange(LBID_t start, uint count)
 			copylocks->release(CopyLocks::WRITE);
 		}
 		throw;
-	}
-}
-
-/* OID Manager section */
-
-int DBRM::allocOIDs(int num)
-{
-#ifdef BRM_INFO
-  	if (fDebug) TRACER_WRITENOW("allocOID");
-#endif
-	ByteStream command, response;
-	uint8_t err;
-	uint32_t ret;
-
-	command << ALLOC_OIDS;
-	command << (uint32_t) num;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		cerr << "DBRM: OIDManager::allocOIDs(): network error" << endl;
-		log("DBRM: OIDManager::allocOIDs(): network error", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-
-	try {
-		response >> err;
-		if (err != ERR_OK)
-			return -1;
-		response >> ret;
-		CHECK_EMPTY(response);
-		return (int) ret;
-	}
-	catch (...) {
-		log("DBRM: OIDManager::allocOIDs(): bad response", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-}
-
-void DBRM::returnOIDs(int start, int end)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << RETURN_OIDS;
-	command << (uint32_t) start;
-	command << (uint32_t) end;
-	err = send_recv(command, response);
-	if (err == ERR_NETWORK) {
-		cerr << "DBRM: OIDManager::returnOIDs(): network error" << endl;
-		log("DBRM: OIDManager::returnOIDs(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::returnOIDs(): network error");
-	}
-
-	try {
-		response >> err;
-		CHECK_EMPTY(response);
-	}
-	catch (...) {
-		err = ERR_FAILURE;
-	}
-
-	if (err != ERR_OK) {
-		log("DBRM: OIDManager::returnOIDs() failed", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::returnOIDs() failed");
-	}
-}
-
-int DBRM::oidm_size()
-{
-	ByteStream command, response;
-	uint8_t err;
-	uint32_t ret;
-
-	command << OIDM_SIZE;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		cerr << "DBRM: OIDManager::size(): network error" << endl;
-		log("DBRM: OIDManager::size(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::size(): network error");
-	}
-
-	try {
-		response >> err;
-		if (err == ERR_OK) {
-			response >> ret;
-			CHECK_EMPTY(response);
-			return ret;
-		}
-		CHECK_EMPTY(response);
-		return -1;
-	}
-	catch (...) {
-		log("DBRM: OIDManager::size(): bad response", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::size(): bad response");
-	}
-}
-
-int DBRM::allocVBOID(uint dbroot)
-{
-	ByteStream command, response;
-	uint8_t err;
-	uint32_t ret;
-
-	command << ALLOC_VBOID << (uint) dbroot;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		cerr << "DBRM: OIDManager::allocVBOID(): network error" << endl;
-		log("DBRM: OIDManager::allocVBOID(): network error", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-
-	try {
-		response >> err;
-		if (err == ERR_OK) {
-			response >> ret;
-			CHECK_EMPTY(response);
-			return ret;
-		}
-		CHECK_EMPTY(response);
-		return -1;
-	}
-	catch (...) {
-		log("DBRM: OIDManager::allocVBOID(): bad response", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-}
-
-int DBRM::getDBRootOfVBOID(uint vbOID)
-{
-	ByteStream command, response;
-	uint8_t err;
-	uint32_t ret;
-
-	command << GETDBROOTOFVBOID << (uint) vbOID;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		cerr << "DBRM: OIDManager::getDBRootOfVBOID(): network error" << endl;
-		log("DBRM: OIDManager::getDBRootOfVBOID(): network error", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-
-	try {
-		response >> err;
-		if (err == ERR_OK) {
-			response >> ret;
-			CHECK_EMPTY(response);
-			return (int) ret;
-		}
-		CHECK_EMPTY(response);
-		return -1;
-	}
-	catch (...) {
-		log("DBRM: OIDManager::getDBRootOfVBOID(): bad response", logging::LOG_TYPE_CRITICAL);
-		return -1;
-	}
-}
-
-vector<uint16_t> DBRM::getVBOIDToDBRootMap()
-{
-	ByteStream command, response;
-	uint8_t err;
-	vector<uint16_t> ret;
-
-	command << GETVBOIDTODBROOTMAP;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: OIDManager::getVBOIDToDBRootMap(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::getVBOIDToDBRootMap(): network error");
-	}
-
-	try {
-		response >> err;
-		if (err != ERR_OK) {
-			log("DBRM: OIDManager::getVBOIDToDBRootMap(): processing error", logging::LOG_TYPE_CRITICAL);
-			throw runtime_error("DBRM: OIDManager::getVBOIDToDBRootMap(): processing error");
-		}
-		deserializeInlineVector<uint16_t>(response, ret);
-		CHECK_EMPTY(response);
-		return ret;
-	}
-	catch (...) {
-		log("DBRM: OIDManager::getVBOIDToDBRootMap(): bad response", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: OIDManager::getVBOIDToDBRootMap(): bad response");
-	}
-}
-
-uint64_t DBRM::getTableLock(const vector<uint> &pmList, uint32_t tableOID,
-		string *ownerName, uint32_t *ownerPID, int32_t *ownerSessionID, int32_t *ownerTxnID, LockState state)
-{
-	ByteStream command, response;
-	uint8_t err;
-	uint64_t ret;
-	TableLockInfo tli;
-	uint32_t tmp32;
-	vector<uint32_t> dbRootsList;
-	OamCache * oamcache = OamCache::makeOamCache();
-	OamCache::PMDbrootsMap_t pmDbroots = oamcache->getPMToDbrootsMap();
-	int moduleId = 0;
-	for (uint i = 0; i < pmList.size(); i++)
-	{
-		moduleId = pmList[i];
-		vector<int> dbroots = (*pmDbroots)[moduleId];
-		for (uint j = 0; j < dbroots.size(); j++)
-			dbRootsList.push_back((uint32_t)dbroots[j]);
-	}
-	tli.id = 0;
-	tli.ownerName = *ownerName;
-	tli.ownerPID = *ownerPID;
-	tli.ownerSessionID = *ownerSessionID;
-	tli.ownerTxnID = *ownerTxnID;
-	tli.dbrootList = dbRootsList;
-	tli.state = state;
-	tli.tableOID = tableOID;
-	tli.creationTime = time(NULL);
-
-	command << GET_TABLE_LOCK << tli;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: getTableLock(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getTableLock(): network error");
-	}
-	response >> err;
-	/* TODO: this means a save failure, need a specific exception type */
-	if (err != ERR_OK)
-		throw runtime_error("Table lock save file failure");
-	response >> ret;
-	if (ret == 0) {
-		response >> *ownerPID;
-		response >> *ownerName;
-		response >> tmp32;
-		*ownerSessionID = tmp32;
-		response >> tmp32;
-		*ownerTxnID = tmp32;
-	}
-	idbassert(response.length() == 0);
-	return ret;
-}
-
-bool DBRM::releaseTableLock(uint64_t id)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << RELEASE_TABLE_LOCK << id;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: releaseTableLock(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: releaseTableLock(): network error");
-	}
-	response >> err;
-	/* TODO: this means a save failure, need a specific exception type */
-	if (err != ERR_OK)
-		throw runtime_error("Table lock save file failure");
-	response >> err;
-	idbassert(response.length() == 0);
-
-	return (bool) err;
-}
-
-bool DBRM::changeState(uint64_t id, LockState state)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << CHANGE_TABLE_LOCK_STATE << id << (uint32_t) state;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: changeState(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: changeState(): network error");
-	}
-	response >> err;
-	/* TODO: this means a save failure, need a specific exception type */
-	if (err != ERR_OK)
-		throw runtime_error("Table lock save file failure");
-	response >> err;
-	idbassert(response.length() == 0);
-
-	return (bool) err;
-}
-
-bool DBRM::changeOwner(uint64_t id, const string &ownerName, uint ownerPID, int32_t ownerSessionID,
-		int32_t ownerTxnID)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << CHANGE_TABLE_LOCK_OWNER << id << ownerName << ownerPID <<
-			(uint32_t) ownerSessionID << (uint32_t) ownerTxnID;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: changeOwner(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: changeOwner(): network error");
-	}
-	response >> err;
-	/* TODO: this means a save failure, need a specific exception type */
-	if (err != ERR_OK)
-		throw runtime_error("Table lock save file failure");
-	response >> err;
-	idbassert(response.length() == 0);
-	return (bool) err;
-}
-
-bool DBRM::checkOwner(uint64_t id)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << OWNER_CHECK << id;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: ownerCheck(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: ownerCheck(): network error");
-	}
-	response >> err;
-	/* TODO: this means a save failure, need a specific exception type */
-	if (err != ERR_OK)
-		throw runtime_error("Table lock save file failure");
-	response >> err;
-	idbassert(response.length() == 0);
-	return (bool) err;  // Return true means the owner is valid
-}
-
-vector<TableLockInfo> DBRM::getAllTableLocks()
-{
-	ByteStream command, response;
-	uint8_t err;
-	vector<TableLockInfo> ret;
-
-	command << GET_ALL_TABLE_LOCKS;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: getAllTableLocks(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAllTableLocks(): network error");
-	}
-	response >> err;
-	if (err != ERR_OK) {
-		log("DBRM: getAllTableLocks(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAllTableLocks(): processing error");
-	}
-	deserializeVector<TableLockInfo>(response, ret);
-	idbassert(response.length() == 0);
-	return ret;
-}
-
-void DBRM::releaseAllTableLocks()
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << RELEASE_ALL_TABLE_LOCKS;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: releaseAllTableLocks(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: releaseAllTableLocks(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK)
-		throw runtime_error("DBRM: releaseAllTableLocks(): processing error");
-}
-
-bool DBRM::getTableLockInfo(uint64_t id, TableLockInfo *tli)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << GET_TABLE_LOCK_INFO << id;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: getTableLockInfo(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getTableLockInfo(): network error");
-	}
-	response >> err;
-	if (err != ERR_OK)
-		throw runtime_error("DBRM: getTableLockInfo() processing error");
-	response >> err;
-	if (err)
-		response >> *tli;
-	return (bool) err;
-}
-
-void DBRM::startAISequence(uint32_t OID, uint64_t firstNum, uint colWidth)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << START_AI_SEQUENCE << OID << firstNum << colWidth;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: startAISequence(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: startAISequence(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK) {
-		log("DBRM: startAISequence(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: startAISequence(): processing error");
-	}
-}
-
-bool DBRM::getAIRange(uint32_t OID, uint32_t count, uint64_t *firstNum)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << GET_AI_RANGE << OID << count;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: getAIRange(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAIRange(): network error");
-	}
-	response >> err;
-	if (err != ERR_OK) {
-		log("DBRM: getAIRange(): processing error",	logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAIRange(): processing error");
-	}
-	response >> err;
-	if (err == 0)
-		return false;
-	response >> *firstNum;
-	idbassert(response.length() == 0);
-	return true;
-}
-
-bool DBRM::getAIValue(uint32_t OID, uint64_t *value)
-{
-	return getAIRange(OID, 0, value);
-}
-
-void DBRM::resetAISequence(uint32_t OID, uint64_t value)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << RESET_AI_SEQUENCE << OID << value;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: resetAISequence(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: resetAISequence(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK) {
-		log("DBRM: resetAISequence(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: resetAISequence(): processing error");
-	}
-}
-
-void DBRM::getAILock(uint32_t OID)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << GET_AI_LOCK << OID;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: getAILock(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAILock(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK) {
-		log("DBRM: getAILock(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: getAILock(): processing error");
-	}
-}
-
-void DBRM::releaseAILock(uint32_t OID)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << RELEASE_AI_LOCK << OID;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM: releaseAILock(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: releaseAILock(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK) {
-		log("DBRM: releaseAILock(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: releaseAILock(): processing error");
-	}
-}
-
-void DBRM::deleteAISequence(uint32_t OID)
-{
-	ByteStream command, response;
-	uint8_t err;
-
-	command << DELETE_AI_SEQUENCE << OID;
-	err = send_recv(command, response);
-	if (err != ERR_OK) {
-		log("DBRM:deleteAILock(): network error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: deleteAILock(): network error");
-	}
-	response >> err;
-	idbassert(response.length() == 0);
-	if (err != ERR_OK) {
-		log("DBRM: deleteAILock(): processing error", logging::LOG_TYPE_CRITICAL);
-		throw runtime_error("DBRM: deleteAILock(): processing error");
 	}
 }
 

@@ -16,19 +16,13 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkstatus.h 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_bulkstatus.h 2873 2011-02-08 14:35:57Z rdempsey $
 *
 *******************************************************************************/
 /** @file */
 
 #ifndef _WE_BULKSTATUS_H_
 #define _WE_BULKSTATUS_H_
-
-#if 0 //defined(_MSC_VER) && defined(WE_BULKSTATUS_DLLEXPORT)
-#define EXPORT __declspec(dllexport)
-#else
-#define EXPORT
-#endif
 
 namespace WriteEngine
 {
@@ -40,7 +34,7 @@ class BulkStatus
 {
 public:
    static int     getJobStatus()           { return fJobStatus; }
-   EXPORT static void setJobStatus(int jobStatus);
+   static void setJobStatus(int jobStatus) { fJobStatus = jobStatus; }
 
 private:
     /* @brief Global job status flag.
@@ -49,15 +43,9 @@ private:
     * as a flag.  Making the variable volatile should suffice, to make it
     * work with multiple threads.
     */
-#ifdef _MSC_VER
-   static volatile LONG fJobStatus;
-#else
    static volatile int fJobStatus;
-#endif
 };
 
 } // end of namespace
-
-#undef EXPORT
 
 #endif // _WE_BULKSTATUS_H_

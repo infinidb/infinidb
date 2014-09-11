@@ -62,15 +62,12 @@ class BPPSendThread {
 		void mainLoop();
 		bool flowControlEnabled();
 		void abort();
-		inline bool aborted() const
-		{
-			return die;
-		}
+		bool aborted();
 				
 	private:
-		BPPSendThread(const BPPSendThread&);
-		BPPSendThread& operator=(const BPPSendThread&);
-
+		BPPSendThread(const BPPSendThread &);
+		BPPSendThread &operator=(const BPPSendThread);
+		
 		struct Runner_t {
 			BPPSendThread *bppst;
 			Runner_t(BPPSendThread *b) : bppst(b) { }

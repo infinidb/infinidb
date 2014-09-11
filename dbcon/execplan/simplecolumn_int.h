@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplecolumn_int.h 8536 2012-05-21 21:27:17Z zzhu $
+*   $Id: simplecolumn_int.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -55,7 +55,6 @@ public:
 	SimpleColumn_INT(const std::string& schema, 
 		               const std::string& table, 
 		               const std::string& col, 
-		               const bool isInfiniDB,
 		               const u_int32_t sessionID = 0);
 	SimpleColumn_INT(const SimpleColumn& rhs, const u_int32_t sessionID = 0);
 	
@@ -101,9 +100,8 @@ template<int len>
 SimpleColumn_INT<len>::SimpleColumn_INT(const std::string& schema, 
 		           const std::string& table, 
 		           const std::string& col, 
-		           const bool isInfiniDB,
 		           const u_int32_t sessionID) :
-		          SimpleColumn(schema, table, col, isInfiniDB, sessionID) 
+		           	SimpleColumn(schema, table, col, sessionID) 
 {
 	setNullVal();
 }

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackmgr.h 4496 2013-01-31 19:13:20Z pleblanc $
+* $Id: we_bulkrollbackmgr.h 3603 2012-03-06 16:39:32Z dcathey $
 */
 
 /** @file
@@ -49,7 +49,7 @@
 
 namespace WriteEngine
 {
-    class Log;
+	class Log;
 
 //------------------------------------------------------------------------------
 /** @brief Class to clear a database table lock, and rolls back extents
@@ -58,151 +58,123 @@ namespace WriteEngine
 //------------------------------------------------------------------------------
 class BulkRollbackMgr
 {
-    enum BulkRollbackVersion
-    {
-        BULK_RB_VERSION_OTHER,
-        BULK_RB_VERSION3 = 3,
-        BULK_RB_VERSION4 = 4
-    };
-
 public:
-    /**
-     * @brief BulkRollbackMgr constructor
-     * @param tableOID table to be rolled back.
-     * @param lockID Table lock id of the table to be rolled back.
-     *        Currently used for logging only.
-     * @param tableName name of table associated with tableOID.
-     *        Currently used for logging only.
-     * @param applName application that is driving this bulk rollback.
-     *        Currently used for logging only.
-     */
-    EXPORT BulkRollbackMgr(OID tableOID,
-                           u_int64_t lockID,
+	/**
+	 * @brief BulkRollbackMgr constructor
+	 * @param tableOID table to be rolled back.
+	 * @param tableName name of table associated with tableOID
+	 * @param applName application that is driving this bulk rollback
+	 */
+	EXPORT BulkRollbackMgr(OID tableOID,
                            const std::string& tableName,
                            const std::string& applName,
                            Log* logger=0);
 
-    /**
-     * @brief Clear table lock and rollback extents for fTableOID
-     * @param keepMetaFile controls whether the meta data file is deleted
-     * @return NO_ERROR upon success
-     */
-    EXPORT int rollback (  bool keepMetaFile );
+#ifdef _MSC_VER
+	EXPORT ~BulkRollbackMgr() { if (fPids) free(fPids); }
+#endif
+	/**
+	 * @brief Clear table lock and rollback extents for fTableOID
+	 * @param rollbackOnly requests rollback w/o clearing table lock
+	 * @param keepMetaFile controls whether the meta data file is deleted
+	 * @return NO_ERROR upon success
+	 *         ERR_TBL_TABLE_HAS_VALID_CPIMPORT_LOCK - locked by cpimport,
+	 *         ERR_TBL_TABLE_HAS_VALID_DML_DDL_LOCK  - locked by DDL/DML,
+	 *         ERR_TBL_TABLE_LOCK_NOT_FOUND          - table has no lock,
+	 *         other errors such as a BRM error are possible
+	 */
+	EXPORT int rollback ( bool rollbackOnly, bool keepMetaFile );
 
-    /**
-     * @brief Accessor to any error msg related to a bad return code.
-     * @return error message if rollback rejected or failed.
-     */
-    const std::string& getErrorMsg( ) const { return fErrorMsg; }
+	/**
+	 * @brief Accessor to any error msg related to a bad return code.
+	 * @return error message if rollback rejected or failed.
+	 */
+	const std::string& getErrorMsg( ) const { return fErrorMsg; }
 
-    /**
-     * @brief Accessor to the name of the meta file we are processing
-     */
-    const std::string& getMetaFileName() const { return fMetaFileName; }
+	/**
+	 * @brief Save error msg for later reference.
+	 */
+	void setErrorMsg ( const std::string& errMsg ) { fErrorMsg = errMsg; }
 
-    /**
-     * @brief Mutator to enable/disable debug logging to console.
-     */
-    const void setDebugConsole ( bool debug ) { fDebugConsole = debug; }
+	/**
+	 * @brief Accessor to the name of the meta file we are processing
+	 */
+	const std::string& getMetaFileName() const { return fMetaFileName; }
 
-    /**
-     * @brief Log the specified message.
-     * @param logType   type of message to be logged
-     * @param msgId     message id to be used
-     * @param columnOID column OID
-     * @param text      message text to be logged
-     */
-    void logAMessage          ( logging::LOG_TYPE   logType, //log a message
+	/**
+	 * @brief Mutator to enable/disable debug logging to console.
+	 */
+	const void setDebugConsole ( bool debug ) { fDebugConsole = debug; }
+
+	/**
+	 * @brief Log the specified message.
+	 * @param logType   type of message to be logged
+	 * @param msgId     message id to be used
+	 * @param columnOID column OID
+	 * @param text      message text to be logged
+	 */
+	void logAMessage          ( logging::LOG_TYPE   logType, //log a message
                                 logging::Message::MessageID msgId,
                                 OID                 columnOID,
                                 const std::string&  text );
-    /**
-     * @brief Standalone utility that can be used to delete the bulk rollback
-     * meta data files.  Caution: this function can throw an exception.
-     * @param tableOID Bulk rollback files for this table are to be deleted
-     */
-    EXPORT static void deleteMetaFile( OID tableOID );
-
-    /*
-     * @brief Get list of segment file numbers found in dirName directory
-     * @param dirName Directory path to be searched
-     * @param segList List of segment files found in dirName
-     * @param errMsg Error msg if return code is not NO_ERROR
-     */
-    EXPORT static int getSegFileList( const std::string& dirName,
-                                std::vector<u_int32_t>& segList,
-                                std::string& errMsg );
 
 private:
-    // Declare but don't define copy constructor and assignment operator
-    BulkRollbackMgr(const BulkRollbackMgr& rhs);
-    BulkRollbackMgr& operator=(const BulkRollbackMgr& rhs);
+#ifdef _MSC_VER
+	//Needs proper copy ctors on Windows
+	BulkRollbackMgr(const BulkRollbackMgr& rhs);
+	BulkRollbackMgr& operator=(const BulkRollbackMgr& rhs);
+#endif
+	// Structure used to store info for the list of dictionary store
+	// segment files in the last partition.
+	/**
+	 * @brief Structure used to store info for the list of dictionary
+	 * store segment files in the last partition.
+	 */
+	struct RollbackData
+	{
+		u_int32_t	fDbRoot;
+		u_int32_t	fPartNum;
+		u_int32_t	fSegNum;
+		HWM			fHwm;
+		bool		fWithHwm;
+	};
 
-    // Structure used to store info for the list of dictionary store
-    // segment files in the last partition.
-    struct RollbackData
-    {
-        u_int32_t    fDbRoot;
-        u_int32_t    fPartNum;
-        u_int32_t    fSegNum;
-        HWM          fHwm;
-        bool         fWithHwm;
-    };
+	int deleteColumnExtents   ( const char* inBuf ); // delete col extents
+	int deleteDctnryExtents   ( ); // delete dictionary store extents
+	int deleteExtents         ( ); // function that drives extent deletion
+	void deleteSubDir         ( ); // delete subdirectory used for backup chunks
+	void closeMetaDataFile    ( bool keepMetaFile ); //close/delete metafile
+	bool lookupProcessStatus  ( ); // are fProcessId/fProcessName active
+	int metaDataFileExists    ( bool& exists ); // does meta-data file exists
+	int openMetaDataFile      ( ); // open meta-data file with HWM info
+	int readMetaDataRecDctnry ( const char* inBuf );//read meta-data dct rec
+	int validateClearTableLock( ); // verify fTableOID lock can be cleared
 
-    void createFileDeletionEntry( OID     columnOID,
-                                bool      fileTypeFlag,
-                                u_int32_t dbRoot,
-                                u_int32_t partNum,
-                                u_int32_t segNum,
-                                const std::string& segFileName );
-    void deleteColumn1Extents ( const char* inBuf ); // delete col extents
-    void deleteColumn1ExtentsV3(const char* inBuf );
-    void deleteColumn1ExtentsV4(const char* inBuf );
-    void deleteColumn2Extents ( const char* inBuf ); // delete col extents
-    void deleteColumn2ExtentsV3(const char* inBuf );
-    void deleteColumn2ExtentsV4(const char* inBuf );
-    void deleteDbFiles        ( ); // delete DB files waiting to be deleted
-    void deleteDctnryExtents  ( ); // delete dictionary store extents
-    void deleteDctnryExtentsV3( );
-    void deleteDctnryExtentsV4( );
-    void deleteExtents        ( ); // function that drives extent deletion ver3
-    void readMetaDataRecDctnry(const char* inBuf );//read meta-data dct rec
+	// Data members
+	OID           fTableOID;	// table to be rolled back
+	std::string   fTableName;	// name of table associated with fTableOID
+	u_int32_t     fProcessId;	// pid associated with current table lock
+	std::string   fProcessName;	// processName associated with fProcessId
+	std::ifstream fMetaFile;	// meta data file we are reading
+	std::string   fMetaFileName;// name of meta data file
+	std::string   fErrorMsg;
+	unsigned char fDctnryHdr[DCTNRY_HEADER_SIZE]; // empty dctnry store blk
 
-    void deleteSubDir         ( const std::string& metaFileName ); // delete
-                                   // subdirectory used for backup chunks
-    void closeMetaDataFile    ( ); // close a metafile
-    void deleteMetaDataFiles  ( ); // delete metafiles
-    int  metaDataFileExists   ( bool& exists ); // does meta-data file exists
-    bool openMetaDataFile     ( u_int16_t dbRoot );  //  open a metadata file
-    void validateAllMetaFilesExist(const std::vector<u_int16_t>& dbRoots) const;
+	// Dictionary store extents for an OID are read in and managed as a
+	// group.  The following data members are used to collect this info.
+	OID           fPendingDctnryStoreOID;  // OID of pending dctnry extents
+	int           fPendingDctnryStoreCompressionType; // Dctnry compression type
+	std::vector<RollbackData> fPendingDctnryExtents;
 
-    // Data members
-    OID           fTableOID;    // table to be rolled back
-    u_int64_t     fLockID;      // unique lock ID associated with table lock
-    std::string   fTableName;   // name of table associated with fTableOID
-    u_int32_t     fProcessId;   // pid associated with current table lock
-    std::string   fProcessName; // processName associated with fProcessId
-    std::ifstream fMetaFile;    // current meta data file we are reading
-    std::string   fMetaFileName;// name of current meta data file
-    std::vector<std::string> fMetaFileNames; // all relevant meta data files
-    std::string   fErrorMsg;
-    unsigned char fDctnryHdr[DCTNRY_HEADER_SIZE]; // empty dctnry store blk
-
-    // Dictionary store extents for an OID are read in and managed as a
-    // group.  The following data members are used to collect this info.
-    OID           fPendingDctnryStoreOID;// Dctnry OID of pending dctnry extents
-    u_int32_t     fPendingDctnryStoreDbRoot; // DbRoot of pending dctnry extents
-    int           fPendingDctnryStoreCompressionType; // Dctnry compression type
-    std::vector<RollbackData> fPendingDctnryExtents;
-
-	// List of DB Files to be deleted.  Files are deleted in reverse order.
-    std::vector<File>         fPendingFilesToDelete;
-
-    logging::MessageLog fSysLogger; // Used for syslogging
-    bool          fDebugConsole;    // control debug logging to console
-    Log*          fLog;             // optional logger object
-    std::string   fApplName;        // application initiating the bulk rollback
-    int           fVersion;         // version of meta data file being read
+	logging::MessageLog fSysLogger; // Used for syslogging
+	bool          fDebugConsole;    // control debug logging to console
+	Log*          fLog;             // optional logger object
+	std::string   fApplName;        // application initiating the bulk rollback
+#ifdef _MSC_VER
+	boost::mutex fPidMemLock;
+	DWORD* fPids;
+	DWORD fMaxPids;
+#endif
 };
 
 } //end of namespace

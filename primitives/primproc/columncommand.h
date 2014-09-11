@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand.h 2058 2013-02-13 18:07:30Z pleblanc $
+// $Id: columncommand.h 1581 2011-02-03 17:55:28Z rdempsey $
 // C++ Interface: columncommand
 //
 // Description: 
@@ -62,7 +62,7 @@ public:
 	void setMakeAbsRids(bool m) { makeAbsRids = m; }
 	bool willPrefetch();
 	const int64_t getEmptyRowValue( const execplan::CalpontSystemCatalog::ColDataType dataType, const int width ) const;
-	const int64_t getLastLbid();
+	const int64_t getLastLbid() const { return lastLbid;}
 	void getLBIDList(uint loopCount, std::vector<int64_t> *lbids);
 
 	SCommand duplicate();
@@ -95,7 +95,7 @@ private:
 
 	bool _isScan;
 
-	boost::scoped_array<uint8_t> inputMsg;
+	uint8_t inputMsg[BatchPrimitiveProcessor::BUFFER_SIZE];
 	NewColRequestHeader *primMsg;
 	NewColResultHeader *outMsg;
 
@@ -127,7 +127,7 @@ private:
 	bool suppressFilter;
 
 	UDFFcnPtr_t fUdfFuncPtr;
-	std::vector<uint64_t> lastLbid;
+	uint64_t lastLbid;
 
 	/* speculative optimizations for projectintorowgroup() */
 	rowgroup::Row r;

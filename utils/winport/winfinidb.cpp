@@ -170,9 +170,7 @@ int startUp()
 	ProcInfoVec procInfo;
 	procInfo.push_back(ProcInfo("workernode DBRM_Worker1 fg"));
 	procInfo.push_back(ProcInfo("controllernode fg"));
-	procInfo.push_back(ProcInfo("DecomSvr"));
 	procInfo.push_back(ProcInfo("PrimProc"));
-	procInfo.push_back(ProcInfo("WriteEngineServer"));
 	procInfo.push_back(ProcInfo("ExeMgr"));
 	procInfo.push_back(ProcInfo("DDLProc"));
 	procInfo.push_back(ProcInfo("DMLProc"));
@@ -336,8 +334,8 @@ int shutDown()
 	pList.push_back("DMLProc.exe");
 	pList.push_back("DDLProc.exe");
 	pList.push_back("ExeMgr.exe");
-	pList.push_back("WriteEngineServer.exe");
 	pList.push_back("PrimProc.exe");
+	pList.push_back("DecomSvr.exe");
 	pList.push_back("DecomSvr.exe");
 	pList.push_back("controllernode.exe");
 	pList.push_back("workernode.exe");

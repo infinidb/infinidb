@@ -1706,7 +1706,7 @@ public:
   Item_cond_xor(Item *i1,Item *i2) :Item_cond(i1,i2) {}
   enum Functype functype() const { return COND_XOR_FUNC; }
   /* TODO: remove the next line when implementing XOR optimization */
-  //enum Type type() const { return FUNC_ITEM; } // @InfiniDB treat as COND_ITEM
+  enum Type type() const { return FUNC_ITEM; }
   longlong val_int();
   const char *func_name() const { return "xor"; }
   void top_level_item() {}

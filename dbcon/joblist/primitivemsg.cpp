@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: primitivemsg.cpp 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: primitivemsg.cpp 7396 2011-02-03 17:54:36Z rdempsey $
  */
 
 #include <stdexcept>
@@ -25,8 +25,8 @@ using namespace std;
 #include "calpontselectexecutionplan.h"
 using namespace execplan;
 
+#include "jobstep.h"
 #include "primitivemsg.h"
-#include "primitivestep.h"
 using namespace joblist;
 
 namespace joblist

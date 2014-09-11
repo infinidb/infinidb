@@ -29,16 +29,14 @@ dmlpackageprocessorfactory.cpp \
 insertpackageprocessor.cpp \
 updatepackageprocessor.cpp \
 commandpackageprocessor.cpp \
-autoincrementdata.cpp \
-tablelockdata.cpp
+autoincrementdata.cpp
 include_HEADERS = deletepackageprocessor.h \
 dmlpackageprocessor.h \
 dmlpackageprocessorfactory.h \
 insertpackageprocessor.h \
 updatepackageprocessor.h \
 commandpackageprocessor.h\
-autoincrementdata.h \
-tablelockdata.h
+autoincrementdata.h
 
 test:
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: calpontselectexecutionplan.h 8731 2012-07-23 18:47:07Z pleblanc $
+*   $Id: calpontselectexecutionplan.h 7646 2011-04-18 17:38:07Z xlou $
 *
 *
 ***********************************************************************/
@@ -92,21 +92,6 @@ public:
 	typedef std::vector<SCEP> SelectList;
 
 	typedef std::vector<RMParam> RMParmVec;
-		
-	// query type of this select plan. 
-#undef DELETE //Windows defines this...
-	enum IDB_QUERYTYPE
-	{
-		SELECT,
-		UPDATE,
-		DELETE,
-		INSERT_SELECT,
-		CREATE_TABLE,
-		DROP_TABLE,
-		ALTER_TABLE,
-		INSERT,
-		LOAD_DATA_INFILE
-	};
 	
 	enum SE_LOCATION
 	{
@@ -119,7 +104,7 @@ public:
 	/** subselect type */
 	enum SE_SubSelectType 
 	{
-		MAIN_SELECT, 
+		UNKNOWN_SUBS, 
 		SINGLEROW_SUBS,
 		EXISTS_SUBS,
 		NOT_EXISTS_SUBS, 
@@ -129,7 +114,6 @@ public:
 		ANY_SUBS,
 		FROM_SUBS,
 		SELECT_SUBS,
-		UNKNOWN_SUBS
 	};
 
 	/**
@@ -347,23 +331,12 @@ public:
 	void limitNum(const uint64_t limitNum) { fLimitNum = limitNum; }
 	const uint64_t limitNum() const { return fLimitNum; }
 	
-	void hasOrderBy(const bool hasOrderBy) { fHasOrderBy = hasOrderBy; }
-	const bool hasOrderBy() const { return fHasOrderBy; }
-	
 	void selectSubList(const SelectList& selectSubList) { fSelectSubList = selectSubList; }
 	const SelectList& selectSubList() const { return fSelectSubList; }
 	
 	void stringScanThreshold(uint64_t n) { fStringScanThreshold = n; }
 	uint64_t stringScanThreshold() const { return fStringScanThreshold; }
 	
-	// query type. return string for easy stats insert
-	void queryType(const uint queryType) { fQueryType = queryType; }
-	const std::string queryType() const;
-	static std::string queryTypeToString(const uint queryType);
-	
-	void priority(uint p) { fPriority = p; }
-	uint priority() { return fPriority; }
-
 	/**
 	 * The serialization interface
 	 */
@@ -400,6 +373,8 @@ public:
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const CalpontSelectExecutionPlan& t) const;
+
+
 
 /**
  * Protected stuff
@@ -512,19 +487,11 @@ private:
 	uint64_t fLimitStart;
 	uint64_t fLimitNum;
 	
-	// for parent select order by
-	bool fHasOrderBy;
-	
 	// for Select clause subquery
 	SelectList fSelectSubList;
 
 	// @bug3321, for string scan blocks
 	uint64_t fStringScanThreshold;
-	
-	// query type
-	uint fQueryType;
-
-	uint fPriority;
 };
 
 typedef boost::shared_ptr<CalpontSelectExecutionPlan> SCSEP;

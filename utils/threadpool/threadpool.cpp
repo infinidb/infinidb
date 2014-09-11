@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: threadpool.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+*   $Id: threadpool.cpp 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -204,7 +204,7 @@ void ThreadPool::beginThread() throw()
 				Container_T::const_iterator iter;
 
 				/* If one thread gets fewer than 10 jobs, just do them all */
-				if (num < 1)	//BP 01/17/2012 15:26 -changed from 10 to 1 for WES 
+				if (num < 10)
 					num = waitingFunctorsSize - issued;
 
 				for (i = 0; i < num; i++)

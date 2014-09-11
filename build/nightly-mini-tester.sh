@@ -77,6 +77,7 @@ ${prefix}/Calpont/mysql/bin/mysql_install_db --defaults-file=${prefix}/Calpont/m
 sed -i -e 's?<NumBlocksPct>.*</NumBlocksPct>?<NumBlocksPct>46</NumBlocksPct>?' ${prefix}/Calpont/etc/Calpont.xml
 
 # start the system
+export SLOWSTART=1
 ${prefix}/Calpont/bin/infinidb start
 
 #really start MySQL

@@ -67,7 +67,7 @@ const CALPONT_OID SNAME_OID [] = { 1, 3, 6, 1, 4, 1, 2021, 991, 21 };
 const CALPONT_OID PNAME_OID [] = { 1, 3, 6, 1, 4, 1, 2021, 991, 22 };
 const CALPONT_OID PID_OID [] = { 1, 3, 6, 1, 4, 1, 2021, 991, 23 };
 const CALPONT_OID TID_OID [] = { 1, 3, 6, 1, 4, 1, 2021, 991, 24 };
-const bool CALPONT_SNMP_DEBUG = false;
+const bool DEBUG = false;
 const uint16_t INVALID_ALARM_ID = 0;
 }
 

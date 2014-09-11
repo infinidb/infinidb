@@ -104,7 +104,7 @@ else
 	AC_SUBST([idb_cflags],['-g0 -O3 -fno-strict-aliasing -Wall'])
 	AC_MSG_RESULT(no)
 fi
-AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,/usr/local/Calpont/lib -Wl,--no-as-needed -Wl,--add-needed'])
+AC_SUBST([idb_ldflags],['-Wl,--rpath -Wl,/usr/local/Calpont/lib'])
 
 AC_MSG_CHECKING(for CPU architecture)
 uname=`uname -m`
@@ -129,11 +129,11 @@ AC_SUBST([mibdir], ['${prefix}/Calpont/share/snmp/mibs'])
 
 AC_SUBST([netsnmp_libs], [' '])
 
-AC_SUBST([idb_common_libs], ['-lmessageqcpp -lloggingcpp -lconfigcpp -lidbboot -lboost_idb -lxml2 -lpthread -lrt'])
+AC_SUBST([idb_common_libs], ['-lmessageqcpp -lloggingcpp -lconfigcpp -lboost_idb -lxml2 -lpthread -lrt'])
 AC_SUBST([idb_oam_libs], ['-loamcpp -lsnmpmanager ${netsnmp_libs}'])
-AC_SUBST([idb_brm_libs], ['-lbrm -lrwlock -lcacheutils ${idb_oam_libs} ${idb_common_libs}'])
-AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon -lmysqlcl_idb -lquerystats ${idb_brm_libs}'])
-AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcacheutils ${idb_exec_libs}'])
+AC_SUBST([idb_brm_libs], ['-lbrm -lrwlock ${idb_common_libs}'])
+AC_SUBST([idb_exec_libs], ['-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon ${idb_brm_libs} ${idb_oam_libs}'])
+AC_SUBST([idb_write_libs], ['-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -ldm -lcacheutils ${idb_exec_libs}'])
 AC_SUBST([idb_common_includes], ['-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'])
 AC_SUBST([idb_common_ldflags], ['-L${prefix}/Calpont/lib -L/usr/local/lib'])
 
@@ -141,7 +141,6 @@ AC_CONFIG_FILES([
 	Makefile
 	utils/Makefile
 	utils/boost_idb/Makefile
-	utils/startup/Makefile
 	utils/common/Makefile
 	utils/configcpp/Makefile
 	utils/loggingcpp/Makefile
@@ -155,10 +154,6 @@ AC_CONFIG_FILES([
 	utils/multicast/Makefile
 	utils/funcexp/Makefile
 	utils/compress/Makefile
-	utils/ddlcleanup/Makefile
-	utils/batchloader/Makefile
-	utils/mysqlcl_idb/Makefile
-	utils/querystats/Makefile
 	exemgr/Makefile
 	ddlproc/Makefile
 	dbcon/Makefile
@@ -170,6 +165,7 @@ AC_CONFIG_FILES([
 	dbcon/joblist/Makefile
 	dbcon/mysql/Makefile
 	dbcon/sm/Makefile
+	dmlib/Makefile
 	dmlproc/Makefile
 	oam/Makefile
 	oam/etc/Makefile
@@ -208,10 +204,5 @@ AC_CONFIG_FILES([
 	writeengine/wrapper/Makefile
 	writeengine/xml/Makefile
 	writeengine/bulk/Makefile
-	writeengine/client/Makefile
-	writeengine/splitter/Makefile
-	writeengine/server/Makefile
-	writeengine/cpimport/Makefile
-	writeengine/redistribute/Makefile
 ])
 AC_OUTPUT

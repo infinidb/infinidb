@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: createtable.cpp 8793 2012-08-07 20:13:39Z dhall $
+*   $Id: createtable.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -44,10 +44,7 @@ namespace ddlpackage {
 		
 	CreateTableStatement::~CreateTableStatement()
 	{
-		if (fTableDef)
-		{
-			delete fTableDef;
-		}
+		delete fTableDef;
 	}
 
 	/** \brief Put to ostream. */

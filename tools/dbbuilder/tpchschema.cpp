@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: tpchschema.cpp 1763 2012-04-04 18:20:36Z rdempsey $
+* $Id: tpchschema.cpp 1404 2011-02-08 14:36:35Z rdempsey $
 *
 ******************************************************************************************/
 #include <boost/timer.hpp>
@@ -379,7 +379,7 @@ void TpchSchema::buildTable(string createText)
 
             ddlpackage::SqlStatement &stmt = *ptree.fList[0];
             ddlpackageprocessor::CreateTableProcessor::DDLResult result;
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+			CalpontSystemCatalog* systemCatalogPtr =
         		CalpontSystemCatalog::makeCalpontSystemCatalog( 1 );
             result  = processor.processPackage(dynamic_cast<ddlpackage::CreateTableStatement&>(stmt));
             systemCatalogPtr->removeCalpontSystemCatalog(1);
@@ -413,7 +413,7 @@ void TpchSchema::createindex(string createText)
 
                 SqlStatement &stmt = *ptree.fList[0];
                 CreateIndexProcessor::DDLResult result;
-				boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+				CalpontSystemCatalog* systemCatalogPtr =
         		CalpontSystemCatalog::makeCalpontSystemCatalog( 1 );
                 result = processor.processPackage(dynamic_cast<CreateIndexStatement&>(stmt));
                 systemCatalogPtr->removeCalpontSystemCatalog(1);

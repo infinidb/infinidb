@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: lbidlist.h 8729 2012-07-22 19:29:01Z dcathey $
+*   $Id: lbidlist.h 9142 2012-12-11 22:18:06Z pleblanc $
 *
 *
 ***********************************************************************/
@@ -54,7 +54,6 @@ struct MinMaxPartition
 	int64_t max;
 	int64_t seq;
 	int     isValid;
-	uint32_t blksScanned;
 };
 
 /** @brief class LBIDList

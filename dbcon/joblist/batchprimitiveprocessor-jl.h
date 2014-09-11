@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor-jl.h 8774 2012-07-31 21:00:09Z pleblanc $
+// $Id: batchprimitiveprocessor-jl.h 8765 2012-07-30 17:29:49Z pleblanc $
 // C++ Interface: batchprimitiveprocessor
 //
 // Description: 
@@ -38,11 +38,10 @@
 
 #include "primitivemsg.h"
 #include "serializeable.h"
-#include "primitivestep.h"
+#include "jobstep.h"
 #include "brm.h"
 #include "command-jl.h"
 #include "resourcemanager.h"
-//#include "tableband.h"
 
 namespace joblist
 {
@@ -79,7 +78,7 @@ public:
 	inline uint getRidCount() { return ridCount; }
 
 	void addFilterStep(const pColScanStep &);
-	void addFilterStep(const pColScanStep &, std::vector<BRM::LBID_t> lastScannedLBID);
+	void addFilterStep(const pColScanStep &, BRM::LBID_t lastScannedLBID);
 	void addFilterStep(const pColStep &);
 	void addFilterStep(const pDictionaryStep &);
 	void addFilterStep(const FilterStep &);
@@ -95,22 +94,22 @@ public:
 	bool nextJoinerMsg(messageqcpp::ByteStream &);
 
 	/* Call this one last */
-	// void addDeliveryStep(const DeliveryStep &);
+	void addDeliveryStep(const DeliveryStep &);
 
 	/* At runtime, feed input here */
-	void addElementType(const ElementType &, uint dbroot);
-	void addElementType(const StringElementType &, uint dbroot);
+	void addElementType(const ElementType &);
+	void addElementType(const StringElementType &);
 	void setRowGroupData(const rowgroup::RowGroup &);
 
-	void runBPP(messageqcpp::ByteStream &, uint32_t pmNum);
+	void runBPP(messageqcpp::ByteStream &, const uint16_t firstExtentDBRoot);
 	void abortProcessing(messageqcpp::ByteStream *);
 
 	/* After serializing a BPP object, reset it and it's ready for more input */
 	void reset();
 
 	/* The JobStep calls these to initialize a BPP that starts with a column scan */
-	void setLBID(uint64_t lbid, uint dbroot = 1);
-	inline void setCount(uint16_t c) { idbassert(c > 0); count = c; }
+	void setLBID(uint64_t lbid);
+	inline void setCount(uint16_t c) { assert(c > 0); count = c; }
 
 	/* Turn a ByteStream into ElementTypes or StringElementTypes */
 	void getElementTypes(messageqcpp::ByteStream &in, std::vector<ElementType> *out,
@@ -122,9 +121,9 @@ public:
 		int64_t *min, int64_t *max, uint32_t *cachedIO, uint32_t *physIO, 
 		uint32_t *touchedBlocks) const;
 	/* (returns the row count) */
-//	uint getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
-//		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
-//		uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const;
+	uint getTableBand(messageqcpp::ByteStream &in, messageqcpp::ByteStream *out,
+		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
+		uint32_t *cachedIO, uint32_t *physIO, uint32_t *touchedBlocks) const;
 	void getTuples(messageqcpp::ByteStream &in, std::vector<TupleType> *out,
 		bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max,
 		uint32_t *cachedIO,	uint32_t *physIO, uint32_t *touchedBlocks) const;
@@ -137,7 +136,7 @@ public:
 	void setStatus(uint16_t s) {  status = s; }
 	uint16_t  getStatus() const { return status; }
 	void runErrorBPP(messageqcpp::ByteStream &);
-//	uint getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
+	uint getErrorTableBand(uint16_t error, messageqcpp::ByteStream *out);
 	boost::shared_array<uint8_t> getErrorRowGroupData(uint16_t error) const;
 
 	// @bug 1098
@@ -176,17 +175,13 @@ public:
 	/* This fcn determines whether or not the containing TBPS obj will process results
 	from a join or put the RG data right in the output datalist. */
 	bool pmSendsFinalResult() const
-	{
-		//isn't aware of UM-only joins.  Function name is a bit misleading.
-		return (tJoiners.size() == 0 || (PMJoinerCount > 0 && (fe2 || aggregatorPM)));
+	{ 
+		return ((sendTupleJoinRowGroupData && tJoiners.size() > 0 && PMJoinerCount > 0) || tJoiners.size() == 0); 
 	}
 	const std::string toMiniString() const;
 
-	void priority(uint p) { _priority = p; };
-	uint priority() { return _priority; }
-
 private:
-	void setLBIDForScan(uint64_t rid, uint dbroot);
+	void setLBIDForScan(uint64_t rid);
 
 	BPSOutputType ot;
 
@@ -223,7 +218,7 @@ private:
 	bool needRidsAtDelivery;
 	uint8_t ridMap;
 
-//	TableBand templateTB;
+	TableBand templateTB;
 	uint32_t tableOID;
 	boost::scoped_array<int> tablePositions;
 	uint tableColumnCount;
@@ -277,10 +272,7 @@ private:
 	rowgroup::RowGroup joinFERG;
 
 	unsigned fJoinerChunkSize;
-	uint dbRoot;
 	bool hasSmallOuterJoin;
-
-	uint _priority;
 
 	friend class CommandJL;
 	friend class ColumnCommandJL;

@@ -77,36 +77,45 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libjoblist_la_LIBADD =
-am_libjoblist_la_OBJECTS = libjoblist_la-anydatalist.lo \
+am_libjoblist_la_OBJECTS = libjoblist_la-aggregatefilterstep.lo \
+	libjoblist_la-aggregator.lo libjoblist_la-anydatalist.lo \
 	libjoblist_la-batchprimitiveprocessor-jl.lo \
+	libjoblist_la-batchprimitivestep.lo \
+	libjoblist_la-bucketreuse.lo libjoblist_la-bucketreusestep.lo \
 	libjoblist_la-columncommand-jl.lo libjoblist_la-command-jl.lo \
-	libjoblist_la-crossenginestep.lo libjoblist_la-dictstep-jl.lo \
+	libjoblist_la-deliverystep.lo libjoblist_la-deliverywsdl.lo \
+	libjoblist_la-dictstep-jl.lo \
 	libjoblist_la-distributedenginecomm.lo \
 	libjoblist_la-elementtype.lo libjoblist_la-expressionstep.lo \
-	libjoblist_la-filtercommand-jl.lo libjoblist_la-filterstep.lo \
-	libjoblist_la-groupconcat.lo libjoblist_la-jl_logger.lo \
-	libjoblist_la-jlf_common.lo \
+	libjoblist_la-filtercommand-jl.lo \
+	libjoblist_la-filteroperation.lo libjoblist_la-filterstep.lo \
+	libjoblist_la-groupconcat.lo libjoblist_la-hashjoin.lo \
+	libjoblist_la-jl_logger.lo libjoblist_la-jlf_common.lo \
 	libjoblist_la-jlf_execplantojoblist.lo \
 	libjoblist_la-jlf_graphics.lo \
 	libjoblist_la-jlf_tuplejoblist.lo \
 	libjoblist_la-jlf_subquery.lo libjoblist_la-joblist.lo \
 	libjoblist_la-joblistfactory.lo libjoblist_la-jobstep.lo \
-	libjoblist_la-jobstepassociation.lo libjoblist_la-lbidlist.lo \
+	libjoblist_la-jobstepassociation.lo \
+	libjoblist_la-largehashjoin.lo libjoblist_la-lbidlist.lo \
 	libjoblist_la-limitedorderby.lo \
 	libjoblist_la-passthrucommand-jl.lo \
 	libjoblist_la-passthrustep.lo libjoblist_la-pcolscan.lo \
 	libjoblist_la-pcolstep.lo libjoblist_la-pdictionary.lo \
 	libjoblist_la-pdictionaryscan.lo libjoblist_la-primitivemsg.lo \
+	libjoblist_la-profiling.lo libjoblist_la-reducestep.lo \
 	libjoblist_la-resourcedistributor.lo \
 	libjoblist_la-resourcemanager.lo libjoblist_la-rowestimator.lo \
 	libjoblist_la-rtscommand-jl.lo libjoblist_la-subquerystep.lo \
 	libjoblist_la-subquerytransformer.lo \
-	libjoblist_la-tablecolumn.lo libjoblist_la-timestamp.lo \
-	libjoblist_la-tuple-bps.lo libjoblist_la-tupleaggregatestep.lo \
+	libjoblist_la-tableband.lo libjoblist_la-tablecolumn.lo \
+	libjoblist_la-timestamp.lo libjoblist_la-tuple-bps.lo \
+	libjoblist_la-tupleaggregatestep.lo \
 	libjoblist_la-tupleannexstep.lo \
 	libjoblist_la-tupleconstantstep.lo \
 	libjoblist_la-tuplehashjoin.lo \
 	libjoblist_la-tuplehavingstep.lo libjoblist_la-tupleunion.lo \
+	libjoblist_la-tuplewsdl.lo libjoblist_la-unionstep.lo \
 	libjoblist_la-unique32generator.lo \
 	libjoblist_la-virtualtable.lo
 libjoblist_la_OBJECTS = $(am_libjoblist_la_OBJECTS)
@@ -256,21 +265,28 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libjoblist.la
-libjoblist_la_CPPFLAGS = -I../../mysql/include -I../../mysql/sql -I../../mysql/regex $(AM_CPPFLAGS)
 libjoblist_la_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 libjoblist_la_SOURCES = \
+        aggregatefilterstep.cpp \
+        aggregator.cpp \
         anydatalist.cpp \
         batchprimitiveprocessor-jl.cpp \
+        batchprimitivestep.cpp \
+        bucketreuse.cpp \
+        bucketreusestep.cpp \
         columncommand-jl.cpp \
         command-jl.cpp \
-        crossenginestep.cpp \
+        deliverystep.cpp \
+        deliverywsdl.cpp \
         dictstep-jl.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \
         filtercommand-jl.cpp \
+        filteroperation.cpp \
         filterstep.cpp \
         groupconcat.cpp \
+        hashjoin.cpp \
         jl_logger.cpp \
         jlf_common.cpp \
         jlf_execplantojoblist.cpp \
@@ -281,6 +297,7 @@ libjoblist_la_SOURCES = \
         joblistfactory.cpp \
         jobstep.cpp \
         jobstepassociation.cpp \
+        largehashjoin.cpp \
         lbidlist.cpp \
         limitedorderby.cpp \
         passthrucommand-jl.cpp \
@@ -290,12 +307,15 @@ libjoblist_la_SOURCES = \
         pdictionary.cpp \
         pdictionaryscan.cpp \
         primitivemsg.cpp \
+        profiling.cpp \
+        reducestep.cpp  \
         resourcedistributor.cpp \
         resourcemanager.cpp \
         rowestimator.cpp \
         rtscommand-jl.cpp \
         subquerystep.cpp \
         subquerytransformer.cpp \
+        tableband.cpp \
         tablecolumn.cpp \
         timestamp.cpp \
         tuple-bps.cpp \
@@ -305,17 +325,25 @@ libjoblist_la_SOURCES = \
         tuplehashjoin.cpp \
         tuplehavingstep.cpp \
         tupleunion.cpp \
+        tuplewsdl.cpp \
+        unionstep.cpp \
         unique32generator.cpp \
         virtualtable.cpp
 
 include_HEADERS = \
+        aggregator.h \
+        batchprimitiveprocessor-jl.h \
+        bdlwrapper.h \
         bpp-jl.h \
-        datalist.h \
-        datalistimpl.h \
+        bucketreuse.h \
+        columncommand-jl.h \
+        command-jl.h \
+        deliverywsdl.h \
+        dictstep-jl.h \
         distributedenginecomm.h \
-        elementcompression.h \
         elementtype.h \
-        fifo.h \
+        filtercommand-jl.h \
+        filteroperation.h \
         groupconcat.h \
         jl_logger.h \
         joblist.h \
@@ -324,14 +352,30 @@ include_HEADERS = \
         jobstep.h \
         lbidlist.h \
         limitedorderby.h \
+        passthrucommand-jl.h \
         primitivemsg.h \
+        profiling.h \
         resourcedistributor.h \
         resourcemanager.h \
+        rowestimator.h \
         rtscommand-jl.h \
+        tableband.h \
         tablecolumn.h \
         threadsafequeue.h \
         timeset.h \
         timestamp.h \
+        bandeddl.h \
+        bucketdl.h \
+        constantdatalist.h \
+        datalist.h \
+        datalistimpl.h \
+        elementcompression.h \
+        fifo.h \
+        largedatalist.h \
+        swsdl.h \
+        tuplewsdl.h \
+        wsdl.h \
+        zdl.h \
         unique32generator.h
 
 all: all-am
@@ -403,18 +447,26 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-aggregatefilterstep.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-aggregator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-anydatalist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-batchprimitivestep.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-bucketreuse.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-bucketreusestep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-columncommand-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-command-jl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-crossenginestep.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-deliverystep.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-deliverywsdl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-dictstep-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-distributedenginecomm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-elementtype.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-expressionstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-filtercommand-jl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-filteroperation.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-filterstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-groupconcat.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-hashjoin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-jl_logger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-jlf_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Plo@am__quote@
@@ -425,6 +477,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-joblistfactory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-jobstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-jobstepassociation.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-largehashjoin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-lbidlist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-limitedorderby.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-passthrucommand-jl.Plo@am__quote@
@@ -434,12 +487,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-pdictionary.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-pdictionaryscan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-primitivemsg.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-profiling.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-reducestep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-resourcedistributor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-resourcemanager.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-rowestimator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-rtscommand-jl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-subquerystep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-subquerytransformer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tableband.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tablecolumn.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-timestamp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tuple-bps.Plo@am__quote@
@@ -449,6 +505,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tuplehashjoin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tuplehavingstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tupleunion.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-tuplewsdl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-unionstep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-unique32generator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjoblist_la-virtualtable.Plo@am__quote@
 
@@ -473,341 +531,439 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
+libjoblist_la-aggregatefilterstep.lo: aggregatefilterstep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-aggregatefilterstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-aggregatefilterstep.Tpo" -c -o libjoblist_la-aggregatefilterstep.lo `test -f 'aggregatefilterstep.cpp' || echo '$(srcdir)/'`aggregatefilterstep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-aggregatefilterstep.Tpo" "$(DEPDIR)/libjoblist_la-aggregatefilterstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-aggregatefilterstep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='aggregatefilterstep.cpp' object='libjoblist_la-aggregatefilterstep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-aggregatefilterstep.lo `test -f 'aggregatefilterstep.cpp' || echo '$(srcdir)/'`aggregatefilterstep.cpp
+
+libjoblist_la-aggregator.lo: aggregator.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-aggregator.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-aggregator.Tpo" -c -o libjoblist_la-aggregator.lo `test -f 'aggregator.cpp' || echo '$(srcdir)/'`aggregator.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-aggregator.Tpo" "$(DEPDIR)/libjoblist_la-aggregator.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-aggregator.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='aggregator.cpp' object='libjoblist_la-aggregator.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-aggregator.lo `test -f 'aggregator.cpp' || echo '$(srcdir)/'`aggregator.cpp
+
 libjoblist_la-anydatalist.lo: anydatalist.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-anydatalist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-anydatalist.Tpo" -c -o libjoblist_la-anydatalist.lo `test -f 'anydatalist.cpp' || echo '$(srcdir)/'`anydatalist.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-anydatalist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-anydatalist.Tpo" -c -o libjoblist_la-anydatalist.lo `test -f 'anydatalist.cpp' || echo '$(srcdir)/'`anydatalist.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-anydatalist.Tpo" "$(DEPDIR)/libjoblist_la-anydatalist.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-anydatalist.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='anydatalist.cpp' object='libjoblist_la-anydatalist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-anydatalist.lo `test -f 'anydatalist.cpp' || echo '$(srcdir)/'`anydatalist.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-anydatalist.lo `test -f 'anydatalist.cpp' || echo '$(srcdir)/'`anydatalist.cpp
 
 libjoblist_la-batchprimitiveprocessor-jl.lo: batchprimitiveprocessor-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-batchprimitiveprocessor-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Tpo" -c -o libjoblist_la-batchprimitiveprocessor-jl.lo `test -f 'batchprimitiveprocessor-jl.cpp' || echo '$(srcdir)/'`batchprimitiveprocessor-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-batchprimitiveprocessor-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Tpo" -c -o libjoblist_la-batchprimitiveprocessor-jl.lo `test -f 'batchprimitiveprocessor-jl.cpp' || echo '$(srcdir)/'`batchprimitiveprocessor-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Tpo" "$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-batchprimitiveprocessor-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='batchprimitiveprocessor-jl.cpp' object='libjoblist_la-batchprimitiveprocessor-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-batchprimitiveprocessor-jl.lo `test -f 'batchprimitiveprocessor-jl.cpp' || echo '$(srcdir)/'`batchprimitiveprocessor-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-batchprimitiveprocessor-jl.lo `test -f 'batchprimitiveprocessor-jl.cpp' || echo '$(srcdir)/'`batchprimitiveprocessor-jl.cpp
+
+libjoblist_la-batchprimitivestep.lo: batchprimitivestep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-batchprimitivestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-batchprimitivestep.Tpo" -c -o libjoblist_la-batchprimitivestep.lo `test -f 'batchprimitivestep.cpp' || echo '$(srcdir)/'`batchprimitivestep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-batchprimitivestep.Tpo" "$(DEPDIR)/libjoblist_la-batchprimitivestep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-batchprimitivestep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='batchprimitivestep.cpp' object='libjoblist_la-batchprimitivestep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-batchprimitivestep.lo `test -f 'batchprimitivestep.cpp' || echo '$(srcdir)/'`batchprimitivestep.cpp
+
+libjoblist_la-bucketreuse.lo: bucketreuse.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-bucketreuse.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-bucketreuse.Tpo" -c -o libjoblist_la-bucketreuse.lo `test -f 'bucketreuse.cpp' || echo '$(srcdir)/'`bucketreuse.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-bucketreuse.Tpo" "$(DEPDIR)/libjoblist_la-bucketreuse.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-bucketreuse.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='bucketreuse.cpp' object='libjoblist_la-bucketreuse.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-bucketreuse.lo `test -f 'bucketreuse.cpp' || echo '$(srcdir)/'`bucketreuse.cpp
+
+libjoblist_la-bucketreusestep.lo: bucketreusestep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-bucketreusestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-bucketreusestep.Tpo" -c -o libjoblist_la-bucketreusestep.lo `test -f 'bucketreusestep.cpp' || echo '$(srcdir)/'`bucketreusestep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-bucketreusestep.Tpo" "$(DEPDIR)/libjoblist_la-bucketreusestep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-bucketreusestep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='bucketreusestep.cpp' object='libjoblist_la-bucketreusestep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-bucketreusestep.lo `test -f 'bucketreusestep.cpp' || echo '$(srcdir)/'`bucketreusestep.cpp
 
 libjoblist_la-columncommand-jl.lo: columncommand-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-columncommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-columncommand-jl.Tpo" -c -o libjoblist_la-columncommand-jl.lo `test -f 'columncommand-jl.cpp' || echo '$(srcdir)/'`columncommand-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-columncommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-columncommand-jl.Tpo" -c -o libjoblist_la-columncommand-jl.lo `test -f 'columncommand-jl.cpp' || echo '$(srcdir)/'`columncommand-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-columncommand-jl.Tpo" "$(DEPDIR)/libjoblist_la-columncommand-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-columncommand-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='columncommand-jl.cpp' object='libjoblist_la-columncommand-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-columncommand-jl.lo `test -f 'columncommand-jl.cpp' || echo '$(srcdir)/'`columncommand-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-columncommand-jl.lo `test -f 'columncommand-jl.cpp' || echo '$(srcdir)/'`columncommand-jl.cpp
 
 libjoblist_la-command-jl.lo: command-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-command-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-command-jl.Tpo" -c -o libjoblist_la-command-jl.lo `test -f 'command-jl.cpp' || echo '$(srcdir)/'`command-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-command-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-command-jl.Tpo" -c -o libjoblist_la-command-jl.lo `test -f 'command-jl.cpp' || echo '$(srcdir)/'`command-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-command-jl.Tpo" "$(DEPDIR)/libjoblist_la-command-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-command-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='command-jl.cpp' object='libjoblist_la-command-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-command-jl.lo `test -f 'command-jl.cpp' || echo '$(srcdir)/'`command-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-command-jl.lo `test -f 'command-jl.cpp' || echo '$(srcdir)/'`command-jl.cpp
 
-libjoblist_la-crossenginestep.lo: crossenginestep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-crossenginestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-crossenginestep.Tpo" -c -o libjoblist_la-crossenginestep.lo `test -f 'crossenginestep.cpp' || echo '$(srcdir)/'`crossenginestep.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-crossenginestep.Tpo" "$(DEPDIR)/libjoblist_la-crossenginestep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-crossenginestep.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='crossenginestep.cpp' object='libjoblist_la-crossenginestep.lo' libtool=yes @AMDEPBACKSLASH@
+libjoblist_la-deliverystep.lo: deliverystep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-deliverystep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-deliverystep.Tpo" -c -o libjoblist_la-deliverystep.lo `test -f 'deliverystep.cpp' || echo '$(srcdir)/'`deliverystep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-deliverystep.Tpo" "$(DEPDIR)/libjoblist_la-deliverystep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-deliverystep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='deliverystep.cpp' object='libjoblist_la-deliverystep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-crossenginestep.lo `test -f 'crossenginestep.cpp' || echo '$(srcdir)/'`crossenginestep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-deliverystep.lo `test -f 'deliverystep.cpp' || echo '$(srcdir)/'`deliverystep.cpp
+
+libjoblist_la-deliverywsdl.lo: deliverywsdl.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-deliverywsdl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-deliverywsdl.Tpo" -c -o libjoblist_la-deliverywsdl.lo `test -f 'deliverywsdl.cpp' || echo '$(srcdir)/'`deliverywsdl.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-deliverywsdl.Tpo" "$(DEPDIR)/libjoblist_la-deliverywsdl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-deliverywsdl.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='deliverywsdl.cpp' object='libjoblist_la-deliverywsdl.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-deliverywsdl.lo `test -f 'deliverywsdl.cpp' || echo '$(srcdir)/'`deliverywsdl.cpp
 
 libjoblist_la-dictstep-jl.lo: dictstep-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-dictstep-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-dictstep-jl.Tpo" -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-dictstep-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-dictstep-jl.Tpo" -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-dictstep-jl.Tpo" "$(DEPDIR)/libjoblist_la-dictstep-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-dictstep-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='dictstep-jl.cpp' object='libjoblist_la-dictstep-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-dictstep-jl.lo `test -f 'dictstep-jl.cpp' || echo '$(srcdir)/'`dictstep-jl.cpp
 
 libjoblist_la-distributedenginecomm.lo: distributedenginecomm.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-distributedenginecomm.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo" -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-distributedenginecomm.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo" -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo" "$(DEPDIR)/libjoblist_la-distributedenginecomm.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-distributedenginecomm.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='distributedenginecomm.cpp' object='libjoblist_la-distributedenginecomm.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-distributedenginecomm.lo `test -f 'distributedenginecomm.cpp' || echo '$(srcdir)/'`distributedenginecomm.cpp
 
 libjoblist_la-elementtype.lo: elementtype.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-elementtype.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-elementtype.Tpo" -c -o libjoblist_la-elementtype.lo `test -f 'elementtype.cpp' || echo '$(srcdir)/'`elementtype.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-elementtype.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-elementtype.Tpo" -c -o libjoblist_la-elementtype.lo `test -f 'elementtype.cpp' || echo '$(srcdir)/'`elementtype.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-elementtype.Tpo" "$(DEPDIR)/libjoblist_la-elementtype.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-elementtype.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='elementtype.cpp' object='libjoblist_la-elementtype.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-elementtype.lo `test -f 'elementtype.cpp' || echo '$(srcdir)/'`elementtype.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-elementtype.lo `test -f 'elementtype.cpp' || echo '$(srcdir)/'`elementtype.cpp
 
 libjoblist_la-expressionstep.lo: expressionstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-expressionstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-expressionstep.Tpo" -c -o libjoblist_la-expressionstep.lo `test -f 'expressionstep.cpp' || echo '$(srcdir)/'`expressionstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-expressionstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-expressionstep.Tpo" -c -o libjoblist_la-expressionstep.lo `test -f 'expressionstep.cpp' || echo '$(srcdir)/'`expressionstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-expressionstep.Tpo" "$(DEPDIR)/libjoblist_la-expressionstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-expressionstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='expressionstep.cpp' object='libjoblist_la-expressionstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-expressionstep.lo `test -f 'expressionstep.cpp' || echo '$(srcdir)/'`expressionstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-expressionstep.lo `test -f 'expressionstep.cpp' || echo '$(srcdir)/'`expressionstep.cpp
 
 libjoblist_la-filtercommand-jl.lo: filtercommand-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-filtercommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-filtercommand-jl.Tpo" -c -o libjoblist_la-filtercommand-jl.lo `test -f 'filtercommand-jl.cpp' || echo '$(srcdir)/'`filtercommand-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-filtercommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-filtercommand-jl.Tpo" -c -o libjoblist_la-filtercommand-jl.lo `test -f 'filtercommand-jl.cpp' || echo '$(srcdir)/'`filtercommand-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-filtercommand-jl.Tpo" "$(DEPDIR)/libjoblist_la-filtercommand-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-filtercommand-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='filtercommand-jl.cpp' object='libjoblist_la-filtercommand-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-filtercommand-jl.lo `test -f 'filtercommand-jl.cpp' || echo '$(srcdir)/'`filtercommand-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-filtercommand-jl.lo `test -f 'filtercommand-jl.cpp' || echo '$(srcdir)/'`filtercommand-jl.cpp
+
+libjoblist_la-filteroperation.lo: filteroperation.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-filteroperation.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-filteroperation.Tpo" -c -o libjoblist_la-filteroperation.lo `test -f 'filteroperation.cpp' || echo '$(srcdir)/'`filteroperation.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-filteroperation.Tpo" "$(DEPDIR)/libjoblist_la-filteroperation.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-filteroperation.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='filteroperation.cpp' object='libjoblist_la-filteroperation.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-filteroperation.lo `test -f 'filteroperation.cpp' || echo '$(srcdir)/'`filteroperation.cpp
 
 libjoblist_la-filterstep.lo: filterstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-filterstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-filterstep.Tpo" -c -o libjoblist_la-filterstep.lo `test -f 'filterstep.cpp' || echo '$(srcdir)/'`filterstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-filterstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-filterstep.Tpo" -c -o libjoblist_la-filterstep.lo `test -f 'filterstep.cpp' || echo '$(srcdir)/'`filterstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-filterstep.Tpo" "$(DEPDIR)/libjoblist_la-filterstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-filterstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='filterstep.cpp' object='libjoblist_la-filterstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-filterstep.lo `test -f 'filterstep.cpp' || echo '$(srcdir)/'`filterstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-filterstep.lo `test -f 'filterstep.cpp' || echo '$(srcdir)/'`filterstep.cpp
 
 libjoblist_la-groupconcat.lo: groupconcat.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-groupconcat.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-groupconcat.Tpo" -c -o libjoblist_la-groupconcat.lo `test -f 'groupconcat.cpp' || echo '$(srcdir)/'`groupconcat.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-groupconcat.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-groupconcat.Tpo" -c -o libjoblist_la-groupconcat.lo `test -f 'groupconcat.cpp' || echo '$(srcdir)/'`groupconcat.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-groupconcat.Tpo" "$(DEPDIR)/libjoblist_la-groupconcat.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-groupconcat.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='groupconcat.cpp' object='libjoblist_la-groupconcat.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-groupconcat.lo `test -f 'groupconcat.cpp' || echo '$(srcdir)/'`groupconcat.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-groupconcat.lo `test -f 'groupconcat.cpp' || echo '$(srcdir)/'`groupconcat.cpp
+
+libjoblist_la-hashjoin.lo: hashjoin.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-hashjoin.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-hashjoin.Tpo" -c -o libjoblist_la-hashjoin.lo `test -f 'hashjoin.cpp' || echo '$(srcdir)/'`hashjoin.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-hashjoin.Tpo" "$(DEPDIR)/libjoblist_la-hashjoin.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-hashjoin.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='hashjoin.cpp' object='libjoblist_la-hashjoin.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-hashjoin.lo `test -f 'hashjoin.cpp' || echo '$(srcdir)/'`hashjoin.cpp
 
 libjoblist_la-jl_logger.lo: jl_logger.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jl_logger.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jl_logger.Tpo" -c -o libjoblist_la-jl_logger.lo `test -f 'jl_logger.cpp' || echo '$(srcdir)/'`jl_logger.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jl_logger.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jl_logger.Tpo" -c -o libjoblist_la-jl_logger.lo `test -f 'jl_logger.cpp' || echo '$(srcdir)/'`jl_logger.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jl_logger.Tpo" "$(DEPDIR)/libjoblist_la-jl_logger.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jl_logger.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jl_logger.cpp' object='libjoblist_la-jl_logger.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jl_logger.lo `test -f 'jl_logger.cpp' || echo '$(srcdir)/'`jl_logger.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jl_logger.lo `test -f 'jl_logger.cpp' || echo '$(srcdir)/'`jl_logger.cpp
 
 libjoblist_la-jlf_common.lo: jlf_common.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_common.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_common.Tpo" -c -o libjoblist_la-jlf_common.lo `test -f 'jlf_common.cpp' || echo '$(srcdir)/'`jlf_common.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_common.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_common.Tpo" -c -o libjoblist_la-jlf_common.lo `test -f 'jlf_common.cpp' || echo '$(srcdir)/'`jlf_common.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jlf_common.Tpo" "$(DEPDIR)/libjoblist_la-jlf_common.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jlf_common.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jlf_common.cpp' object='libjoblist_la-jlf_common.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_common.lo `test -f 'jlf_common.cpp' || echo '$(srcdir)/'`jlf_common.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_common.lo `test -f 'jlf_common.cpp' || echo '$(srcdir)/'`jlf_common.cpp
 
 libjoblist_la-jlf_execplantojoblist.lo: jlf_execplantojoblist.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_execplantojoblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Tpo" -c -o libjoblist_la-jlf_execplantojoblist.lo `test -f 'jlf_execplantojoblist.cpp' || echo '$(srcdir)/'`jlf_execplantojoblist.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_execplantojoblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Tpo" -c -o libjoblist_la-jlf_execplantojoblist.lo `test -f 'jlf_execplantojoblist.cpp' || echo '$(srcdir)/'`jlf_execplantojoblist.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Tpo" "$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jlf_execplantojoblist.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jlf_execplantojoblist.cpp' object='libjoblist_la-jlf_execplantojoblist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_execplantojoblist.lo `test -f 'jlf_execplantojoblist.cpp' || echo '$(srcdir)/'`jlf_execplantojoblist.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_execplantojoblist.lo `test -f 'jlf_execplantojoblist.cpp' || echo '$(srcdir)/'`jlf_execplantojoblist.cpp
 
 libjoblist_la-jlf_graphics.lo: jlf_graphics.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_graphics.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_graphics.Tpo" -c -o libjoblist_la-jlf_graphics.lo `test -f 'jlf_graphics.cpp' || echo '$(srcdir)/'`jlf_graphics.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_graphics.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_graphics.Tpo" -c -o libjoblist_la-jlf_graphics.lo `test -f 'jlf_graphics.cpp' || echo '$(srcdir)/'`jlf_graphics.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jlf_graphics.Tpo" "$(DEPDIR)/libjoblist_la-jlf_graphics.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jlf_graphics.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jlf_graphics.cpp' object='libjoblist_la-jlf_graphics.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_graphics.lo `test -f 'jlf_graphics.cpp' || echo '$(srcdir)/'`jlf_graphics.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_graphics.lo `test -f 'jlf_graphics.cpp' || echo '$(srcdir)/'`jlf_graphics.cpp
 
 libjoblist_la-jlf_tuplejoblist.lo: jlf_tuplejoblist.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_tuplejoblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_tuplejoblist.Tpo" -c -o libjoblist_la-jlf_tuplejoblist.lo `test -f 'jlf_tuplejoblist.cpp' || echo '$(srcdir)/'`jlf_tuplejoblist.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_tuplejoblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_tuplejoblist.Tpo" -c -o libjoblist_la-jlf_tuplejoblist.lo `test -f 'jlf_tuplejoblist.cpp' || echo '$(srcdir)/'`jlf_tuplejoblist.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jlf_tuplejoblist.Tpo" "$(DEPDIR)/libjoblist_la-jlf_tuplejoblist.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jlf_tuplejoblist.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jlf_tuplejoblist.cpp' object='libjoblist_la-jlf_tuplejoblist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_tuplejoblist.lo `test -f 'jlf_tuplejoblist.cpp' || echo '$(srcdir)/'`jlf_tuplejoblist.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_tuplejoblist.lo `test -f 'jlf_tuplejoblist.cpp' || echo '$(srcdir)/'`jlf_tuplejoblist.cpp
 
 libjoblist_la-jlf_subquery.lo: jlf_subquery.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_subquery.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_subquery.Tpo" -c -o libjoblist_la-jlf_subquery.lo `test -f 'jlf_subquery.cpp' || echo '$(srcdir)/'`jlf_subquery.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jlf_subquery.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jlf_subquery.Tpo" -c -o libjoblist_la-jlf_subquery.lo `test -f 'jlf_subquery.cpp' || echo '$(srcdir)/'`jlf_subquery.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jlf_subquery.Tpo" "$(DEPDIR)/libjoblist_la-jlf_subquery.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jlf_subquery.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jlf_subquery.cpp' object='libjoblist_la-jlf_subquery.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_subquery.lo `test -f 'jlf_subquery.cpp' || echo '$(srcdir)/'`jlf_subquery.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jlf_subquery.lo `test -f 'jlf_subquery.cpp' || echo '$(srcdir)/'`jlf_subquery.cpp
 
 libjoblist_la-joblist.lo: joblist.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-joblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-joblist.Tpo" -c -o libjoblist_la-joblist.lo `test -f 'joblist.cpp' || echo '$(srcdir)/'`joblist.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-joblist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-joblist.Tpo" -c -o libjoblist_la-joblist.lo `test -f 'joblist.cpp' || echo '$(srcdir)/'`joblist.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-joblist.Tpo" "$(DEPDIR)/libjoblist_la-joblist.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-joblist.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='joblist.cpp' object='libjoblist_la-joblist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-joblist.lo `test -f 'joblist.cpp' || echo '$(srcdir)/'`joblist.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-joblist.lo `test -f 'joblist.cpp' || echo '$(srcdir)/'`joblist.cpp
 
 libjoblist_la-joblistfactory.lo: joblistfactory.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-joblistfactory.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-joblistfactory.Tpo" -c -o libjoblist_la-joblistfactory.lo `test -f 'joblistfactory.cpp' || echo '$(srcdir)/'`joblistfactory.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-joblistfactory.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-joblistfactory.Tpo" -c -o libjoblist_la-joblistfactory.lo `test -f 'joblistfactory.cpp' || echo '$(srcdir)/'`joblistfactory.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-joblistfactory.Tpo" "$(DEPDIR)/libjoblist_la-joblistfactory.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-joblistfactory.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='joblistfactory.cpp' object='libjoblist_la-joblistfactory.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-joblistfactory.lo `test -f 'joblistfactory.cpp' || echo '$(srcdir)/'`joblistfactory.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-joblistfactory.lo `test -f 'joblistfactory.cpp' || echo '$(srcdir)/'`joblistfactory.cpp
 
 libjoblist_la-jobstep.lo: jobstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jobstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jobstep.Tpo" -c -o libjoblist_la-jobstep.lo `test -f 'jobstep.cpp' || echo '$(srcdir)/'`jobstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jobstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jobstep.Tpo" -c -o libjoblist_la-jobstep.lo `test -f 'jobstep.cpp' || echo '$(srcdir)/'`jobstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jobstep.Tpo" "$(DEPDIR)/libjoblist_la-jobstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jobstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jobstep.cpp' object='libjoblist_la-jobstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jobstep.lo `test -f 'jobstep.cpp' || echo '$(srcdir)/'`jobstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jobstep.lo `test -f 'jobstep.cpp' || echo '$(srcdir)/'`jobstep.cpp
 
 libjoblist_la-jobstepassociation.lo: jobstepassociation.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jobstepassociation.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jobstepassociation.Tpo" -c -o libjoblist_la-jobstepassociation.lo `test -f 'jobstepassociation.cpp' || echo '$(srcdir)/'`jobstepassociation.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-jobstepassociation.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-jobstepassociation.Tpo" -c -o libjoblist_la-jobstepassociation.lo `test -f 'jobstepassociation.cpp' || echo '$(srcdir)/'`jobstepassociation.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-jobstepassociation.Tpo" "$(DEPDIR)/libjoblist_la-jobstepassociation.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-jobstepassociation.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='jobstepassociation.cpp' object='libjoblist_la-jobstepassociation.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jobstepassociation.lo `test -f 'jobstepassociation.cpp' || echo '$(srcdir)/'`jobstepassociation.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-jobstepassociation.lo `test -f 'jobstepassociation.cpp' || echo '$(srcdir)/'`jobstepassociation.cpp
+
+libjoblist_la-largehashjoin.lo: largehashjoin.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-largehashjoin.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-largehashjoin.Tpo" -c -o libjoblist_la-largehashjoin.lo `test -f 'largehashjoin.cpp' || echo '$(srcdir)/'`largehashjoin.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-largehashjoin.Tpo" "$(DEPDIR)/libjoblist_la-largehashjoin.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-largehashjoin.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='largehashjoin.cpp' object='libjoblist_la-largehashjoin.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-largehashjoin.lo `test -f 'largehashjoin.cpp' || echo '$(srcdir)/'`largehashjoin.cpp
 
 libjoblist_la-lbidlist.lo: lbidlist.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-lbidlist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-lbidlist.Tpo" -c -o libjoblist_la-lbidlist.lo `test -f 'lbidlist.cpp' || echo '$(srcdir)/'`lbidlist.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-lbidlist.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-lbidlist.Tpo" -c -o libjoblist_la-lbidlist.lo `test -f 'lbidlist.cpp' || echo '$(srcdir)/'`lbidlist.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-lbidlist.Tpo" "$(DEPDIR)/libjoblist_la-lbidlist.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-lbidlist.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='lbidlist.cpp' object='libjoblist_la-lbidlist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-lbidlist.lo `test -f 'lbidlist.cpp' || echo '$(srcdir)/'`lbidlist.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-lbidlist.lo `test -f 'lbidlist.cpp' || echo '$(srcdir)/'`lbidlist.cpp
 
 libjoblist_la-limitedorderby.lo: limitedorderby.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-limitedorderby.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-limitedorderby.Tpo" -c -o libjoblist_la-limitedorderby.lo `test -f 'limitedorderby.cpp' || echo '$(srcdir)/'`limitedorderby.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-limitedorderby.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-limitedorderby.Tpo" -c -o libjoblist_la-limitedorderby.lo `test -f 'limitedorderby.cpp' || echo '$(srcdir)/'`limitedorderby.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-limitedorderby.Tpo" "$(DEPDIR)/libjoblist_la-limitedorderby.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-limitedorderby.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='limitedorderby.cpp' object='libjoblist_la-limitedorderby.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-limitedorderby.lo `test -f 'limitedorderby.cpp' || echo '$(srcdir)/'`limitedorderby.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-limitedorderby.lo `test -f 'limitedorderby.cpp' || echo '$(srcdir)/'`limitedorderby.cpp
 
 libjoblist_la-passthrucommand-jl.lo: passthrucommand-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-passthrucommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-passthrucommand-jl.Tpo" -c -o libjoblist_la-passthrucommand-jl.lo `test -f 'passthrucommand-jl.cpp' || echo '$(srcdir)/'`passthrucommand-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-passthrucommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-passthrucommand-jl.Tpo" -c -o libjoblist_la-passthrucommand-jl.lo `test -f 'passthrucommand-jl.cpp' || echo '$(srcdir)/'`passthrucommand-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-passthrucommand-jl.Tpo" "$(DEPDIR)/libjoblist_la-passthrucommand-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-passthrucommand-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='passthrucommand-jl.cpp' object='libjoblist_la-passthrucommand-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-passthrucommand-jl.lo `test -f 'passthrucommand-jl.cpp' || echo '$(srcdir)/'`passthrucommand-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-passthrucommand-jl.lo `test -f 'passthrucommand-jl.cpp' || echo '$(srcdir)/'`passthrucommand-jl.cpp
 
 libjoblist_la-passthrustep.lo: passthrustep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-passthrustep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-passthrustep.Tpo" -c -o libjoblist_la-passthrustep.lo `test -f 'passthrustep.cpp' || echo '$(srcdir)/'`passthrustep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-passthrustep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-passthrustep.Tpo" -c -o libjoblist_la-passthrustep.lo `test -f 'passthrustep.cpp' || echo '$(srcdir)/'`passthrustep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-passthrustep.Tpo" "$(DEPDIR)/libjoblist_la-passthrustep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-passthrustep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='passthrustep.cpp' object='libjoblist_la-passthrustep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-passthrustep.lo `test -f 'passthrustep.cpp' || echo '$(srcdir)/'`passthrustep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-passthrustep.lo `test -f 'passthrustep.cpp' || echo '$(srcdir)/'`passthrustep.cpp
 
 libjoblist_la-pcolscan.lo: pcolscan.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pcolscan.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pcolscan.Tpo" -c -o libjoblist_la-pcolscan.lo `test -f 'pcolscan.cpp' || echo '$(srcdir)/'`pcolscan.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pcolscan.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pcolscan.Tpo" -c -o libjoblist_la-pcolscan.lo `test -f 'pcolscan.cpp' || echo '$(srcdir)/'`pcolscan.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-pcolscan.Tpo" "$(DEPDIR)/libjoblist_la-pcolscan.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-pcolscan.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pcolscan.cpp' object='libjoblist_la-pcolscan.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pcolscan.lo `test -f 'pcolscan.cpp' || echo '$(srcdir)/'`pcolscan.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pcolscan.lo `test -f 'pcolscan.cpp' || echo '$(srcdir)/'`pcolscan.cpp
 
 libjoblist_la-pcolstep.lo: pcolstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pcolstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pcolstep.Tpo" -c -o libjoblist_la-pcolstep.lo `test -f 'pcolstep.cpp' || echo '$(srcdir)/'`pcolstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pcolstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pcolstep.Tpo" -c -o libjoblist_la-pcolstep.lo `test -f 'pcolstep.cpp' || echo '$(srcdir)/'`pcolstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-pcolstep.Tpo" "$(DEPDIR)/libjoblist_la-pcolstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-pcolstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pcolstep.cpp' object='libjoblist_la-pcolstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pcolstep.lo `test -f 'pcolstep.cpp' || echo '$(srcdir)/'`pcolstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pcolstep.lo `test -f 'pcolstep.cpp' || echo '$(srcdir)/'`pcolstep.cpp
 
 libjoblist_la-pdictionary.lo: pdictionary.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pdictionary.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pdictionary.Tpo" -c -o libjoblist_la-pdictionary.lo `test -f 'pdictionary.cpp' || echo '$(srcdir)/'`pdictionary.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pdictionary.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pdictionary.Tpo" -c -o libjoblist_la-pdictionary.lo `test -f 'pdictionary.cpp' || echo '$(srcdir)/'`pdictionary.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-pdictionary.Tpo" "$(DEPDIR)/libjoblist_la-pdictionary.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-pdictionary.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pdictionary.cpp' object='libjoblist_la-pdictionary.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pdictionary.lo `test -f 'pdictionary.cpp' || echo '$(srcdir)/'`pdictionary.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pdictionary.lo `test -f 'pdictionary.cpp' || echo '$(srcdir)/'`pdictionary.cpp
 
 libjoblist_la-pdictionaryscan.lo: pdictionaryscan.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pdictionaryscan.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pdictionaryscan.Tpo" -c -o libjoblist_la-pdictionaryscan.lo `test -f 'pdictionaryscan.cpp' || echo '$(srcdir)/'`pdictionaryscan.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-pdictionaryscan.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-pdictionaryscan.Tpo" -c -o libjoblist_la-pdictionaryscan.lo `test -f 'pdictionaryscan.cpp' || echo '$(srcdir)/'`pdictionaryscan.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-pdictionaryscan.Tpo" "$(DEPDIR)/libjoblist_la-pdictionaryscan.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-pdictionaryscan.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='pdictionaryscan.cpp' object='libjoblist_la-pdictionaryscan.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pdictionaryscan.lo `test -f 'pdictionaryscan.cpp' || echo '$(srcdir)/'`pdictionaryscan.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-pdictionaryscan.lo `test -f 'pdictionaryscan.cpp' || echo '$(srcdir)/'`pdictionaryscan.cpp
 
 libjoblist_la-primitivemsg.lo: primitivemsg.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-primitivemsg.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-primitivemsg.Tpo" -c -o libjoblist_la-primitivemsg.lo `test -f 'primitivemsg.cpp' || echo '$(srcdir)/'`primitivemsg.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-primitivemsg.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-primitivemsg.Tpo" -c -o libjoblist_la-primitivemsg.lo `test -f 'primitivemsg.cpp' || echo '$(srcdir)/'`primitivemsg.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-primitivemsg.Tpo" "$(DEPDIR)/libjoblist_la-primitivemsg.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-primitivemsg.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='primitivemsg.cpp' object='libjoblist_la-primitivemsg.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-primitivemsg.lo `test -f 'primitivemsg.cpp' || echo '$(srcdir)/'`primitivemsg.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-primitivemsg.lo `test -f 'primitivemsg.cpp' || echo '$(srcdir)/'`primitivemsg.cpp
+
+libjoblist_la-profiling.lo: profiling.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-profiling.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-profiling.Tpo" -c -o libjoblist_la-profiling.lo `test -f 'profiling.cpp' || echo '$(srcdir)/'`profiling.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-profiling.Tpo" "$(DEPDIR)/libjoblist_la-profiling.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-profiling.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='profiling.cpp' object='libjoblist_la-profiling.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-profiling.lo `test -f 'profiling.cpp' || echo '$(srcdir)/'`profiling.cpp
+
+libjoblist_la-reducestep.lo: reducestep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-reducestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-reducestep.Tpo" -c -o libjoblist_la-reducestep.lo `test -f 'reducestep.cpp' || echo '$(srcdir)/'`reducestep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-reducestep.Tpo" "$(DEPDIR)/libjoblist_la-reducestep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-reducestep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='reducestep.cpp' object='libjoblist_la-reducestep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-reducestep.lo `test -f 'reducestep.cpp' || echo '$(srcdir)/'`reducestep.cpp
 
 libjoblist_la-resourcedistributor.lo: resourcedistributor.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-resourcedistributor.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo" -c -o libjoblist_la-resourcedistributor.lo `test -f 'resourcedistributor.cpp' || echo '$(srcdir)/'`resourcedistributor.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-resourcedistributor.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo" -c -o libjoblist_la-resourcedistributor.lo `test -f 'resourcedistributor.cpp' || echo '$(srcdir)/'`resourcedistributor.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo" "$(DEPDIR)/libjoblist_la-resourcedistributor.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-resourcedistributor.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='resourcedistributor.cpp' object='libjoblist_la-resourcedistributor.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-resourcedistributor.lo `test -f 'resourcedistributor.cpp' || echo '$(srcdir)/'`resourcedistributor.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-resourcedistributor.lo `test -f 'resourcedistributor.cpp' || echo '$(srcdir)/'`resourcedistributor.cpp
 
 libjoblist_la-resourcemanager.lo: resourcemanager.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-resourcemanager.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-resourcemanager.Tpo" -c -o libjoblist_la-resourcemanager.lo `test -f 'resourcemanager.cpp' || echo '$(srcdir)/'`resourcemanager.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-resourcemanager.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-resourcemanager.Tpo" -c -o libjoblist_la-resourcemanager.lo `test -f 'resourcemanager.cpp' || echo '$(srcdir)/'`resourcemanager.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-resourcemanager.Tpo" "$(DEPDIR)/libjoblist_la-resourcemanager.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-resourcemanager.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='resourcemanager.cpp' object='libjoblist_la-resourcemanager.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-resourcemanager.lo `test -f 'resourcemanager.cpp' || echo '$(srcdir)/'`resourcemanager.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-resourcemanager.lo `test -f 'resourcemanager.cpp' || echo '$(srcdir)/'`resourcemanager.cpp
 
 libjoblist_la-rowestimator.lo: rowestimator.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-rowestimator.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-rowestimator.Tpo" -c -o libjoblist_la-rowestimator.lo `test -f 'rowestimator.cpp' || echo '$(srcdir)/'`rowestimator.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-rowestimator.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-rowestimator.Tpo" -c -o libjoblist_la-rowestimator.lo `test -f 'rowestimator.cpp' || echo '$(srcdir)/'`rowestimator.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-rowestimator.Tpo" "$(DEPDIR)/libjoblist_la-rowestimator.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-rowestimator.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='rowestimator.cpp' object='libjoblist_la-rowestimator.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-rowestimator.lo `test -f 'rowestimator.cpp' || echo '$(srcdir)/'`rowestimator.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-rowestimator.lo `test -f 'rowestimator.cpp' || echo '$(srcdir)/'`rowestimator.cpp
 
 libjoblist_la-rtscommand-jl.lo: rtscommand-jl.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-rtscommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-rtscommand-jl.Tpo" -c -o libjoblist_la-rtscommand-jl.lo `test -f 'rtscommand-jl.cpp' || echo '$(srcdir)/'`rtscommand-jl.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-rtscommand-jl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-rtscommand-jl.Tpo" -c -o libjoblist_la-rtscommand-jl.lo `test -f 'rtscommand-jl.cpp' || echo '$(srcdir)/'`rtscommand-jl.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-rtscommand-jl.Tpo" "$(DEPDIR)/libjoblist_la-rtscommand-jl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-rtscommand-jl.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='rtscommand-jl.cpp' object='libjoblist_la-rtscommand-jl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-rtscommand-jl.lo `test -f 'rtscommand-jl.cpp' || echo '$(srcdir)/'`rtscommand-jl.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-rtscommand-jl.lo `test -f 'rtscommand-jl.cpp' || echo '$(srcdir)/'`rtscommand-jl.cpp
 
 libjoblist_la-subquerystep.lo: subquerystep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-subquerystep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-subquerystep.Tpo" -c -o libjoblist_la-subquerystep.lo `test -f 'subquerystep.cpp' || echo '$(srcdir)/'`subquerystep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-subquerystep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-subquerystep.Tpo" -c -o libjoblist_la-subquerystep.lo `test -f 'subquerystep.cpp' || echo '$(srcdir)/'`subquerystep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-subquerystep.Tpo" "$(DEPDIR)/libjoblist_la-subquerystep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-subquerystep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='subquerystep.cpp' object='libjoblist_la-subquerystep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-subquerystep.lo `test -f 'subquerystep.cpp' || echo '$(srcdir)/'`subquerystep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-subquerystep.lo `test -f 'subquerystep.cpp' || echo '$(srcdir)/'`subquerystep.cpp
 
 libjoblist_la-subquerytransformer.lo: subquerytransformer.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-subquerytransformer.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-subquerytransformer.Tpo" -c -o libjoblist_la-subquerytransformer.lo `test -f 'subquerytransformer.cpp' || echo '$(srcdir)/'`subquerytransformer.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-subquerytransformer.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-subquerytransformer.Tpo" -c -o libjoblist_la-subquerytransformer.lo `test -f 'subquerytransformer.cpp' || echo '$(srcdir)/'`subquerytransformer.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-subquerytransformer.Tpo" "$(DEPDIR)/libjoblist_la-subquerytransformer.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-subquerytransformer.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='subquerytransformer.cpp' object='libjoblist_la-subquerytransformer.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-subquerytransformer.lo `test -f 'subquerytransformer.cpp' || echo '$(srcdir)/'`subquerytransformer.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-subquerytransformer.lo `test -f 'subquerytransformer.cpp' || echo '$(srcdir)/'`subquerytransformer.cpp
+
+libjoblist_la-tableband.lo: tableband.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tableband.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tableband.Tpo" -c -o libjoblist_la-tableband.lo `test -f 'tableband.cpp' || echo '$(srcdir)/'`tableband.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tableband.Tpo" "$(DEPDIR)/libjoblist_la-tableband.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tableband.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tableband.cpp' object='libjoblist_la-tableband.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tableband.lo `test -f 'tableband.cpp' || echo '$(srcdir)/'`tableband.cpp
 
 libjoblist_la-tablecolumn.lo: tablecolumn.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tablecolumn.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tablecolumn.Tpo" -c -o libjoblist_la-tablecolumn.lo `test -f 'tablecolumn.cpp' || echo '$(srcdir)/'`tablecolumn.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tablecolumn.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tablecolumn.Tpo" -c -o libjoblist_la-tablecolumn.lo `test -f 'tablecolumn.cpp' || echo '$(srcdir)/'`tablecolumn.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tablecolumn.Tpo" "$(DEPDIR)/libjoblist_la-tablecolumn.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tablecolumn.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tablecolumn.cpp' object='libjoblist_la-tablecolumn.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tablecolumn.lo `test -f 'tablecolumn.cpp' || echo '$(srcdir)/'`tablecolumn.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tablecolumn.lo `test -f 'tablecolumn.cpp' || echo '$(srcdir)/'`tablecolumn.cpp
 
 libjoblist_la-timestamp.lo: timestamp.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-timestamp.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-timestamp.Tpo" -c -o libjoblist_la-timestamp.lo `test -f 'timestamp.cpp' || echo '$(srcdir)/'`timestamp.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-timestamp.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-timestamp.Tpo" -c -o libjoblist_la-timestamp.lo `test -f 'timestamp.cpp' || echo '$(srcdir)/'`timestamp.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-timestamp.Tpo" "$(DEPDIR)/libjoblist_la-timestamp.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-timestamp.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='timestamp.cpp' object='libjoblist_la-timestamp.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-timestamp.lo `test -f 'timestamp.cpp' || echo '$(srcdir)/'`timestamp.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-timestamp.lo `test -f 'timestamp.cpp' || echo '$(srcdir)/'`timestamp.cpp
 
 libjoblist_la-tuple-bps.lo: tuple-bps.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuple-bps.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuple-bps.Tpo" -c -o libjoblist_la-tuple-bps.lo `test -f 'tuple-bps.cpp' || echo '$(srcdir)/'`tuple-bps.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuple-bps.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuple-bps.Tpo" -c -o libjoblist_la-tuple-bps.lo `test -f 'tuple-bps.cpp' || echo '$(srcdir)/'`tuple-bps.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tuple-bps.Tpo" "$(DEPDIR)/libjoblist_la-tuple-bps.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tuple-bps.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tuple-bps.cpp' object='libjoblist_la-tuple-bps.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuple-bps.lo `test -f 'tuple-bps.cpp' || echo '$(srcdir)/'`tuple-bps.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuple-bps.lo `test -f 'tuple-bps.cpp' || echo '$(srcdir)/'`tuple-bps.cpp
 
 libjoblist_la-tupleaggregatestep.lo: tupleaggregatestep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleaggregatestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleaggregatestep.Tpo" -c -o libjoblist_la-tupleaggregatestep.lo `test -f 'tupleaggregatestep.cpp' || echo '$(srcdir)/'`tupleaggregatestep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleaggregatestep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleaggregatestep.Tpo" -c -o libjoblist_la-tupleaggregatestep.lo `test -f 'tupleaggregatestep.cpp' || echo '$(srcdir)/'`tupleaggregatestep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tupleaggregatestep.Tpo" "$(DEPDIR)/libjoblist_la-tupleaggregatestep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tupleaggregatestep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tupleaggregatestep.cpp' object='libjoblist_la-tupleaggregatestep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleaggregatestep.lo `test -f 'tupleaggregatestep.cpp' || echo '$(srcdir)/'`tupleaggregatestep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleaggregatestep.lo `test -f 'tupleaggregatestep.cpp' || echo '$(srcdir)/'`tupleaggregatestep.cpp
 
 libjoblist_la-tupleannexstep.lo: tupleannexstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleannexstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleannexstep.Tpo" -c -o libjoblist_la-tupleannexstep.lo `test -f 'tupleannexstep.cpp' || echo '$(srcdir)/'`tupleannexstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleannexstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleannexstep.Tpo" -c -o libjoblist_la-tupleannexstep.lo `test -f 'tupleannexstep.cpp' || echo '$(srcdir)/'`tupleannexstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tupleannexstep.Tpo" "$(DEPDIR)/libjoblist_la-tupleannexstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tupleannexstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tupleannexstep.cpp' object='libjoblist_la-tupleannexstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleannexstep.lo `test -f 'tupleannexstep.cpp' || echo '$(srcdir)/'`tupleannexstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleannexstep.lo `test -f 'tupleannexstep.cpp' || echo '$(srcdir)/'`tupleannexstep.cpp
 
 libjoblist_la-tupleconstantstep.lo: tupleconstantstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleconstantstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleconstantstep.Tpo" -c -o libjoblist_la-tupleconstantstep.lo `test -f 'tupleconstantstep.cpp' || echo '$(srcdir)/'`tupleconstantstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleconstantstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleconstantstep.Tpo" -c -o libjoblist_la-tupleconstantstep.lo `test -f 'tupleconstantstep.cpp' || echo '$(srcdir)/'`tupleconstantstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tupleconstantstep.Tpo" "$(DEPDIR)/libjoblist_la-tupleconstantstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tupleconstantstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tupleconstantstep.cpp' object='libjoblist_la-tupleconstantstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleconstantstep.lo `test -f 'tupleconstantstep.cpp' || echo '$(srcdir)/'`tupleconstantstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleconstantstep.lo `test -f 'tupleconstantstep.cpp' || echo '$(srcdir)/'`tupleconstantstep.cpp
 
 libjoblist_la-tuplehashjoin.lo: tuplehashjoin.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuplehashjoin.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuplehashjoin.Tpo" -c -o libjoblist_la-tuplehashjoin.lo `test -f 'tuplehashjoin.cpp' || echo '$(srcdir)/'`tuplehashjoin.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuplehashjoin.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuplehashjoin.Tpo" -c -o libjoblist_la-tuplehashjoin.lo `test -f 'tuplehashjoin.cpp' || echo '$(srcdir)/'`tuplehashjoin.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tuplehashjoin.Tpo" "$(DEPDIR)/libjoblist_la-tuplehashjoin.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tuplehashjoin.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tuplehashjoin.cpp' object='libjoblist_la-tuplehashjoin.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuplehashjoin.lo `test -f 'tuplehashjoin.cpp' || echo '$(srcdir)/'`tuplehashjoin.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuplehashjoin.lo `test -f 'tuplehashjoin.cpp' || echo '$(srcdir)/'`tuplehashjoin.cpp
 
 libjoblist_la-tuplehavingstep.lo: tuplehavingstep.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuplehavingstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuplehavingstep.Tpo" -c -o libjoblist_la-tuplehavingstep.lo `test -f 'tuplehavingstep.cpp' || echo '$(srcdir)/'`tuplehavingstep.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuplehavingstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuplehavingstep.Tpo" -c -o libjoblist_la-tuplehavingstep.lo `test -f 'tuplehavingstep.cpp' || echo '$(srcdir)/'`tuplehavingstep.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tuplehavingstep.Tpo" "$(DEPDIR)/libjoblist_la-tuplehavingstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tuplehavingstep.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tuplehavingstep.cpp' object='libjoblist_la-tuplehavingstep.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuplehavingstep.lo `test -f 'tuplehavingstep.cpp' || echo '$(srcdir)/'`tuplehavingstep.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuplehavingstep.lo `test -f 'tuplehavingstep.cpp' || echo '$(srcdir)/'`tuplehavingstep.cpp
 
 libjoblist_la-tupleunion.lo: tupleunion.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleunion.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleunion.Tpo" -c -o libjoblist_la-tupleunion.lo `test -f 'tupleunion.cpp' || echo '$(srcdir)/'`tupleunion.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tupleunion.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tupleunion.Tpo" -c -o libjoblist_la-tupleunion.lo `test -f 'tupleunion.cpp' || echo '$(srcdir)/'`tupleunion.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tupleunion.Tpo" "$(DEPDIR)/libjoblist_la-tupleunion.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tupleunion.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tupleunion.cpp' object='libjoblist_la-tupleunion.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleunion.lo `test -f 'tupleunion.cpp' || echo '$(srcdir)/'`tupleunion.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tupleunion.lo `test -f 'tupleunion.cpp' || echo '$(srcdir)/'`tupleunion.cpp
+
+libjoblist_la-tuplewsdl.lo: tuplewsdl.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-tuplewsdl.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-tuplewsdl.Tpo" -c -o libjoblist_la-tuplewsdl.lo `test -f 'tuplewsdl.cpp' || echo '$(srcdir)/'`tuplewsdl.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-tuplewsdl.Tpo" "$(DEPDIR)/libjoblist_la-tuplewsdl.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-tuplewsdl.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tuplewsdl.cpp' object='libjoblist_la-tuplewsdl.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-tuplewsdl.lo `test -f 'tuplewsdl.cpp' || echo '$(srcdir)/'`tuplewsdl.cpp
+
+libjoblist_la-unionstep.lo: unionstep.cpp
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-unionstep.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-unionstep.Tpo" -c -o libjoblist_la-unionstep.lo `test -f 'unionstep.cpp' || echo '$(srcdir)/'`unionstep.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-unionstep.Tpo" "$(DEPDIR)/libjoblist_la-unionstep.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-unionstep.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='unionstep.cpp' object='libjoblist_la-unionstep.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-unionstep.lo `test -f 'unionstep.cpp' || echo '$(srcdir)/'`unionstep.cpp
 
 libjoblist_la-unique32generator.lo: unique32generator.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-unique32generator.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-unique32generator.Tpo" -c -o libjoblist_la-unique32generator.lo `test -f 'unique32generator.cpp' || echo '$(srcdir)/'`unique32generator.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-unique32generator.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-unique32generator.Tpo" -c -o libjoblist_la-unique32generator.lo `test -f 'unique32generator.cpp' || echo '$(srcdir)/'`unique32generator.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-unique32generator.Tpo" "$(DEPDIR)/libjoblist_la-unique32generator.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-unique32generator.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='unique32generator.cpp' object='libjoblist_la-unique32generator.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-unique32generator.lo `test -f 'unique32generator.cpp' || echo '$(srcdir)/'`unique32generator.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-unique32generator.lo `test -f 'unique32generator.cpp' || echo '$(srcdir)/'`unique32generator.cpp
 
 libjoblist_la-virtualtable.lo: virtualtable.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-virtualtable.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-virtualtable.Tpo" -c -o libjoblist_la-virtualtable.lo `test -f 'virtualtable.cpp' || echo '$(srcdir)/'`virtualtable.cpp; \
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -MT libjoblist_la-virtualtable.lo -MD -MP -MF "$(DEPDIR)/libjoblist_la-virtualtable.Tpo" -c -o libjoblist_la-virtualtable.lo `test -f 'virtualtable.cpp' || echo '$(srcdir)/'`virtualtable.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libjoblist_la-virtualtable.Tpo" "$(DEPDIR)/libjoblist_la-virtualtable.Plo"; else rm -f "$(DEPDIR)/libjoblist_la-virtualtable.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='virtualtable.cpp' object='libjoblist_la-virtualtable.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libjoblist_la_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-virtualtable.lo `test -f 'virtualtable.cpp' || echo '$(srcdir)/'`virtualtable.cpp
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjoblist_la_CXXFLAGS) $(CXXFLAGS) -c -o libjoblist_la-virtualtable.lo `test -f 'virtualtable.cpp' || echo '$(srcdir)/'`virtualtable.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo

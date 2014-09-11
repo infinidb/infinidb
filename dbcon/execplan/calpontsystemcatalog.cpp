@@ -16,11 +16,10 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontsystemcatalog.cpp 8993 2012-10-16 15:59:46Z wweeks $
+ *   $Id: calpontsystemcatalog.cpp 9028 2012-10-25 22:16:28Z pleblanc $
  *
  *
  ***********************************************************************/
-#include <unistd.h>
 #include <stdexcept>
 #include <string>
 #include <iostream>
@@ -198,28 +197,26 @@ const CalpontSystemCatalog::TableName make_table(const string& s, const string& 
     return tn;
 }
 
-const CalpontSystemCatalog::TableAliasName make_aliastable(const string& s, const string& t, const string& a, const bool isInfiniDB)
+const CalpontSystemCatalog::TableAliasName make_aliastable(const string& s, const string& t, const string& a)
 {
     CalpontSystemCatalog::TableAliasName tn;
     tn.schema = s;
     tn.table = t;
     tn.alias = a;
     tn.view = "";
-    tn.fIsInfiniDB = isInfiniDB;
     transform (tn.schema.begin(), tn.schema.end(), tn.schema.begin(), to_lower());
     transform (tn.table.begin(), tn.table.end(), tn.table.begin(), to_lower());
     transform (tn.alias.begin(), tn.alias.end(), tn.alias.begin(), to_lower());
     return tn;
 }
 
-const CalpontSystemCatalog::TableAliasName make_aliasview(const string& s, const string& t, const string& a, const string& v, const bool isInfiniDB)
+const CalpontSystemCatalog::TableAliasName make_aliasview(const string& s, const string& t, const string& a, const string& v)
 {
     CalpontSystemCatalog::TableAliasName tn;
     tn.schema = s;
     tn.table = t;
     tn.alias = a;
     tn.view = v;
-    tn.fIsInfiniDB = isInfiniDB;
     transform (tn.schema.begin(), tn.schema.end(), tn.schema.begin(), to_lower());
     transform (tn.table.begin(), tn.table.end(), tn.table.begin(), to_lower());
     transform (tn.alias.begin(), tn.alias.end(), tn.alias.begin(), to_lower());
@@ -289,14 +286,7 @@ bool CalpontSystemCatalog::TableAliasName::operator<(const TableAliasName& rhs) 
             else if (alias == rhs.alias)
             {
             	if (view < rhs.view)
-            	{
             		return true;
-            	}
-            	else if (view == rhs.view)
-            	{
-            		if (fIsInfiniDB < rhs.fIsInfiniDB)
-            			return true;
-            	}
             }
         }
     }
@@ -310,7 +300,6 @@ void CalpontSystemCatalog::TableAliasName::serialize(messageqcpp::ByteStream& b)
 	b << table;
 	b << alias;
 	b << view;
-	b << static_cast<const ByteStream::doublebyte>(fIsInfiniDB);
 }
 
 void CalpontSystemCatalog::TableAliasName::unserialize(messageqcpp::ByteStream& b)
@@ -319,7 +308,6 @@ void CalpontSystemCatalog::TableAliasName::unserialize(messageqcpp::ByteStream& 
 	b >> table;
 	b >> alias;
 	b >> view;
-	b >> reinterpret_cast< ByteStream::doublebyte&>(fIsInfiniDB);
 }
 
 /*static*/
@@ -394,9 +382,8 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
 	string compressiontype = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+COMPRESSIONTYPE_COL;
 	string autoincrement = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+AUTOINC_COL;
 	string nextVal = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+NEXTVALUE_COL;
-	string nullable = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+NULLABLE_COL;
 
-    SimpleColumn* col[17];
+    SimpleColumn* col[16];
     col[0] = new SimpleColumn(columnlength, fSessionID);
     col[1] = new SimpleColumn(objectid, fSessionID); 
     col[2] = new SimpleColumn(datatype, fSessionID);
@@ -413,7 +400,6 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
 	col[13] = new SimpleColumn(compressiontype, fSessionID);
 	col[14] = new SimpleColumn(autoincrement, fSessionID);
 	col[15] = new SimpleColumn(nextVal, fSessionID);
-	col[16] = new SimpleColumn(nullable, fSessionID);
 	
     SRCP srcp;
     srcp.reset(col[0]);
@@ -435,8 +421,8 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
     srcp.reset(col[8]);
     colMap.insert(CMVT_(precision, srcp));
     // TODO: NULL value handling
-    srcp.reset(col[9]);
-    colMap.insert(CMVT_(defaultvalue, srcp));
+    //srcp.reset(col[9]);
+    //colMap.insert(CMVT_(defaultvalue, srcp));
     srcp.reset(col[10]);
     colMap.insert(CMVT_(schemaname, srcp));
     srcp.reset(col[11]);
@@ -449,14 +435,12 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
     colMap.insert(CMVT_(autoincrement, srcp));
 	srcp.reset(col[15]);
     colMap.insert(CMVT_(nextVal, srcp));
-	srcp.reset(col[16]);
-    colMap.insert(CMVT_(nullable, srcp));
     csep.columnMapNonStatic(colMap);
 
     // ignore returnedcolumn, because it's not read by Joblist for now
     csep.returnedCols(returnedColumnList);
-    OID oid[17];
-    for (int i = 0; i < 17; i++)
+    OID oid[16];
+    for (int i = 0; i < 16; i++)
         oid[i] = col[i]->oid();
 
     // Filters
@@ -536,22 +520,9 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
 		}
 		else if ((*it)->ColumnOID() == oid[15])
             ct.nextvalue = ((*it)->GetData(0));
-		else if ((*it)->ColumnOID() == oid[16])
-        {
-            if (static_cast<ConstraintType> ((*it)->GetData(0)) == 0)
-			{
-                ct.constraintType = NOTNULL_CONSTRAINT;
-			}
-        }
-        else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
-		{
-            ct.defaultValue = ((*it)->GetStringData(0));
-			if ((!ct.defaultValue.empty()) || (ct.defaultValue.length() > 0))
-			{
-				if (ct.constraintType != NOTNULL_CONSTRAINT)
-					ct.constraintType = DEFAULT_CONSTRAINT;
-			}
-		}
+        // TODO: check datatype to call GetData() or GetStringData()
+        //else if ((*it)->ColumnOID() == oid[9])
+        //    ct.defaultValue = ((*it)->GetData(0));
         else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_SCHEMA)
             tcn.schema = ((*it)->GetStringData(0));
         else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_TABLENAME)
@@ -561,7 +532,7 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
     }
 
     // temporialy memory leak fix until defaultvalue is added.
-   // delete col[9];
+    delete col[9];
     ct.columnOID = coloid;
     // populate colinfomap cache and oidbitmap
     boost::mutex::scoped_lock lk3(fColinfomapLock);
@@ -569,6 +540,8 @@ const CalpontSystemCatalog::OID CalpontSystemCatalog::lookupOID(const TableColNa
     return coloid;
 
 }
+
+class retry_ec_fetch { };
 
 void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
                                          NJLSysDataList& sysDataList,
@@ -580,16 +553,16 @@ void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
 	int oldTxnID;
 	txnID = fSessionManager->getTxnID(fSessionID);
 	
-    if (!txnID.valid)
-    {
-        txnID.id = 0;
-        txnID.valid = true;
-    }
+  if (!txnID.valid)
+  {
+  	txnID.id = 0;
+    txnID.valid = true;
+  }
 	
-    CalpontSystemCatalog::SCN verID, oldVerID;
-    verID = fSessionManager->verID();
-    oldTxnID = csep.txnID();
-    csep.txnID(txnID.id);
+	CalpontSystemCatalog::SCN verID, oldVerID;
+		verID = fSessionManager->verID();
+	oldTxnID = csep.txnID();
+		csep.txnID(txnID.id);
 	oldVerID = csep.verID();
     csep.verID(verID);
     //We need to use a session ID that's separate from the actual query SID, because the dbcon runs queries
@@ -613,18 +586,25 @@ void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
 	{
 		csep.returnedCols().push_back(it->second);
 	}
-	
+
 	if (fIdentity == EC)
 	{
-		try {
-			getSysData_EC(csep, sysDataList, sysTableName);		
+		uint tries = 0;
+		bool success = false;
+		while (tries < 6 && !success) {
+			try {
+				getSysData_EC(csep, sysDataList, sysTableName);
+				success = true;
+			}
+			catch (retry_ec_fetch &) {
+				tries++;
+			}
+			catch ( runtime_error& e ) {
+				throw runtime_error ( e.what() );
+			}
 		}
-        catch ( IDBExcept& ){
-            throw;
-        }
-		catch ( runtime_error& e ) {
-			throw runtime_error ( e.what() );
-		}					
+		if (tries == 6) 
+			throw IDBExcept(ERR_SYSTEM_CATALOG);
 	}
 	else
 	{
@@ -635,7 +615,7 @@ void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
 				getSysData_FE(csep, sysDataList, sysTableName);
 				break;
 			}
-			catch(IDBExcept&) // error already occured. this is not a broken pipe
+			catch(IDBExcept &e) // error already occured. this is not a broken pipe
 			{
 				throw;
 			}
@@ -660,7 +640,32 @@ void CalpontSystemCatalog::getSysData (CalpontSelectExecutionPlan& csep,
 	csep.txnID(oldTxnID);
 	csep.verID(oldVerID);
 }
-                                       
+
+class TimeoutRunner {
+public:
+	TimeoutRunner(SJLP j, uint s) : jl(j)
+	{
+		timeout.reset(new uint);
+		*timeout = s;
+		gotData.reset(new bool);
+		*gotData = false;
+	}	
+	void sawSomeData() { *gotData = true; }
+	void operator()()
+	{
+		uint waitTime = 0;
+		while (waitTime++ < *timeout && !(*gotData))
+			sleep(1);
+		if (!(*gotData)) 
+			jl->abort();
+	}
+
+private:
+	SJLP jl;
+	boost::shared_ptr<uint> timeout;
+	boost::shared_ptr<bool> gotData;
+};
+
 void CalpontSystemCatalog::getSysData_EC(CalpontSelectExecutionPlan& csep,
                                          NJLSysDataList& sysDataList,
                                          const string& sysTableName)
@@ -700,12 +705,17 @@ void CalpontSystemCatalog::getSysData_EC(CalpontSelectExecutionPlan& csep,
 	}
 	
 	TupleJobList* tjlp = dynamic_cast<TupleJobList*>(jl.get());
-	idbassert(tjlp);
+	assert(tjlp);
 	RowGroup rowGroup = tjlp->getOutputRowGroup();
+	TimeoutRunner timer(jl, 10);
+	boost::thread thd(timer);
 	while (true)
 	{
 		bs.restart();
 		uint rowCount = jl->projectTable(tableOID, bs);
+		if (jl->aborted()) 
+			throw retry_ec_fetch();
+		timer.sawSomeData();
 		rowGroup.setData(const_cast<uint8_t*>(bs.buf())); 
 		if ((status = rowGroup.getStatus()) != 0)
 		{
@@ -752,7 +762,7 @@ void CalpontSystemCatalog::getSysData_FE(const CalpontSelectExecutionPlan& csep,
 	ByteStream bs;
 	bs << qb;
 	fExeMgr->write(bs);
-	boost::scoped_ptr<rowgroup::RowGroup> rowGroup;
+	rowgroup::RowGroup *rowGroup = NULL;
 
 	msg.restart();
 	bs.restart();
@@ -792,7 +802,7 @@ void CalpontSystemCatalog::getSysData_FE(const CalpontSelectExecutionPlan& csep,
 
 		if (!rowGroup)
 		{
-			rowGroup.reset(new RowGroup());
+			rowGroup = new RowGroup();
 			rowGroup->deserialize(bs);
 			continue;
 		}
@@ -915,8 +925,8 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colType(const OID& Oid
     colMap.insert(CMVT_(precision, srcp));
     // TODO: NULL value handling & convert to boost::any
     // delete this manually at fcn exit
-    srcp.reset(col[9]);
-    colMap.insert(CMVT_(defaultvalue, srcp));
+    //srcp.reset(col[9]);
+    //colMap.insert(CMVT_(defaultvalue, srcp));
     srcp.reset(col[10]);
     colMap.insert(CMVT_(schemaname, srcp));
     srcp.reset(col[11]);
@@ -983,15 +993,9 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colType(const OID& Oid
             ct.scale = ((*it)->GetData(0));
         else if ((*it)->ColumnOID() == oid[8])
             ct.precision = ((*it)->GetData(0));
-        else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
-		{
+        // TODO: check datatype to call GetData() or GetStringData()
+        else if ((*it)->ColumnOID() == oid[9])
             ct.defaultValue = ((*it)->GetStringData(0));
-			if ((!ct.defaultValue.empty()) || (ct.defaultValue.length() > 0))
-			{
-				if (ct.constraintType != NOTNULL_CONSTRAINT)
-					ct.constraintType = DEFAULT_CONSTRAINT;
-			}
-		}
 	// NJL fix.  The schema, table, and column now return the oids for the dictionary columns
 	// on schema, table, and column.
         else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_SCHEMA)
@@ -1003,9 +1007,7 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colType(const OID& Oid
         else if ((*it)->ColumnOID() == oid[13])
         {
             if (static_cast<ConstraintType> ((*it)->GetData(0)) == 0)
-			{
                 ct.constraintType = NOTNULL_CONSTRAINT;
-			}
         }
 		else if ((*it)->ColumnOID() == oid[14])
             ct.compressionType = ct.ddn.compressionType = ((*it)->GetData(0));
@@ -1033,7 +1035,7 @@ const CalpontSystemCatalog::ColType CalpontSystemCatalog::colType(const OID& Oid
     	fColRIDmap[tcn] = rid;
 
     //Prevent mem leak
-    //delete col[9];
+    delete col[9];
 
     return ct;     
 }
@@ -1310,7 +1312,7 @@ const int64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
 		throw runtime_error ( e.what() );
 	}
 	int64_t nextVal = 0;
-	vector<ColumnResult*>::const_iterator it; 
+	vector<ColumnResult*>::const_iterator it;  
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
         
@@ -1324,24 +1326,11 @@ const int64_t CalpontSystemCatalog::nextAutoIncrValue ( TableName aTableName)
 	
 }
 
-int32_t CalpontSystemCatalog::autoColumOid ( TableName aTableName)
+const CalpontSystemCatalog::ROPair CalpontSystemCatalog::nextAutoIncrRid ( const OID& tableoid)
 {
-	transform( aTableName.schema.begin(), aTableName.schema.end(), aTableName.schema.begin(), to_lower() );
-	transform( aTableName.table.begin(), aTableName.table.end(), aTableName.table.begin(), to_lower() );
+	CalpontSystemCatalog::TableName tbName  = tableName(tableoid); 
 	
-	TableInfo tbInfo;
-	try {
-		tbInfo = tableInfo (aTableName);
-	}
-	catch (runtime_error& /*ex*/)
-	{
-		return -2;
-	}
-	
-	if (tbInfo.tablewithautoincr == NO_AUTOINCRCOL)
-		return 0;
-
-	//Build a plan to get column oid:  select objectid from syscolumn where schema = tableName.schema and tablename = tableName.table and autoincrement='y';
+	//Build a plan to get rid of nextvalue:  select nextvalue from syscolumn where schema = tableName.schema and tablename = tableName.table and autoincrement='y';
 	CalpontSelectExecutionPlan csep;          
     CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
     CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
@@ -1350,13 +1339,13 @@ int32_t CalpontSystemCatalog::autoColumOid ( TableName aTableName)
     string tablename = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+TABLENAME_COL;
     string schemaname = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+SCHEMA_COL;
 	string autoincrement = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+AUTOINC_COL;
-    string objectid = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+OBJECTID_COL;
+    string nextvalue = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+NEXTVALUE_COL;
 	
     SimpleColumn* col[5];
     col[0] = new SimpleColumn(tablename, fSessionID);    
     col[1] = new SimpleColumn(schemaname, fSessionID); 
     col[2] = new SimpleColumn(autoincrement, fSessionID);
-    col[3] = new SimpleColumn(objectid, fSessionID);
+    col[3] = new SimpleColumn(nextvalue, fSessionID);
     
 	SRCP srcp;
     srcp.reset(col[0]);
@@ -1366,7 +1355,7 @@ int32_t CalpontSystemCatalog::autoColumOid ( TableName aTableName)
 	srcp.reset(col[2]);
     colMap.insert(CMVT_(autoincrement, srcp));
 	srcp.reset(col[3]);
-    colMap.insert(CMVT_(objectid, srcp));
+    colMap.insert(CMVT_(nextvalue, srcp));
 	
     csep.columnMapNonStatic(colMap);
 	
@@ -1379,13 +1368,13 @@ int32_t CalpontSystemCatalog::autoColumOid ( TableName aTableName)
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          col[1]->clone(),
-                                         new ConstantColumn(aTableName.schema, ConstantColumn::LITERAL));
+                                         new ConstantColumn(tbName.schema, ConstantColumn::LITERAL));
     filterTokenList.push_back(f1);
     filterTokenList.push_back(new Operator("and"));
 
     SimpleFilter *f2 = new SimpleFilter (opeq,
                                          col[0]->clone(),
-                                         new ConstantColumn(aTableName.table, ConstantColumn::LITERAL));
+                                         new ConstantColumn(tbName.table, ConstantColumn::LITERAL));
     filterTokenList.push_back(f2);
     filterTokenList.push_back(new Operator("and"));                                     
 
@@ -1395,72 +1384,7 @@ int32_t CalpontSystemCatalog::autoColumOid ( TableName aTableName)
     filterTokenList.push_back(f3);
     csep.filterTokenList(filterTokenList); 
     ostringstream oss;
-    oss << "select nextvalue from syscolumn where schema = aTableName.schema and tablename = aTableName.table and autoincrement='y'";       
-    if (fIdentity == EC) oss << "EC";
-    else oss << "FE";
-    csep.data(oss.str());
-    NJLSysDataList sysDataList;    
-	try {	
-		getSysData(csep, sysDataList, SYSCOLUMN_TABLE);
-	}
-	catch  (runtime_error& e)
-	{
-		throw runtime_error ( e.what() );
-	}
-	int32_t columnOid = 0;
-	vector<ColumnResult*>::const_iterator it;  
-    for (it = sysDataList.begin(); it != sysDataList.end(); it++)
-    {
-        
-        if ((*it)->ColumnOID() == oid[3]) 
-        {       
-            columnOid = ((*it)->GetData(0));   
-        }
-	}
-	
-	return (columnOid);
-	
-}
-
-const CalpontSystemCatalog::ROPair CalpontSystemCatalog::nextAutoIncrRid ( const OID& columnoid)
-{
-	
-	//Build a plan to get rid of nextvalue:  select nextvalue from syscolumn where objectid = columnoid;
-	CalpontSelectExecutionPlan csep;          
-    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
-    CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
-    CalpontSelectExecutionPlan::ColumnMap colMap;   
-            
-    string objectid = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+OBJECTID_COL;
-    string nextvalue = CALPONT_SCHEMA+"."+SYSCOLUMN_TABLE+"."+NEXTVALUE_COL;
-	
-    SimpleColumn* col[2];
-    col[0] = new SimpleColumn(objectid, fSessionID);    
-    col[1] = new SimpleColumn(nextvalue, fSessionID);
-    
-	SRCP srcp;
-    srcp.reset(col[0]);
-    colMap.insert(CMVT_(objectid, srcp));
-    srcp.reset(col[1]);
-    colMap.insert(CMVT_(nextvalue, srcp));
-	
-    csep.columnMapNonStatic(colMap);
-	
-	csep.returnedCols(returnedColumnList);
-	
-    OID oid[2];
-    for (int i = 0; i < 2; i++)
-        oid[i] = col[i]->oid();
-
-    // Filters
-    SimpleFilter *f1 = new SimpleFilter (opeq,
-                                         col[0]->clone(),
-                                         new ConstantColumn(columnoid, ConstantColumn::LITERAL));
-    filterTokenList.push_back(f1);
-   
-    csep.filterTokenList(filterTokenList); 
-    ostringstream oss;
-    oss << "select nextvalue from syscolumn objectid = columnoid";       
+    oss << "select nextvalue from syscolumn where schema = tableName.schema and tablename = tableName.table and autoincrement='y'";       
     if (fIdentity == EC) oss << "EC";
     else oss << "FE";
     csep.data(oss.str());
@@ -1478,13 +1402,13 @@ const CalpontSystemCatalog::ROPair CalpontSystemCatalog::nextAutoIncrRid ( const
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
         
-        if ((*it)->ColumnOID() == oid[1]) 
+        if ((*it)->ColumnOID() == oid[3]) 
         {       
             roPair.rid = ((*it)->GetRid(0));  
-			roPair.objnum = oid[1];
-			return roPair;
+			roPair.objnum = oid[3];
         }
 	}
+	
 	return roPair;
 }
 
@@ -1505,16 +1429,16 @@ const CalpontSystemCatalog::SCN CalpontSystemCatalog::scn(void) const
 #endif
 
 /* static */
-boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemCatalog(u_int32_t sessionID) 
+CalpontSystemCatalog* CalpontSystemCatalog::makeCalpontSystemCatalog(u_int32_t sessionID) 
 {
     boost::mutex::scoped_lock lock(map_mutex);
-    boost::shared_ptr<CalpontSystemCatalog> instance;
+    CalpontSystemCatalog* instance;
     CatalogMap::const_iterator it = fCatalogMap.find(sessionID);
     if (sessionID == 0)
     {
         if (it == fCatalogMap.end())
         {
-            instance.reset(new CalpontSystemCatalog());
+            instance = new CalpontSystemCatalog();
             fCatalogMap[0] = instance;
             return instance;
         }
@@ -1536,7 +1460,7 @@ boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemC
 
     if (it == fCatalogMap.end())
     {
-        instance.reset(new CalpontSystemCatalog());
+        instance = new CalpontSystemCatalog();
         instance->sessionID(sessionID);
 	    instance->fExeMgr->setSessionId(sessionID);
         fCatalogMap[sessionID] = instance;
@@ -1551,15 +1475,12 @@ void CalpontSystemCatalog::removeCalpontSystemCatalog(u_int32_t sessionID)
 {
     boost::mutex::scoped_lock lock(map_mutex);
     DEBUG << "remove calpont system catalog for session " << sessionID << endl;
-	fCatalogMap.erase(sessionID);
-/*
     CatalogMap::iterator it = fCatalogMap.find(sessionID);
     if (it != fCatalogMap.end())
     {
         delete (*it).second;
         fCatalogMap.erase(it);
     }    
-*/
 }
 
 CalpontSystemCatalog::CalpontSystemCatalog():
@@ -2358,17 +2279,21 @@ const CalpontSystemCatalog::RID CalpontSystemCatalog::constraintColRID(const Tab
 }
 #endif
 
-const vector< pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> > CalpontSystemCatalog::getTables (const std::string schema)
+const vector<string> CalpontSystemCatalog::getTables (const std::string& schema)
 {
     string schemaname = schema;
-    vector < pair<OID, TableName> > tables;
-    transform( schemaname.begin(), schemaname.end(), schemaname.begin(), to_lower() );
+    vector<string> tnl;
+	transform( schemaname.begin(), schemaname.end(), schemaname.begin(), to_lower() );
     if (schemaname == CALPONT_SCHEMA)
     {
         // systables
-        tables.push_back( make_pair(SYSTABLE_BASE, make_table(CALPONT_SCHEMA, SYSTABLE_TABLE)));
-        tables.push_back( make_pair(SYSCOLUMN_BASE, make_table(CALPONT_SCHEMA, SYSCOLUMN_TABLE)));
-        return tables;
+        tnl.push_back("systable");
+        tnl.push_back("syscolumn");
+        tnl.push_back("sysindex");
+        tnl.push_back("sysindexcol");
+        tnl.push_back("sysconstraint");
+        tnl.push_back("sysconstraintcol");
+        return tnl;
     }
       
     DEBUG << "Enter getTables" << endl;
@@ -2397,62 +2322,49 @@ const vector< pair<CalpontSystemCatalog::OID, CalpontSystemCatalog::TableName> >
     returnedColumnList.push_back(srcp);
     csep.returnedCols(returnedColumnList);
     OID oid1 = DICTOID_SYSTABLE_TABLENAME;
-    OID oid2 = DICTOID_SYSTABLE_SCHEMA;
     
-    if (!schema.empty())
-    {
-      // Filters
-      SimpleFilter *f1 = new SimpleFilter (opeq,
-                                           c2->clone(),
-                                           new ConstantColumn(schemaname, ConstantColumn::LITERAL));
-      filterTokenList.push_back(f1);
-      csep.filterTokenList(filterTokenList); 
-    }
+    // Filters
+    SimpleFilter *f1 = new SimpleFilter (opeq,
+                                         c2->clone(),
+                                         new ConstantColumn(schemaname, ConstantColumn::LITERAL));
+    filterTokenList.push_back(f1);
+    csep.filterTokenList(filterTokenList); 
     
     NJLSysDataList sysDataList;  
     getSysData (csep, sysDataList, SYSTABLE_TABLE);  
  
     vector<ColumnResult*>::const_iterator it;
-    vector<string> tnl;
     ROPair rp;
-    
+        
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
         if ((*it)->ColumnOID() == oid1)
         {
-          for (int i = 0; i < (*it)->dataCount(); i++)
-          {
-            tables.push_back( make_pair(0, make_table("", (*it)->GetStringData(i))));
-            tnl.push_back((*it)->GetStringData(i));
-          }
+        	for (int i = 0; i < (*it)->dataCount(); i++)
+        	{
+            	tnl.push_back((*it)->GetStringData(i));      
+            	DEBUG << tnl[i] << endl;
+            }
         }
-    }
-    for (it = sysDataList.begin(); it != sysDataList.end(); it++)
-    {    
-      if ((*it)->ColumnOID() == oid2)
-      {
-        for (int i = 0; i < (*it)->dataCount(); i++)
-          tables[i].second.schema = (*it)->GetStringData(i);
-      }
     }
     
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
-      if ((*it)->ColumnOID() == c3->oid())
-      {
-        for (int i = 0; i < (*it)->dataCount(); i++)
+        if ((*it)->ColumnOID() == c3->oid())
         {
-          rp.objnum = (OID)((*it)->GetData(i));
-          if (fIdentity == EC)
-            rp.rid = (*it)->GetRid(i);
-          fTablemap[tables[i].second] = rp.objnum;
-          fTableRIDmap[tables[i].second] = rp.rid;
-          tables[i].first = rp.objnum;
+            for (int i = 0; i < (*it)->dataCount(); i++)
+            {
+                rp.objnum = (OID)((*it)->GetData(i));
+                if (fIdentity == EC)
+                    rp.rid = (*it)->GetRid(i);
+                TableName tn(schema, tnl[i]);
+                fTablemap[tn] = rp.objnum;
+                fTableRIDmap[tn] = rp.rid;
+            }
         }
-      }
     }   
     
-    return tables;
+    return tnl;
 }
 
 /* SQL statement: select objectid from systable */
@@ -2664,9 +2576,10 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
     colMap.insert(CMVT_(scale, srcp));
     srcp.reset(col[8]);
     colMap.insert(CMVT_(precision, srcp));
-    
-    srcp.reset(col[9]);
-    colMap.insert(CMVT_(defaultvalue, srcp));
+    // TODO: NULL value handling & convert to boost::any
+    // delete this manually at fcn exit
+    //srcp.reset(col[9]);
+    //colMap.insert(CMVT_(defaultvalue, srcp));
     srcp.reset(col[10]);
     colMap.insert(CMVT_(schemaname, srcp));
     srcp.reset(col[11]);
@@ -2692,6 +2605,7 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
         oid[i] = col[i]->oid();
     
     oid[12] = DICTOID_SYSCOLUMN_COLNAME;
+
     // Filters
     SimpleFilter *f1 = new SimpleFilter (opeq,
                                          col[10]->clone(),
@@ -2727,7 +2641,6 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
             DEBUG << "column count: " << (*it)->dataCount() << endl;
             // populate tableinfo cache for numOfCols
             ti.numOfCols = (*it)->dataCount();
-//			ti.tablewithautoincr = NO_AUTOINCRCOL;
          
             ctList = new ColType[ti.numOfCols];
             for (int i = 0 ; i < (*it)->dataCount(); i++)
@@ -2820,17 +2733,10 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
                 ctList[i].precision = ((*it)->GetData(i));
         }
         // TODO: check datatype to call GetData() or GetStringData()
-        else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
+        else if ((*it)->ColumnOID() == oid[9])
         {
             for (int i = 0; i < (*it)->dataCount(); i++)
-			{
-                ctList[i].defaultValue = ((*it)->GetStringData(i));
-				if ((!ctList[i].defaultValue.empty()) || (ctList[i].defaultValue.length() > 0))
-				{
-					if (ctList[i].constraintType != NOTNULL_CONSTRAINT)
-						ctList[i].constraintType = DEFAULT_CONSTRAINT;
-				}
-			}
+                ctList[i].defaultValue = ((*it)->GetData(i));
         }
         else if ((*it)->ColumnOID() == oid[13])
         {
@@ -2869,7 +2775,7 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
     lk3.unlock();
     
     delete [] ctList;
-   // delete col[9];    
+    delete col[9];    
     if (rl.size() != 0)
     {
         return rl;
@@ -2879,6 +2785,7 @@ const CalpontSystemCatalog::RIDList CalpontSystemCatalog::columnRIDs(const Table
 		args.add("'" + tableName.schema + "." + tableName.table + "'");
 		throw IDBExcept(ERR_TABLE_NOT_IN_CATALOG, args);
 }
+
 
 const CalpontSystemCatalog::TableName CalpontSystemCatalog::tableName(const OID& tableoid)
 {
@@ -3068,9 +2975,6 @@ const CalpontSystemCatalog::ROPair CalpontSystemCatalog::tableRID(const TableNam
 	try {
 		getSysData (csep, sysDataList, SYSTABLE_TABLE);
 	}
-    catch ( IDBExcept& ){
-        throw;
-    }
 	catch ( runtime_error& e ) {
 		throw runtime_error ( e.what() );
 	}
@@ -4266,12 +4170,6 @@ const CalpontSystemCatalog::DictOIDList CalpontSystemCatalog::dictOIDs( const Ta
                                          c4->clone(),
                                          new ConstantColumn(aTableName.table, ConstantColumn::LITERAL));
     filterTokenList.push_back(f2);
-	SOP opisnotnull(new Operator("isnotnull"));
-	filterTokenList.push_back(new Operator("and"));
-	SimpleFilter *f3 = new SimpleFilter (opisnotnull,
-										c5->clone(),
-										new ConstantColumn("", ConstantColumn::NULLDATA));
-	filterTokenList.push_back(f3);
     csep.filterTokenList(filterTokenList); 
     
     NJLSysDataList sysDataList;  
@@ -4813,8 +4711,8 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 	colMap.insert(CMVT_(precision, srcp));
 	// TODO: NULL value handling & convert to boost::any
 	// delete this manually at fcn exit
-	srcp.reset(col[9]);
-	colMap.insert(CMVT_(defaultvalue, srcp));
+	//srcp.reset(col[9]);
+	//colMap.insert(CMVT_(defaultvalue, srcp));
 	srcp.reset(col[10]);
 	colMap.insert(CMVT_(schemaname, srcp));
 	srcp.reset(col[11]);
@@ -4841,6 +4739,7 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 	
 	oid[12] = DICTOID_SYSCOLUMN_COLNAME;
 	oid[11] = DICTOID_SYSCOLUMN_TABLENAME;
+	
 	
 	// Filters
 	SimpleFilter *f1 = new SimpleFilter (opeq,
@@ -4903,7 +4802,7 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 		}
 	}
 
-	// loop 3rd time to populate col cache
+	// loop 2nd time to populate col cache
 	for (it = sysDataList.begin(); it != sysDataList.end(); it++)
 	{
 		if ((*it)->ColumnOID() == oid[15])
@@ -4979,17 +4878,11 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 			for (int i = 0; i < (*it)->dataCount(); i++)
 				ctList[i].precision = ((*it)->GetData(i));
 		}
-		else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
+		// TODO: check datatype to call GetData() or GetStringData()
+		else if ((*it)->ColumnOID() == oid[9])
 		{
 			for (int i = 0; i < (*it)->dataCount(); i++)
-			{
-				ctList[i].defaultValue = ((*it)->GetStringData(i));
-				if ((!ctList[i].defaultValue.empty()) || (ctList[i].defaultValue.length() > 0))
-				{
-					if (ctList[i].constraintType != NOTNULL_CONSTRAINT)
-						ctList[i].constraintType = DEFAULT_CONSTRAINT;
-				}
-			}
+				ctList[i].defaultValue = ((*it)->GetData(i));
 		}
 		else if ((*it)->ColumnOID() == oid[13])
 		{
@@ -5036,7 +4929,7 @@ void CalpontSystemCatalog::getSchemaInfo(const string& in_schema)
 		DEBUG << tbIter->first << " " << tbIter->second.numOfCols << " " << (tbIter->second).tablewithautoincr << endl;
 	}
    
-	//delete col[9];    
+	delete col[9];    
 	lk.lock();
 	fSchemaCache.insert(schema);
 	lk.unlock();
@@ -5056,8 +4949,7 @@ const string CalpontSystemCatalog::TableName::toString() const
 }
 ostream& operator<<(ostream& os, const CalpontSystemCatalog::TableAliasName& rhs)
 {
-    os << rhs.schema << '.' << rhs.table << "(" << rhs.alias << "/" << rhs.view 
-       << ") engineType=" << (rhs.fIsInfiniDB? "InfiniDB" : "ForeignEngine");
+    os << rhs.schema << '.' << rhs.table << "(" << rhs.alias << "/" << rhs.view << ")";
     return os;
 }
 
@@ -5113,14 +5005,13 @@ void CalpontSystemCatalog::updateColinfoCache(CalpontSystemCatalog::OIDNextvalMa
 void CalpontSystemCatalog::buildSysColinfomap()
 {
 	ColType aCol;
-   // aCol.defaultValue = "";
+    aCol.defaultValue = 0;
     aCol.scale = 0;
     aCol.precision = 10;
 	aCol.compressionType = 0;
 	DictOID notDict;
 
-    // @bug 4433 - Increase object width from 64 to 128 for schema names, table names, and column names.
-    aCol.colWidth = 129; // @bug 4433
+    aCol.colWidth = 129;
     aCol.constraintType = NOTNULL_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSTABLE_TABLENAME;
@@ -5130,7 +5021,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	aCol.columnOID = OID_SYSTABLE_TABLENAME;
     fColinfomap[aCol.columnOID] = aCol;
  
-    aCol.colWidth = 129; // @bug 4433
+    aCol.colWidth = 129;
     aCol.constraintType = NOTNULL_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSTABLE_SCHEMA;
@@ -5214,7 +5105,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	
     fTablemap[make_table(CALPONT_SCHEMA, SYSCOLUMN_TABLE )] = SYSCOLUMN_BASE;
     
-    aCol.colWidth = 129; // @bug 4433
+    aCol.colWidth = 129;
     aCol.constraintType = NOTNULL_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSCOLUMN_SCHEMA;
@@ -5224,7 +5115,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	aCol.columnOID = OID_SYSCOLUMN_SCHEMA;
     fColinfomap[aCol.columnOID] = aCol;
     
-    aCol.colWidth = 129; // @bug 4433
+    aCol.colWidth = 129;
     aCol.constraintType = NOTNULL_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSCOLUMN_TABLENAME;
@@ -5234,7 +5125,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	aCol.columnOID = OID_SYSCOLUMN_TABLENAME;
     fColinfomap[aCol.columnOID] = aCol;
     
-    aCol.colWidth = 129; // @bug 4433
+    aCol.colWidth = 129;
     aCol.constraintType = NOTNULL_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSCOLUMN_COLNAME;
@@ -5308,7 +5199,7 @@ void CalpontSystemCatalog::buildSysColinfomap()
 	aCol.columnOID = OID_SYSCOLUMN_LASTUPDATE;
     fColinfomap[aCol.columnOID] = aCol;
     
-    aCol.colWidth = 64;
+    aCol.colWidth = 9;
     aCol.constraintType = NO_CONSTRAINT;
     aCol.colDataType = VARCHAR;
     aCol.ddn.dictOID = DICTOID_SYSCOLUMN_DEFAULTVAL;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_date_format.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_date_format.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -169,12 +169,12 @@ const string IDB_date_format(const DateTime& dt, const string& format)
 				break;
 			case 'x':
 				(void) calc_week(dt.year, dt.month, dt.day, week_Year | week_monday_first, &lyear);
-				sprintf(ptr, "%04d", lyear);
+				sprintf(ptr, "%04d", dt.year);
 				ptr += 4;
 				break;
 			case 'X':
 				(void) calc_week(dt.year, dt.month, dt.day, week_Year | week_first_weekday, &lyear);
-				sprintf(ptr, "%04d", lyear);
+				sprintf(ptr, "%04d", dt.year);
 				ptr += 4;
 				break;
 			default:

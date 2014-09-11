@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmljob.cpp 4200 2012-09-24 15:28:27Z dcathey $
+* $Id: we_xmljob.cpp 3698 2012-03-29 21:12:08Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -29,12 +29,9 @@
 #include <sstream>
 #include <unistd.h>
 #include <stdexcept>
-#include <cstdlib>
 #include <set>
 #include "we_config.h"
 #include "we_log.h"
-#include "we_convertor.h"
-#include "dataconvert.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/convenience.hpp>
@@ -74,7 +71,7 @@ const long long infinidb_precision[19] = {
 99999999999999999LL,
 999999999999999999LL
 };
-
+
 //------------------------------------------------------------------------------
 // Constructor
 //------------------------------------------------------------------------------
@@ -95,7 +92,7 @@ XMLJob::~XMLJob()
         unlink( fJobFileName.c_str() );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Load a job xml file
 // fileName - name of file to load
@@ -128,9 +125,9 @@ int XMLJob::loadJobXmlFile( const string& fileName,
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
-// Print contents of fJob to the specified logger object.
+// Print contents of specified Job to specified logger object.
 // logger - Log object to use in logging
 //------------------------------------------------------------------------------
 void XMLJob::printJobInfo( Log& logger ) const
@@ -196,8 +193,7 @@ void XMLJob::printJobInfo( Log& logger ) const
             oss3 << "\t\tColumn OID        : " << jobCol.mapOid << endl;
             oss3 << "\t\tColumn type name  : " << jobCol.typeName << endl;
             oss3 << "\t\tColumn width      : " << jobCol.width << endl;
-            oss3 << "\t\tColumn Not Null   : " << jobCol.fNotNull << endl;
-            oss3 << "\t\tColumn WithDefault: " << jobCol.fWithDefault << endl;
+            oss3 << "\t\tColumn Not Null   : " << jobCol.notNull << endl;
             oss3 << "\t\tColumn type       : " << jobCol.colType << endl;
             oss3 << "\t\tColumn comp type  : " << jobCol.compressionType <<endl;
 
@@ -215,10 +211,10 @@ void XMLJob::printJobInfo( Log& logger ) const
                         jobCol.dctnry.dctnryOid << endl;
             }
             logger.logMsg( oss3.str(), MSGLVL_INFO2 );
-        } // end of loop through columns in a table
-    } // end of loop through tables
+        }
+    } // end of for( int i
 }
-
+
 //------------------------------------------------------------------------------
 // Print brief contents of specified Job to specified logger object.
 // logger - Log object to use in logging
@@ -269,19 +265,11 @@ void XMLJob::printJobInfoBrief( Log& logger ) const
             if( jobCol.colType == 'D' )
                 oss3 << "); DctnryOid(" << jobCol.dctnry.dctnryOid;
             oss3 << ')';
-#ifndef SKIP_AUTOI
-            if (jobCol.autoIncFlag)
-                oss3 << "; autoInc";
-#endif
-            if (jobCol.fNotNull)
-                oss3 << "; NotNull";
-            if (jobCol.fWithDefault)
-                oss3 << "; WithDefault";
             logger.logMsg( oss3.str(), MSGLVL_INFO2 );
         }
     } // end of for( int i
 }
-
+
 //------------------------------------------------------------------------------
 // Process a node
 // pNode - current node
@@ -350,7 +338,7 @@ bool XMLJob::processNode( xmlNode* pNode )
 
     return true;
 }
-
+
 //------------------------------------------------------------------------------
 // Generic setter
 // pNode - current node
@@ -365,8 +353,10 @@ void XMLJob::setJobData( xmlNode* pNode,
 {
     int         intVal = 0;
     long long   llVal = 0;
-    std::string bufString;
+    char        buf[XML_NODE_BUF_SIZE];
     bool        bSuccess = false;
+
+    memset( buf, 0, XML_NODE_BUF_SIZE );
 
     if (bExpectContent)
     {
@@ -377,7 +367,7 @@ void XMLJob::setJobData( xmlNode* pNode,
                 bSuccess = getNodeContent( pNode, &llVal, TYPE_LONGLONG );
         else // char
             if( tagType == TYPE_CHAR ) 
-                bSuccess = getNodeContentStr( pNode, bufString );
+                bSuccess = getNodeContent( pNode, buf, TYPE_CHAR );
         if (!bSuccess)
             return;
     }
@@ -391,16 +381,16 @@ void XMLJob::setJobData( xmlNode* pNode,
             setJobDataColumn( pNode, false );
             break;
         case  TAG_CREATE_DATE:
-            fJob.createDate = bufString;
+            fJob.createDate = buf;
             break;
         case  TAG_CREATE_TIME:
-            fJob.createTime = bufString;
+            fJob.createTime = buf;
             break;
         case  TAG_DEFAULT_COLUMN:
             setJobDataColumn( pNode, true );
             break;
         case  TAG_DESC:
-            fJob.desc = bufString;
+            fJob.desc = buf;
             break;
         case  TAG_ID:
             fJob.id = intVal;
@@ -409,7 +399,7 @@ void XMLJob::setJobData( xmlNode* pNode,
             setJobDataIgnoreField( );
             break;
         case  TAG_NAME:
-            fJob.name = bufString;
+            fJob.name = buf;
             break;
         case  TAG_PATH:
             // no action necessary, but keep for backwards compatability
@@ -421,7 +411,7 @@ void XMLJob::setJobData( xmlNode* pNode,
             // no action necessary, but keep for backwards compatability
             break;
         case  TAG_USER:
-            fJob.userName = bufString;
+            fJob.userName = buf;
             break;
         case  TAG_SCHEMA:
             setSchema( pNode );
@@ -431,7 +421,6 @@ void XMLJob::setJobData( xmlNode* pNode,
             break;
         case TAG_DELIMITER:
         {
-            const char* buf = bufString.c_str();
             if ((!strcmp(buf,"\\t")) ||
                 (!strcmp(buf,"'\\t'")))
             {
@@ -439,25 +428,25 @@ void XMLJob::setJobData( xmlNode* pNode,
             }
             else
             {
-                fJob.fDelimiter = bufString[0];
+                fJob.fDelimiter = buf[0];
             }
             break;
         }
         case TAG_ENCLOSED_BY_CHAR:
         {
-            fJob.fEnclosedByChar = bufString[0];
+            fJob.fEnclosedByChar = buf[0];
             break;
         }
         case TAG_ESCAPE_CHAR:
         {
-            fJob.fEscapeChar = bufString[0];
+            fJob.fEscapeChar = buf[0];
             break;
         }
 
         default: break;
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Set table information parms.
 // pNode - current node
@@ -465,13 +454,13 @@ void XMLJob::setJobData( xmlNode* pNode,
 void XMLJob::setJobDataTable( xmlNode* pNode ) 
 {
     int         intVal;
-    std::string bufString;
+    char        buf[XML_NODE_BUF_SIZE];
     JobTable    curTable;
 
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_ORIG_NAME], bufString ) )
-        curTable.tblName = bufString;
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_TBL_NAME], bufString ) )
-        curTable.tblName = bufString;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_ORIG_NAME], buf, TYPE_CHAR ) )
+        curTable.tblName = buf;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_TBL_NAME], buf, TYPE_CHAR ) )
+        curTable.tblName = buf;
     if (curTable.tblName.empty())
     {
         throw runtime_error(
@@ -481,8 +470,8 @@ void XMLJob::setJobDataTable( xmlNode* pNode )
     if( getNodeAttribute( pNode, xmlTagTable[TAG_TBL_OID], &intVal, TYPE_INT ) )
         curTable.mapOid = intVal;
 
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_LOAD_NAME], bufString ) )
-        curTable.loadFileName = bufString;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_LOAD_NAME], buf, TYPE_CHAR ) )
+        curTable.loadFileName = buf;
 
     if( getNodeAttribute( pNode, xmlTagTable[TAG_MAX_ERR_ROW], &intVal,
         TYPE_INT))
@@ -490,36 +479,26 @@ void XMLJob::setJobDataTable( xmlNode* pNode )
 
     fJob.jobTableList.push_back( curTable );
 }
-
+
 //------------------------------------------------------------------------------
 // Set column information parms.
 // pNode - current node
 // bDefaultCol - is this a <DefaultColumn> tag
-//
-// Note on Supported Tags: (Bug 2828)
-// Note that the "notnull" and "defaultValue" attribute tags are not recognized
-// by this function because by the time we added support for these tags, we had
-// changed to only store the table and column names in the XML file.  Much of
-// the functionality in setJobDataColumn() is only present to provide backwards
-// compatability for an old Job XML file that a user might still be using.
-//
-// Any other new tags probably don't need adding to setJobDataColumn() either,
-// for the same reason.
 //------------------------------------------------------------------------------
 void XMLJob::setJobDataColumn( xmlNode* pNode, bool bDefaultCol ) 
 {
     int         intVal;
-    std::string bufString;
+    char        buf[XML_NODE_BUF_SIZE];
     JobColumn   curColumn;
 
     if( fJob.jobTableList.size() == 0 )
         return;
 
     int tableNo = fJob.jobTableList.size() - 1;
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_ORIG_NAME], bufString ) )
-        curColumn.colName = bufString;
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_COL_NAME], bufString ) )
-        curColumn.colName = bufString;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_ORIG_NAME], buf, TYPE_CHAR ) )
+        curColumn.colName = buf;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_COL_NAME], buf, TYPE_CHAR ) )
+        curColumn.colName = buf;
     if (curColumn.colName.empty())
     {
         ostringstream oss;
@@ -543,8 +522,8 @@ void XMLJob::setJobDataColumn( xmlNode* pNode, bool bDefaultCol )
     if( getNodeAttribute( pNode, xmlTagTable[TAG_SCALE], &intVal, TYPE_INT ) )
         curColumn.scale = intVal;
 
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_DATA_TYPE], bufString ) )
-        curColumn.typeName = bufString;
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_DATA_TYPE], buf, TYPE_CHAR ) ) 
+        curColumn.typeName = buf;
 
     if( getNodeAttribute( pNode, xmlTagTable[TAG_COMPRESS_TYPE], &intVal,
         TYPE_INT))
@@ -566,8 +545,10 @@ void XMLJob::setJobDataColumn( xmlNode* pNode, bool bDefaultCol )
     curColumn.autoIncFlag = false;
 #endif
 
-    if( getNodeAttributeStr( pNode, xmlTagTable[TAG_COL_TYPE], bufString ) ) {
-        const char* buf = bufString.c_str();
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_NOT_NULL], buf, TYPE_CHAR ) ) 
+        curColumn.notNull = !strcmp( buf, "true" ) ? true : false ;
+
+    if( getNodeAttribute( pNode, xmlTagTable[TAG_COL_TYPE], buf, TYPE_CHAR ) ) {
         if( !strcmp( buf, "D" ) ) {
             curColumn.colType = 'D';
 
@@ -614,7 +595,7 @@ void XMLJob::setJobDataColumn( xmlNode* pNode, bool bDefaultCol )
         fJob.jobTableList[tableNo].fFldRefs.push_back( fieldRef  );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Set column information parms for an input field that is to be ignored
 //------------------------------------------------------------------------------
@@ -636,7 +617,7 @@ void XMLJob::setJobDataIgnoreField( )
                           fJob.jobTableList[tableNo].fIgnoredFields.size()-1 );
     fJob.jobTableList[tableNo].fFldRefs.push_back      ( fieldRef  );
 }
-
+
 //------------------------------------------------------------------------------
 // Initialize the saturation limits for the specified column.
 //------------------------------------------------------------------------------
@@ -665,7 +646,7 @@ void XMLJob::initSatLimits( JobColumn& curColumn ) const
         curColumn.fMaxIntSat = infinidb_precision[curColumn.precision];
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Set Read Buffers attributes
 // pNode - current node
@@ -686,21 +667,22 @@ void XMLJob::setReadBuffers( xmlNode* pNode )
                         TYPE_INT ))
         fJob.readBufferSize = intVal;
 }
-
+
 //------------------------------------------------------------------------------
 // Set Schema attributes
 // pNode - current node
 //------------------------------------------------------------------------------
 void XMLJob::setSchema( xmlNode* pNode ) 
 {
-    std::string bufString;
+    char        buf[XML_NODE_BUF_SIZE];
 
-    if( getNodeAttributeStr( pNode,
+    if( getNodeAttribute( pNode,
                           xmlTagTable[TAG_SCHEMA_NAME],
-                          bufString ) )
-        fJob.schema = bufString;
+                          buf,
+                          TYPE_CHAR ) )
+        fJob.schema = buf;
 }
-
+
 //------------------------------------------------------------------------------
 // Transfer any/all <DefaultColumn> columns from temporary fDefaultColumns, to
 // the end of the column/field lists.
@@ -710,10 +692,8 @@ void XMLJob::setSchema( xmlNode* pNode )
 //------------------------------------------------------------------------------
 void XMLJob::postProcessTableNode()
 {
-    bool bValidateNoDefColWithoutDefValue = false;
     if (fDefaultColumns.size() > 0)
     {
-        bValidateNoDefColWithoutDefValue = true;
         int tableNo = fJob.jobTableList.size() - 1;
 
         for (unsigned k=0; k<fDefaultColumns.size(); k++)
@@ -733,38 +713,12 @@ void XMLJob::postProcessTableNode()
     execplan::CalpontSystemCatalog::RIDList colRidList;
     fillInXMLDataAsLoaded( colRidList );
 
-    // After getting all the system catalog information...
-    // Validate that if there are any <DefaultColumn> tags for a NotNull
-    // column, that the column is defined as NotNull With Default.
-    if (bValidateNoDefColWithoutDefValue)
-    {
-        int tableNo = fJob.jobTableList.size() - 1;
-
-        for (unsigned int iCol=0;
-            iCol<fJob.jobTableList[tableNo].colList.size(); iCol++)
-        {
-            JobColumn& col = fJob.jobTableList[tableNo].colList[iCol];
-
-            if (col.fFldColRelation == BULK_FLDCOL_COLUMN_DEFAULT)
-            {
-                if ( (col.fNotNull) && (!col.fWithDefault) )
-                {
-                    std::ostringstream oss;
-                    oss << "Column " << col.colName << " in table " <<
-                        fJob.jobTableList[tableNo].tblName << " is NotNull "
-                        "w/o default; cannot be used with <DefaultColumn>";
-                    throw std::runtime_error( oss.str() );
-                }
-            }
-        }
-    }
-
     // Make sure all Columns in the DB are counted for with <Column> or
     // <DefaultColumn> tags (unless validate is disabled)
     if (fValidateColList)
         validateAllColumnsHaveTags( colRidList );
 }
-
+
 //------------------------------------------------------------------------------
 // Use the table and column names from the last <Table> just loaded, to
 // collect the remaining information from the system catalog, in order to
@@ -773,7 +727,7 @@ void XMLJob::postProcessTableNode()
 void XMLJob::fillInXMLDataAsLoaded(
     execplan::CalpontSystemCatalog::RIDList& colRidList)
 {
-    boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+    execplan::CalpontSystemCatalog* cat =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
         BULK_SYSCAT_SESSION_ID);
     cat->identity(execplan::CalpontSystemCatalog::EC);
@@ -838,7 +792,8 @@ void XMLJob::fillInXMLDataAsLoaded(
                 col.precision           = colType.precision;
                 col.scale               = colType.scale;
             }
-            col.typeName                = ColDataTypeStr[colType.colDataType];
+            col.typeName                = ColDataTypeStr[
+                                          colType.colDataType];
             col.compressionType         = colType.compressionType;
             col.dctnry.fCompressionType = colType.compressionType;
             if (colType.autoincrement)
@@ -848,10 +803,7 @@ void XMLJob::fillInXMLDataAsLoaded(
 #ifdef SKIP_AUTOI
             col.autoIncFlag             = false;
 #endif
-
-            // Initialize NotNull and Default Value (based on data type)
-            fillInXMLDataNotNullDefault( tbl.tblName, colType, col );
-            
+            col.notNull                 = false;
             if (colType.ddn.dictOID > 0)
             {
                 col.colType             = 'D';
@@ -875,122 +827,7 @@ void XMLJob::fillInXMLDataAsLoaded(
         }
     } // end of loop through columns
 }
-
-//------------------------------------------------------------------------------
-// Using information from the system catalog (in colType), fill in the
-// applicable NotNull Default values into the specified JobColumn.
-//------------------------------------------------------------------------------
-void XMLJob::fillInXMLDataNotNullDefault(
-    const std::string& fullTblName,
-    execplan::CalpontSystemCatalog::ColType& colType,
-    JobColumn& col )
-{
-    const std::string col_defaultValue(colType.defaultValue);
 
-    if (colType.constraintType ==
-        execplan::CalpontSystemCatalog::NOTNULL_CONSTRAINT)
-    {
-        col.fNotNull            = true;
-        if (!col_defaultValue.empty())
-            col.fWithDefault    = true;
-    }
-    else if (colType.constraintType ==
-        execplan::CalpontSystemCatalog::DEFAULT_CONSTRAINT)
-    {
-        col.fWithDefault        = true;
-    }
-
-    if (col.fWithDefault)
-    {
-        bool bDefaultConvertError = false;
-
-        // Convert Default Value.
-        // We go ahead and report basic format conversion error;
-        // but we don't do complete validation (like checking to see
-        // if the default is too large for the given integer type),
-        // because we assume DDL is fully validating the default value.
-        switch (colType.colDataType)
-        {
-            case execplan::CalpontSystemCatalog::BIT:
-            case execplan::CalpontSystemCatalog::TINYINT:
-            case execplan::CalpontSystemCatalog::SMALLINT:
-            case execplan::CalpontSystemCatalog::MEDINT:
-            case execplan::CalpontSystemCatalog::INT:
-            case execplan::CalpontSystemCatalog::BIGINT:
-            {
-                errno = 0;
-                col.fDefaultInt = strtoll(col_defaultValue.c_str(),0,10);
-                if (errno == ERANGE)
-                    bDefaultConvertError = true;
-                break;
-            }
-
-            case execplan::CalpontSystemCatalog::DECIMAL:
-            {
-                col.fDefaultInt = Convertor::convertDecimalString(
-                    col_defaultValue.c_str(),
-                    col_defaultValue.length(),
-                    colType.scale);           
-                if (errno == ERANGE)
-                    bDefaultConvertError = true;
-                break;
-            }
-
-            case execplan::CalpontSystemCatalog::DATE:
-            {
-                int convertStatus;
-                u_int32_t dt =
-                    dataconvert::DataConvert::convertColumnDate(
-                    col_defaultValue.c_str(),
-                    dataconvert::CALPONTDATE_ENUM, convertStatus,
-                    col_defaultValue.length() );
-                if (convertStatus != 0)
-                    bDefaultConvertError = true;
-                col.fDefaultInt = dt;
-                break;
-            }
-
-            case execplan::CalpontSystemCatalog::DATETIME:
-            {
-                int convertStatus;
-                u_int64_t dt =
-                    dataconvert::DataConvert::convertColumnDatetime(
-                    col_defaultValue.c_str(),
-                    dataconvert::CALPONTDATETIME_ENUM, convertStatus,
-                    col_defaultValue.length() );
-                if (convertStatus != 0)
-                    bDefaultConvertError = true;
-                col.fDefaultInt = dt;
-                break;
-            }
-
-            case execplan::CalpontSystemCatalog::FLOAT:
-            case execplan::CalpontSystemCatalog::DOUBLE:
-            {
-                errno = 0;
-                col.fDefaultDbl = strtod(col_defaultValue.c_str(),0);
-                if (errno == ERANGE)
-                    bDefaultConvertError = true;
-                break;
-            }
-
-            default:
-            {
-                col.fDefaultChr = col_defaultValue;
-                break;
-            }
-        }
-
-        if (bDefaultConvertError)
-        {
-            std::ostringstream oss;
-            oss << "Column " << col.colName << " in table " << fullTblName <<
-                " has an invalid default value in system catalog.";
-            throw std::runtime_error( oss.str() );
-        }
-    }
-}
-
 //------------------------------------------------------------------------------
 // Use the table and column names from the last <Table> just loaded, to
 // validate that all the columns have a <Column> or <DefaultColumn> tag
@@ -1023,7 +860,7 @@ void XMLJob::validateAllColumnsHaveTags(
             retVal = colOIDList.insert( col.mapOid );
             if (!retVal.second)
             {
-                boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+                execplan::CalpontSystemCatalog* cat =
                     execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
                     BULK_SYSCAT_SESSION_ID);
                 cat->identity(execplan::CalpontSystemCatalog::EC);
@@ -1051,7 +888,7 @@ void XMLJob::validateAllColumnsHaveTags(
             }
             else
             {
-                boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+                execplan::CalpontSystemCatalog* cat =
                     execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
                     BULK_SYSCAT_SESSION_ID);
                 cat->identity(execplan::CalpontSystemCatalog::EC);
@@ -1082,7 +919,7 @@ void XMLJob::validateAllColumnsHaveTags(
         throw std::runtime_error( oss.str() );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Generate a permanent or temporary Job XML file name path.
 // sXMLJobDir Command line override for complete Job directory path
@@ -1159,7 +996,7 @@ int XMLJob::genJobXMLFileName(
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Create directory for temporary XML job description files.
 // OAM restart should delete any/all files in this directory.

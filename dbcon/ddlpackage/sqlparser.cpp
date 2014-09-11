@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: sqlparser.cpp 8706 2012-07-13 16:25:50Z rdempsey $
+*   $Id: sqlparser.cpp 7694 2011-05-11 19:14:46Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -28,11 +28,7 @@
 #include "sqlparser.h"
 #undef DDLPKGSQLPARSER_DLLEXPORT
 
-#ifdef _MSC_VER
-#include "ddl-gram-win.h"
-#else
 #include "ddl-gram.h"
-#endif
 
 void scanner_finish(void);
 void scanner_init(const char *str);

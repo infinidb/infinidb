@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: pidxwalk.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: pidxwalk.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -151,7 +151,7 @@ namespace joblist
     if (err)
       throw runtime_error("pIdxWalk: BRM error!");
 
-	uniqueID = UniqueNumberGenerator::instance()->getUnique32();
+	uniqueID = Unique32Generator::instance()->getUnique32();
 	if (fDec)
 		fDec->addQueue(uniqueID);
   }
@@ -220,7 +220,7 @@ pIdxWalk::~pIdxWalk()
 
   void pIdxWalk::makeIndexHeader(IndexWalkHeader& indexHdr)
   {
-    indexHdr.ism.Interleave=0;
+    indexHdr.ism.Reserve=0;
     indexHdr.ism.Flags=planFlagsToPrimFlags(fTraceFlags);
     indexHdr.ism.Command=INDEX_WALK;
     indexHdr.ism.Size=sizeof(IndexWalkHeader);
@@ -234,7 +234,7 @@ pIdxWalk::~pIdxWalk()
     indexHdr.Hdr.StepID = fStepId;
 
     indexHdr.LBID = fLBID;
-    idbassert(indexHdr.LBID >= 0);
+    assert(indexHdr.LBID >= 0);
    
     indexHdr.SSlen = fColType.colWidth * 8;
     indexHdr.Shift = 0;

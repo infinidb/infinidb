@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantfilter.h 8816 2012-08-15 18:51:49Z dhall $
+*   $Id: constantfilter.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -89,7 +89,7 @@ public:
 	 */
     void pushFilter (SimpleFilter* sf) {SSFP ssfp(sf); fFilterList.push_back(ssfp);} 
 	
-	//virtual const std::string data() const;
+	virtual const std::string data() const;
 	virtual const std::string toString() const;
 
 	/**
@@ -131,8 +131,7 @@ public:
 	  *  @param f the filter that this fiter tries to combine with
 	  *  @param op the operator that connects the two filters. if one or both of the
 	  *  two filters is constantFilter, need to make sure operator is consistant.
-	  *  @return a filter(constantfilter) if successfully combined. otherwise
-	  *     	 return NULL
+	  *  @return a filter(constantfilter) if sucessfully combined. otherwise return NULL
 	  */
 	 virtual Filter* combinable(Filter* f, Operator* op);
 

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_instr.cpp 3716 2013-04-18 16:35:52Z bpaul $
+* $Id: func_instr.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -29,7 +29,6 @@ using namespace std;
 #include "functor_int.h"
 #include "functioncolumn.h"
 #include "rowgroup.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 namespace funcexp
@@ -40,21 +39,6 @@ CalpontSystemCatalog::ColType Func_instr::operationType( FunctionParm& fp, Calpo
 	ct.colDataType = CalpontSystemCatalog::VARCHAR;
 	ct.colWidth = 255;
 	return ct;
-}
-
-size_t Func_instr::in_str(const string& str, const string& substr, size_t start)
-{
-	// convert both inputs to wide character strings
-	std::wstring wcstr = utf8::utf8_to_wstring(str);
-	std::wstring wcsubstr = utf8::utf8_to_wstring(substr);
-
-	if ((str.length() && !wcstr.length()) ||
-		(substr.length() && !wcsubstr.length()))
-		// this means one or both of the strings had conversion errors to wide character
-		return 0;
-
-	size_t pos = wcstr.find(wcsubstr, start-1);
-	return (pos != string::npos ? pos+1 : 0);
 }
 
 int64_t Func_instr::getIntVal(rowgroup::Row& row,
@@ -69,9 +53,9 @@ int64_t Func_instr::getIntVal(rowgroup::Row& row,
 	if (isNull || start == 0)
 		return 0;
 
-	//Bug 5110 : to support utf8 char type, we have to convert and search  
-	return in_str(parm[0]->data()->getStrVal(row, isNull), parm[1]->data()->getStrVal(row, isNull), start);
+	size_t pos = parm[0]->data()->getStrVal(row, isNull).find(parm[1]->data()->getStrVal(row, isNull),start-1);
 
+	return (pos != string::npos ? pos+1 : 0);
 }
 
 

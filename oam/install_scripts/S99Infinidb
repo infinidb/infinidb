@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# start/stop InfiniDb
+
+### BEGIN INIT INFO
+# Provides:          InfiniDB
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     S 2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: InfiniDB Process and mysql daemon
+### END INIT INFO
+
+test -f /usr/local/Calpont/bin/ProcMon || exit 0
+
+case "$1" in
+    start)
+	/usr/local/Calpont/bin/ProcMon &
+	test -f /etc/init.d/mysql-Calpont || exit 0
+	/etc/init.d/mysql-Calpont start
+	;;
+    stop)
+	/usr/local/Calpont/bin/calpontConsole stops INSTALL y
+	sleep 5
+	pkill ProcMon
+	test -f /etc/init.d/mysql-Calpont || exit 0
+	/etc/init.d/mysql-Calpont stop
+	/usr/local/Calpont/bin/clearShm
+	;;
+    force-reload)
+	$0 restart
+	;;
+    restart)
+	$0 stop
+	$0 start
+	;;
+    *)
+esac
+
+exit 0
+

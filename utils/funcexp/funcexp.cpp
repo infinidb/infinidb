@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: funcexp.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: funcexp.cpp 3011 2012-02-29 22:02:53Z rdempsey $
 *
 *
 ****************************************************************************/
@@ -40,9 +40,6 @@ using namespace joblist;
 #ifndef SKIP_UDF
 #include "udfsdk.h"
 #endif
-
-bool cPo = false;		// extern-ed in utils_utf8.h
-
 
 namespace funcexp
 {

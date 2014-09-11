@@ -1,24 +1,15 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+//
+// C++ Interface: fixedallocator
+//
+// Description: 
+//
+//
+// Author: Patrick <pleblanc@localhost.localdomain>, (C) 2009
+//
+// Copyright: See COPYING file that comes with this distribution
+//
+//
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
-
-/******************************************************************************************
-* $Id$
-*
-******************************************************************************************/
 
 /* This allocator is for frequent small allocations that all get deallocated at once.
    It allocates large blocks of memory from the system and distributes 'allocsize'
@@ -36,7 +27,6 @@
 #include <stdint.h>
 #include <boost/shared_array.hpp>
 #include <vector>
-#include <limits>
 
 #if defined(_MSC_VER) && defined(xxxFIXEDALLOCATOR_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -48,45 +38,33 @@ namespace utils {
 
 class FixedAllocator
 {
-public:
-	EXPORT static const unsigned long DEFAULT_NUM_ELEMENTS=(4096 * 4);  // should be a multiple of pagesize
+	public:
+		EXPORT FixedAllocator();
+		EXPORT FixedAllocator(unsigned long allocsize, bool isTmpSpace = false,
+		  unsigned long numelements = DEFAULT_NUM_ELEMENTS);
+		EXPORT FixedAllocator(const FixedAllocator &);
+		EXPORT virtual ~FixedAllocator();
+		EXPORT FixedAllocator & operator=(const FixedAllocator &);
 
-	EXPORT FixedAllocator() :
-		capacityRemaining(0),
-		elementCount(std::numeric_limits<unsigned long>::max()),
-		elementSize(0),
-		currentlyStored(0),
-		tmpSpace(false),
-		nextAlloc(0) {}
-	EXPORT explicit FixedAllocator(unsigned long allocSize, bool isTmpSpace = false,
-	  unsigned long numElements = DEFAULT_NUM_ELEMENTS) :
-		capacityRemaining(0),
-		elementCount(numElements),
-		elementSize(allocSize),
-		currentlyStored(0),
-		tmpSpace(isTmpSpace),
-		nextAlloc(0) {}
-	EXPORT FixedAllocator(const FixedAllocator &);
-	EXPORT FixedAllocator & operator=(const FixedAllocator &);
-	virtual ~FixedAllocator() {}
+		EXPORT void * allocate();
+		void deallocate() { };   // does nothing
+		EXPORT void deallocateAll();		// drops all memory in use
+		EXPORT inline uint64_t getMemUsage() const {
+			return (tmpSpace ? elementSize * elementCount : currentlyStored * elementSize);
+		}
 
-	EXPORT void * allocate();
-	void deallocate() { }   // does nothing
-	EXPORT void deallocateAll();		// drops all memory in use
-	EXPORT inline uint64_t getMemUsage() const {
-		return (tmpSpace ? elementSize * elementCount : currentlyStored * elementSize);
-	}
+		EXPORT static const unsigned long DEFAULT_NUM_ELEMENTS=16384;  // should be a multiple of pagesize
 
-private:
-	void newBlock();
+	private:
+		void newBlock();
 
-	std::vector<boost::shared_array<uint8_t> > mem;
-	unsigned long capacityRemaining;
-	unsigned long elementCount;
-	unsigned long elementSize;
-	unsigned long currentlyStored;
-	bool tmpSpace;
-	uint8_t* nextAlloc;
+		std::vector<boost::shared_array<uint8_t> > mem;
+		unsigned long capacityRemaining;
+		unsigned long elementCount;
+		unsigned long elementSize;
+		unsigned long currentlyStored;
+		bool tmpSpace;
+		uint8_t* nextAlloc;
 };
 
 }

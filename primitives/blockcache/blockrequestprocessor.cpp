@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockrequestprocessor.cpp 1965 2012-10-11 19:58:47Z xlou $
+ *   $Id: blockrequestprocessor.cpp 1808 2012-01-10 00:10:20Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -32,7 +32,6 @@ using namespace std;
 #include "blockrequestprocessor.h"
 #include "rwlock_local.h"
 #include "dbrm.h"
-#include "pp_logger.h"
 
 namespace dbbc {
 
@@ -130,13 +129,6 @@ int BlockRequestProcessor::check(const BRM::InlineLBIDRange& range, const BRM::V
 	fileRequest rqstBlk(adjRange, ver, txn, compType);
 	check(rqstBlk);
 	if (rqstBlk.RequestStatus() != fileRequest::SUCCESSFUL) {
-		if (rqstBlk.RequestStatus() == fileRequest::FS_EINVAL)
-			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
-					errorMsg(logging::ERR_O_DIRECT), logging::ERR_O_DIRECT);
-		else if (rqstBlk.RequestStatus() == fileRequest::FS_ENOENT)
-			throw logging::IDBExcept(logging::IDBErrorInfo::instance()->
-					errorMsg(logging::ERR_ENOENT), logging::ERR_ENOENT);
-
 		throw runtime_error(rqstBlk.RequestStatusStr());
 	}
 	lbidCount=rqstBlk.BlocksRead();
@@ -225,25 +217,7 @@ const int BlockRequestProcessor::getBlock(const BRM::LBID_t& lbid, const BRM::VE
 	fileRequest rqstBlk(lbid, ver, vbFlg, txn, compType, (uint8_t *) bufferPtr, insertIntoCache);
 	check(rqstBlk);
 	if (rqstBlk.RequestStatus() == fileRequest::BRM_LOOKUP_ERROR)
-	{
-		ostringstream os;
-		os << "BRP::getBlock(): got a BRM lookup error.  LBID=" << lbid << " ver=" << ver << " txn="
-			<< txn << " vbFlg=" << (int) vbFlg;
-		primitiveprocessor::Logger logger;
-		logger.logMessage(os.str(), false);
 		throw logging::IDBExcept(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_BRM_LOOKUP), logging::ERR_BRM_LOOKUP);
-	}
-	else if (rqstBlk.RequestStatus() == fileRequest::FS_EINVAL)
-	{
-		throw logging::IDBExcept(logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_O_DIRECT),
-									logging::ERR_O_DIRECT);
-	}
-	else if (rqstBlk.RequestStatus() == fileRequest::FS_ENOENT)
-	{
-		throw logging::IDBExcept(
-						logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_ENOENT),
-									logging::ERR_ENOENT);
-	}
 	else if (rqstBlk.RequestStatus() != fileRequest::SUCCESSFUL) {
 		throw runtime_error(rqstBlk.RequestStatusStr());
 	}

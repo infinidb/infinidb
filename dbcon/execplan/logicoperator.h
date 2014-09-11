@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: logicoperator.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: logicoperator.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -133,22 +133,6 @@ public:
 				isNull = false;
 				//return (lop->getBoolVal(row, isNull) || rop->getBoolVal(row, isNull));
 				return rop->getBoolVal(row, isNull);
-			}
-			case OP_XOR:
-			{
-				// Logical XOR. Returns NULL if either operand is NULL. 
-				// For non-NULL operands, evaluates to 1 if an odd number of operands is nonzero, 
-				// otherwise 0 is returned. 
-				bool lopv = lop->getBoolVal(row, isNull);
-				if (isNull)
-					return false;
-				bool ropv = rop->getBoolVal(row, isNull);
-				if (isNull)
-					return false;
-				if ((lopv && !ropv) || (ropv && !lopv))
-					return true;
-				else
-					return false;
 			}
 			default:
 				throw std::runtime_error("invalid logical operation");

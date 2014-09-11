@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: rgnode.h 1635 2012-08-03 18:57:10Z rdempsey $
+ * $Id: rgnode.h 1266 2011-02-08 14:36:09Z rdempsey $
  *
  *****************************************************************************/
 
@@ -31,7 +31,7 @@
 
 #include "brmtypes.h"
 
-#if defined(_MSC_VER) && defined(xxxRGNODE_DLLEXPORT)
+#if defined(_MSC_VER) && defined(RGNODE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT

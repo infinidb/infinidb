@@ -16,24 +16,20 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: exceptclasses.h 3678 2013-04-02 15:45:49Z rdempsey $
+ * $Id: exceptclasses.h 2635 2011-05-20 21:24:47Z zzhu $
  *
  *****************************************************************************/
 
 /** @file */
 
-#ifndef LOGGING_EXCEPTCLASSES_H
-#define LOGGING_EXCEPTCLASSES_H
+#ifndef EXCEPTCLASSES_H
+#define EXCEPTCLASSES_H
 
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
+#include <exception>
 #include <string>
-
 #include "errorcodes.h"
 #include "errorids.h"
 #include "idberrorinfo.h"
-#include "logger.h"
 
 namespace logging 
 {
@@ -232,54 +228,7 @@ public:
 	{ }
 };
 
-class DBRMException : public std::runtime_error
-{
-public:
-	DBRMException(const std::string& emsg) :
-	std::runtime_error(emsg) {}
-};
-
-//XXXPAT: I'm told this all works in windows now.  Skeptical.  If it must be changed,
-//it should still throw on error to preserve the control flow...
-#ifndef __STRING
-#define __STRING(x) #x
-#endif
-#define idbassert(x) do { \
-	if (!(x)) { \
-		std::ostringstream os; \
-\
-		os << __FILE__ << "@" << __LINE__ << ": assertion \'" << __STRING(x) << "\' failed"; \
-		std::cerr << os.str() << std::endl; \
-		logging::MessageLog logger((logging::LoggingID())); \
-		logging::Message message; \
-		logging::Message::Args args; \
-\
-		args.add(os.str()); \
-		message.format(args); \
-		logger.logErrorMessage(message); \
-		throw logging::IDBExcept(logging::ERR_ASSERTION_FAILURE); \
-	} \
-} while (0)
-
-#define idbassert_s(x, s) do { \
-	if (!(x)) { \
-		std::ostringstream os; \
-\
-		os << __FILE__ << "@" << __LINE__ << ": assertion \'" << __STRING(x) << "\' failed.  Error msg \'" << s << "\'"; \
-		std::cerr << os.str() << std::endl; \
-		logging::MessageLog logger((logging::LoggingID())); \
-		logging::Message message; \
-		logging::Message::Args args; \
-\
-		args.add(os.str()); \
-		message.format(args); \
-		logger.logErrorMessage(message); \
-		throw logging::IDBExcept(logging::ERR_ASSERTION_FAILURE); \
-	} \
-} while (0)
-
 }
-
 
 #endif
 // vim:ts=4 sw=4:

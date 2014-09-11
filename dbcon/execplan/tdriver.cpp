@@ -109,7 +109,7 @@ if (OIDBitmapFilename != NULL)
 CPPUNIT_TEST_SUITE_END();
 
 private:
-	      boost::shared_ptr<CalpontSystemCatalog> csc;
+	      CalpontSystemCatalog *csc;
 public:
 	
     static void walkfnString(const ParseTree* n)

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: masterdbrmnode.cpp 1807 2012-12-20 16:56:10Z pleblanc $
+ * $Id: masterdbrmnode.cpp 1546 2012-04-03 18:32:59Z dcathey $
  *
  ****************************************************************************/
 
@@ -34,6 +34,10 @@
 #include "liboamcpp.h"
 #include "stopwatch.h"
 #include "masterdbrmnode.h"
+
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 // #define BRM_VERBOSE
 
@@ -108,7 +112,6 @@ MasterDBRMNode::MasterDBRMNode()
 	readOnly = false;
 	halting = false;
 
-	tableLockServer.reset(new TableLockServer(&sm));
 	initMsgQueues(config);
 	rg = new LBIDResourceGraph();
 	//@Bug 2325 DBRMTimeOut is default to 60 seconds
@@ -300,9 +303,6 @@ void MasterDBRMNode::run()
 		params->t = reader;
 		params->sock = s;
 		mutex2.unlock();
-#ifdef __FreeBSD__
-		mutex.unlock();
-#endif
 	}
 	serverLock.lock();
 	delete dbrmServer;
@@ -326,9 +326,8 @@ void MasterDBRMNode::msgProcessor()
 	mutex2.lock();
 	p = params;
 	mutex2.unlock();
-#ifndef __FreeBSD__
 	mutex.unlock();
-#endif
+	
 	while (!die) {
 		try {
 			msg = p->sock->read(&MSG_TIMEOUT);
@@ -366,7 +365,7 @@ void MasterDBRMNode::msgProcessor()
 			case GETREADONLY: doGetReadOnly(p->sock); continue;
 		}
 
-		/* Process SessionManager calls */
+		/* Check if the command is for the SessionManager */
 		switch (cmd) {
 			case VER_ID: doVerID(msg, p); continue;
 			case SYSCAT_VER_ID: doSysCatVerID(msg, p); continue;
@@ -375,54 +374,23 @@ void MasterDBRMNode::msgProcessor()
 			case ROLLED_BACK: doRolledBack(msg, p); continue;
 			case GET_TXN_ID: doGetTxnID(msg, p); continue;
 			case SID_TID_MAP: doSIDTIDMap(msg, p); continue;
+			case GET_SHM_CONTENTS: doGetShmContents(msg, p); continue;
 			case GET_UNIQUE_UINT32: doGetUniqueUint32(msg, p); continue;
-			case GET_UNIQUE_UINT64: doGetUniqueUint64(msg, p); continue;
+			case SET_TABLE_LOCK: doSetTableLock(msg, p); continue;
+			case UPDATE_TABLE_LOCK: doUpdateTableLock(msg, p); continue;
+			case GET_TABLE_LOCK: doGetTableLock(msg, p); continue;
+			case GET_TABLE_LOCKS: doGetTableLocks(msg, p); continue;
 			case GET_SYSTEM_STATE: doGetSystemState(msg, p); continue;
 			case SET_SYSTEM_STATE: doSetSystemState(msg, p); continue;
-			case CLEAR_SYSTEM_STATE: doClearSystemState(msg, p); continue;
-			case SM_RESET: doSessionManagerReset(msg, p); continue;
-		}
-
-		/* Process TableLock calls */
-		switch (cmd) {
-			case GET_TABLE_LOCK: doGetTableLock(msg, p); continue;
-			case RELEASE_TABLE_LOCK: doReleaseTableLock(msg, p); continue;
-			case CHANGE_TABLE_LOCK_STATE: doChangeTableLockState(msg, p); continue;
-			case CHANGE_TABLE_LOCK_OWNER: doChangeTableLockOwner(msg, p); continue;
-			case GET_ALL_TABLE_LOCKS: doGetAllTableLocks(msg, p); continue;
-			case RELEASE_ALL_TABLE_LOCKS: doReleaseAllTableLocks(msg, p); continue;
-			case GET_TABLE_LOCK_INFO: doGetTableLockInfo(msg, p); continue;
-			case OWNER_CHECK: doOwnerCheck(msg, p); continue;
-		}
-
-		/* Process OIDManager calls */
-		switch (cmd) {
-			case ALLOC_OIDS: doAllocOIDs(msg, p); continue;
-			case RETURN_OIDS: doReturnOIDs(msg, p); continue;
-			case OIDM_SIZE: doOidmSize(msg, p); continue;
-
-			case ALLOC_VBOID: doAllocVBOID(msg, p); continue;
-			case GETDBROOTOFVBOID: doGetDBRootOfVBOID(msg, p); continue;
-			case GETVBOIDTODBROOTMAP: doGetVBOIDToDBRootMap(msg, p); continue;
-		}
-
-		/* Process Autoincrement calls */
-		switch (cmd) {
-			case START_AI_SEQUENCE: doStartAISequence(msg, p); continue;
-			case GET_AI_RANGE: doGetAIRange(msg, p); continue;
-			case RESET_AI_SEQUENCE: doResetAISequence(msg, p); continue;
-			case GET_AI_LOCK: doGetAILock(msg, p); continue;
-			case RELEASE_AI_LOCK: doReleaseAILock(msg, p); continue;
-			case DELETE_AI_SEQUENCE: doDeleteAISequence(msg, p); continue;
 		}
 
 retrycmd:
 		uint haltloops = 0;
 
-		while (halting && ++haltloops < static_cast<uint>(FIVE_MIN_TIMEOUT.tv_sec))
+		while (halting && ++haltloops < FIVE_MIN_TIMEOUT.tv_sec)
 			sleep(1);
 
-		slaveLock.lock();
+		slaveLock.lock(); //pthread_mutex_lock(&slaveLock);
 		if (haltloops == FIVE_MIN_TIMEOUT.tv_sec) {
 			ostringstream os;
 			os << "A node is unresponsive, no reconfigure in at least " << FIVE_MIN_TIMEOUT.tv_sec <<
@@ -430,41 +398,16 @@ retrycmd:
 			log(os.str());
 			readOnly = true;
 			halting = false;
-		}	
-	
+		}
+
 		if (readOnly) {
 			SEND_ALARM
-			slaveLock.unlock();
+			slaveLock.unlock(); //pthread_mutex_unlock(&slaveLock);
 			sendError(p->sock, ERR_READONLY);
 			goto out;
 		}
 
-		/* TODO: Separate these out-of-band items into separate functions */
-
-		/* Need to get the dbroot, convert to vbOID */
-		if (cmd == BEGIN_VB_COPY) {
-			try {
-				boost::mutex::scoped_lock lk(oidsMutex);
-				uint8_t *buf = msg.buf();
-
-				// dbroot is currently after the cmd and transid
-				uint16_t *dbRoot = (uint16_t *) &buf[1+4];
-
-				// If that dbroot has no vboid, create one
-				int16_t err;
-				err = oids.getVBOIDOfDBRoot(*dbRoot);
-				//cout << "dbRoot " << *dbRoot << " -> vbOID " << err << endl;
-				if (err < 0) {
-					err = oids.allocVBOID(*dbRoot);
-				//	cout << "  - allocated oid " << err << endl;
-				}
-				*dbRoot = err;
-			}
-			catch (...) {
-				sendError(p->sock, -1);
-				goto out;
-			}
-		}
+		/* TODO: Seperate these out-of-band items into seperate functions */
 
 		/* Check for deadlock on beginVBCopy */
 /*		if (cmd == BEGIN_VB_COPY) {
@@ -512,11 +455,17 @@ retrycmd:
 			2) "out of band" failures, like a network problem
 	*/
 
-		/* Need to atomically do the safety check and the clear. */
+		/* Need to atomically do the safety check and the clear */
 		if (cmd == CLEAR) {
-			uint txnCount = sm.getTxnCount();
+			const SIDTIDEntry *entries = NULL;
+			int len;
+
+			try {
+				entries = sm.SIDTIDMap(len);
+			}
+			catch (exception&) { }
 			// do nothing if there's an active transaction
-			if (txnCount != 0) {
+			if (entries == NULL || len != 0) {
 				ByteStream *reply = new ByteStream();
 				*reply << (uint8_t) ERR_FAILURE;
 				responses.push_back(reply);
@@ -547,8 +496,7 @@ retrycmd:
 		cerr << "DBRM Controller: distributed msg" << endl;
 #endif
 
-		bool readErrFlag; // ignore this flag in this case
-		err = gatherResponses(cmd, msg.length(), &responses, readErrFlag);
+		err = gatherResponses(cmd, msg.length(), &responses);
 		
 #ifdef BRM_VERBOSE
 		cerr << "DBRM Controller: got responses" << endl;
@@ -566,20 +514,7 @@ retrycmd:
 			cerr << "DBRM Controller: inconsistency detected between the resource graph and the VSS or CopyLocks logic." << endl;
 #endif
 
-		// these command will have error message carried in the response
-		if (!responses.empty() && (cmd == DELETE_PARTITION || cmd == MARK_PARTITION_FOR_DELETION || cmd == RESTORE_PARTITION) 
-			 && err)
-		{
-			if (err != ERR_PARTITION_DISABLED && err != ERR_PARTITION_ENABLED && 
-				  err != ERR_INVALID_OP_LAST_PARTITION && err != ERR_NOT_EXIST_PARTITION &&
-				  err != ERR_NO_PARTITION_PERFORMED)
-				undo();
-			//goto no_confirm;
-		}
-		else 
-		{ 
-  		CHECK_ERROR1(err)
-  	}
+		CHECK_ERROR1(err)
 
 		// these cmds don't need the 2-phase commit
 		if (cmd == FLUSH_INODE_CACHES || cmd == CLEAR || cmd == TAKE_SNAPSHOT)
@@ -646,18 +581,13 @@ void MasterDBRMNode::distribute(ByteStream *msg)
 		}
 }
 
-// readErrFlag is a separate return flag used by doChangeTableLockOwner()
-// (or any subsequent function) which calls gatherResponses() outside the
-// scope of msgProcessor() which instead uses the halting flag for error
-// handling.
 int MasterDBRMNode::gatherResponses(uint8_t cmd,
 	uint32_t cmdMsgLength,
-	vector<ByteStream*>* responses,
-	bool& readErrFlag) throw()
+	vector<ByteStream*>* responses) throw()
 {
 	int i;
-	ByteStream *tmp=0;
-	readErrFlag = false;
+	ByteStream *tmp;
+	vector<ByteStream *>::const_iterator it;
 
 		//Bug 2258 gather all responses
 	int error = 0;
@@ -681,8 +611,6 @@ int MasterDBRMNode::gatherResponses(uint8_t cmd,
 			*/
 
 			halting = true;
-			readErrFlag = true;
-			delete tmp;
 			return ERR_OK;
 
 			/*
@@ -702,8 +630,6 @@ int MasterDBRMNode::gatherResponses(uint8_t cmd,
 		if (tmp->length() == 0 && !halting) {
 			/* See the comment above */
 			halting = true;
-			readErrFlag = true;
-			delete tmp;
 			return ERR_OK;
 
 			/*
@@ -757,12 +683,12 @@ int MasterDBRMNode::compareResponses(uint8_t cmd,
 		return ERR_NETWORK;
 	}
 
-	/*if (errCode != ERR_OK) {
+	if (errCode != ERR_OK) {
 #ifdef BRM_VERBOSE
 		cerr << "DBRM Controller: first response has error code " << errCode << endl;
 #endif
 		return errCode;
-	}*/
+	}
 	
 	for (it = responses.begin(), it2 = it + 1, i = 2; it2 != responses.end(); it++, it2++, i++)
 		if (**it != **it2 && !halting) {
@@ -780,8 +706,7 @@ int MasterDBRMNode::compareResponses(uint8_t cmd,
 			return ERR_SLAVE_INCONSISTENCY;
 		}
 
-	//return ERR_OK;
-	return errCode;
+	return ERR_OK;
 }
 		
 void MasterDBRMNode::undo() throw()
@@ -1218,11 +1143,191 @@ void MasterDBRMNode::doGetTxnID(ByteStream &msg, ThreadParams *p)
 	catch (...) { }
 }
 
+void MasterDBRMNode::doSetTableLock(messageqcpp::ByteStream &msg, ThreadParams *p)
+{
+	ByteStream reply;
+	OID_t tableOID;
+	u_int32_t sessionID;
+	u_int32_t processID;
+	std::string processName;
+	bool lock;
+	uint8_t cmd;
+	int8_t rc = 0;
+	uint32_t tmp32;
+	uint8_t tmp8;
+	try {
+		msg >> cmd;
+		msg >> tmp32;
+		tableOID = tmp32;
+		msg >> tmp32;
+		sessionID = tmp32;
+		msg >> tmp32;
+		processID = tmp32;;
+		msg >> processName;
+		msg >> tmp8;
+		lock = (tmp8 != 0);
+
+		rc = sm.setTableLock ( tableOID, sessionID, processID, processName, lock );
+#ifdef BRM_VERBOSE
+		cerr << "doSetTableLock returning rc=" << rc << endl;
+#endif
+	}
+	catch (exception&) {
+		reply << (uint8_t) ERR_FAILURE;
+		try {
+			p->sock->write(reply);
+		}
+		catch (...) { }
+		return;
+	}
+
+	reply << (uint8_t) ERR_OK;
+	reply << (uint8_t) rc;
+	try {
+		p->sock->write(reply);
+	}
+	catch (...) { }
+}
+
+void MasterDBRMNode::doUpdateTableLock(messageqcpp::ByteStream &msg, ThreadParams *p)
+{
+	ByteStream reply;
+	OID_t tableOID;
+	u_int32_t processID;
+	std::string processName;
+	uint8_t cmd;
+	int8_t rc = 0;
+	uint32_t tmp32;
+	try {
+		msg >> cmd;
+		msg >> tmp32;
+		tableOID = tmp32;
+		msg >> tmp32;
+		processID = tmp32;;
+		msg >> processName;
+
+		rc = sm.updateTableLock ( tableOID, processID, processName );
+#ifdef BRM_VERBOSE
+		cerr << "doUpdateTableLock returning rc=" << rc << endl;
+#endif
+	}
+	catch (exception&) {
+		reply << (uint8_t) ERR_FAILURE;
+		reply << (uint32_t) processID;
+		reply << processName;
+		try {
+			p->sock->write(reply);
+		}
+		catch (...) { }
+		return;
+	}
+
+	reply << (uint8_t) ERR_OK;
+	reply << (uint8_t) rc;
+	
+	reply << (uint32_t) processID;
+	reply << processName;
+	
+	try {
+		p->sock->write(reply);
+	}
+	catch (...) { }
+}
+
+void MasterDBRMNode::doGetTableLock(messageqcpp::ByteStream &msg, ThreadParams *p)
+{
+	ByteStream reply;
+	OID_t tableOID;
+	u_int32_t processID;
+	std::string processName;
+	bool lockStatus;
+	SessionManagerServer::SID sid;
+	uint8_t cmd;
+	int8_t rc = 0;
+	uint32_t tmp32;
+	uint8_t tmp8;
+	try {
+		msg >> cmd;
+		msg >> tmp32;
+		tableOID = tmp32;
+		msg >> tmp32;
+		processID = tmp32;
+		msg >> processName;
+		msg >> tmp8;
+		lockStatus = (tmp8 != 0);
+
+		rc = sm.getTableLockInfo ( tableOID, processID, processName, lockStatus, sid );
+#ifdef BRM_VERBOSE
+		cerr << "doGetTableLock returning rc=" << rc << endl;
+#endif
+	}
+	catch (exception&) {
+		reply << (uint8_t) ERR_FAILURE;
+		try {
+			p->sock->write(reply);
+		}
+		catch (...) { }
+		return;
+	}
+
+	reply << (uint8_t) ERR_OK;
+	reply <<  (uint8_t) rc;
+	reply << (uint32_t) processID;
+	reply << processName;
+	reply << (uint8_t) lockStatus;
+	reply << (uint32_t) sid;
+
+	try {
+		p->sock->write(reply);
+	}
+	catch (...) { }
+	
+}
+
+void MasterDBRMNode::doGetTableLocks(messageqcpp::ByteStream &msg, ThreadParams *p)
+{
+	ByteStream reply;
+	uint8_t cmd;
+	std::vector<SIDTIDEntry> sidTidEntries;
+	try {
+		msg >> cmd;
+		sidTidEntries = sm.getTableLocksInfo ();
+#ifdef BRM_VERBOSE
+		cerr << "doGetTableLocks returning " <<  sidTidEntries.size() << " entries. " << endl;
+#endif
+	}
+	catch (exception&) {
+		reply << (uint8_t) ERR_FAILURE;
+		try {
+			p->sock->write(reply);
+		}
+		catch (...) { }
+		return;
+	}
+
+	reply << (uint8_t) ERR_OK;
+	reply << (uint8_t) sidTidEntries.size();
+	for ( uint8_t i = 0; i < sidTidEntries.size(); i++ )
+	{
+		reply << (uint32_t) sidTidEntries[i].txnid.id;
+		reply << (uint8_t) sidTidEntries[i].txnid.valid;
+		reply << (uint32_t) sidTidEntries[i].sessionid;
+		reply << (uint32_t) sidTidEntries[i].tableOID;
+		reply << (uint32_t) sidTidEntries[i].processID;
+		reply << sidTidEntries[i].processName;
+	}
+	try {
+		p->sock->write(reply);
+	}
+	catch (...) { }
+	
+}
+
 void MasterDBRMNode::doSIDTIDMap(ByteStream &msg, ThreadParams *p)
 {
 	ByteStream reply;
 	int len, i;
-	boost::shared_array<SIDTIDEntry> entries;
+	const SIDTIDEntry *entries;
 
 	try {
 		entries = sm.SIDTIDMap(len);
@@ -1250,8 +1355,40 @@ void MasterDBRMNode::doSIDTIDMap(ByteStream &msg, ThreadParams *p)
 #endif
 		reply << (uint32_t) entries[i].txnid.id << (uint8_t) entries[i].txnid.valid << 
 			(uint32_t) entries[i].sessionid;
+		reply << (uint32_t) entries[i].tableOID << (uint32_t) entries[i].processID <<
+			string(entries[i].processName);
 	}
 	
+	delete [] entries;
+	try {
+		p->sock->write(reply);
+	}
+	catch (...) { }
+}
+
+
+
+void MasterDBRMNode::doGetShmContents(ByteStream &msg, ThreadParams *p)
+{
+	ByteStream reply;
+	int len;
+	char *shm;
+
+	try {
+		shm = sm.getShmContents(len);
+	}
+	catch(exception&) {
+		reply << (uint8_t) ERR_FAILURE;
+		try { 
+			p->sock->write(reply);
+		}
+		catch (...) { }
+		return;
+	}
+
+	reply << (uint8_t) ERR_OK;
+	reply.append((uint8_t *)shm, len);
+	delete [] shm;
 	try {
 		p->sock->write(reply);
 	}
@@ -1287,46 +1424,18 @@ void MasterDBRMNode::doGetUniqueUint32(ByteStream &msg, ThreadParams *p)
 	catch (exception&) { }
 }
 
-void MasterDBRMNode::doGetUniqueUint64(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	uint64_t ret;
-
-	try {
-		ret = sm.getUnique64();
-		reply << (uint8_t) ERR_OK;
-		reply << ret;
-#ifdef BRM_VERBOSE
-		cerr << "getUnique64() returning " << ret << endl;
-#endif
-	}
-	catch (exception&) {
-		reply.reset();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch (...) { }
-		return;
-	}
-
-	try {
-		p->sock->write(reply);
-	}
-	catch (exception&) { }
-}
-
 void MasterDBRMNode::doGetSystemState(ByteStream &msg, ThreadParams *p)
 {
 	ByteStream reply;
-	uint32_t ss = 0;
+	int ret;
+	int ss = SessionManagerServer::SS_NOT_READY;
 	ByteStream::byte err = ERR_FAILURE;
 
 	try {
-		sm.getSystemState(ss);
-		err = ERR_OK;
+		ret = sm.getSystemState(ss);
+		if (ret == 0) err = ERR_OK;
 		reply << err;
-		reply << static_cast<ByteStream::quadbyte>(ss);
+		reply << static_cast<ByteStream::byte>(ss);
 #ifdef BRM_VERBOSE
 		cerr << "getSystemState() returning " << static_cast<int>(err) << endl;
 #endif
@@ -1352,48 +1461,17 @@ void MasterDBRMNode::doSetSystemState(ByteStream &msg, ThreadParams *p)
 {
 	ByteStream reply;
 	ByteStream::byte cmd;
+	int rc = 0;
+	ByteStream::byte tmp8;
 	ByteStream::byte err = ERR_FAILURE;
-	uint32_t ss;
+	int ss;
 
 	try {
 		msg >> cmd;
-		msg >> ss;
+		msg >> tmp8;
+		ss = static_cast<int>(tmp8);
 
-		sm.setSystemState(ss);
-#ifdef BRM_VERBOSE
-		cerr << "doSetSystemState setting " << hex << ss << dec << endl;
-#endif
-	}
-	catch (exception&) {
-		err = ERR_FAILURE;
-		reply << err;
-		try {
-			p->sock->write(reply);
-		}
-		catch (...) { }
-		return;
-	}
-
-	err = ERR_OK;
-	reply << err;
-	try {
-		p->sock->write(reply);
-	}
-	catch (...) { }
-}
-
-void MasterDBRMNode::doClearSystemState(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	ByteStream::byte cmd;
-	ByteStream::byte err = ERR_FAILURE;
-	uint32_t ss;
-
-	try {
-		msg >> cmd;
-		msg >> ss;
-
-		sm.clearSystemState(ss);
+		rc = sm.setSystemState(ss);
 #ifdef BRM_VERBOSE
 		cerr << "doSetSystemState returning rc=" << rc << endl;
 #endif
@@ -1408,651 +1486,12 @@ void MasterDBRMNode::doClearSystemState(ByteStream &msg, ThreadParams *p)
 		return;
 	}
 
-	err = ERR_OK;
+	if (rc == 0) err = ERR_OK;
 	reply << err;
 	try {
 		p->sock->write(reply);
 	}
 	catch (...) { }
-}
-
-void MasterDBRMNode::doSessionManagerReset(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-
-	try {
-		sm.reset();
-		reply << (uint8_t) ERR_OK;
-	}
-	catch (...) {
-		reply << (uint8_t) ERR_FAILURE;
-	}
-
-	try {
-		p->sock->write(reply);
-	}
-	catch (...) { }
-}
-
-void MasterDBRMNode::doAllocOIDs(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	int ret;
-	uint32_t tmp32;
-	int num;
-	uint8_t cmd;
-
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		msg >> cmd;
-		msg >> tmp32;
-		num = (int) tmp32;
-		ret = oids.allocOIDs(num);
-		reply << (uint8_t) ERR_OK;
-		reply << (uint32_t) ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-void MasterDBRMNode::doReturnOIDs(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	uint8_t cmd;
-	uint32_t tmp32;
-	int start, end;
-
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		msg >> cmd;
-		msg >> tmp32;
-		start = (int) tmp32;
-		msg >> tmp32;
-		end = (int) tmp32;
-		oids.returnOIDs(start, end);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-void MasterDBRMNode::doOidmSize(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	int ret;
-
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		ret = oids.size();
-		reply << (uint8_t) ERR_OK;
-		reply << (uint32_t) ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-void MasterDBRMNode::doAllocVBOID(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	uint32_t dbroot;
-	uint32_t ret;
-	uint8_t cmd;
-
-	msg >> cmd;
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		msg >> dbroot;
-		ret = oids.allocVBOID(dbroot);
-		reply << (uint8_t) ERR_OK;
-		reply << ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-void MasterDBRMNode::doGetDBRootOfVBOID(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	uint32_t vbOID;
-	uint32_t ret;
-	uint8_t cmd;
-
-	msg >> cmd;
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		msg >> vbOID;
-		ret = oids.getDBRootOfVBOID(vbOID);
-		reply << (uint8_t) ERR_OK;
-		reply << ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-void MasterDBRMNode::doGetVBOIDToDBRootMap(ByteStream &msg, ThreadParams *p)
-{
-	ByteStream reply;
-	uint8_t cmd;
-
-	msg >> cmd;
-	try {
-		boost::mutex::scoped_lock lk(oidsMutex);
-
-		const vector<uint16_t> &ret = oids.getVBOIDToDBRootMap();
-		reply << (uint8_t) ERR_OK;
-		serializeInlineVector<uint16_t>(reply, ret);
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		} catch (...) { }
-	}
-}
-
-
-void MasterDBRMNode::doGetTableLock(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	TableLockInfo tli;
-	uint64_t id;
-	ByteStream reply;
-
-	msg >> cmd;
-
-	try {
-		msg >> tli;
-		idbassert(msg.length() == 0);
-		id = tableLockServer->lock(&tli);
-		reply << (uint8_t) ERR_OK;
-		reply << id;
-		if (id == 0) {
-			reply << tli.ownerPID;
-			reply << tli.ownerName;
-			reply << (uint32_t) tli.ownerSessionID;
-			reply << (uint32_t) tli.ownerTxnID;
-		}
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doReleaseTableLock(ByteStream &msg, ThreadParams *p)
-{
-	uint64_t id;
-	uint8_t cmd;
-	bool ret;
-	ByteStream reply;
-
-	msg >> cmd;
-
-	try {
-		msg >> id;
-		idbassert(msg.length() == 0);
-		ret = tableLockServer->unlock(id);
-		reply << (uint8_t) ERR_OK;
-		reply << (uint8_t) ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doChangeTableLockState(ByteStream &msg, ThreadParams *p)
-{
-	uint64_t id;
-	uint32_t tmp32;
-	uint8_t cmd;
-	LockState state;
-	bool ret;
-	ByteStream reply;
-
-	msg >> cmd;
-	try {
-		msg >> id;
-		msg >> tmp32;
-		idbassert(msg.length() == 0);
-		state = (LockState) tmp32;
-		ret = tableLockServer->changeState(id, state);
-		reply << (uint8_t) ERR_OK;
-		reply << (uint8_t) ret;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doChangeTableLockOwner(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	uint64_t id;
-	string name;
-	uint pid;
-	ByteStream reply;
-	ByteStream workerNodeCmd;
-	uint32_t tmp32;
-	int32_t sessionID;
-	int32_t txnID;
-	bool ret;
-	vector<ByteStream *> responses;
-	int err;
-
-	// current owner vars
-	TableLockInfo tli;
-	string processName;
-	string::size_type namelen;
-	bool exists;
-
-	try {
-		msg >> cmd >> id >> name >> pid >> tmp32;
-		sessionID = tmp32;
-		msg >> tmp32;
-		txnID = tmp32;
-		idbassert(msg.length() == 0);
-
-		/* get the current owner info
-		 * send cmd to look for the owner
-		 * if there's an existing owner, reject the request
-		 */
-
-		ret = tableLockServer->getLockInfo(id, &tli);
-		if (!ret) {
-			reply << (uint8_t) ERR_OK << (uint8_t) ret;
-			goto write;
-		}
-
-		namelen = tli.ownerName.find_first_of(" ");
-		if (namelen == string::npos)
-			processName = tli.ownerName;
-		else
-			processName = tli.ownerName.substr(0, namelen);
-		workerNodeCmd << (uint8_t) OWNER_CHECK << processName << tli.ownerPID;
-		bool readErrFlag;
-		{
-			boost::mutex::scoped_lock lk(slaveLock);
-			distribute(&workerNodeCmd);
-			err = gatherResponses(OWNER_CHECK, workerNodeCmd.length(), &responses,
-				readErrFlag);
-		}
-		if ((err != ERR_OK) || (readErrFlag)) {
-			reply << (uint8_t) ERR_FAILURE;
-			goto write;
-		}
-
-		exists = false;
-		for (uint i = 0; i < responses.size(); i++) {
-			/* Parse msg from worker node */
-			uint8_t ret;
-			idbassert(responses[i]->length() == 1);
-			*(responses[i]) >> ret;
-			if (ret == 1)
-				exists = true;
-			delete responses[i];
-		}
-		if (exists) {
-			reply << (uint8_t) ERR_OK << (uint8_t) false;
-			goto write;
-		}
-
-		ret = tableLockServer->changeOwner(id, name, pid, sessionID, txnID);
-		reply << (uint8_t) ERR_OK << (uint8_t) ret;
-
-write:
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doGetAllTableLocks(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	vector<TableLockInfo> ret;
-	ByteStream reply;
-
-	try {
-		msg >> cmd;
-		idbassert(msg.length() == 0);
-		ret = tableLockServer->getAllLocks();
-		reply << (uint8_t) ERR_OK;
-		serializeVector<TableLockInfo>(reply, ret);
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doReleaseAllTableLocks(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-
-	try {
-		msg >> cmd;
-		idbassert(msg.length() == 0);
-		tableLockServer->releaseAllLocks();
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doGetTableLockInfo(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint64_t id;
-	TableLockInfo tli;
-	bool ret;
-
-	try {
-		msg >> cmd >> id;
-		idbassert(msg.length() == 0);
-		ret = tableLockServer->getLockInfo(id, &tli);
-		reply << (uint8_t) ERR_OK << (uint8_t) ret;
-		if (ret)
-			reply << tli;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doOwnerCheck(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	uint64_t id;
-	ByteStream reply;
-	ByteStream workerNodeCmd;
-	bool ret;
-	vector<ByteStream *> responses;
-	int err;
-
-	// current owner vars
-	TableLockInfo tli;
-	string processName;
-	string::size_type namelen;
-	bool exists;
-
-	try {
-		msg >> cmd >> id;
-		idbassert(msg.length() == 0);
-
-		/* get the current owner info
-		 * send cmd to look for the owner
-		 * if there's an existing owner, reject the request
-		 */
-
-		ret = tableLockServer->getLockInfo(id, &tli);
-		if (!ret) {
-			reply << (uint8_t) ERR_OK << (uint8_t) ret;
-			goto write;
-		}
-
-		namelen = tli.ownerName.find_first_of(" ");
-		if (namelen == string::npos)
-			processName = tli.ownerName;
-		else
-			processName = tli.ownerName.substr(0, namelen);
-		workerNodeCmd << (uint8_t) OWNER_CHECK << processName << tli.ownerPID;
-		bool readErrFlag;
-		{
-			boost::mutex::scoped_lock lk(slaveLock);
-			distribute(&workerNodeCmd);
-			err = gatherResponses(OWNER_CHECK, workerNodeCmd.length(), &responses,
-				readErrFlag);
-		}
-		if ((err != ERR_OK) || (readErrFlag)) {
-			reply << (uint8_t) ERR_FAILURE;
-			goto write;
-		}
-
-		exists = false;
-		for (uint i = 0; i < responses.size(); i++) {
-			/* Parse msg from worker node */
-			uint8_t ret;
-			idbassert(responses[i]->length() == 1);
-			*(responses[i]) >> ret;
-			if (ret == 1)
-				exists = true;
-			delete responses[i];
-		}
-		reply << (uint8_t) ERR_OK << (uint8_t) exists;
-
-write:
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doStartAISequence(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid, colWidth;
-	uint64_t firstNum;
-
-	try {
-		msg >> cmd >> oid >> firstNum >> colWidth;
-		idbassert(msg.length() == 0);
-		aiManager.startSequence(oid, firstNum, colWidth);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doGetAIRange(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid, count;
-	uint64_t nextVal;
-	bool ret;
-
-	try {
-		msg >> cmd >> oid >> count;
-		idbassert(msg.length() == 0);
-		ret = aiManager.getAIRange(oid, count, &nextVal);
-		reply << (uint8_t) ERR_OK << (uint8_t) ret << nextVal;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doResetAISequence(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid;
-	uint64_t val;
-
-	try {
-		msg >> cmd >> oid >> val;
-		idbassert(msg.length() == 0);
-		aiManager.resetSequence(oid, val);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doGetAILock(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid;
-
-	try {
-		msg >> cmd >> oid;
-		idbassert(msg.length() == 0);
-		aiManager.getLock(oid);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doReleaseAILock(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid;
-
-	try {
-		msg >> cmd >> oid;
-		idbassert(msg.length() == 0);
-		aiManager.releaseLock(oid);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
-}
-
-void MasterDBRMNode::doDeleteAISequence(ByteStream &msg, ThreadParams *p)
-{
-	uint8_t cmd;
-	ByteStream reply;
-	uint32_t oid;
-
-	try {
-		msg >> cmd >> oid;
-		idbassert(msg.length() == 0);
-		aiManager.deleteSequence(oid);
-		reply << (uint8_t) ERR_OK;
-		p->sock->write(reply);
-	}
-	catch (exception&) {
-		reply.restart();
-		reply << (uint8_t) ERR_FAILURE;
-		try {
-			p->sock->write(reply);
-		}
-		catch(...) { }
-	}
 }
 
 MasterDBRMNode::MsgProcessor::MsgProcessor(MasterDBRMNode *master) : m(master)

@@ -1,8 +1,7 @@
 /******************************************************************************************
-* $Id: main.cpp 1976 2013-02-08 16:50:01Z dhill $
+* $Id: main.cpp 1966 2013-01-31 20:54:28Z dhill $
 *
-* Copyright (C) 2009-2012 Calpont Corporation
-*
+* Copyright (C) 2006 Calpont Corp
 * All rights reserved
 ******************************************************************************************/
 
@@ -12,7 +11,6 @@
 namespace bi=boost::interprocess;
 
 #include "processmonitor.h"
-#include "installdir.h"
 
 using namespace std;
 using namespace messageqcpp;
@@ -33,15 +31,12 @@ static void sigHupHandler(int sig);
 static void mysqlMonitorThread(MonitorConfig config);
 string systemOAM;
 string dm_server;
-string cloud;
-string GlusterConfig = "n";
 
-void updateShareMemory(processStatusList* aPtr);
+void updateShareMemory();
 
 bool runStandby = false;
+bool gsharedNothingFlag;
 bool processInitComplete = false;
-bool rootUser = true;
-string USER = "root";
 
 //extern std::string gOAMParentModuleName;
 extern bool gOAMParentModuleFlag;
@@ -56,9 +51,6 @@ pthread_mutex_t STATUS_LOCK;
 ******************************************************************************************/
 int main(int argc, char **argv)
 {
-#ifndef _MSC_VER
-    setuid(0); // set effective ID to root; ignore return status
-#endif
 
 	if (argc > 1 && string(argv[1]) == "--daemon")
 	{
@@ -84,23 +76,7 @@ int main(int argc, char **argv)
 	log.writeLog(__LINE__, " ", LOG_TYPE_DEBUG);
 	log.writeLog(__LINE__, "**********Process Monitor Started**********", LOG_TYPE_DEBUG);
 
-	//Ignore SIGPIPE signals
-	signal(SIGPIPE, SIG_IGN);
-
-	//create SIGHUP handler to get configuration updates
-	signal(SIGHUP, sigHupHandler);
-
- 	//check if root-user
-	int user;
-	user = getuid();
-	if (user != 0)
-		rootUser = false;
-
-	char* p= getenv("USER");
-	if (p && *p)
-   		USER = p;
-
-  // get and set locale language    
+    // get and set locale language    
 	string systemLang = "C";
 
 	try{
@@ -113,80 +89,43 @@ int main(int argc, char **argv)
 
     setlocale(LC_ALL, systemLang.c_str());
 
-	// if amazon cloud, check and update Instance IP Addresses and volumes
-	try {
-		oam.getSystemConfig( "Cloud", cloud);
-	}
-	catch(...) {}
-
-	if ( cloud == "amazon" ) {
-		if(!aMonitor.amazonIPCheck()) {
-			string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
-			system(cmd.c_str());
-			exit(1);
-		}
-	}
-
-	//get gluster config
-	try {
-		oam.getSystemConfig( "GlusterConfig", GlusterConfig);
-	}
-	catch(...)
-	{
-		GlusterConfig = "n";
-	}
-
-	if ( GlusterConfig == "y" ) {
-		system("mount -a > /dev/null 2>&1");
-	}
-
-	//define entry if missing
-	Config* sysConfig = Config::makeConfig();
-	if ( gOAMParentModuleFlag )
-	{
-		string PrimaryUMModuleName;
-		try {
-			oam.getSystemConfig("PrimaryUMModuleName", PrimaryUMModuleName);
-		}
-		catch(...) {
-			sysConfig->setConfig("SystemConfig", "PrimaryUMModuleName", oam::UnassignedName);
-			sysConfig->write();
-		}
-	}
-
-	// if single server amazon ami, calculate TotalUmMemory
-/*	string ami;
-	try {
-		oam.getSystemConfig( "AMI", ami);
-	}
-	catch(...) {}
-
-	if ( ami == "y" )
-		aMonitor.calTotalUmMemory();
-*/
-	if ( config.moduleType() == "pm" )
-	{
-		if ( gOAMParentModuleFlag )
-			log.writeLog(__LINE__, "ProcMon: Starting as ACTIVE Parent", LOG_TYPE_DEBUG);
-		else
-			log.writeLog(__LINE__, "ProcMon: Starting as NON-ACTIVE Parent", LOG_TYPE_DEBUG);
-	}
-
 	// create message thread
 	pthread_t MessageThread;
 	int ret = pthread_create (&MessageThread, NULL, (void*(*)(void*)) &messageThread, &config);
 	if ( ret != 0 )
 		log.writeLog(__LINE__, "pthread_create failed, return code = " + oam.itoa(ret), LOG_TYPE_ERROR);
 
-	//create and mount data directories
-	aMonitor.createDataDirs(cloud);
+	//create pm data and pm mount directories based on contents of fstab
+	//need before mounting from storage option
+	aMonitor.createDataDirs("storage");
+
+	//mount disk
+	system("mount -a > /tmp/mount.log 2>&1");
+
+	//check for any mount errors
+	if (oam.checkLogStatus("/tmp/mount.log", "error") || oam.checkLogStatus("/tmp/mount.log", "bad") ) {
+		log.writeLog(__LINE__, "Mount disk error, check log file in /tmp/mount.log", LOG_TYPE_CRITICAL);
+		exit (1);
+	}
+
+	aMonitor.createDataDirs("local");
+
+	// Get Shared-Nothing Storage Type and make sure nfs is started
+	try{
+		string sharedNothing;
+		oam.getSystemConfig("SharedNothing", sharedNothing);
+
+		if ( sharedNothing == "y" )
+			system("/etc/init.d nfs start > /dev/null 2>&1");
+	}
+	catch(...)
+	{}
 
 	//check if this module is recovering after a reboot for an active OAM parent state
 	ByteStream msg;
 	ByteStream::byte requestID = GETPARENTOAMMODULE;
 	msg << requestID;
 
-	//check if currently configured as Parent OAM Module on startup
 	if ( gOAMParentModuleFlag ) {
 		if ( config.OAMStandbyName() != oam::UnassignedName ) {
 			//try for 20 minutes checking if the standby node is up
@@ -208,16 +147,16 @@ int main(int argc, char **argv)
 				//Set the alarm
 				aMonitor.sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
 				sleep (1);
-				string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
-				system(cmd.c_str());
+				system("/etc/init.d/infinidb stop");
 			}
 
 			log.writeLog(__LINE__, "Old Standby has moduleparentOAMModule = " + parentOAMModule, LOG_TYPE_DEBUG);
 
 			if ( parentOAMModule != config.moduleName() ) {
+				//not parent, get new copy of Config file
 				gOAMParentModuleFlag = false;
 
-				log.writeLog(__LINE__, "NOT Parent OAM Module", LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "get Calpont.xml from previous standby parent", LOG_TYPE_DEBUG);
 				try
 				{
 					Config* sysConfig = Config::makeConfig();
@@ -230,11 +169,10 @@ int main(int argc, char **argv)
 			
 					sysConfig->setConfig("ProcMgr", "IPAddr", IPaddr);
 			
-					log.writeLog(__LINE__, "set ProcMgr IPaddr to Old Standby Module: " + IPaddr, LOG_TYPE_DEBUG);
+					log.writeLog(__LINE__, "set ProcMgr IPaddr to " + IPaddr, LOG_TYPE_DEBUG);
 					//update Calpont Config table
 					try {
 						sysConfig->write();
-						sleep(1);
 					}
 					catch(...)
 					{
@@ -257,14 +195,14 @@ int main(int argc, char **argv)
 		{
 			try {
 				oam.distributeConfigFile(config.moduleName());
-				log.writeLog(__LINE__, "Successfull return from distributeConfigFile", LOG_TYPE_DEBUG);
+				log.writeLog(__LINE__, "Not Parent, successfull return from distributeConfigFile", LOG_TYPE_DEBUG);
 				break;
 			}
 			catch(...) {
 				count++;
-				if (count > 60 ) {
+				if (count > 10 ) {
 					count = 0;
-					log.writeLog(__LINE__, "error return from distributeConfigFile, waiting for Active ProcMgr to start", LOG_TYPE_DEBUG);
+					log.writeLog(__LINE__, "Not Parent, error return from distributeConfigFile, waiting for Active ProcMgr to start", LOG_TYPE_DEBUG);
 				}
 				sleep(1);
 			}
@@ -272,6 +210,25 @@ int main(int argc, char **argv)
 		//re-read local system info with new Calpont.xml
 		sleep(1);
 		MonitorConfig config;
+	}
+
+	//Ignore SIGPIPE signals
+	signal(SIGPIPE, SIG_IGN);
+
+	// Get Shared-Nothing Storage Type
+	try{
+		string sharedNothing;
+		oam.getSystemConfig("SharedNothing", sharedNothing);
+
+		if ( sharedNothing == "y" )
+			gsharedNothingFlag = true;
+		else
+			gsharedNothingFlag = false;
+	}
+	catch(...)
+	{
+		cout << endl << "**** Failed : Failed to read SharedNothing Name" << endl;
+		exit(-1);
 	}
 
 	int moduleStatus;
@@ -282,7 +239,42 @@ int main(int argc, char **argv)
 		exit (-1);
 	}
 
-	// not OAM parent module, delay starting until a successful get status is performed
+	// set data mount to read-write of parent OAM module and in shared-everything setup
+	string mountOption;
+	if ( gOAMParentModuleFlag) {
+		log.writeLog(__LINE__, "Running as Active Parent OAM", LOG_TYPE_DEBUG);
+		mountOption = "rw";
+	}
+	else
+	{
+		log.writeLog(__LINE__, "Running as Standby", LOG_TYPE_DEBUG);
+		mountOption = "ro";
+	}
+
+	if ( !gsharedNothingFlag && config.moduleType() == "pm" ) {
+		int retry = 0;
+		for (  ; retry < 20 ; retry++ )
+		{
+			if (aMonitor.setDataMount(mountOption) == oam::API_SUCCESS)
+				break;
+			log.writeLog(__LINE__, "ERROR: setDataMount to failed, retrying", LOG_TYPE_WARNING);
+			
+			//send notification about the mount setup failure
+			oam.sendDeviceNotification(config.moduleName(), DBROOT_MOUNT_FAILURE);
+			sleep(30);
+		}
+		
+		if ( retry == 20 )
+		{
+			log.writeLog(__LINE__, "Set DB mounts failed, infinidb shutting down", LOG_TYPE_CRITICAL);
+			//Set the alarm
+			aMonitor.sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
+			sleep (1);
+			system("/etc/init.d/infinidb stop");
+		}
+	}
+
+	// if not OAM parent module, delay starting until a successful get status is performed
 	// makes sure the Parent OAM ProcMon is fully ready
 	if ( !gOAMParentModuleFlag) {
 		while(true)
@@ -307,43 +299,10 @@ int main(int argc, char **argv)
 		DISABLED = true;
 
 	if ( config.moduleType() == "pm" ) {
-		int retry = 0;
-		for (  ; retry < 20 ; retry++ )
-		{
-			int ret = aMonitor.checkDataMount();
-			if ( ret == oam::API_SUCCESS)
-				break;
-
-			if (ret == API_INVALID_PARAMETER) {
-				//no dbroots assigned, treat as disabled
-				if ( !DISABLED )
-					DISABLED=true;
-			}
-
-			if ( DISABLED ) {
-				log.writeLog(__LINE__, "ERROR: checkDataMount to failed, module is disabled, continuing", LOG_TYPE_WARNING);
-				break;
-			}
-			else
-				log.writeLog(__LINE__, "ERROR: checkDataMount to failed, retrying", LOG_TYPE_WARNING);
-			
-			//send notification about the mount setup failure
-			oam.sendDeviceNotification(config.moduleName(), DBROOT_MOUNT_FAILURE);
-			sleep(30);
-		}
-		
-		if ( retry == 20 )
-		{
-			log.writeLog(__LINE__, "Check DB mounts failed, infinidb shutting down", LOG_TYPE_CRITICAL);
-			//Set the alarm
-			aMonitor.sendAlarm(config.moduleName().c_str(), STARTUP_DIAGNOTICS_FAILURE, SET);
-			sleep (1);
-			string cmd = startup::StartUp::installDir() + "/bin/infinidb stop > /dev/null 2>&1";
-			system(cmd.c_str());
-		}
-
 		if ( !gOAMParentModuleFlag ) {
 			runStandby = true;
+			log.writeLog(__LINE__, "Running Standby", LOG_TYPE_INFO);
+
 			// delete any old active alarm log file
 			unlink ("/var/log/Calpont/activeAlarms");
 		}
@@ -356,7 +315,7 @@ int main(int argc, char **argv)
 
 		sleep(5);	// give the Status thread time to fully initialize
 
-/*		if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM ) {
+		if ( config.ServerInstallType() == oam::INSTALL_COMBINE_DM_UM_PM )
 			// start mysqld to make sure it's running
 			// need for addmodule command
 			try {
@@ -364,9 +323,8 @@ int main(int argc, char **argv)
 			}
 			catch(...)
 			{}
-		}
-*/	}
-/*	else
+	}
+	else
 	{	// um, start mysqld to make sure it's running
 		// need for reconfiguremodule command
 		try {
@@ -375,14 +333,6 @@ int main(int argc, char **argv)
 		catch(...)
 		{}
 	}
-*/
-
-	// stop mysqld to make sure it's not running after reboot
-	try {
-		oam.actionMysqlCalpont(MYSQL_STOP);
-	}
-	catch(...)
-	{}
 
 	SystemStatus systemstatus;
 
@@ -455,7 +405,7 @@ int main(int argc, char **argv)
 			}
 			catch(...)
 			{
-				log.writeLog(__LINE__, "Problem getting the ParentOAMModuleName key from the Calpont System Configuration file", LOG_TYPE_ERROR);
+				log.writeLog(__LINE__, "Problem getting ParentOAMModuleName the Calpont System Configuration file", LOG_TYPE_ERROR);
 				exit(-1);
 			}
 		}
@@ -487,6 +437,9 @@ int main(int argc, char **argv)
 
 	//Mark this process AUTO-OFFLINE
 	aMonitor.updateProcessInfo("ProcessMonitor", oam::AUTO_OFFLINE, getpid());
+
+	//create SIGHUP handler to get configuration updates
+	signal(SIGHUP, sigHupHandler);
 
 	//handle SIGCHLD signal
 	pthread_t signalThread;
@@ -533,7 +486,8 @@ int main(int argc, char **argv)
 
 		if (systemprocessconfig.processconfig[i].ModuleType == config.moduleType() ||
 			systemprocessconfig.processconfig[i].ModuleType == "ChildExtOAMModule" ||
-			(systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" ) ||
+			(systemprocessconfig.processconfig[i].ModuleType == "ChildOAMModule" &&
+			config.moduleType() != "xm" ) ||
 			(systemprocessconfig.processconfig[i].ModuleType == "ParentOAMModule" &&
 			config.moduleType() == OAMParentModuleType ) )
 		{
@@ -591,7 +545,8 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	if ( systemstatus.SystemOpState != MAN_OFFLINE && !DISABLED) {
+	if ( config.moduleType() != "xm" && systemstatus.SystemOpState != MAN_OFFLINE &&
+		!DISABLED) {
 
 		// Loop through the process list to check the process current state
 		// Launch the Processes controlled by the Process-Monitor
@@ -801,9 +756,6 @@ static void messageThread(MonitorConfig config)
 		Config* sysConfig = Config::makeConfig();
 		string port = sysConfig->getConfig(msgPort, "Port");
 		string cmd = "fuser -k " + port + "/tcp >/dev/null 2>&1";
-		if ( !rootUser)
-			cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
-
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -947,11 +899,13 @@ static void chldHandleThread(MonitorConfig config)
 	processList* aPtr = config.monitoredListPtr();
 
 	//get dbhealth flag
-	string DBFunctionalMonitorFlag;
+	string DBHealthMonitorFlag = "n";
 	try {
-		oam.getSystemConfig( "DBFunctionalMonitorFlag", DBFunctionalMonitorFlag);
+		oam.getSystemConfig( "DBHealthMonitorFlag", DBHealthMonitorFlag);
 	}
-	catch(...) {}
+	catch(...) {
+		DBHealthMonitorFlag = "n";
+	}
 
 	int delayCount=0;
 	while (true)
@@ -1007,7 +961,7 @@ static void chldHandleThread(MonitorConfig config)
 //								aMonitor.updateProcessInfo((*listPtr).ProcessName, oam::FAILED, (*listPtr).processID);
 
 								//force restart the un-initted process
-								log.writeLog(__LINE__, (*listPtr).ProcessName + "/" + oam.itoa((*listPtr).processID) + " failed to init in 20 seconds, force killing it so it can restart", LOG_TYPE_CRITICAL);
+								log.writeLog(__LINE__, (*listPtr).ProcessName + " failed to init in 20 seconds, force kill so it can restart", LOG_TYPE_CRITICAL);
 								kill((*listPtr).processID, SIGKILL);
 								break;
 							}
@@ -1050,7 +1004,7 @@ static void chldHandleThread(MonitorConfig config)
 								(state == oam::FAILED && (*listPtr).state == oam::BUSY_INIT) ||
 								(state == oam::FAILED && (*listPtr).state == oam::MAN_INIT) ) {
 								// issue ALARM and update local status to FAILED
-								log.writeLog(__LINE__, (*listPtr).ProcessName + " failed initialization", LOG_TYPE_WARNING);
+								log.writeLog(__LINE__, (*listPtr).ProcessName + " failed Initization", LOG_TYPE_WARNING);
 								aMonitor.sendAlarm((*listPtr).ProcessName, PROCESS_INIT_FAILURE, SET);
 								(*listPtr).state = state;
 								break;
@@ -1083,16 +1037,45 @@ static void chldHandleThread(MonitorConfig config)
 				//skip
 				continue;
 
-			//log.writeLog(__LINE__, "check status " + (*listPtr).ProcessName + "/" + oam.itoa((*listPtr).processID) + " " +  oam.itoa(kill((*listPtr).processID, 0)) + " " + oam.itoa((*listPtr).state) , LOG_TYPE_CRITICAL);
-			if (  ( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::ACTIVE ) ||
+			//Make sure Process got started correctly by check PID processName
+			bool procNeedsRestart = false;
+/*			for (int retry = 0; retry < 5 ; retry++) 
+			{
+				if ( (*listPtr).processID == 0 || (*listPtr).ProcessName == "ProcessMonitor" )
+					procNeedsRestart = false;
+				else
+				{
+					string cmd = "ps --pid=" + oam.itoa((*listPtr).processID) + " > /tmp/procName";
+					system(cmd.c_str());
+					cmd = "cat /tmp/procName";
+					system(cmd.c_str());
+		
+					if (oam.checkLogStatus("/tmp/procName", "ProcMon"))
+					{
+						procNeedsRestart = true;
+						sleep(1);
+						log.writeLog(__LINE__, "*****Calpont Child Process shows ProcMon as Process Name " + (*listPtr).ProcessName + " PID = " + oam.itoa((*listPtr).processID), LOG_TYPE_DEBUG);
+					}
+					else
+					{
+						procNeedsRestart = false;
+						break;
+					}
+				}
+			}
+
+			if ( procNeedsRestart ) {
+				log.writeLog(__LINE__, "*****Process didn't ever get started (ProcMon is its process-Name), restarting it: " + (*listPtr).ProcessName + " PID = " + oam.itoa((*listPtr).processID), LOG_TYPE_CRITICAL);
+			}
+*/
+			if (  procNeedsRestart ||
+					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::ACTIVE ) ||
 					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::STANDBY ) ||
 					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::MAN_INIT ) ||
-					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::BUSY_INIT ) ||
-					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::AUTO_INIT &&
-						(*listPtr).processID != 0 ) ||
+					( (kill((*listPtr).processID, 0)) != 0 && (*listPtr).state == oam::AUTO_INIT ) ||
 				 ( (*listPtr).state == oam::ACTIVE && (*listPtr).processID == 0 ) )
 			{
-				log.writeLog(__LINE__, "*****Calpont Process Restarting: " + (*listPtr).ProcessName + ", old PID = " + oam.itoa((*listPtr).processID), LOG_TYPE_CRITICAL);
+				log.writeLog(__LINE__, "*****Calpont Child Process died: " + (*listPtr).ProcessName + " PID = " + oam.itoa((*listPtr).processID), LOG_TYPE_CRITICAL);
 
 				if ( (*listPtr).dieCounter >= processRestartCount ||
 					processRestartCount == 0) {
@@ -1136,19 +1119,19 @@ static void chldHandleThread(MonitorConfig config)
 						log.writeLog(__LINE__, "EXCEPTION ERROR on setModuleStatus: Caught unknown exception!", LOG_TYPE_ERROR);
 					}
 
-					// check if process failover is needed due to process outage
+					// check if module failover is needed due to process outage
 					aMonitor.checkProcessFailover((*listPtr).ProcessName);
 
 					//check the db health
-					if (DBFunctionalMonitorFlag == "y" ) {
-						log.writeLog(__LINE__, "Call the check DB Functional API", LOG_TYPE_DEBUG);
+					if (DBHealthMonitorFlag == "y" ) {
+						log.writeLog(__LINE__, "Call the check DB Health API", LOG_TYPE_DEBUG);
 						try {
-							oam.checkDBFunctional();
-							log.writeLog(__LINE__, "check DB Functional passed", LOG_TYPE_DEBUG);
+							oam.checkDBHealth();
+							log.writeLog(__LINE__, "check DB Health passed", LOG_TYPE_DEBUG);
 						}
 						catch(...)
 						{
-							log.writeLog(__LINE__, "check DB Functional FAILED", LOG_TYPE_ERROR);
+							log.writeLog(__LINE__, "check DB Health FAILED", LOG_TYPE_ERROR);
 						}
 					}
 				}
@@ -1211,7 +1194,7 @@ static void chldHandleThread(MonitorConfig config)
 							restartStatus = " restart failed with hard failure, don't retry!!";
 							(*listPtr).processID = 0;
 
-							// check if process failover is needed due to process outage
+							// check if module failover is needed due to process outage
 							aMonitor.checkProcessFailover((*listPtr).ProcessName);
 							break;
 						}
@@ -1241,15 +1224,15 @@ static void chldHandleThread(MonitorConfig config)
 						}
 
 						//check the db health
-						if (DBFunctionalMonitorFlag == "y" ) {
-							log.writeLog(__LINE__, "Call the check DB Functional API", LOG_TYPE_DEBUG);
+						if (DBHealthMonitorFlag == "y" ) {
+							log.writeLog(__LINE__, "Call the check DB Health API", LOG_TYPE_DEBUG);
 							try {
-								oam.checkDBFunctional();
-								log.writeLog(__LINE__, "check DB Functional passed", LOG_TYPE_DEBUG);
+								oam.checkDBHealth();
+								log.writeLog(__LINE__, "check DB Health passed", LOG_TYPE_DEBUG);
 							}
 							catch(...)
 							{
-								log.writeLog(__LINE__, "check DB Functional FAILED", LOG_TYPE_ERROR);
+								log.writeLog(__LINE__, "check DB Health FAILED", LOG_TYPE_ERROR);
 							}
 						}
 					}
@@ -1407,7 +1390,7 @@ static void statusControlThread()
 
 				if (processModuleType == systemModuleType
 					|| processModuleType == "ChildExtOAMModule"
-					|| (processModuleType == "ChildOAMModule" )
+					|| (processModuleType == "ChildOAMModule" && systemModuleType != "xm")
 					|| (processModuleType == "ParentOAMModule" && systemModuleType == OAMParentModuleType) )
 				{
 					processstatus procstat;
@@ -1747,91 +1730,10 @@ static void statusControlThread()
 		log.writeLog(__LINE__, "Ext Device Status shared Memory allociated and Initialized", LOG_TYPE_DEBUG);
 	}
 
-	//
-	//Allocate Shared Memory for storing DBRoot Status Data
-	//
-	int dbrootNumber = 0;
-	shmDeviceStatus* fShmDbrootStatus = 0;
-	std::vector<string>dbrootList;
-
-	string DBRootStorageType;
-	try{
-		oam.getSystemConfig("DBRootStorageType", DBRootStorageType);
-	}
-	catch(...) {}
- 
-	if ( DBRootStorageType == "external" || 
-			GlusterConfig == "y") {
-		//get system dbroots
-		DBRootConfigList dbrootConfigList;
-		try
-		{
-			oam.getSystemDbrootConfig(dbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			log.writeLog(__LINE__, "EXCEPTION ERROR on getSystemDbrootConfig: Caught unknown exception!", LOG_TYPE_ERROR);
-		}
-	
-		DBRootConfigList::iterator pt = dbrootConfigList.begin();
-		for( ; pt != dbrootConfigList.end() ;pt++)
-		{
-			dbrootList.push_back(oam.itoa(*pt));
-			dbrootNumber++;
-		}
-	}
-
-	boost::interprocess::shared_memory_object fDbrootShmobj;
-	static const int DBROOTSTATshmsize = MAX_DBROOT * sizeof(shmDeviceStatus);
-	memInit = true;
-	keyName = BRM::ShmKeys::keyToName(fShmKeys.DBROOTSTATUS_SYSVKEY);
-	try
-	{
-		bi::shared_memory_object shm(bi::create_only, keyName.c_str(), bi::read_write);
-#ifdef __linux__
-		{
-			string pname = "/dev/shm/" + keyName;
-			chmod(pname.c_str(), 0666);
-		}
-#endif
-		shm.truncate(DBROOTSTATshmsize);
-		fDbrootShmobj.swap(shm);
-	}
-	catch (bi::interprocess_exception& biex)
-	{
-		memInit = false;
-		bi::shared_memory_object shm(bi::open_only, keyName.c_str(), bi::read_write);
-		fDbrootShmobj.swap(shm);
-	}
-	catch (...)
-	{
-		throw;
-	}
-	bi::mapped_region fdDbrootStatMapreg(fDbrootShmobj, bi::read_write);
-	fShmDbrootStatus = static_cast<shmDeviceStatus*>(fdDbrootStatMapreg.get_address());
-
-	if (fShmDbrootStatus == 0) {
-		log.writeLog(__LINE__, "*****DbrootStatusTable shmat failed.", LOG_TYPE_ERROR);
-		exit(1);
-	}
-
-	//Initialize Shared memory
-	if (memInit) {
-		// Init Ext Device Status Memory
-		memset(fShmDbrootStatus, 0, DBROOTSTATshmsize);
-		for ( int i=0; i < dbrootNumber ; ++i)
-		{
-			fShmDbrootStatus[i].OpState = oam::INITIAL;
-			memcpy(fShmDbrootStatus[i].Name, dbrootList[i].c_str(), NAMESIZE);
-		}
-		log.writeLog(__LINE__, "Dbroot Status shared Memory allociated and Initialized", LOG_TYPE_DEBUG);
-	}
-
 	string portName = "ProcStatusControl";
 	if (runStandby) {
 		portName = "ProcStatusControlStandby";
-		processStatusList* aPtr = aMonitor.statusListPtr();
-		updateShareMemory(aPtr);
+		updateShareMemory();
 	}
 
 	//
@@ -1847,10 +1749,6 @@ static void statusControlThread()
 		Config* sysConfig = Config::makeConfig();
 		string port = sysConfig->getConfig(portName, "Port");
 		string cmd = "fuser -k " + port + "/tcp >/dev/null 2>&1";
-		if ( !rootUser)
-			cmd = "sudo fuser -k " + port + "/tcp >/dev/null 2>&1";
-
-		
 		system(cmd.c_str());
 	}
 	catch(...)
@@ -2044,7 +1942,7 @@ static void statusControlThread()
 									}
 								}
 
-								log.writeLog(__LINE__, "statusControl: Set Process " + processName + " of module " + moduleName + " State = " + oam.itoa(state) + " PID = " + oam.itoa(PID), LOG_TYPE_DEBUG);
+								log.writeLog(__LINE__, "statusControl: Set Process " + processName + " of module " + moduleName + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
 
 								//update table
 								fShmProcessStatus[shmIndex].ProcessOpState = state;
@@ -2125,7 +2023,7 @@ static void statusControlThread()
 										shmIndex = (*listPtr).tableIndex;
 		
 										//get PID
-										if ( PID == (ByteStream::quadbyte) fShmProcessStatus[shmIndex].ProcessID) {
+										if ( PID == fShmProcessStatus[shmIndex].ProcessID) {
 											// match found, get state
 											state = fShmProcessStatus[shmIndex].ProcessOpState;
 											//get process name
@@ -2216,19 +2114,6 @@ static void statusControlThread()
 									name = fShmNICStatus[i].Name;
 									state = fShmNICStatus[i].OpState;
 									changeDate = fShmNICStatus[i].StateChangeDate;
-		
-									ackmsg << name;
-									ackmsg << state;
-									ackmsg << changeDate;
-								}
-		
-								ackmsg << (ByteStream::byte) dbrootNumber;
-		
-								for (int i=0 ; i < dbrootNumber; ++i)
-								{
-									name = fShmDbrootStatus[i].Name;
-									state = fShmDbrootStatus[i].OpState;
-									changeDate = fShmDbrootStatus[i].StateChangeDate;
 		
 									ackmsg << name;
 									ackmsg << state;
@@ -2464,50 +2349,6 @@ static void statusControlThread()
 							}
 							break;
 
-							case SET_DBROOT_STATUS:
-							{
-								ByteStream::byte state;
-								std::string name;
-								std::string shmName;
-								char charName[NAMESIZE];
-		
-								msg >> name;
-								msg >> state;
-
-								if (!runStandby) {
-									ByteStream ackmsg;
-									ackmsg << (ByteStream::byte) requestType;
-									fIos.write(ackmsg);
-								}
-
-								log.writeLog(__LINE__, "statusControl: REQUEST RECEIVED: Set DBroot " + name + " State = " + oam.itoa(state), LOG_TYPE_DEBUG);
-
-								if ( dbrootNumber == 0 ) {
-									// no dbroots setup in shared memory, must be internal
-									log.writeLog(__LINE__, "statusControl: SET_DBROOT_STATUS: DBroot not valid: " + name, LOG_TYPE_ERROR);
-									break;
-								}
-									
-								int i=0;
-								for ( ; i < dbrootNumber; ++i)
-								{
-									memcpy(charName, fShmDbrootStatus[i].Name, NAMESIZE);
-									shmName = charName;
-									if ( name == shmName ) {
-										fShmDbrootStatus[i].OpState = state;
-										memcpy(fShmDbrootStatus[i].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
-										break;
-									}
-								}
-		
-								if ( i == dbrootNumber) {
-									// not in list
-									log.writeLog(__LINE__, "statusControl: SET_DBROOT_STATUS: DBroot not valid: " + name, LOG_TYPE_ERROR);
-									break;
-								}
-							}
-							break;
-
 							case SET_NIC_STATUS:
 							{
 								ByteStream::byte state;
@@ -2571,8 +2412,6 @@ static void statusControlThread()
 								DeviceNetworkList::iterator pt = devicenetworklist.begin();
 								for( ; pt != devicenetworklist.end() ; pt++)
 								{
-									moduleNameList.push_back((*pt).DeviceName);
-
 									string moduleName = (*pt).DeviceName;
 									memcpy(fShmSystemStatus[fmoduleNumber].Name, moduleName.c_str(), NAMESIZE);
 									fShmSystemStatus[fmoduleNumber].OpState = oam::MAN_DISABLED;
@@ -2608,7 +2447,7 @@ static void statusControlThread()
 
 										if (processModuleType == moduleType
 											|| processModuleType == "ChildExtOAMModule"
-											|| (processModuleType == "ChildOAMModule" )
+											|| (processModuleType == "ChildOAMModule" && moduleType != "xm")
 											|| (processModuleType == "ParentOAMModule" && moduleType == OAMParentModuleType) )
 										{
 											processstatus procstat;
@@ -2803,7 +2642,7 @@ static void statusControlThread()
 
 										for ( int i=0 ; i < processNumber ; i++ )
 										{
-											ackmsg << (ByteStream::quadbyte) fShmProcessStatus[i].ProcessID;
+											ackmsg << fShmProcessStatus[i].ProcessID;
 											ackmsg << fShmProcessStatus[i].ProcessOpState;
 										}
 
@@ -2844,8 +2683,7 @@ static void statusControlThread()
 				if ( runStandby ) {
 					standbyUpdateCount++;
 					if ( standbyUpdateCount >= 3 ) {
-						processStatusList* aPtr = aMonitor.statusListPtr();
-						updateShareMemory(aPtr);
+						updateShareMemory();
 						standbyUpdateCount = 0;
 					}
 				}
@@ -2875,7 +2713,7 @@ static void statusControlThread()
 * purpose:	Get and update shared memory from Parent OAM module
 *
 ******************************************************************************************/
-void updateShareMemory(processStatusList* aPtr)
+void updateShareMemory()
 {
 	MonitorLog log;
 	MonitorConfig config;
@@ -2887,33 +2725,18 @@ void updateShareMemory(processStatusList* aPtr)
 	SystemProcessStatus systemprocessstatus;
 	ProcessStatus processstatus;
 
-	processStatusList::iterator listPtr;
-	listPtr = aPtr->begin();
-
 	try
 	{
 		oam.getProcessStatus(systemprocessstatus);
 
+		string prevModule = systemprocessstatus.processstatus[0].Module;
+
 		for( unsigned int i = 0 ; i < systemprocessstatus.processstatus.size(); i++)
 		{
-			int shmIndex = 0;
-			for (; listPtr != aPtr->end(); ++listPtr)
-			{
-				if ((*listPtr).ProcessName == systemprocessstatus.processstatus[i].ProcessName &&
-					(*listPtr).ModuleName == systemprocessstatus.processstatus[i].Module) {
-					shmIndex = (*listPtr).tableIndex;
-					break;
-				}
-			}
-
-			if (listPtr == aPtr->end())
-				continue;
-
-			//update table
-			fShmProcessStatus[shmIndex].ProcessOpState = systemprocessstatus.processstatus[i].ProcessOpState;
-			fShmProcessStatus[shmIndex].ProcessID = systemprocessstatus.processstatus[i].ProcessID;
+			fShmProcessStatus[i].ProcessOpState = systemprocessstatus.processstatus[i].ProcessOpState;
+			fShmProcessStatus[i].ProcessID = systemprocessstatus.processstatus[i].ProcessID;
 			string stime = systemprocessstatus.processstatus[i].StateChangeDate ;
-			memcpy(fShmProcessStatus[shmIndex].StateChangeDate, stime.c_str(), DATESIZE);
+			memcpy(fShmProcessStatus[i].StateChangeDate, stime.c_str(), DATESIZE);
 		}
 //		log.writeLog(__LINE__, "Process Status shared Memory Initialized from Active OAM Module", LOG_TYPE_DEBUG);
 	}
@@ -2924,13 +2747,12 @@ void updateShareMemory(processStatusList* aPtr)
 
 //	log.writeLog(__LINE__, "Get System Status shared Memory from Active OAM", LOG_TYPE_DEBUG);
 
-	SystemStatus systemstatus;
 	try
 	{
+		SystemStatus systemstatus;
 		oam.getSystemStatus(systemstatus);
 		fShmSystemStatus[0].OpState = systemstatus.SystemOpState;
-		string stime = systemstatus.systemmodulestatus.modulestatus[0].StateChangeDate ;
-		memcpy(fShmSystemStatus[0].StateChangeDate, stime.c_str(), DATESIZE);
+		memcpy(fShmSystemStatus[0].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
 	}
 	catch(...)
 	{
@@ -2939,27 +2761,21 @@ void updateShareMemory(processStatusList* aPtr)
 
 //	log.writeLog(__LINE__, "Get Module Status shared Memory from Active OAM", LOG_TYPE_DEBUG);
 
-	std::string shmName;
-	char charName[NAMESIZE];
-	for( unsigned int i = 0 ; i < systemstatus.systemmodulestatus.modulestatus.size(); i++)
+	for ( int i=1; i < fmoduleNumber ; ++i)
 	{
-		if( systemstatus.systemmodulestatus.modulestatus[i].Module.empty() )
-			// end of list
-			break;
-
-		int j=1;
-		for ( ; j < fmoduleNumber; ++j)
+		try {
+			int opState;
+			bool degraded;
+			oam.getModuleStatus(moduleNameList[i-1], opState, degraded);
+			fShmSystemStatus[i].OpState = opState;
+			memcpy(fShmSystemStatus[i].StateChangeDate, oam.getCurrentTime().c_str(), DATESIZE);
+		}
+		catch(...)
 		{
-			memcpy(charName, fShmSystemStatus[j].Name, NAMESIZE);
-			shmName = charName;
-			if ( systemstatus.systemmodulestatus.modulestatus[i].Module == shmName ) {
-				fShmSystemStatus[j].OpState = systemstatus.systemmodulestatus.modulestatus[i].ModuleOpState;
-				string stime = systemstatus.systemmodulestatus.modulestatus[i].StateChangeDate ;
-				memcpy(fShmSystemStatus[j].StateChangeDate, stime.c_str(), DATESIZE);
-				break;
-			}
+			return;
 		}
 	}
+
 }
 // vim:ts=4 sw=4:
 

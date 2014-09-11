@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: bppseeder.cpp 1960 2012-09-27 17:35:56Z pleblanc $
+// $Id: bppseeder.cpp 1975 2012-10-25 22:16:45Z pleblanc $
 // C++ Implementation: bppseeder
 //
 // Description: 
@@ -96,15 +96,14 @@ BPPSeeder::BPPSeeder(const SBS &b,
 
 	sessionID = *((uint32_t *) &buf[pos]); pos += 4;
 	stepID = *((uint32_t *) &buf[pos]); pos += 4;
-	uniqueID = *((uint32_t *) &buf[pos]); pos +=4;
-	_priority = *((uint32_t *) &buf[pos]);
+	uniqueID = *((uint32_t *) &buf[pos]);
 }
 
 BPPSeeder::BPPSeeder(const BPPSeeder &b)
 					: bs(b.bs), writelock(b.writelock), sock(b.sock),
 					fPMThreads(b.fPMThreads), fTrace(b.fTrace), uniqueID(b.uniqueID),
 					sessionID(b.sessionID), stepID(b.stepID), failCount(b.failCount), bpp(b.bpp),
-					firstRun(b.firstRun), _priority(b._priority)
+					firstRun(b.firstRun)
 {
 }
 
@@ -136,9 +135,7 @@ int BPPSeeder::operator()()
 
 		sessionID = *((uint32_t *) &buf[pos]); pos += 4;
 		stepID = *((uint32_t *) &buf[pos]); pos += 4;
-		uniqueID = *((uint32_t *) &buf[pos]); pos += 4;
-		_priority = *((uint32_t *) &buf[pos]);
-
+		uniqueID = *((uint32_t *) &buf[pos]);
 		if (0 < status)
 		{
 			sendErrorMsg(uniqueID, status, stepID);
@@ -258,7 +255,11 @@ restart:
 		flushSyscatOIDs();
 		bs->rewind();
 		bpp->resetBPP(*bs, writelock, sock);
+#ifdef _MSC_VER
+		Sleep(1 * 1000);
+#else
 		sleep(1);
+#endif
 		goto restart;
 	}
 

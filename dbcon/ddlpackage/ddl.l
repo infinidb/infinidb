@@ -15,18 +15,14 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: ddl.l 8706 2012-07-13 16:25:50Z rdempsey $ */
+/* $Id: ddl.l 7694 2011-05-11 19:14:46Z rdempsey $ */
 %{
 #include <iostream>
 #include <vector>
 #include <stdio.h>
 #include "ddlpkg.h"
 
-#ifdef _MSC_VER
-#include "ddl-gram-win.h"
-#else
 #include "ddl-gram.h"
-#endif
 
 int lineno = 1;
 void ddlerror(char *s);
@@ -62,7 +58,7 @@ ident_start [A-Za-z\200-\377_]
 ident_cont [A-Za-z\200-\377_0-9\$]
 identifier {ident_start}{ident_cont}*
 
-integer			[-+]?{digit}+
+integer			{digit}+
 decimal			(({digit}*\.{digit}+)|({digit}+\.{digit}*))
 real			({integer}|{decimal})[Ee][-+]?{digit}+
 realfail1		({integer}|{decimal})[Ee]
@@ -101,7 +97,7 @@ CONSTRAINT {return CONSTRAINT;}
 CONSTRAINTS {return CONSTRAINTS;}
 CREATE {return CREATE;}
 CURRENT_USER {return CURRENT_USER;}
-DATE {ddllval.str=strdup("date"); return DATE;}
+DATE {return DATE;}
 DATETIME {return DATETIME;}
 DECIMAL {return DECIMAL;}
 DEC {return DECIMAL;}

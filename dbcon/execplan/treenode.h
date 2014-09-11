@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//   $Id: treenode.h 9261 2013-02-06 20:59:01Z xlou $
+//   $Id: treenode.h 7858 2011-07-15 19:16:15Z chao $
 
 
 /** @file */
@@ -27,18 +27,16 @@
 #include <iostream>
 #include <cmath>
 #include <boost/shared_ptr.hpp>
-
-#ifdef _MSC_VER
 #include <boost/regex.hpp>
-#else
-#include <regex.h>
-#endif
-#include <stdlib.h>
 #include <unistd.h>
 
 #include "calpontsystemcatalog.h"
 #include "exceptclasses.h"
 #include "dataconvert.h"
+
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 namespace messageqcpp {
 class ByteStream;
@@ -54,6 +52,81 @@ class Row;
 namespace execplan{
 
 typedef execplan::CalpontSystemCatalog::ColType Type;
+
+/**
+ * @brief IDB_Decimal type
+ *
+ */
+struct IDB_Decimal
+{
+	IDB_Decimal(): value(0), scale(0), precision(0) {}
+	IDB_Decimal(int64_t val, int8_t s, uint8_t p) :
+				value (val),
+				scale(s),
+				precision(p) {}
+
+	long double decimalDiff(const IDB_Decimal& d) const
+	{
+		return ((long double)(value) / pow((long double)10, scale - d.scale)) - d.value;
+	}
+	bool operator==(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value == rhs.value;
+		else
+			return (decimalDiff(rhs) == 0.0);
+	}
+	bool operator>(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value > rhs.value;
+		else
+			return (decimalDiff(rhs) > 0.0);
+	}
+	bool operator<(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value < rhs.value;
+		else
+			return (decimalDiff(rhs) < 0.0);
+	}
+	bool operator>=(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value >= rhs.value;
+		else
+			return (decimalDiff(rhs) >= 0.0);
+	}
+	bool operator<=(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value <= rhs.value;
+		else
+			return (decimalDiff(rhs) <= 0.0);
+	}
+	bool operator!=(const IDB_Decimal& rhs) const
+	{
+		if (scale == rhs.scale)
+			return value != rhs.value;
+		else
+			return (decimalDiff(rhs) != 0.0);
+	}
+
+	int64_t value;
+	int8_t  scale;      // 0~18
+	uint8_t precision;  // 1~18
+};
+typedef IDB_Decimal CNX_Decimal;
+
+/**
+ * @brief IDB_Regex struct
+ *
+ */
+typedef boost::regex IDB_Regex;
+typedef IDB_Regex CNX_Regex;
+
+typedef boost::shared_ptr<IDB_Regex> SP_IDB_Regex;
+typedef SP_IDB_Regex SP_CNX_Regex;
 
 const int64_t IDB_pow[19] = {
 1,
@@ -76,119 +149,6 @@ const int64_t IDB_pow[19] = {
 100000000000000000LL,
 1000000000000000000LL
 };
-
-/**
- * @brief IDB_Decimal type
- *
- */
-struct IDB_Decimal
-{
-	IDB_Decimal(): value(0), scale(0), precision(0) {}
-	IDB_Decimal(int64_t val, int8_t s, uint8_t p) :
-				value (val),
-				scale(s),
-				precision(p) {}
-
-	int decimalComp(const IDB_Decimal& d) const
-	{
-		lldiv_t d1 = lldiv(value, IDB_pow[scale]);
-		lldiv_t d2 = lldiv(d.value, IDB_pow[d.scale]);
-
-		int ret = 0;
-		if (d1.quot > d2.quot)
-		{
-			ret = 1;
-		}
-		else if (d1.quot < d2.quot)
-		{
-			ret = -1;
-		}
-		else
-		{
-			// rem carries the value's sign, but needs to be normalized.
-			int64_t s = scale - d.scale;
-			if (s < 0)
-			{
-				if ((d1.rem * IDB_pow[-s]) > d2.rem)
-					ret = 1;
-				else if ((d1.rem * IDB_pow[-s]) < d2.rem)
-					ret = -1;
-			}
-			else
-			{
-				if (d1.rem > (d2.rem * IDB_pow[s]))
-					ret = 1;
-				else if (d1.rem < (d2.rem * IDB_pow[s]))
-					ret = -1;
-			}
-		}
-
-		return ret;
-	}
-
-	bool operator==(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value == rhs.value;
-		else
-			return (decimalComp(rhs) == 0);
-	}
-	bool operator>(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value > rhs.value;
-		else
-			return (decimalComp(rhs) > 0);
-	}
-	bool operator<(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value < rhs.value;
-		else
-			return (decimalComp(rhs) < 0);
-	}
-	bool operator>=(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value >= rhs.value;
-		else
-			return (decimalComp(rhs) >= 0);
-	}
-	bool operator<=(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value <= rhs.value;
-		else
-			return (decimalComp(rhs) <= 0);
-	}
-	bool operator!=(const IDB_Decimal& rhs) const
-	{
-		if (scale == rhs.scale)
-			return value != rhs.value;
-		else
-			return (decimalComp(rhs) != 0);
-	}
-
-	int64_t value;
-	int8_t  scale;      // 0~18
-	uint8_t precision;  // 1~18
-};
-typedef IDB_Decimal CNX_Decimal;
-
-/**
- * @brief IDB_Regex struct
- *
- */
-#ifdef _MSC_VER
-typedef boost::regex IDB_Regex;
-#else
-typedef regex_t IDB_Regex;
-#endif
-
-typedef IDB_Regex CNX_Regex;
-
-typedef boost::shared_ptr<IDB_Regex> SP_IDB_Regex;
-typedef SP_IDB_Regex SP_CNX_Regex;
 
 /** Trim trailing 0 from val. All insignificant zeroes to the right of the 
  *  decimal point are removed. Also, the decimal point is not included on 
@@ -250,7 +210,7 @@ struct Result
 	Result():intVal(0), origIntVal(0), dummy(0),
 			doubleVal(0), floatVal(0), boolVal(false),
 			strVal(""), decimalVal(IDB_Decimal(0,0,0)),
-			valueConverted(false) {}
+			valueConverted(false){}
 	int64_t intVal;
 	uint64_t origIntVal;
 	// clear up the memory following origIntVal to make sure null terminated string

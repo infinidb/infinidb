@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: objectidmanager.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: objectidmanager.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -29,7 +29,6 @@
 
 #include <string>
 #include <stdint.h>
-#include "dbrm.h"
 
 namespace execplan {
 
@@ -40,6 +39,10 @@ namespace execplan {
  */
 class ObjectIDManager
 {
+private:
+	struct FEntry {
+		int begin, end;
+	};
 
 public:
 	/** @brief Default constructor
@@ -62,41 +65,25 @@ public:
 	 */
 	int allocOIDs(int num);
 
-	/** @brief Allocates a new oid for a version buffer file, associates it
-	 * with dbroot.
-	 *
-	 * @return Returns -1 on all errors.
-	 */
-	int allocVBOID(uint dbroot);
-
-	/** @brief Returns the DBRoot of the given version buffer OID, or -1 on error. */
-	int getDBRootOfVBOID(uint vboid);
-
-	/** @brief Returns the VB OID -> DB Root mapping.  ret[0] = dbroot of VB OID 0
-	 *
-	 * @return vector where index n = dbroot of VBOID n.
-	 * @throw runtime_exception on error
-	 */
-	std::vector<uint16_t> getVBOIDToDBRootMap();
 	/** @brief Return an OID to the pool
 	 *
 	 * @param oid The OID to return
 	 */
-	void returnOID(int oid);
+	void returnOID(int oid) const;
 
 	/** @brief Return a list of OIDs to the pool
 	 *
 	 * @param start The first OID to return
 	 * @param end The last OID to return
 	 */
-	void returnOIDs(int start, int end);
+	void returnOIDs(int start, int end) const;
 
 	/** @brief Counts the number of allocated OIDs
 	 *
 	 * @note This currently assumes the bitmap length is a multiple of 4096
 	 * @return The number of allocated OIDs
 	 */
-	int size();
+	int size() const;
 
 	/** @brief Get the OID bitmap filename
 	 */
@@ -104,10 +91,6 @@ public:
 
 private:
 	std::string fFilename;
-	BRM::DBRM dbrm;
-
-#if 0
-
 	static const int FreeListEntries = 256;
 	static const int HeaderSize = FreeListEntries * sizeof(FEntry);
 	static const int FileSize = HeaderSize + 2097152;  // (2^24/8)
@@ -187,8 +170,6 @@ private:
 	 * fullscan
 	 */
 	void patchFreelist(struct FEntry* freelist, int start, int num) const;
-#endif
-
 
 };
 

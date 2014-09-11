@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: systemcatalog.cpp 1763 2012-04-04 18:20:36Z rdempsey $
+//  $Id: systemcatalog.cpp 1422 2011-03-09 21:42:52Z chao $
 
 #include <iostream>
 #include <assert.h>
@@ -158,9 +158,9 @@ void SystemCatalog::build()
   //------------------------------------------------------------------------------
   // Create SYSCOLUMN table
   //------------------------------------------------------------------------------
-  //dbRoot++;
-  //if (dbRoot > dbRootCount)
-  //  dbRoot = 1;
+  dbRoot++;
+  if (dbRoot > dbRootCount)
+    dbRoot = 1;
 
   //SYSCOLUMN
   cout<< endl;

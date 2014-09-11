@@ -1,11 +1,11 @@
-# $Id: MessageFile.txt 3174 2012-07-04 12:09:47Z dcathey $
+# $Id: MessageFile.txt 3534 2013-02-05 01:40:58Z bpaul $
 #
 # This file maps message ID's to message texts.
 #
 # When you need a new message text, you put it here and you add a detailed description
 #  in the error message descriptions document in the Software docs folder
 #
-# The first token on a line must be the message ID. Everything else up to the the end of
+# The first token on a line must be the mesage ID. Everything else up to the the end of
 #  the line is the message text. There must be exactly one tab character
 #  separating the message id from the message text. The message text may
 #  contain any character(s) except tab. The line must end with a single '\n'.
@@ -82,10 +82,10 @@
 69	Error loading UDF ordinal %1% from library
 70	TransportReceiverThread error: %1%
 71	%1%: socket read error: %2%; %3%; Will retry.
-72	ClearTableLock: Rollback extents   for table %1%.
-73	ClearTableLock: Rollback extents   for table %1%, column %2%. %3%
-74	ClearTableLock: Rollback extentMap for table %1%, column %2%. %3%
-75	ClearTableLock: Rollback dbfile    for table %1%, column %2%. %3%
+72	ClearTableLock: Rolling back extents for table %1%.
+73	ClearTableLock: Rolling back extents for table %1%, column %2%.  %3%
+74	ClearTableLock: Rolling back extent map for table %1%, column %2%.  %3%
+75	ClearTableLock: Rolling back db file for table %1%, column %2%.  %3%
 76	Out of disk space for DB file: %1%
 77	PrimProc: Remount performed to open file-%1%; OID-%2%; tries-%3%; elapsedTime-%4% secs; status-%5%
 78	Error executing VB copy; unable to fseek to DB file for OID %1%, offset %2%; %3%
@@ -94,16 +94,13 @@
 81	Start BulkLoad: JobId-%1%; db-%2%
 82	End BulkLoad: JobId-%1%; status-%2%
 83	BulkLoad: JobId-%1%; finished loading table %2%; %3% rows inserted
-84	ClearTableLock: Starting bulk rollback for table %1%; lock-%2%; initiated by %3%.
-85	ClearTableLock: Ending bulk rollback for table %1%; lock-%2%; initiated by %3%.
+84	ClearTableLock: Starting bulk rollback for table %1%; initiated by %2%.
+85	ClearTableLock: Ending bulk rollback for table %1%; initiated by %2%.
 86	Initiating BulkLoad: %1%
 87	BulkLoad Error: %1%
-88	ClearTableLock: Initiating %1% for table %2%; lock-%3%
-89	ClearTableLock: %1% for table %2%; lock-%3%.  %4%
-90	ClearTableLock: Nothing to rollback for table %1% on DBRoot%2%
-91	BBRM encountered network error, check the controllernode.	
-92	A process crashed while holding the BRM mutex.  The lock state is unreliable.  Please restart InfiniDB
-93	Unrecoverable BRM lock state detected. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%. Please restart InfiniDB.
-94	Attempting to fix the BRM lock state. Diagnostic values: r=%1% rwt=%2% w=%3% wwt=%4%.
-95	BRM lock state appears to be functional again.
-103	Starting FBO for new %1% extent too large for current db file; %2%
+91  BBRM encountered network error, check the controllernode.
+92  A process crashed while holding the BRM mutex.  The lock state is unreliable.  Please restart InfiniDB
+93  Unrecoverable BRM lock state detected. Diagnostic values: r=%1% rwt=%2 w=%3% wwt=%4%. Please restart InfiniDB.
+94  Attempting to fix the BRM lock state. Diagnostic values: r=%1% rwt=%2 w=%3% wwt=%4%.
+95  BRM lock state appears to be functional again.
+

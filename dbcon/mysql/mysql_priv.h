@@ -59,7 +59,6 @@ enum enum_query_type
   QT_IS,
   QT_INFINIDB, // this is for InfiniDB post process to customerize item::print() functions.
   QT_INFINIDB_NO_QUOTE, // customized item:print() without quote delimiter
-  QT_INFINIDB_DERIVED // for union view as derived table. no view name is appended to the table alias.
 };
 
 /* TODO convert all these three maps to Bitmap classes */
@@ -1252,17 +1251,13 @@ bool mysql_rename_table(handlerton *base, const char *old_db,
                         const char * new_name, uint flags);
 bool mysql_prepare_update(THD *thd, TABLE_LIST *table_list,
                           Item **conds, uint order_num, ORDER *order);
-// @InfiniDB. Make conds argument reference to pointer so the optimization
-// result can be passed in to the InfiniDB connector.
 int mysql_update(THD *thd,TABLE_LIST *tables,List<Item> &fields,
-		 List<Item> &values,COND *& conds,
+		 List<Item> &values,COND *conds,
 		 uint order_num, ORDER *order, ha_rows limit,
 		 enum enum_duplicates handle_duplicates, bool ignore);
-// @InfiniDB. Make conds argument reference to pointer so the optimization
-// result can be passed in to the InfiniDB connector.
 bool mysql_multi_update(THD *thd, TABLE_LIST *table_list,
                         List<Item> *fields, List<Item> *values,
-                        COND *& conds, ulonglong options,
+                        COND *conds, ulonglong options,
                         enum enum_duplicates handle_duplicates, bool ignore,
                         SELECT_LEX_UNIT *unit, SELECT_LEX *select_lex);
 bool mysql_prepare_insert(THD *thd, TABLE_LIST *table_list, TABLE *table,
@@ -1279,9 +1274,7 @@ int check_that_all_fields_are_given_values(THD *thd, TABLE *entry,
                                            TABLE_LIST *table_list);
 void prepare_triggers_for_insert_stmt(TABLE *table);
 int mysql_prepare_delete(THD *thd, TABLE_LIST *table_list, Item **conds);
-// @InfiniDB. Make conds argument reference to pointer so the optimization
-// result can be passed in to the InfiniDB connector.
-bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *& conds,
+bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
                   SQL_LIST *order, ha_rows rows, ulonglong options,
                   bool reset_auto_increment);
 bool mysql_truncate(THD *thd, TABLE_LIST *table_list, bool dont_send_ok);

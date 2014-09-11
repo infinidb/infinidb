@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: ha_calpont_impl_if.h 8984 2012-10-12 21:16:32Z zzhu $
+// $Id: ha_calpont_impl_if.h 8326 2012-02-15 18:58:10Z xlou $
 /** @file */
 #ifndef HA_CALPONT_IMPL_IF_H__
 #define HA_CALPONT_IMPL_IF_H__
@@ -38,7 +38,6 @@ struct st_ha_create_information;
 
 #include "idberrorinfo.h"
 #include "calpontselectexecutionplan.h"
-#include "querystats.h"
 #include "sm.h"
 
 /** Debug macro */
@@ -60,13 +59,12 @@ namespace execplan
 namespace cal_impl_if
 {
 class SubQuery;
-class View;
 
 struct JoinInfo
 {
 	execplan::CalpontSystemCatalog::TableAliasName tn;
-	uint32_t joinTimes;
-	std::vector<uint32_t> IDs;
+	uint joinTimes;
+	std::vector<uint> IDs;	
 };
 
 enum ClauseType
@@ -81,14 +79,13 @@ enum ClauseType
 };
 
 typedef std::vector<JoinInfo> JoinInfoVec;
-typedef std::map<execplan::CalpontSystemCatalog::TableAliasName, std::pair<int, TABLE_LIST*> > TableMap;
+typedef std::map<execplan::CalpontSystemCatalog::TableAliasName, int> TableMap;
 
 struct gp_walk_info
 {
 	std::vector <std::string> selectCols;
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList returnedCols;
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList groupByCols;
-	execplan::CalpontSelectExecutionPlan::ReturnedColumnList subGroupByCols;
 	execplan::CalpontSelectExecutionPlan::ReturnedColumnList orderByCols;
 	execplan::CalpontSelectExecutionPlan::ColumnMap columnMap;
 	std::stack<execplan::ReturnedColumn*> rcWorkStack;
@@ -107,7 +104,7 @@ struct gp_walk_info
 	std::vector<execplan::AggregateColumn*> count_asterisk_list;
 	std::vector<execplan::FunctionColumn*> no_parm_func_list;
 	TableMap tableMap;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog *csc;
 	int8_t internalDecimalScale;
 	THD* thd;
 	uint64_t subSelectType; // the type of sub select filter that owns the gwi
@@ -115,47 +112,45 @@ struct gp_walk_info
 	execplan::CalpontSelectExecutionPlan::SelectList derivedTbList;
 	execplan::CalpontSelectExecutionPlan::TableList tbList;
 	std::vector<execplan::CalpontSystemCatalog::TableAliasName> correlatedTbNameVec;
+	std::vector<execplan::CalpontSystemCatalog::TableAliasName> viewList;
 	ClauseType clauseType;
 	execplan::CalpontSystemCatalog::TableAliasName viewName;
-	bool aggOnSelect;
-	std::vector<View*> viewList;
+
 
 	gp_walk_info() : sessionid(0), 
 		               fatalParseError(false), 
 		               condPush(false), 
 		               dropCond(false), 
-		               expressionId(0),
+		               expressionId(0), 
+		               csc(0), 
 		               internalDecimalScale(4),
 		               thd(0),
 		               subSelectType(uint64_t(-1)),
 		               subQuery(0),
-		               clauseType(INIT),
-		               aggOnSelect(false)
+		               clauseType(INIT)
 	{ }
-	
-	~gp_walk_info() {}
 };
 
 struct cal_table_info
 {
 	enum RowSources { FROM_ENGINE, FROM_FILE };
 
-	cal_table_info() : tpl_ctx(0),
-		                 //tpl_scan_ctx(0),
-		                 c(0),
-		                 msTablePtr(0),
+	cal_table_info() : tpl_ctx(0), 
+		                 tpl_scan_ctx(0), 
+		                 c(0), 
+		                 msTablePtr(0), 
 		                 conn_hndl(0),
 		                 condInfo(0),
+		                 csep(0),
 		                 moreRows(false)
 	{ }
-	~cal_table_info() {}
 	sm::cpsm_tplh_t* tpl_ctx;
-	sm::sp_cpsm_tplsch_t tpl_scan_ctx;
-	unsigned c; // for debug purpose
-	st_table* msTablePtr; // no ownership
-	sm::cpsm_conhdl_t* conn_hndl;
+	sm::cpsm_tplsch_t* tpl_scan_ctx;
+	unsigned c;	// for debug purpose
+	st_table* msTablePtr;
+	sm::cpsm_conhdl_t* conn_hndl; 
 	gp_walk_info* condInfo;
-	execplan::SCSEP csep;
+	execplan::CalpontSelectExecutionPlan* csep;
 	bool moreRows; //are there more rows to consume (b/c of limit)
 };
 
@@ -166,8 +161,8 @@ typedef std::map<uint32_t, ColValuesList> TableValuesMap;
 struct cal_connection_info
 {
 	enum AlterTableState { NOT_ALTER, ALTER_SECOND_RENAME, ALTER_FIRST_RENAME };
-	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false),
-	bulkInsertRows(0), singleInsert(true), isLoaddataInfile( false ), dmlProc(0), rowsHaveInserted(0), rc(0), tableOid(0)
+	cal_connection_info() : cal_conn_hndl(0), queryState(0), currentTable(0), traceFlags(0), alterTableState(NOT_ALTER), isAlter(false), 
+	bulkInsertRows(0), singleInsert(true), isLoaddataInfile( false ), dmlProc(0), rowsHaveInserted(0), rc(0) 
 	{ }
 
 	sm::cpsm_conhdl_t* cal_conn_hndl;
@@ -188,25 +183,20 @@ struct cal_connection_info
 	ColNameList colNameList;
 	TableValuesMap tableValuesMap;
 	int rc;
-	uint32_t tableOid;
-	querystats::QueryStats stats;
-	std::string warningMsg;
 };
 
 typedef std::tr1::unordered_map<int, cal_connection_info> CalConnMap;
 
 const std::string infinidb_err_msg = "\nThe query includes syntax that is not supported by InfiniDB. Use 'show warnings;' to get more information. Review the Calpont InfiniDB Syntax guide for additional information on supported distributed syntax or consider changing the InfiniDB Operating Mode (infinidb_vtable_mode).";
 
-int cp_get_plan(THD* thd, execplan::SCSEP& csep);
-int cp_get_table_plan(THD* thd, execplan::SCSEP& csep, cal_impl_if::cal_table_info& ti);
-int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, execplan::SCSEP& csep, bool isUnion=false);
+int cp_get_plan(THD* thd, execplan::CalpontSelectExecutionPlan& csep);
+int cp_get_table_plan(THD* thd, execplan::CalpontSelectExecutionPlan& csep, cal_impl_if::cal_table_info& ti);
+int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, execplan::CalpontSelectExecutionPlan& csep, bool isUnion=false);
 void setError(THD* thd, uint errcode, const std::string errmsg);
 void gp_walk(const Item *item, void *arg);
 void parse_item (Item *item, std::vector<Item_field*>& field_vec, bool& hasNonSupportItem, uint16& parseInfo);
 execplan::ReturnedColumn* buildReturnedColumn(Item* item, gp_walk_info& gwi, bool& nonSupport);
 const std::string bestTableName(const Item_field* ifp);
-bool isInfiniDB(TABLE* table_ptr);
-
 #ifdef DEBUG_WALK_COND
 void debug_walk(const Item *item, void *arg);
 #endif

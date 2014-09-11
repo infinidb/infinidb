@@ -101,8 +101,8 @@ public:
 	EXPORT int verifyHdr(const void* hdrBuf) const;
 
 	/**
-	* Extracts list of compression pointers from the specified ptr buffer.
-	* ptrBuf points to the pointer section taken from the headers.
+	* Extracts list of compression pointers from the specified header's pointer section.
+	* ptrBuf points to start of 2 buffer headers from compressed db file.
 	* chunkPtrs is a vector of offset, size pairs for the compressed chunks.
 	* Returns 0 if success.
 	*/
@@ -112,26 +112,11 @@ public:
 
 	/**
 	* Extracts list of compression pointers from the specified header.
-	* hdrBuf points to start of 2 buffer headers from compressed db file.
 	* Overloaded for backward compatibility. For none dictionary columns.
 	* Note: the pointer passed in is the beginning of the header,
 	*       not the pointer section as above.
 	*/
 	EXPORT int getPtrList(const char* hdrBuf, CompChunkPtrList& chunkPtrs) const;
-
-	/**
-	* Return the number of chunk pointers contained in the specified ptr buffer.
-	* ptrBuf points to the pointer section taken from the headers.
-	*/
-	EXPORT unsigned int getPtrCount(const char* ptrBuf,
-		const int ptrBufSize) const;
-
-	/**
-	* Return the number of chunk pointers contained in the specified header.
-	* hdrBuf points to start of 2 buffer headers from compressed db file.
-	* For non-dictionary columns.
-	*/
-	EXPORT unsigned int getPtrCount(const char* hdrBuf) const;
 
 	/**
 	* Store vector of pointers into the specified buffer header's pointer section.
@@ -205,8 +190,6 @@ inline void IDBCompressInterface::initHdr(void*, void*, int,int) const {}
 inline int IDBCompressInterface::verifyHdr(const void*) const { return -1; }
 inline int IDBCompressInterface::getPtrList(const char*, const int, CompChunkPtrList&) const { return -1; }
 inline int IDBCompressInterface::getPtrList(const char*, CompChunkPtrList&) const { return -1; }
-inline unsigned int IDBCompressInterface::getPtrCount(const char* ptrBuf, const int ptrBufSize) const { return 0; }
-inline unsigned int IDBCompressInterface::getPtrCount(const char* hdrBuf) const { return 0; }
 inline void IDBCompressInterface::storePtrs(const std::vector<uint64_t>&,void*,int) const {}
 inline void IDBCompressInterface::storePtrs(const std::vector<uint64_t>&, void*) const {}
 inline void IDBCompressInterface::locateBlock(unsigned int block,

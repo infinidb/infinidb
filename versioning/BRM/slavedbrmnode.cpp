@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavedbrmnode.cpp 1837 2013-01-31 19:13:18Z pleblanc $
+ * $Id: slavedbrmnode.cpp 1805 2012-12-19 23:09:07Z pleblanc $
  *
  ****************************************************************************/
 
@@ -44,7 +44,6 @@
 #include "loggingid.h"
 #include "errorcodes.h"
 #include "idberrorinfo.h"
-#include "cacheutils.h"
 using namespace std;
 using namespace logging;
 
@@ -87,33 +86,11 @@ int SlaveDBRMNode::lookup(OID_t oid, LBIDRange_v& lbidList) throw()
 }
 
 //------------------------------------------------------------------------------
-// Create a "stripe" of column extents for the specified column OIDs and DBRoot.
+// Create an extent for the specified OID.
 //------------------------------------------------------------------------------
-int SlaveDBRMNode::createStripeColumnExtents(
-	const std::vector<CreateStripeColumnExtentsArgIn>& cols,
-	u_int16_t  dbRoot,
-	u_int32_t& partitionNum,
-	u_int16_t& segmentNum,
-	std::vector<CreateStripeColumnExtentsArgOut>& extents) throw()
-{
-	try {
-		em.createStripeColumnExtents(cols, dbRoot,
-			partitionNum, segmentNum, extents );
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Create an extent for the specified OID and DBRoot.
-//------------------------------------------------------------------------------
-int SlaveDBRMNode::createColumnExtent_DBroot(OID_t oid,
+int SlaveDBRMNode::createColumnExtent(OID_t oid,
 	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
+	u_int16_t& dbRoot,
 	u_int32_t& partitionNum,
 	u_int16_t& segmentNum,
 	LBID_t&    lbid,
@@ -121,32 +98,7 @@ int SlaveDBRMNode::createColumnExtent_DBroot(OID_t oid,
 	u_int32_t& startBlockOffset) throw()
 {
 	try {
-		em.createColumnExtent_DBroot(oid, colWidth, dbRoot, partitionNum,
-			segmentNum, lbid, allocdSize, startBlockOffset );
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Create extent for the exact segment file specified by the requested
-// OID, DBRoot, partition, and segment.
-//------------------------------------------------------------------------------
-int SlaveDBRMNode::createColumnExtentExactFile(OID_t oid,
-	u_int32_t  colWidth,
-	u_int16_t  dbRoot,
-	u_int32_t  partitionNum,
-	u_int16_t  segmentNum,
-	LBID_t&    lbid,
-	int&       allocdSize,
-	u_int32_t& startBlockOffset) throw()
-{
-	try {
-		em.createColumnExtentExactFile(oid, colWidth, dbRoot, partitionNum,
+		em.createColumnExtent(oid, colWidth, dbRoot, partitionNum,
 			segmentNum, lbid, allocdSize, startBlockOffset );
 	}
 	catch (exception& e) {
@@ -182,18 +134,15 @@ int SlaveDBRMNode::createDictStoreExtent(OID_t oid,
 
 //------------------------------------------------------------------------------
 // Rollback (delete) the extents that logically trail the specified extent for
-// the given OID and DBRoot.  Also sets the HWM for the specified extent.
+// the given OID.  Also sets the HWM for the specified extent.
 //------------------------------------------------------------------------------
-int SlaveDBRMNode::rollbackColumnExtents_DBroot(OID_t oid,
-	bool     bDeleteAll,
-	uint16_t dbRoot,
+int SlaveDBRMNode::rollbackColumnExtents(OID_t oid,
 	uint32_t partitionNum,
 	uint16_t segmentNum,
 	HWM_t    hwm) throw()
 {
 	try {
-		em.rollbackColumnExtents_DBroot(
-			oid, bDeleteAll, dbRoot, partitionNum, segmentNum, hwm);
+		em.rollbackColumnExtents(oid, partitionNum, segmentNum, hwm);
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -204,20 +153,16 @@ int SlaveDBRMNode::rollbackColumnExtents_DBroot(OID_t oid,
 }
 
 //------------------------------------------------------------------------------
-// Rollback (delete) the extents that follow the specified extents for the
-// given OID and DBRoot. 
+// Rollback (delete) the extents that follow the specified OID and partition.
 // Also sets the HWMs for the last extents to be kept in each segment file in
 // the specified partition.
 //------------------------------------------------------------------------------
-int SlaveDBRMNode::rollbackDictStoreExtents_DBroot(OID_t oid,
-	uint16_t             dbRoot,
+int SlaveDBRMNode::rollbackDictStoreExtents(OID_t oid,
 	uint32_t             partitionNum,
-	const vector<uint16_t>& segNums,
 	const vector<HWM_t>& hwms) throw()
 {
 	try {
-		em.rollbackDictStoreExtents_DBroot(
-			oid, dbRoot, partitionNum, segNums, hwms);
+		em.rollbackDictStoreExtents(oid, partitionNum, hwms);
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -334,21 +279,6 @@ int SlaveDBRMNode::setLocalHWM(OID_t oid, uint32_t partitionNum,
 	return 0;
 }
 
-int SlaveDBRMNode::bulkSetHWM(const vector<BulkSetHWMArg> &args, VER_t transID,
-		bool firstNode) throw()
-{
-	try {
-		if (transID)
-			vbCommit(transID);
-		em.bulkSetHWM(args, firstNode);
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-	return 0;
-}
-
 int SlaveDBRMNode::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &hwmArgs,
 		const std::vector<CPInfo> & setCPDataArgs,
 		const std::vector<CPInfoMerge> & mergeCPDataArgs,
@@ -401,18 +331,6 @@ int SlaveDBRMNode::bulkSetHWMAndCP(const vector<BulkSetHWMArg> &hwmArgs,
 	return 0;
 }
 
-int SlaveDBRMNode::bulkUpdateDBRoot(const vector<BulkUpdateDBRootArg> &args) throw()
-{
-	try {
-		em.bulkUpdateDBRoot(args);
-	}
-	catch (exception &e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-	return 0;
-}
-
 
 int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 										 u_int32_t vbFBO) throw()
@@ -420,7 +338,7 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 	bool vbFlag;
 	VER_t oldVerID;
 	int err;
-
+	uint i;
 	if (transID == 0)
 	{
 		ostringstream msg;
@@ -430,7 +348,6 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 	}
 	
 #ifdef BRM_DEBUG
-	uint i;
 	for (i = 0; i < lastFreeList.size(); i++) {
 		if (lastFreeList[i].vbOID == vbOID) {
 			LBID_t lastLBID = lastFreeList[i].vbFBO + lastFreeList[i].size - 1;
@@ -451,14 +368,15 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 		return -1;
 	}
 #endif
-/*
-	LBIDRange r;
-	r.start = lbid;
-	r.size = 1;
-	if (!copylocks.isLocked(r))
-		cout << "Copylock error: lbid " << lbid << " isn't locked\n";
-*/
 
+/*
+    LBIDRange r;
+    r.start = lbid;
+    r.size = 1;
+    if (!copylocks.isLocked(r))
+        cout << "Copylock error: lbid " << lbid << " isn't locked\n";
+*/
+	
 	try {
 		vbbm.lock(VBBM::WRITE);
 		locked[0] = true;
@@ -510,9 +428,9 @@ int SlaveDBRMNode::writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID,
 	
 	return 0;
 }
-
-int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
-		const LBIDRange_v& ranges, VBRange_v& freeList, bool flushPMCache) throw()
+		
+int SlaveDBRMNode::beginVBCopy(VER_t transID, const LBIDRange_v& ranges,
+									  VBRange_v& freeList) throw()
 {
 	int64_t sum = 0;
 	uint64_t maxRetries;
@@ -557,9 +475,9 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 		 * ranges.  When we support multiple transactions at once, the resource
 		 * graph in the controller node should make this redundant anyway.
 		 */
-		for (i = 0; i < ranges.size(); i++)
-			if (vss.isLocked(ranges[i], transID))
-				return -1;
+       for (i = 0; i < ranges.size(); i++)
+            if (vss.isLocked(ranges[i], transID))
+                return -1;
 
 		copylocks.lock(CopyLocks::WRITE);
 		locked[2] = true;
@@ -570,16 +488,16 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 		retries = 0;
 		while (!allLocked && retries < maxRetries) {
 			allLocked = true;
-			for (i = 0; i < ranges.size(); i++) {
-				if (!lockedRanges[i]) {
-					if (copylocks.isLocked(ranges[i]))
-						allLocked = false;
-					else {
-						copylocks.lockRange(ranges[i], transID);
-						lockedRanges[i] = true;
-					}
-				}
-			}
+            for (i = 0; i < ranges.size(); i++) {
+                if (!lockedRanges[i]) {
+                    if (copylocks.isLocked(ranges[i]))
+                        allLocked = false;
+                    else {
+                        copylocks.lockRange(ranges[i], transID);
+                        lockedRanges[i] = true;
+                    }
+                }
+            }
 			/* PrimProc is reading at least 1 range and it could need the locks.
 			 */
 			if (!allLocked) {
@@ -600,38 +518,38 @@ int SlaveDBRMNode::beginVBCopy(VER_t transID, uint16_t vbOID,
 			}
 		}
 
-		if (retries >= maxRetries) {
-			for (i = 0; i < ranges.size(); i++) {
-				if (!lockedRanges[i]) {
-					copylocks.forceRelease(ranges[i]);
-					copylocks.lockRange(ranges[i], transID);
-					lockedRanges[i] = true;
-				}
-			}
-		}
+        if (retries >= maxRetries) {
+            for (i = 0; i < ranges.size(); i++) {
+                if (!lockedRanges[i]) {
+                    copylocks.forceRelease(ranges[i]);
+                    copylocks.lockRange(ranges[i], transID);
+                    lockedRanges[i] = true;
+                }
+            }
+        }
 
-		vbbm.getBlocks(sum, vbOID, freeList, vss, flushPMCache);
+		vbbm.getBlocks(sum, freeList, vss);
 		lastFreeList = freeList;
 /*
-		for (i = 0; i < ranges.size(); i++)
-			assert(copylocks.isLocked(ranges[i]));
+        for (i = 0; i < ranges.size(); i++)
+            assert(copylocks.isLocked(ranges[i]));
 */
 		return 0;
 	}
 	catch(const logging::VBBMBufferOverFlowExcept &e) {
-		cerr << e.what() << endl;
-		for (i = 0; i < ranges.size(); i++)
-			if (lockedRanges[i])
-				copylocks.releaseRange(ranges[i]);
-		return e.errorCode();
-	}
-	catch(exception &e) {
-		for (i = 0; i < ranges.size(); i++)
-			if (lockedRanges[i])
-				copylocks.releaseRange(ranges[i]);
-		cerr << e.what() << endl;
-		return -1;
-	}
+        cerr << e.what() << endl;
+        for (i = 0; i < ranges.size(); i++)
+            if (lockedRanges[i])
+                copylocks.releaseRange(ranges[i]);
+        return e.errorCode();
+    }
+    catch(exception &e) {
+        for (i = 0; i < ranges.size(); i++)
+            if (lockedRanges[i])
+                copylocks.releaseRange(ranges[i]);
+        cerr << e.what() << endl;
+        return -1;
+    }
 }
 		
 int SlaveDBRMNode::endVBCopy(VER_t transID, const LBIDRange_v& ranges)
@@ -665,12 +583,7 @@ int SlaveDBRMNode::vbCommit(VER_t transID) throw()
 		if ( lbids.size() > 0 )
 		{
 			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbCommit: After commit for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-		
-			
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
-			
+			ostr << "vbRollback: After rollback for transaction " << transID << ", entry still locked with lbid:txnId:" << endl;
 			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
 		}
 		return 0;
@@ -681,7 +594,7 @@ int SlaveDBRMNode::vbCommit(VER_t transID) throw()
 	}
 }
 
-int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool flushPMCache)
+int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList)
 		throw()
 {
 	LBIDRange_v::const_iterator it;
@@ -689,11 +602,10 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool f
 	VER_t oldVerID;
 	int err;
 	bool vbFlag;
-	vector<LBID_t> flushList;
 
 #ifdef BRM_DEBUG
 	if (transID < 1) {
-		cerr << "SlaveDBRMNode::vbRollback(): transID must be > 0" << endl;
+		cerr << "WorkerDBRMNode::vbRollback(): transID must be > 0" << endl;
 		return -1;
 	}
 #endif
@@ -715,24 +627,19 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool f
 				if (err == -1)
 					oldVerID = 0;
 				
-				vss.removeEntry(lbid, transID, &flushList);
+				vss.removeEntry(lbid, transID);
 				if (vbFlag)
 					vbbm.removeEntry(lbid, oldVerID);
 				vss.setVBFlag(lbid, oldVerID, false);
 			}
 		}
-
-		if (flushPMCache && !flushList.empty())
-			cacheutils::flushPrimProcAllverBlocks(flushList);
 		
 		BlockList_t lbids;
 		vss.getLockedLBIDs(lbids);
 		if ( lbids.size() > 0 )
 		{
 			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbRollback: After rollback for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
+			ostr << "vbRollback: After rollback for transaction " << transID << ", entry still locked with lbid:txnId:" << endl;
 			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
 		}
 		
@@ -744,18 +651,17 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const LBIDRange_v& lbidList, bool f
 	}
 }
 
-int SlaveDBRMNode::vbRollback(VER_t transID, const vector<LBID_t>& lbidList, bool flushPMCache)
+int SlaveDBRMNode::vbRollback(VER_t transID, const vector<LBID_t>& lbidList)
 		throw()
 {
 	vector<LBID_t>::const_iterator it;
 	VER_t oldVerID;
 	int err;
 	bool vbFlag;
-	vector<LBID_t> flushList;
 
 #ifdef BRM_DEBUG
 	if (transID < 1) {
-		cerr << "SlaveDBRMNode::vbRollback(): transID must be > 0" << endl;
+		cerr << "WorkerDBRMNode::vbRollback(): transID must be > 0" << endl;
 		return -1;
 	}
 #endif
@@ -776,23 +682,17 @@ int SlaveDBRMNode::vbRollback(VER_t transID, const vector<LBID_t>& lbidList, boo
 			if (err == -1)
 				oldVerID = 0;
 			
-			vss.removeEntry(*it, transID, &flushList);
+			vss.removeEntry(*it, transID);
 			if (vbFlag)
 				vbbm.removeEntry(*it, oldVerID);
 			vss.setVBFlag(*it, oldVerID, false);
 		}
-
-		if (flushPMCache && !flushList.empty())
-			cacheutils::flushPrimProcAllverBlocks(flushList);
-		
 		BlockList_t lbids;
 		vss.getLockedLBIDs(lbids);
 		if ( lbids.size() > 0 )
 		{
 			ostringstream ostr;
-			ostr << "SlaveDBRMNode::vbRollback: After rollback for transaction " << transID <<
-				", " << lbids.size() << " entries are still locked!" << endl;
-			ostr << "The first locked lbid:verId = " << lbids[0].first <<":"<<lbids[0].second << endl;
+			ostr << "vbRollback: After rollback for transaction " << transID << ", entry still locked with lbid:txnId:" << endl;
 			log(ostr.str(), logging::LOG_TYPE_CRITICAL);
 		}
 		return 0;
@@ -1094,10 +994,10 @@ int SlaveDBRMNode::mergeExtentsMaxMin(CPMaxMinMergeMap_t &cpMap)
 // Delete all extents for the specified OID(s) and partition number.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::deletePartition(const std::set<OID_t>& oids,
-	set<LogicalPartition>& partitionNums, string& emsg) throw()
+	uint32_t partitionNum) throw()
 {
 	try {
-		em.deletePartition(oids, partitionNums, emsg);
+		em.deletePartition(oids, partitionNum);
 	}
 	catch (IDBExcept& iex) {
 		cerr << iex.what() << endl;
@@ -1105,15 +1005,8 @@ int SlaveDBRMNode::deletePartition(const std::set<OID_t>& oids,
 			return ERR_NOT_EXIST_PARTITION;
 		else if ( iex.errorCode() == ERR_INVALID_LAST_PARTITION )
 			return ERR_INVALID_OP_LAST_PARTITION;
-		else if (iex.errorCode() == WARN_NO_PARTITION_PERFORMED)
-			return ERR_NO_PARTITION_PERFORMED;
 		else
 			return -1;
-	}
-	catch (DBRMException& e)
-	{
-		// exceptions that can be ignored
-		return 0;
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -1128,10 +1021,10 @@ int SlaveDBRMNode::deletePartition(const std::set<OID_t>& oids,
 // number.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::markPartitionForDeletion(const std::set<OID_t>& oids,
-	set<LogicalPartition>& partitionNums, string& emsg) throw()
+	uint32_t partitionNum) throw()
 {
 	try {
-		em.markPartitionForDeletion(oids, partitionNums, emsg);
+		em.markPartitionForDeletion(oids, partitionNum);
 	}
 	catch (IDBExcept& iex) {
 		cerr << iex.what() << endl;
@@ -1141,15 +1034,8 @@ int SlaveDBRMNode::markPartitionForDeletion(const std::set<OID_t>& oids,
 			return ERR_NOT_EXIST_PARTITION;
 		else if ( iex.errorCode() == ERR_INVALID_LAST_PARTITION )
 			return ERR_INVALID_OP_LAST_PARTITION;
-		else if (iex.errorCode() == WARN_NO_PARTITION_PERFORMED)
-			return ERR_NO_PARTITION_PERFORMED;
 		else
 			return -1;
-	}
-	catch (DBRMException& e)
-	{
-		// exceptions that can be ignored
-		return 0;
 	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
@@ -1162,7 +1048,8 @@ int SlaveDBRMNode::markPartitionForDeletion(const std::set<OID_t>& oids,
 //------------------------------------------------------------------------------
 // Mark all extents as out of service, for the specified OID(s) 
 //------------------------------------------------------------------------------
-int SlaveDBRMNode::markAllPartitionForDeletion(const std::set<OID_t>& oids) throw()
+int SlaveDBRMNode::markAllPartitionForDeletion(const std::set<OID_t>& oids
+	) throw()
 {
 	try {
 		em.markAllPartitionForDeletion(oids);
@@ -1178,11 +1065,6 @@ int SlaveDBRMNode::markAllPartitionForDeletion(const std::set<OID_t>& oids) thro
 		else
 			return -1;
 	}
-	catch (DBRMException& e)
-	{
-		// exceptions that can be ignored
-		return 0;
-	}
 	catch (exception& e) {
 		cerr << e.what() << endl;
 		return -1;
@@ -1195,10 +1077,10 @@ int SlaveDBRMNode::markAllPartitionForDeletion(const std::set<OID_t>& oids) thro
 // Restore all extents for the specified OID(s) and partition number.
 //------------------------------------------------------------------------------
 int SlaveDBRMNode::restorePartition(const std::set<OID_t>& oids,
-	set<LogicalPartition>& partitionNums, string& emsg) throw()
+	uint32_t partitionNum) throw()
 {
 	try {
-		em.restorePartition(oids, partitionNums, emsg);
+		em.restorePartition(oids, partitionNum);
 	}
 	catch (IDBExcept& iex) {
 		cerr << iex.what() << endl;
@@ -1211,136 +1093,101 @@ int SlaveDBRMNode::restorePartition(const std::set<OID_t>& oids,
 		else
 			return -1;
 	}
-	catch (DBRMException& e)
-	{
-		// exceptions that can be ignored
-		return 0;
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-// Delete all extents for the dbroot
-//------------------------------------------------------------------------------
-int SlaveDBRMNode::deleteDBRoot(uint16_t dbroot) throw()
-{
-	try {
-		em.deleteDBRoot(dbroot);
-	}
-	catch (IDBExcept& iex) {
-		cerr << iex.what() << endl;
-			return -1;
-	}
-	catch (DBRMException& e)
-	{
-		// exceptions that can be ignored
-		return 0;
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
-	
 	return 0;
 }
 
 int SlaveDBRMNode::dmlLockLBIDRanges(const vector<LBIDRange> &ranges, int txnID)
 {
-	uint64_t maxRetries;
-	uint64_t waitInterval = 50000;   // usecs to sleep between retries
-	uint64_t retries;
-	bool* lockedRanges = (bool*)alloca(ranges.size() * sizeof(bool));
-	bool allLocked;
-	uint i;
+    uint64_t maxRetries;
+    uint64_t waitInterval = 50000;   // usecs to sleep between retries
+    uint64_t retries;
+    bool* lockedRanges = (bool*)alloca(ranges.size() * sizeof(bool));
+    bool allLocked;
+    uint i;
 
-	/* XXXPAT: The controller node will wait up to 5 mins for the response.
-	 * For now, this alg will try for 1 min to grab all of the locks.
-	 * After that, it will release them all then grab them.  Releasing
-	 * them by force opens the slight possibility of a bad result, but more
-	 * likely something crashed, and there has to be some kind of recovery.  The worst
-	 * case is better than stalling the system or causing the BRM to go read-only.
-	 * It should be extremely rare that it has to be done.
-	 */
-	maxRetries = (60 * 1000000)/waitInterval;
+    /* XXXPAT: The controller node will wait up to 5 mins for the response.
+     * For now, this alg will try for 1 min to grab all of the locks.
+     * After that, it will release them all then grab them.  Releasing
+     * them by force opens the slight possibility of a bad result, but more
+     * likely something crashed, and there has to be some kind of recovery.  The worst
+     * case is better than stalling the system or causing the BRM to go read-only.
+     * It should be extremely rare that it has to be done.
+     */
+    maxRetries = (60 * 1000000)/waitInterval;
 
-	for (i = 0; i < ranges.size(); i++)
-		lockedRanges[i] = false;
+    for (i = 0; i < ranges.size(); i++)
+        lockedRanges[i] = false;
 
-	try {
-		copylocks.lock(CopyLocks::WRITE);
-		locked[2] = true;
-		allLocked = false;
-		/* This version grabs all unlocked ranges in each pass.
-		 * If there are locked ranges it waits and tries again.
-		 */
-		retries = 0;
-		while (!allLocked && retries < maxRetries) {
-			allLocked = true;
-			for (i = 0; i < ranges.size(); i++) {
-				if (!lockedRanges[i]) {
-					if (copylocks.isLocked(ranges[i]))
-						allLocked = false;
-					else {
-						copylocks.lockRange(ranges[i], txnID);
-						lockedRanges[i] = true;
-					}
-				}
-			}
-			/* PrimProc is reading at least 1 range and it could need the locks.
-			 */
-			if (!allLocked) {
-				copylocks.release(CopyLocks::WRITE);
-				locked[2] = false;
-				usleep(waitInterval);
-				retries++;
-				copylocks.lock(CopyLocks::WRITE);
-				locked[2] = true;
-			}
-		}
+    try {
+        copylocks.lock(CopyLocks::WRITE);
+        locked[2] = true;
+        allLocked = false;
+        /* This version grabs all unlocked ranges in each pass.
+         * If there are locked ranges it waits and tries again.
+         */
+        retries = 0;
+        while (!allLocked && retries < maxRetries) {
+            allLocked = true;
+            for (i = 0; i < ranges.size(); i++) {
+                if (!lockedRanges[i]) {
+                    if (copylocks.isLocked(ranges[i]))
+                        allLocked = false;
+                    else {
+                        copylocks.lockRange(ranges[i], txnID);
+                        lockedRanges[i] = true;
+                    }
+                }
+            }
+            /* PrimProc is reading at least 1 range and it could need the locks.
+             */
+            if (!allLocked) {
+                copylocks.release(CopyLocks::WRITE);
+                locked[2] = false;
+                usleep(waitInterval);
+                retries++;
+                copylocks.lock(CopyLocks::WRITE);
+                locked[2] = true;
+            }
+        }
 
-		if (retries >= maxRetries) {
-			for (i = 0; i < ranges.size(); i++) {
-				if (!lockedRanges[i]) {
-					copylocks.forceRelease(ranges[i]);
-					copylocks.lockRange(ranges[i], txnID);
-					lockedRanges[i] = true;
-				}
-			}
-		}
+        if (retries >= maxRetries) {
+            for (i = 0; i < ranges.size(); i++) {
+                if (!lockedRanges[i]) {
+                    copylocks.forceRelease(ranges[i]);
+                    copylocks.lockRange(ranges[i], txnID);
+                    lockedRanges[i] = true;
+                }
+            }
+        }
 
-		return 0;
-	}
-	catch(exception &e) {
-		for (i = 0; i < ranges.size(); i++)
-			if (lockedRanges[i])
-				copylocks.releaseRange(ranges[i]);
-		cerr << e.what() << endl;
-		return -1;
-	}
+        return 0;
+    }
+    catch(exception &e) {
+        for (i = 0; i < ranges.size(); i++)
+            if (lockedRanges[i])
+                copylocks.releaseRange(ranges[i]);
+        cerr << e.what() << endl;
+        return -1;
+    }
 }
 
 int SlaveDBRMNode::dmlReleaseLBIDRanges(const vector<LBIDRange> &ranges)
 {
-	try {
-		copylocks.lock(CopyLocks::WRITE);
-		locked[2] = true;
+    try {
+        copylocks.lock(CopyLocks::WRITE);
+        locked[2] = true;
 
-		for (uint i = 0; i < ranges.size(); ++i)
-			copylocks.releaseRange(ranges[i]);
+        for (uint i = 0; i < ranges.size(); ++i)
+            copylocks.releaseRange(ranges[i]);
 
-		return 0;
-	}
-	catch (exception &e) {
-		cerr << e.what() << endl;
-		return -1;
-	}
+        return 0;
+    }
+    catch (exception &e) {
+        cerr << e.what() << endl;
+        return -1;
+    }
 
 }
-
 
 const bool * SlaveDBRMNode::getEMFLLockStatus()
 {

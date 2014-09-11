@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
  /*********************************************************************
- * $Id: clientrotator.h 8908 2012-09-18 18:50:03Z zzhu $
+ * $Id: clientrotator.h 8910 2012-09-18 18:52:26Z zzhu $
  *
  *
  ***********************************************************************/
@@ -144,7 +144,7 @@ public:
     messageqcpp::MessageQueueClient* fClient;
     typedef std::vector<std::string> ClientList;
     ClientList 	fClients;
-    config::Config* fCf;
+    const config::Config* fCf;
     int		fDebug;
     boost::mutex fClientLock;
 };

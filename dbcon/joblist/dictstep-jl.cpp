@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: dictstep-jl.cpp 8410 2012-03-22 12:57:23Z pleblanc $
+// $Id: dictstep-jl.cpp 8272 2012-01-19 16:28:34Z xlou $
 // C++ Implementation: dictstep-js
 //
 // Description: 
@@ -61,7 +61,7 @@ DictStepJL::~DictStepJL()
 {
 }
 
-void DictStepJL::setLBID(uint64_t token, uint dbroot)
+void DictStepJL::setLBID(uint64_t token)
 {
 // 	lbid = token >> 10;  // the lbid is calculated on the PM
 }
@@ -75,7 +75,7 @@ void DictStepJL::createCommand(ByteStream &bs) const
 	bs << (uint8_t) hasEqFilter;
 
 	if (hasEqFilter) {
-		idbassert(filterCount == eqFilter.size());
+		assert(filterCount == eqFilter.size());
 		bs << eqOp;
 		for (uint i = 0; i < filterCount; i++)
 			bs << eqFilter[i];

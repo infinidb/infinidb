@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: altertableprocessor.h 9058 2012-11-07 15:35:08Z chao $
+ *   $Id: altertableprocessor.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -54,7 +54,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void addColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::ColumnDef* columnDefPtr,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
+                ddlpackage::QualifiedName& fTableName);
 
             /** @brief drop a column
              *
@@ -64,7 +64,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void dropColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumn& ataDropColumn,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
+                ddlpackage::QualifiedName& fTableName );
 
             /** @brief drop columns
              *
@@ -74,7 +74,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void dropColumns(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumns& ataDropColumns,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
+                ddlpackage::QualifiedName& fTableName );
 
             /** @brief add table constraint
              *
@@ -94,7 +94,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void setColumnDefault(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaSetColumnDefault& ataSetColumnDefault,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
+                ddlpackage::QualifiedName& fTableName );
 
             /** @brief drop column default
              *
@@ -104,7 +104,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void dropColumnDefault(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaDropColumnDefault& ataDropColumnDefault,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId );
+                ddlpackage::QualifiedName& fTableName );
 
             /** @brief drop table constraint
              *
@@ -123,7 +123,7 @@ namespace ddlpackageprocessor
              */
             EXPORT void renameTable(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID,
                 DDLResult& result, ddlpackage::AtaRenameTable& ataRenameTable,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
+                ddlpackage::QualifiedName& fTableName );
 
             /** @brief rename a column
              *
@@ -133,10 +133,11 @@ namespace ddlpackageprocessor
              */
             EXPORT void renameColumn(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, DDLResult& result,
                 ddlpackage::AtaRenameColumn& ataRenameColumn,
-                ddlpackage::QualifiedName& fTableName, const uint64_t uniqueId);
+                ddlpackage::QualifiedName& fTableName );
 
         protected:
-	    void rollBackAlter(const std::string& error, BRM::TxnID txnID, int sessionId, DDLResult& result, u_int64_t uniqueId);
+	    void rollBackFiles(BRM::TxnID txnID);
+	    void rollBackAlter(const std::string& error, BRM::TxnID txnID, int sessionId, DDLResult& result);
 
         private:
 

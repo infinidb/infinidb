@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: expressionparser.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: expressionparser.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -252,7 +252,7 @@ ParseTree* ExpressionParser::reduce(TreeNode* op, ParseTree* value)
         delete op;
         return value;
     default:
-        idbassert(0);
+        assert(0);
     }
     
     ostringstream oss;

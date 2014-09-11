@@ -20,7 +20,7 @@
 
 /***************************************************************************
  *
- *   $Id: filerequest.h 1961 2012-09-28 23:08:12Z xlou $
+ *   $Id: filerequest.h 1808 2012-01-10 00:10:20Z pleblanc $
  *
  *   jrodriguez@calpont.com   *
  *                                                                         *
@@ -98,9 +98,7 @@ public:
 	enum request_status_enum {
 		SUCCESSFUL,
 		FAILED,
-		BRM_LOOKUP_ERROR,
-		FS_EINVAL,
-		FS_ENOENT
+		BRM_LOOKUP_ERROR
 	};
 
 	enum request_type_enum {

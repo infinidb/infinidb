@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id: remote_installer.sh 2925 2012-05-24 18:58:17Z dhill $
+# $Id: remote_installer.sh 2115 2010-09-22 19:15:06Z dhill $
 #
 # Remote Install RPM and custom OS files from postConfigure script
 # Argument 1 - Remote Module Name
@@ -39,6 +39,20 @@ expect {
 }
 send_user "\n"
 # 
+# fns umount
+#
+send_user "Perform NFS Disk Unmounted on Module"
+send "ssh $USERNAME@$SERVER 'umount -fl /usr/local/Calpont/data*'\n"
+expect -re "word: "
+# password for ssh
+send "$PASSWORD\n"
+# check return
+expect {
+	-re "# " 				 { send_user "                     DONE" } abort
+	-re "Permission denied"  { send_user "                     FAILED: Invalid password\n" ; exit }
+}
+send_user "\n"
+# 
 # send the package
 #
 send_user "Copy New Calpont Package to Module"
@@ -57,8 +71,6 @@ expect {
 	-re "No such file or directory" { send_user "                       FAILED: Invalid package\n" ; exit }
 }
 send_user "\n"
-#sleep to make sure it's finished
-sleep 5
 #
 # install package
 #

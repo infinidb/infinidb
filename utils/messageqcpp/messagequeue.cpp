@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: messagequeue.cpp 3280 2012-09-13 16:27:28Z rdempsey $
+*   $Id: messagequeue.cpp 2394 2011-02-08 14:36:22Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -59,8 +59,7 @@ void MessageQueueServer::setup(size_t blocksize, int backlog, bool syncProto)
 
 	if (thisEndPortStr.length() == 0 || (port = static_cast<uint16_t>(strtol(thisEndPortStr.c_str(), 0, 0))) == 0)
 	{
-		string msg = "MessageQueueServer::MessageQueueServer: config error: Invalid/Missing Port "
-			"attribute for " + fThisEnd;
+		string msg = "MessageQueueServer::MessageQueueServer: config error: Invalid/Missing Port attribute";
 		throw runtime_error(msg);
 	}
 
@@ -75,10 +74,9 @@ void MessageQueueServer::setup(size_t blocksize, int backlog, bool syncProto)
 	}
 
 	memset(&fServ_addr, 0, sizeof(fServ_addr));
-	sockaddr_in* sinp = reinterpret_cast<sockaddr_in*>(&fServ_addr);
-	sinp->sin_family = AF_INET;
-	sinp->sin_addr.s_addr = listenAddr.s_addr;
-	sinp->sin_port = htons(port);
+	fServ_addr.sin_family = AF_INET;
+	fServ_addr.sin_addr.s_addr = listenAddr.s_addr;
+	fServ_addr.sin_port = htons(port);
 
 	fListenSock.setSocketImpl(new InetStreamSocket(blocksize));
 	fListenSock.syncProto(syncProto);
@@ -87,7 +85,7 @@ void MessageQueueServer::setup(size_t blocksize, int backlog, bool syncProto)
 	fListenSock.listen(backlog);
 
 	fClientSock.setSocketImpl(new InetStreamSocket(blocksize));
-	fClientSock.syncProto(syncProto);
+	fClientSock.syncProto_(syncProto);
 }
 
 MessageQueueServer::MessageQueueServer(const string& thisEnd, const string& config,
@@ -99,7 +97,7 @@ MessageQueueServer::MessageQueueServer(const string& thisEnd, const string& conf
 	setup(blocksize, backlog, syncProto);
 }
 
-MessageQueueServer::MessageQueueServer(const string& thisEnd, Config* config,
+MessageQueueServer::MessageQueueServer(const string& thisEnd, const Config* config,
 	size_t blocksize, int backlog, bool syncProto) :
 	fThisEnd(thisEnd),
 	fConfig(config),
@@ -215,7 +213,7 @@ void MessageQueueServer::write(const ByteStream& msg, const struct timespec* tim
 void MessageQueueServer::syncProto(bool use)
 {
 	fListenSock.syncProto(use);
-	fClientSock.syncProto(use);
+	fClientSock.syncProto_(use);
 }
 
 MessageQueueClient::~MessageQueueClient()
@@ -246,14 +244,13 @@ void MessageQueueClient::setup(bool syncProto)
 	}
 
 	memset(&fServ_addr, 0, sizeof(fServ_addr));
-	sockaddr_in* sinp = reinterpret_cast<sockaddr_in*>(&fServ_addr);
-	sinp->sin_family = AF_INET;
-	sinp->sin_port = htons(port);
-	sinp->sin_addr.s_addr = inet_addr(otherEndIPStr.c_str());
+	fServ_addr.sin_family = AF_INET;
+	fServ_addr.sin_port = htons(port);
+	fServ_addr.sin_addr.s_addr = inet_addr(otherEndIPStr.c_str());
 
 	fClientSock.setSocketImpl(new InetStreamSocket());
 	fClientSock.syncProto(syncProto);
-	fClientSock.sa(&fServ_addr);
+	fClientSock.sa(fServ_addr);
 }
 
 MessageQueueClient::MessageQueueClient(const string& otherEnd, const string& config, bool syncProto) :
@@ -262,7 +259,7 @@ MessageQueueClient::MessageQueueClient(const string& otherEnd, const string& con
 	setup(syncProto);
 }
 
-MessageQueueClient::MessageQueueClient(const string& otherEnd, Config* config, bool syncProto) :
+MessageQueueClient::MessageQueueClient(const string& otherEnd, const Config* config, bool syncProto) :
 	fOtherEnd(otherEnd), fConfig(config), fLogger(31), fIsAvailable(true)
 {
 	if (fConfig == 0)
@@ -381,6 +378,11 @@ bool MessageQueueClient::connect() const
 	}
 
 	return fClientSock.isOpen();
+}
+
+void MessageQueueClient::syncProto(bool use)
+{
+	fClientSock.syncProto_(use);
 }
 
 }//namespace messageqcpp

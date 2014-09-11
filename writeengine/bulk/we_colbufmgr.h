@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: we_colbufmgr.h 3720 2012-04-04 18:18:49Z rdempsey $
+ * $Id: we_colbufmgr.h 2944 2011-04-06 13:06:53Z dcathey $
  *
  *****************************************************************************/
 
@@ -138,15 +138,16 @@ class ColumnBufferManager {
     int setDbFile(FILE* const cFile, HWM hwm, const char* hdrs)
     { return fCBuf->setDbFile(cFile, hwm, hdrs); }
 
-    /** @brief Reset the ColBuf to-be-compressed buffer prior to importing the
-     *  next extent.
+    /** @brief Reset the ColBuf buffer prior to importing the next extent.
      */
-    int resetToBeCompressedColBuf(long long& startFileOffset)
-    { return fCBuf->resetToBeCompressedColBuf( startFileOffset ); }
+    int resetColBuf(long long& startFileOffset)
+    { return fCBuf->resetColBuf( startFileOffset ); }
 
     /** @brief Wrapper around extendColumn(), used for dictionary token columns.
+     *  @param saveLBIDForCP (in) Should new extent's LBID be saved in the
+     *         extent stats we are saving to update Casual Partition.
      */
-    int extendTokenColumn( );
+    int extendTokenColumn( bool saveLBIDForCP );
 
   protected:
 

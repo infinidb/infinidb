@@ -1,17 +1,14 @@
-#!/bin/bash
+#! /bin/sh
 #
-# $Id: build_rpms 1735 2012-10-25 18:07:50Z dhill $
+# $Id: build_rpms 1300 2010-11-04 16:30:56Z rdempsey $
 #
 
-usage="build_rpms [-vgh]"
+usage="build_rpms [-vh]"
 vflg=0
-gflg=0
 
-while getopts "vgh" flag; do
+while getopts "vh" flag; do
 	case $flag in
 	v) ((vflg++))
-		;;
-	g) ((gflg++))
 		;;
 	h) echo $usage
 		exit 0
@@ -73,9 +70,6 @@ for file in bulkload.sh cleanup.sh dbbuilder.sh dbload.sh cpimport.sh bulkloadp.
 	rm -f $buildroot/Calpont/bin/$file
 done
 
-rm -f $buildroot/Calpont/lib/libidbboot.a
-rm -f $buildroot/Calpont/bin/amazonInstaller
-
 mkdir -p $HOME/rpm/BUILD $HOME/rpm/RPMS $HOME/rpm/SRPMS $HOME/rpm/SPECS $HOME/rpm/tmp
 
 if [ ! -f $HOME/.rpmmacros ]; then
@@ -102,8 +96,18 @@ EOD
 fi
 
 #twiddle with the spec file
+cp ./build/calpont.spec.in /tmp/calpont.spec.out.$$
 
+cp /tmp/calpont.spec.out.$$ /tmp/calpont.spec.in.$$
 packager="$USER <$USER@calpont.com>"
+sed "s/@@PACKAGER@@/Packager: $packager/" < /tmp/calpont.spec.in.$$ > /tmp/calpont.spec.out.$$
+
+cp /tmp/calpont.spec.out.$$ /tmp/calpont.spec.in.$$
+sed "s/@@VERSION@@/Version: $version/" < /tmp/calpont.spec.in.$$ > /tmp/calpont.spec.out.$$
+
+cp /tmp/calpont.spec.out.$$ /tmp/calpont.spec.in.$$
+sed "s/@@RELEASE@@/Release: $release/" < /tmp/calpont.spec.in.$$ > /tmp/calpont.spec.out.$$
+
 tag=poc
 buildinfo=`./build/docBuild $tag | (
 read l
@@ -113,14 +117,11 @@ b="$b\\n$l"
 done
 echo $b )`
 
-cp ./build/calpont.spec.in $HOME/rpm/SPECS/calpont.spec
-sed -i  -e "s/@@PACKAGER@@/Packager: $packager/" \
-	-e "s/@@VERSION@@/Version: $version/" \
-	-e "s/@@RELEASE@@/Release: $release/" \
-	-e "s/@@BUILDINFO@@/$buildinfo/" $HOME/rpm/SPECS/calpont.spec
+cp /tmp/calpont.spec.out.$$ /tmp/calpont.spec.in.$$
+sed "s/@@BUILDINFO@@/$buildinfo/" < /tmp/calpont.spec.in.$$ > /tmp/calpont.spec.out.$$
 
+cp /tmp/calpont.spec.out.$$ $HOME/rpm/SPECS/calpont.spec
 echo done.
-
 arch=$(uname -m)
 target=
 if [ x$arch = xi686 ]; then
@@ -146,10 +147,6 @@ rc=$?
 echo done.
 if [ $vflg -gt 0 -o $rc -ne 0 ]; then
 	cat /tmp/rpmbuild.out.$$
-fi
-
-if [ $gflg -eq 0 ]; then
-	rm -f $HOME/rpm/RPMS/x86_64/calpont-datdup-*.x86_64.rpm
 fi
 
 rm -f /tmp/*.$$

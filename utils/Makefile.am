@@ -17,7 +17,7 @@
 
 # $Id: Makefile.am 1310 2009-10-15 14:00:24Z rdempsey $
 
-SUBDIRS = boost_idb startup common configcpp loggingcpp messageqcpp threadpool rwlock dataconvert joiner rowgroup cacheutils multicast funcexp compress batchloader ddlcleanup mysqlcl_idb querystats
+SUBDIRS = boost_idb common configcpp loggingcpp messageqcpp threadpool rwlock dataconvert joiner rowgroup cacheutils multicast funcexp compress
 
 test:
 

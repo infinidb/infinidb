@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor-jl.cpp 8775 2012-08-01 16:12:11Z dhall $
+// $Id: batchprimitiveprocessor-jl.cpp 8323 2012-02-15 16:28:09Z pleblanc $
 // C++ Implementation: batchprimitiveprocessor
 //
 // Description: 
@@ -71,10 +71,8 @@ BatchPrimitiveProcessorJL::BatchPrimitiveProcessorJL(const ResourceManager& rm) 
 	bop(BOP_AND),
 	forHJ(false),
 	fJoinerChunkSize(rm.getJlJoinerChunkSize()),
-	hasSmallOuterJoin(false),
-	_priority(1)
+	hasSmallOuterJoin(false)
 {
-    PMJoinerCount = 0;
 }
 
 BatchPrimitiveProcessorJL::~BatchPrimitiveProcessorJL()
@@ -91,10 +89,10 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pColScanStep &scan)
 	filterSteps.push_back(cc);
 	filterCount++;
 	_hasScan = true;
-	idbassert(sessionID == scan.sessionId());
+	assert(sessionID == scan.sessionId());
 }
 
-void BatchPrimitiveProcessorJL::addFilterStep(const pColScanStep &scan, vector<BRM::LBID_t> lastScannedLBID)
+void BatchPrimitiveProcessorJL::addFilterStep(const pColScanStep &scan, BRM::LBID_t lastScannedLBID)
 {
 	SCommand cc;
 
@@ -104,7 +102,7 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pColScanStep &scan, vector<B
 	filterSteps.push_back(cc);
 	filterCount++;
 	_hasScan = true;
-	idbassert(sessionID == scan.sessionId());
+	assert(sessionID == scan.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addFilterStep(const pColStep &step)
@@ -116,7 +114,7 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pColStep &step)
 	cc->setBatchPrimitiveProcessor(this);
 	filterSteps.push_back(cc);
 	filterCount++;
-	idbassert(sessionID == step.sessionId());
+	assert(sessionID == step.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addFilterStep(const pDictionaryStep &step)
@@ -134,7 +132,7 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pDictionaryStep &step)
 	filterSteps.push_back(cc);
 	filterCount++;
 	needStrValues = true;
-	idbassert(sessionID == step.sessionId());
+	assert(sessionID == step.sessionId());
 }
 
 
@@ -147,7 +145,7 @@ void BatchPrimitiveProcessorJL::addFilterStep(const FilterStep& step)
 	cc->setBatchPrimitiveProcessor(this);
 	filterSteps.push_back(cc);
 	filterCount++;
-	idbassert(sessionID == step.sessionId());
+	assert(sessionID == step.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &step)
@@ -161,7 +159,7 @@ void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &step)
 	colWidths.push_back(cc->getWidth());
 	tupleLength += cc->getWidth();
 	projectCount++;
-	idbassert(sessionID == step.sessionId());
+	assert(sessionID == step.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &step)
@@ -177,7 +175,7 @@ void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &step)
 	projectCount++;
 	if (filterCount == 0 && !sendRowGroups)
 		sendValues = true;
-	idbassert(sessionID == step.sessionId());
+	assert(sessionID == step.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &col,
@@ -193,8 +191,8 @@ void BatchPrimitiveProcessorJL::addProjectStep(const pColStep &col,
 	tupleLength += cc->getWidth();
 	projectCount++;
 	needStrValues = true;
-	idbassert(sessionID == col.sessionId());
-	idbassert(sessionID == dict.sessionId());
+	assert(sessionID == col.sessionId());
+	assert(sessionID == dict.sessionId());
 }
 
 void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &p, 
@@ -215,14 +213,13 @@ void BatchPrimitiveProcessorJL::addProjectStep(const PassThruStep &p,
 		sendAbsRids = true;
 		absRids.reset(new uint64_t[8192]);
 	}
-	idbassert(sessionID == p.sessionId());
-	idbassert(sessionID == dict.sessionId());
+	assert(sessionID == p.sessionId());
+	assert(sessionID == dict.sessionId());
 }
 
-#if 0
 void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep &ds)
 {
-	idbassert(sessionID == ds.sessionId());
+	assert(sessionID == ds.sessionId());
 
 	uint i;
 
@@ -230,12 +227,12 @@ void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep &ds)
 	tableOID = ds.fTableOID;
 	
 	tableColumnCount = templateTB.getColumnCount();
-	idbassert(tableColumnCount > 0);
+	assert(tableColumnCount > 0);
 	tablePositions.reset(new int[tableColumnCount]);
 	for (i = 0; i < tableColumnCount; i++)
 		tablePositions[i] = -1;
 
-	idbassert(projectCount <= projectSteps.size());
+	assert(projectCount <= projectSteps.size());
 
 	/* In theory, tablePositions maps a column's table position to a projection step 
 	 -1 means it's a null column */
@@ -264,9 +261,8 @@ void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep &ds)
 		}
 	}
 }
-#endif
 
-void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroot)
+void BatchPrimitiveProcessorJL::addElementType(const ElementType &et)
 {
 	uint i;
 // 	rowCounter++;
@@ -274,10 +270,10 @@ void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroo
 	if (needToSetLBID) {
 		needToSetLBID = false;
 		for (i = 0; i < filterCount; ++i)
-			filterSteps[i]->setLBID(et.first, dbroot);
+			filterSteps[i]->setLBID(et.first);
 
 		for (i = 0; i < projectCount; ++i)
-			projectSteps[i]->setLBID(et.first, dbroot);
+			projectSteps[i]->setLBID(et.first);
 
 		baseRid = et.first & 0xffffffffffffe000ULL;
 	}
@@ -293,7 +289,7 @@ void BatchPrimitiveProcessorJL::addElementType(const ElementType &et, uint dbroo
 		values[ridCount] = et.second;
 	}
 	ridCount++;
-	idbassert(ridCount <= 8192);
+	assert(ridCount <= 8192);
 }
 
 void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
@@ -308,20 +304,20 @@ void BatchPrimitiveProcessorJL::setRowGroupData(const rowgroup::RowGroup &rg)
 	if (needToSetLBID) {
 		needToSetLBID = false;
 		for (i = 0; i < filterCount; ++i)
-			filterSteps[i]->setLBID(r.getRid(), 1);
+			filterSteps[i]->setLBID(r.getRid());
 
 		for (i = 0; i < projectCount; ++i)
-			projectSteps[i]->setLBID(r.getRid(), 1);
+			projectSteps[i]->setLBID(r.getRid());
 
 		baseRid = r.getRid() & 0xffffffffffffe000ULL;
 	}
 }
 
-void BatchPrimitiveProcessorJL::addElementType(const StringElementType &et, uint dbroot)
+void BatchPrimitiveProcessorJL::addElementType(const StringElementType &et)
 {
 	if (filterCount == 0)
 		throw logic_error("BPPJL::addElementType(StringElementType): doesn't work without filter steps yet");
-	addElementType(ElementType(et.first, et.first), dbroot);
+	addElementType(ElementType(et.first, et.first));
 }
 
 
@@ -366,7 +362,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream &in,
 
 // 	cout << "get Element Types uniqueID=" << uniqueID << endl;
 	/* skip the header */
-	idbassert(in.length() > sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+	assert(in.length() > sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 	in.advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 
 	if (_hasScan) {
@@ -386,27 +382,27 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream &in,
 	in >> l_baseRid;
 	in >> l_count;
 // 	rowsProcessed += l_count;
-	idbassert(l_count <= 8192);
+	assert(l_count <= 8192);
 	out->resize(l_count);
 
 	buf = (uint8_t *) in.buf();
 
 	rids = (uint16_t *) buf;
 	vals = (uint64_t *) (buf + (l_count << 1));
-	idbassert(in.length() > (uint) ((l_count << 1) + (l_count << 3)) );
+	assert(in.length() > (uint) ((l_count << 1) + (l_count << 3)) );
 	in.advance((l_count << 1) + (l_count << 3));
 
 	for (i = 0; i < l_count; ++i) {
 		(*out)[i].first = rids[i] + l_baseRid;
 // 		if (tableOID >= 3000)
-// 			idbassert((*out)[i].first > 1023);
+// 			assert((*out)[i].first > 1023);
 		(*out)[i].second = vals[i];
 	}
 
 	if (joiner.get() != NULL) {
 		in >> *preJoinRidCount;
 		in >> jCount;
-		idbassert(in.length() > (jCount << 4));
+		assert(in.length() > (jCount << 4));
 		jet = (ElementType *) in.buf();
 		for (i = 0; i < jCount; ++i)
 			out->push_back(jet[i]);
@@ -420,7 +416,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream &in,
 	in >> *touchedBlocks;
 // 	cout << "ET: got physIO=" << (int) *physIO << " cachedIO=" << 
 // 		(int) *cachedIO << " touchedBlocks=" << (int) *touchedBlocks << endl;
-	idbassert(in.length() == 0);
+	assert(in.length() == 0);
 }
 
 /**
@@ -481,7 +477,160 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream &in,
 	in >> *touchedBlocks;
 // 	cout << "SET: got physIO=" << (int) *physIO << " cachedIO=" << 
 // 		(int) *cachedIO << " touchedBlocks=" << (int) *touchedBlocks << endl;
-	idbassert(in.length() == 0);
+	assert(in.length() == 0);
+}
+
+uint BatchPrimitiveProcessorJL::getErrorTableBand(uint16_t error, ByteStream *out)
+{
+	*out << (uint64_t) tableOID;
+	*out << (uint64_t) tableColumnCount;
+	*out << (uint64_t) 0; // (rows)
+	if (0 == status) status = error;
+	*out << (uint64_t) status;
+	*out << (uint8_t) 0;  //has rids
+	return 0;
+}
+
+/**
+ * When the output type is TableBand, the messages have the following format:
+ *
+ * ISMPacketHeader
+ * PrimitiveHeader
+ * ----
+ * If the BPP starts with a scan
+ *    Casual partitioning data from the column scanned
+ * Row Count
+ * If RIDs are needed on delivery
+ *    base Rid for the logical block
+ *    (row count)x 16-bit relative rids
+ * (projected column count) x (length | column data)
+ * Cached IO count
+ * Physical IO count
+ * blocks touched
+ */
+
+uint BatchPrimitiveProcessorJL::getTableBand(ByteStream &in, ByteStream *out, 
+	bool *validCPData, uint64_t *lbid, int64_t *min, int64_t *max, uint32_t *cachedIO,
+	uint32_t *physIO, uint32_t *touchedBlocks) const
+{
+	uint i, pos;
+	uint16_t l_rowCount;
+	uint64_t l_baseRid;
+	uint16_t *l_relRids;
+	uint64_t absRids[8192];
+	uint tableColumnCount = templateTB.getColumnCount();
+	//const uint8_t* columnData[projectCount];
+	const uint8_t** columnData = (const uint8_t**)alloca(projectCount * sizeof(uint8_t*));
+	memset(columnData, 0, projectCount * sizeof(uint8_t*));
+	const uint8_t *buf;
+	//uint32_t colLengths[projectCount];
+	uint32_t* colLengths = (uint32_t*)alloca(projectCount * sizeof(uint32_t));
+	uint64_t tmp64;
+	uint8_t tmp8;
+	
+	if (in.length() == 0) {
+		/* make an empty tableband */
+		templateTB.serialize(*out);
+		*cachedIO = 0;
+		*physIO = 0;
+		*touchedBlocks = 0;
+		return 0;
+	}
+
+// 	cout << "msg is " << in.length() << " bytes\n";
+	/* skip the header */
+	in.advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+
+	if (_hasScan) {
+		in >> tmp8;
+		*validCPData = (tmp8 != 0);
+		if (*validCPData) {
+			in >> *lbid;
+			in >> tmp64;
+			*min = (int64_t) tmp64;
+			in >> tmp64;
+			*max = (int64_t) tmp64;
+		}
+		else
+			in >> *lbid;
+	}
+
+	in >> l_rowCount;
+
+// 	cout << " -- read " << l_rowCount << " rows\n";
+
+	if (needRidsAtDelivery) {
+		in >> l_baseRid;
+		l_relRids = (uint16_t *) in.buf();
+		for (i = 0; i < l_rowCount; i++)
+			absRids[i] = l_relRids[i] + l_baseRid;
+		in.advance(l_rowCount << 1);
+	}
+	
+	/* Set up pointers to the column data */
+	pos = 0;
+	buf = in.buf();
+	for (i = 0; i < projectCount; i++) {
+		colLengths[i] = *((uint32_t *) &buf[pos]);
+		pos += 4;
+		columnData[i] = &buf[pos];
+// 		cout << "column " << i << " is " << colLengths[i] << " long at " << pos << endl;
+		pos += colLengths[i];
+		if (pos >= in.length()) {
+			cerr << "BPPJL::getTableBand caught a buffer overrun at project command " << i
+				<< ". toString():\n";
+			cerr << toString() << endl << endl;
+			cerr << "supposed column lengths so far: " << endl;
+			for (uint j = 0; j <= i; j++)
+				cerr << "  column " << j << ": " << colLengths[j] << endl;
+		}
+		assert(pos < in.length());
+	}
+
+/*	Rearrange the data s.t. it looks like a serialized TableBand */
+
+	*out << (uint64_t) tableOID;
+	*out << (uint64_t) tableColumnCount;
+	*out << (uint64_t) l_rowCount;
+	*out << (uint64_t) 0;	//for error checking
+	if (needRidsAtDelivery) {
+		*out << (uint8_t) 1;
+		out->append((uint8_t *) absRids, l_rowCount << 3);
+	}
+	else
+		*out << (uint8_t) 0;
+
+	for (i = 0; i < tableColumnCount; i++) {
+		if (tablePositions[i] == -1) {
+			// null columns serialize themselves
+			templateTB.getColumns()[i]->serialize(*out);
+		}
+		else {
+			*out << (uint64_t) projectSteps[tablePositions[i]]->getOID();
+			*out << projectSteps[tablePositions[i]]->getTableColumnType();
+			*out << (uint8_t) 0;
+			*out << (uint64_t) l_rowCount;
+			out->append((uint8_t *) columnData[tablePositions[i]],
+				colLengths[tablePositions[i]]);
+		}
+	}
+	in.advance(pos);
+	
+	in >> *cachedIO;
+	in >> *physIO;
+	in >> *touchedBlocks;
+// 	cout << "TB: got physIO=" << (int) *physIO << " cachedIO=" << 
+// 		(int) *cachedIO << " touchedBlocks=" << (int) *touchedBlocks << endl;
+
+	if (in.length() != 0) {
+		cerr << "BPPJL::getTableBand caught a parse error.  toString():\n";
+		cerr << toString() << endl << endl;
+		cerr << "supposed column lengths so far: " << endl;
+		for (i = 0; i <= projectCount; i++)
+			cerr << "  column " << i << ": " << colLengths[i] << endl;
+	}
+	assert(in.length() == 0);
+	return l_rowCount;
 }
 
 /**
@@ -546,7 +695,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream &in,
 		columnData[i] = &buf[pos];
 // 		cout << "column " << i << " is " << colLengths[i] << " long at " << pos << endl;
 		pos += colLengths[i];
-		idbassert(pos < in.length());
+		assert(pos < in.length());
 	}
 	in.advance(pos);
 
@@ -555,7 +704,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream &in,
 		(*out)[i].first = absRids[i];
 		(*out)[i].second = new char[tupleLength];
 		for (j = 0, pos = 0; j < projectCount; j++) {
-			idbassert(pos + colWidths[j] <= tupleLength);
+			assert(pos + colWidths[j] <= tupleLength);
 			if (projectSteps[j]->getCommandType() == CommandJL::RID_TO_STRING) {
 				len = *((uint32_t *) columnData[j]); columnData[j] += 4;
 				memcpy(&(*out)[i].second[pos], columnData[j], len);
@@ -600,7 +749,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream &in,
 	in >> *cachedIO;
 	in >> *physIO;
 	in >> *touchedBlocks;
-	idbassert(in.length() == 0);
+	assert(in.length() == 0);
 }
 
 bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream &in) const
@@ -615,7 +764,7 @@ bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream &in) const
 		else
 			offset += 9;  // skip only the "valid CP data" & LBID bytes
 	}
-	idbassert(in.length() > offset);
+	assert(in.length() > offset);
 
 	return (data[offset] != 0);
 }
@@ -679,7 +828,7 @@ BatchPrimitiveProcessorJL::getRowGroupData(messageqcpp::ByteStream &in,
 	rowCount = org.getRowCount();
 //	cout << "rowCount = " << rowCount << endl;
 	bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
-			(fe2 || aggregatorPM));
+			sendTupleJoinRowGroupData);
 
 	if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
 		boost::shared_array<vector<uint32_t> > joinResults;
@@ -722,7 +871,7 @@ BatchPrimitiveProcessorJL::getRowGroupData(messageqcpp::ByteStream &in,
 
 //	if (in.length() != 0)
 // 		cout << "there are " << in.length() << " bytes left!\n";
-	idbassert(in.length() == 0);
+	assert(in.length() == 0);
 	return ret;
 }
 
@@ -746,25 +895,25 @@ void BatchPrimitiveProcessorJL::reset()
 	needToSetLBID = true;
 }
 
-void BatchPrimitiveProcessorJL::setLBID(uint64_t l, uint dbroot)
+void BatchPrimitiveProcessorJL::setLBID(uint64_t l)
 {
-	dbRoot = dbroot;
-	filterSteps[0]->setLBID(l, dbroot);
+	filterSteps[0]->setLBID(l);
 }
 
-void BatchPrimitiveProcessorJL::setLBIDForScan(uint64_t rid, uint dbroot)
+void BatchPrimitiveProcessorJL::setLBIDForScan(uint64_t rid)
 {
 	uint i;
 
 	baseRid = rid;
 // 	cout << "scan set base RID to " << baseRid << endl;
 
+	/* XXXPAT: What to do about dictionary steps? */
 	for (i = 1; i < filterCount; ++i)
-		filterSteps[i]->setLBID(rid, dbroot);
+		filterSteps[i]->setLBID(rid);
 
 	for (i = 0; i < projectCount; ++i) {
 // 		cout << "setting lbid for projection #" << i << endl;
-		projectSteps[i]->setLBID(rid, dbroot);
+		projectSteps[i]->setLBID(rid);
 	}
 }
 
@@ -820,9 +969,10 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	uint i;
 	uint8_t flags = 0;
 
+	memset((void*)&ism, 0, sizeof(ism));
 	ism.Command = BATCH_PRIMITIVE_CREATE;
 
-	bs.load((uint8_t *) &ism, sizeof(ism));
+	bs.append((uint8_t *) &ism, sizeof(ism));
 	bs << (uint8_t) ot;
 	bs << (messageqcpp::ByteStream::quadbyte)versionNum;
 	bs << (messageqcpp::ByteStream::quadbyte)txnID;
@@ -881,7 +1031,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	/* if HAS_JOINER, send the init params */
 	if (flags & HAS_JOINER) {
 		if (ot == ROW_GROUP) {
-			idbassert(tJoiners.size() > 0);
+			assert(tJoiners.size() > 0);
 			bs << (messageqcpp::ByteStream::quadbyte)PMJoinerCount;
 			
 			bool atLeastOneFE = false;
@@ -891,9 +1041,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 			for (i = 0; i < PMJoinerCount; i++) {
 				bs << (uint32_t) tJoiners[i]->size();
 				bs << tJoiners[i]->getJoinType();
-				
-				//bs << (uint64_t) tJoiners[i]->smallNullValue();
-				
+				bs << (uint64_t) tJoiners[i]->smallNullValue();
 				bs << (uint8_t) tJoiners[i]->isTypelessJoin();
 				if (tJoiners[i]->hasFEFilter()) {
 					atLeastOneFE = true;
@@ -903,7 +1051,6 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 					bs << *tJoiners[i]->getFcnExpFilter();
 				}
 				if (!tJoiners[i]->isTypelessJoin()) {
-					bs << (uint64_t) tJoiners[i]->smallNullValue();
 					bs << (messageqcpp::ByteStream::quadbyte)tJoiners[i]->getLargeKeyColumn();
  					//cout << "large key column is " << (uint) tJoiners[i]->getLargeKeyColumn() << endl;
 				}
@@ -920,7 +1067,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 #endif
 				serializeVector<RowGroup>(bs, smallSideRGs);
 				bs << largeSideRG;
-				bs << joinedRG;    // TODO: I think we can omit joinedRG if (!(fe2 || aggregatorPM))
+				bs << joinedRG;
 // 				cout << "joined RG: " << joinedRG.toString() << endl;
 			}
 		}
@@ -959,7 +1106,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
  * The BPP Run messages have the following format:
  *
  * ISMPacketHeader
- *    -- Interleave field is used for DEC interleaving data
+ *    -- Reserve field is used for DEC interleaving data
  *    -- Size field is used for the relative weight to process the message
  * -----
  * Session ID
@@ -980,12 +1127,12 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
  * (projection count)x run msgs for projection Commands
  */
 
-void BatchPrimitiveProcessorJL::runBPP(ByteStream &bs, uint32_t pmNum)
+void BatchPrimitiveProcessorJL::runBPP(ByteStream &bs, const uint16_t firstExtentDBRoot)
 {
 	ISMPacketHeader ism;
 	uint i;
 
-/* XXXPAT: BPPJL currently reuses the ism Size fields for other things to
+/* XXXPAT: BPPJL currently reuses the ism Reserve and Size fields for other things to
 save bandwidth.  They're completely unused otherwise.  We need to throw out all unused
 fields of every defined header. */
 
@@ -994,9 +1141,12 @@ fields of every defined header. */
 	memset((void*)&ism, 0, sizeof(ism));
 	ism.Command = BATCH_PRIMITIVE_RUN;
 
-	// TODO: this causes the code using this ism to send on only one socket, even if more than one socket is defined for each PM.
-	ism.Interleave = pmNum;
-//	ism.Interleave = pmNum - 1;
+	/* BATCH_PRIMITIVE_RUN stores the "interleave" data in the Reserve field */
+	// Added dbRoot for the first extent for the OID into the equation below for the Multiple Files 
+	// per OID enhancement.  Before, we always sent the first extent to PM1, the second to PM2, etc.
+	// Now, if the column starts on DBRoot2, the first extent will get sent to PM2.  If it start on 
+	// DBRoot3, the first extent will get sent to PM3, and so on.
+	ism.Reserve = (baseRid >> LOGICAL_BLOCKS_CONVERTER) + (firstExtentDBRoot - 1);	
 
 	/* ... and the Size field is used for the "weight" of processing a BPP
 	  where 1 is one Command on one logical block. */
@@ -1004,21 +1154,19 @@ fields of every defined header. */
 
 	bs.append((uint8_t *) &ism, sizeof(ism));
 
-	/* The next 4 vars are for BPPSeeder; BPP itself skips them */
-	bs << sessionID;
-	bs << stepID;
+	/* XXXPAT: We can get rid of sessionID and stepID;
+	it's there for easier debugging only */
+	bs << (messageqcpp::ByteStream::quadbyte)sessionID;
+	bs << (messageqcpp::ByteStream::quadbyte)stepID;
 	bs << uniqueID;
-	bs << _priority;
-
-	bs << dbRoot;
 	bs << count;
-
 	if (_hasScan)
-		idbassert(ridCount == 0);
+		assert(ridCount == 0);
 	else if (!sendRowGroups)
-		idbassert(ridCount > 0 && (ridMap != 0 || sendAbsRids));
+		assert(ridCount > 0 && (ridMap != 0 || sendAbsRids));
 	else
-		idbassert(inputRG.getRowCount() > 0);
+		assert(inputRG.getRowCount() > 0);
+
 
 	if (sendRowGroups) {
 		uint32_t rgSize = inputRG.getDataSize();

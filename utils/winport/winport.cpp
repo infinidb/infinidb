@@ -167,27 +167,3 @@ unsigned int sleep(unsigned int secs)
 	Sleep(secs * 1000);
 	return 0;
 }
-int pipe(int fds[2])
-{
-	return -1;
-}
-
-pid_t getppid()
-{
-	return -1;
-}
-
-pid_t waitpid(pid_t, int*, int)
-{
-	return -1;
-}
-
-int kill(pid_t, int)
-{
-	return -1;
-}
-
-int setuid(uid_t)
-{
-	return -1;
-}

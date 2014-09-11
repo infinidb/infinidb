@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_case.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_case.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -39,8 +39,6 @@ using namespace rowgroup;
 #include "errorids.h"
 using namespace logging;
 
-#include "utils_utf8.h"
-using namespace funcexp;
 
 namespace
 {
@@ -89,8 +87,7 @@ inline uint64_t simple_case_cmp(Row& row,
 
 			for (; i < n; i += 2)
 			{
-				//BUG 5362
-				if (utf8::idb_strcoll(ev.c_str(), parm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
+				if (strcoll(ev.c_str(), parm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
 					break;
 				else
 					isNull = false;
@@ -156,14 +153,6 @@ inline uint64_t simple_case_cmp(Row& row,
 
 	if (i == n && !hasElse)
 		isNull = true;
-	else if (isNull && hasElse)
-	// BUG 5110. Only way we can exit above with isNull == true is when ev is NULL
-	// if so and we have else condition we need to use it by setting i = n
-	{
-		i = n;
-		isNull = false;
-	}
-
 
 	return i;
 }
@@ -204,13 +193,13 @@ CalpontSystemCatalog::ColType caseOperationType(FunctionParm& fp,
 	bool hasElse = ((n % 2) != 0);    // if 1, then ELSE exist
 	if (hasElse)
 		--n;                          // n now is an even number
-	idbassert((n % 2) == 0);
+	assert((n % 2) == 0);
 
 	bool allStringO = true;
 	bool allStringR = true;
 
 	FunctionParm::size_type l = fp.size() - 1;  // last fp index
-	idbassert(fp[l]->data());
+	assert(fp[l]->data());
 	CalpontSystemCatalog::ColType oct = fp[l]->data()->resultType();
 	CalpontSystemCatalog::ColType rct = resultType;
 	bool operation = true;

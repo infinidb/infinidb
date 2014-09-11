@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_impl.h 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: ha_calpont_impl.h 7396 2011-02-03 17:54:36Z rdempsey $
  */
 
 /** @file */
@@ -65,7 +65,7 @@ extern std::string  ha_calpont_impl_restorepartition_ (execplan::CalpontSystemCa
 extern std::string  ha_calpont_impl_droppartition_ (execplan::CalpontSystemCatalog::TableName tableName, uint32_t partition);
 
 extern std::string  ha_calpont_impl_viewtablelock( cal_impl_if::cal_connection_info& ci, execplan::CalpontSystemCatalog::TableName& tablename);	
-extern std::string  ha_calpont_impl_cleartablelock( cal_impl_if::cal_connection_info& ci, uint64_t tableLockID);
+extern std::string  ha_calpont_impl_cleartablelock( cal_impl_if::cal_connection_info& ci, execplan::CalpontSystemCatalog::TableName& tablename);	
 #endif
 
 #endif

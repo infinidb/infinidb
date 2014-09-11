@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: groupconcat.cpp 8532 2012-05-21 14:58:07Z xlou $
+//  $Id: groupconcat.cpp 7921 2011-08-26 19:29:53Z xlou $
 
 
 #include <iostream>
@@ -153,9 +153,8 @@ uint GroupConcatInfo::getColumnKey(const SRCP& srcp, JobInfo& jobInfo)
 		if (sc->schemaName().empty())
 		{
 			// bug3839, handle columns from subquery.
-			SimpleColumn tmp(*sc, jobInfo.sessionId);
-			tmp.oid(tableOid(sc, jobInfo.csc) + 1 + sc->colPosition());
-			colKey = getTupleKey(jobInfo, &tmp);
+			colKey = getTupleKey(jobInfo, (tableOid(sc, jobInfo.csc) + 1 + sc->colPosition()),
+									extractTableAlias(sc), sc->viewName(), sc->alias());
 		}
 		else
 		{
@@ -373,6 +372,7 @@ void GroupConcator::initialize(const rowgroup::SP_GroupConcat& gcc)
 {
 	fGroupConcatLen = gcc->fSize;
 	fCurrentLength -= strlen(gcc->fSeparator.c_str());
+
 	fConstCols = gcc->fConstCols;
 	fConstantLen = strlen(gcc->fSeparator.c_str());
 	for (uint64_t i = 0; i < fConstCols.size(); i++)
@@ -523,7 +523,8 @@ int64_t GroupConcator::lengthEstimate(const rowgroup::Row& row)
 			{
 				int64_t colWidth = row.getColumnWidth(*i);
 				uint8_t* pStr = row.getData() + row.getOffset(*i);
-				fieldLen = strnlen((char *) pStr, colWidth);
+				while ((*pStr++ > 0) && (fieldLen < colWidth))
+					fieldLen++;
 				break;
 			}
 			case CalpontSystemCatalog::DOUBLE:
@@ -789,16 +790,13 @@ const string GroupConcatOrderBy::toString() const
 
 
 // GroupConcatNoOrder class implementation
-GroupConcatNoOrder::GroupConcatNoOrder() :
-    fRowsPerRG(128), fErrorCode(ERR_AGGREGATION_TOO_BIG), fMemSize(0), fRm(NULL)
+GroupConcatNoOrder::GroupConcatNoOrder()
 {
 }
 
 
 GroupConcatNoOrder::~GroupConcatNoOrder()
 {
-	if (fRm)
-		fRm->returnMemory(fMemSize);
 }
 
 

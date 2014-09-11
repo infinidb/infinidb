@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/sh
 #
 # Determine the Linux distribution and version that is being run.
 #

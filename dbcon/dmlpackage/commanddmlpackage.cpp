@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: commanddmlpackage.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: commanddmlpackage.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -53,13 +53,9 @@ namespace dmlpackage
         bytestream << session_id;
 
         bytestream << fDMLStatement;
-        bytestream << fSQLStatement; // for cleartablelock, this is table lockID
 		bytestream << (uint8_t)fLogging;
 		bytestream << fSchemaName; 
         bytestream << fTableName; 
-		bytestream << fTableOid;
-		bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
-		bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
         return retval;
     }
 
@@ -71,16 +67,13 @@ namespace dmlpackage
         bytestream >> session_id;
         fSessionID = session_id;
 
+        std::string dmlStatement;
         bytestream >> fDMLStatement;
-        bytestream >> fSQLStatement; // for cleartablelock, this is table lockID
 		uint8_t logging;
 		bytestream >> logging;
 		fLogging = (logging != 0);
 		bytestream >> fSchemaName; 
         bytestream >> fTableName; 
-		bytestream >> fTableOid;
-		bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
-		bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);
         return retval;
     }
 

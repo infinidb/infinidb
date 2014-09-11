@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: tdriver-agg.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: tdriver-agg.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -775,7 +775,7 @@ public:
 	    uint32_t verId = 1;
 	    uint16_t stepID = 0;
 	    uint32_t statementID = 1;
-	    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+	    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
 	        
 	    SRCP srcp;
 	    SimpleColumn *l_orderkey = new SimpleColumn(s_l_orderkey, sessionid);
@@ -944,7 +944,7 @@ public:
 	    uint32_t verId = 1;
 	    uint16_t stepID = 0;
 	    uint32_t statementID = 1;
-	    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+	    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
 	    
 	    SRCP srcp;
 	    SimpleColumn *l_orderkey = new SimpleColumn(s_l_orderkey, sessionid);

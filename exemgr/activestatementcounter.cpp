@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: activestatementcounter.cpp 894 2012-11-02 21:17:14Z pleblanc $
+// $Id: activestatementcounter.cpp 893 2012-11-02 21:13:46Z pleblanc $
 //
 
 //#define NDEBUG
@@ -75,7 +75,7 @@ void ActiveStatementCounter::decr(bool& counted)
 		{
 			scoped_ptr<DBRM> dbrmp(new DBRM());
 			int len;
-			shared_array<SIDTIDEntry> entries = dbrmp->SIDTIDMap(len);
+			scoped_array<const SIDTIDEntry> sidTidMap(dbrmp->SIDTIDMap(len));
 			if (len == 0)
 			{
 				BlockList_t blist;

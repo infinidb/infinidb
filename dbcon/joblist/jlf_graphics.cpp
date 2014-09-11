@@ -15,14 +15,13 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: jlf_graphics.cpp 8526 2012-05-17 02:28:10Z xlou $
+// $Id: jlf_graphics.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 
 #include <iostream>
 using namespace std;
 
 #include "joblist.h"
-#include "primitivestep.h"
-#include "crossenginestep.h"
+#include "hashjoin.h"
 #include "subquerystep.h"
 #include "tuplehashjoin.h"
 #include "tupleunion.h"
@@ -65,8 +64,8 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 
 	for (qsi = querySteps.begin(); qsi != querySteps.end(); ctn++, qsi++)
 	{
-//		if (dynamic_cast<OrDelimiter*>(qsi->get()) != NULL)
-//			continue;
+		if (dynamic_cast<OrDelimiter*>(qsi->get()) != NULL)
+			continue;
 
 		uint16_t stepidIn = qsi->get()->stepId();
 		dotFile << stepidIn << " [label=\"st_" << stepidIn << " ";
@@ -80,20 +79,19 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			dotFile << "(" << qsi->get()->tableOid() << "/" << qsi->get()->oid() << ")"<< "\"";
 			dotFile << " shape=box";
 		}
-//		else if (typeid(*(qsi->get())) == typeid(HashJoinStep) ||
-//				 typeid(*(qsi->get())) == typeid(StringHashJoinStep))
-//		{
-//			dotFile << "\"";
-//			dotFile << " shape=diamond";
-//		}
+		else if (typeid(*(qsi->get())) == typeid(HashJoinStep) ||
+				 typeid(*(qsi->get())) == typeid(StringHashJoinStep))
+		{
+			dotFile << "\"";
+			dotFile << " shape=diamond";
+		}
 		else if (typeid(*(qsi->get())) == typeid(TupleHashJoinStep))
 		{
 			dotFile << "\"";
 			dotFile << " shape=diamond peripheries=2";
 		}
-//		else if (typeid(*(qsi->get())) == typeid(UnionStep) ||
-//				 typeid(*(qsi->get())) == typeid(TupleUnion) )
-		else if (typeid(*(qsi->get())) == typeid(TupleUnion))
+		else if (typeid(*(qsi->get())) == typeid(UnionStep) ||
+				 typeid(*(qsi->get())) == typeid(TupleUnion) )
 		{
 			dotFile << "\"";
 			dotFile << " shape=triangle";
@@ -108,13 +106,12 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			dotFile << "\"";
 			dotFile << " shape=house orientation=180";
 		}
-//		else if (typeid(*(qsi->get())) == typeid(ReduceStep))
-//		{
-//			dotFile << "\"";
-//			dotFile << " shape=triangle orientation=180";
-//		}
-//		else if (typeid(*(qsi->get())) == typeid(BatchPrimitiveStep) || typeid(*(qsi->get())) == typeid(TupleBPS))
-		else if (typeid(*(qsi->get())) == typeid(TupleBPS))
+		else if (typeid(*(qsi->get())) == typeid(ReduceStep))
+		{
+			dotFile << "\"";
+			dotFile << " shape=triangle orientation=180";
+		}
+		else if (typeid(*(qsi->get())) == typeid(BatchPrimitiveStep) || typeid(*(qsi->get())) == typeid(TupleBPS))
 		{
 			bool isTuple = false;
 			BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(qsi->get());
@@ -138,23 +135,16 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			if (isTuple)
 				dotFile << " peripheries=2";
 		}
-		else if (typeid(*(qsi->get())) == typeid(CrossEngineStep))
+		else if (typeid(*(qsi->get())) == typeid(AggregateFilterStep))
 		{
-			BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(qsi->get());
-			dotFile << "(" << bps->alias() << ")\"";
-			dotFile << " shape=box style=bold";
-			dotFile << " peripheries=2";
+			dotFile << "\"";
+			dotFile << " shape=hexagon peripheries=2 style=bold";
 		}
-//		else if (typeid(*(qsi->get())) == typeid(AggregateFilterStep))
-//		{
-//			dotFile << "\"";
-//			dotFile << " shape=hexagon peripheries=2 style=bold";
-//		}
-//		else if (typeid(*(qsi->get())) == typeid(BucketReuseStep))
-//		{
-//			dotFile << "(" << qsi->get()->tableOid() << "/" << qsi->get()->oid() << ")" << "\"";
-//			dotFile << " shape=box style=dashed";
-//		}
+		else if (typeid(*(qsi->get())) == typeid(BucketReuseStep))
+		{
+			dotFile << "(" << qsi->get()->tableOid() << "/" << qsi->get()->oid() << ")" << "\"";
+			dotFile << " shape=box style=dashed";
+		}
 		else
 			dotFile << "\"";
 		dotFile << "]" << endl;
@@ -267,8 +257,7 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			dotFile << "(" << psi->get()->tableOid() << "/" << psi->get()->oid() << ")"<< "\"";
 			dotFile << " shape=octagon";
 		}
-//		else if (typeid(*(psi->get())) == typeid(BatchPrimitiveStep) || typeid(*(psi->get())) == typeid(TupleBPS))
-		else if (typeid(*(psi->get())) == typeid(TupleBPS))
+		else if (typeid(*(psi->get())) == typeid(BatchPrimitiveStep) || typeid(*(psi->get())) == typeid(TupleBPS))
 		{
 			bool isTuple = false;
 			BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(psi->get());
@@ -287,13 +276,6 @@ ostream& writeDotCmds(ostream& dotFile, const JobStepVector& query, const JobSte
 			dotFile << " shape=box style=bold";
 			if (isTuple)
 				dotFile << " peripheries=2";
-		}
-		else if (typeid(*(qsi->get())) == typeid(CrossEngineStep))
-		{
-			BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(qsi->get());
-			dotFile << "(" << bps->alias() << ")\"";
-			dotFile << " shape=box style=bold";
-			dotFile << " peripheries=2";
 		}
 		else
 			dotFile << "\"";

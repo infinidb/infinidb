@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: reset_locks.cpp 1704 2012-09-19 18:26:16Z pleblanc $
+// $Id: reset_locks.cpp 1258 2011-02-03 17:57:07Z rdempsey $
 //
 #include <unistd.h>
 #include <iostream>
@@ -135,8 +135,11 @@ int main(int argc, char** argv)
 		
 		cout << " - resetting SessionManager semaphore" << endl;
 		try {
-			execplan::SessionManager sm;
+			SessionManagerServer sm(true);
 			sm.reset();
+		}
+		catch (boost::interprocess::interprocess_exception&) {
+			//Just swallow this....
 		}
 		catch (std::exception &e) {
 			std::cout << e.what() << std::endl;

@@ -11,6 +11,7 @@
 # Argument 6 - Software File being installed
 # Argument 7 - Debug flag 1 for on, 0 for off
 set timeout 20
+set USERNAME root
 set MODULE [lindex $argv 0]
 set SERVER [lindex $argv 1]
 set PASSWORD [lindex $argv 2]
@@ -18,11 +19,6 @@ set PATCHLOCATION [lindex $argv 3]
 set INSTALLLOCATION [lindex $argv 4]
 set FILE [lindex $argv 5]
 set DEBUG [lindex $argv 6]
-set USERNAME "root"
-set UNM [lindex $argv 7]
-if { $UNM != "" } {
-	set USERNAME $UNM
-}
 log_user $DEBUG
 spawn -noecho /bin/bash
 # 

@@ -1,19 +1,23 @@
 #!/usr/bin/expect
 #
-# $Id$
+# $Id: system_installer.sh 995 2008-09-13 01:57:47Z dhill $
 #
 # Install Package on system
+# Argument 1 - Package Version being installed (1.0.0-100)
+# Argument 2 - DBMS connector type
+# Argument 3 - Root Password of remote server
+# Argument 4 - Root Password of External Mode
 
 set timeout 30
-set USERNAME "root"
+set USERNAME root
 set RPMVERSION " "
 set PASSWORD " "
+set XMPASSWORD dummy
 set MYSQLPASSWORD dummymysqlpw
 set PACKAGE " "
 set CONFIGFILE " "
 set DEBUG 0
 set NODEPS "-h"
-set INSTALLDIR "/usr/local/Calpont"
 
 spawn -noecho /bin/bash
 
@@ -34,35 +38,42 @@ while true {
 		send_user "		password    	- root password on the servers being installed'\n"
 		send_user "		package-type 	- Package Type being installed (rpm, deb, or binary)\n"
 		send_user "		config-file 	- Optional: Calpont.xml config file with directory location, i.e. /root/Calpont.xml\n"
-		send_user "			 	 	Default version is $INSTALLDIR/etc/Calpont.xml.rpmsave\n"
+		send_user "			 	 	Default version is /usr/local/Calpont/etc/Calpont.xml.rpmsave\n"
 		send_user "		mysql-password    - MySQL password on the servers being installed'\n"		
 		send_user "		-d		- Debug flag, output verbose information\n"
 		exit 0
-	} elseif { $arg($i) == "-v" } {
+	}
+	if { $arg($i) == "-v" } {
 		incr i
 		set RPMVERSION $arg($i)
-	} elseif { $arg($i) == "-p" } {
-		incr i
-		set PASSWORD $arg($i)
-	} elseif { $arg($i) == "-t" } {
-		incr i
-		set PACKAGE $arg($i)
-	} elseif { $arg($i) == "-c" } {
-		incr i
-		set CONFIGFILE $arg($i)
-	} elseif { $arg($i) == "-d" } {
-		set DEBUG 1
-	} elseif { $arg($i) == "-f" } {
-		set NODEPS "--nodeps"
-	} elseif { $arg($i) == "-m" } {
-		incr i
-		set MYSQLPASSWORD $arg($i)
-	} elseif { $arg($i) == "-i" } {
-		incr i
-		set INSTALLDIR $arg($i)
-	} elseif { $arg($i) == "-u" } {
-		incr i
-		set USERNAME $arg($i)
+	} else {
+		if { $arg($i) == "-p" } {
+			incr i
+			set PASSWORD $arg($i)
+		} else {
+			if { $arg($i) == "-t" } {
+				incr i
+				set PACKAGE $arg($i)
+			} else {
+				if { $arg($i) == "-c" } {
+					incr i
+					set CONFIGFILE $arg($i)
+				} else {
+					if { $arg($i) == "-d" } {
+						set DEBUG 1
+					} else {
+						if { $arg($i) == "-f" } {
+							set NODEPS "--nodeps"
+						} else {
+							if { $arg($i) == "-m" } {
+								incr i
+								set MYSQLPASSWORD $arg($i)
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	incr i
 }
@@ -70,7 +81,7 @@ while true {
 log_user $DEBUG
 
 set timeout 2
-send "$INSTALLDIR/bin/infinidb status\n"
+send "/usr/local/Calpont/bin/infinidb status\n"
 expect {
         -re "is running"	{ puts "InfiniDB is running, can't run calpontInstall.sh while InfiniDB is running. Exiting..\n";
 						exit 1
@@ -78,20 +89,20 @@ expect {
 }
 
 if { $CONFIGFILE == " " } {
-	set CONFIGFILE $INSTALLDIR/etc/Calpont.xml.rpmsave
+	set CONFIGFILE /usr/local/Calpont/etc/Calpont.xml.rpmsave
 }
 
 if { [catch { open $CONFIGFILE "r"} handle ] } {
 	puts "Calpont Config file not found: $CONFIGFILE"; exit 1
 }
 
-exec rm -f $INSTALLDIR/etc/Calpont.xml.new  > /dev/null 2>&1
-exec mv -f $INSTALLDIR/etc/Calpont.xml $INSTALLDIR/etc/Calpont.xml.new  > /dev/null 2>&1
-exec /bin/cp -f $CONFIGFILE  $INSTALLDIR/etc/Calpont.xml  > /dev/null 2>&1
+exec rm -f /usr/local/Calpont/etc/Calpont.xml.new  > /dev/null 2>&1
+exec mv -f /usr/local/Calpont/etc/Calpont.xml /usr/local/Calpont/etc/Calpont.xml.new  > /dev/null 2>&1
+exec /bin/cp -f $CONFIGFILE  /usr/local/Calpont/etc/Calpont.xml  > /dev/null 2>&1
 
 set timeout 2
 set INSTALL 2
-send "$INSTALLDIR/bin/getConfig DBRM_Controller NumWorkers\n"
+send "/usr/local/Calpont/bin/getConfig DBRM_Controller NumWorkers\n"
 expect {
         -re 1                         { set INSTALL 1
 										set PASSWORD "dummy"
@@ -140,7 +151,7 @@ if { $INSTALL == "2" } {
 
 send_user "Performing InfiniDB System Install, please wait...\n"
 
-send "$INSTALLDIR/bin/setConfig -d Installation EEPackageType $EEPKG\n" 
+send "/usr/local/Calpont/bin/setConfig Installation EEPackageType $EEPKG\n" 
 expect {
 	-re "# "                  {  } abort
 }
@@ -150,7 +161,7 @@ set timeout 600
 #
 # Run installer
 #
-send "$INSTALLDIR/bin/installer $CALPONTPACKAGE $CONNECTORPACKAGE1 $CONNECTORPACKAGE2 initial $PASSWORD n $NODEPS  $MYSQLPASSWORD $DEBUG\n"
+send "/usr/local/Calpont/bin/installer $CALPONTPACKAGE $CONNECTORPACKAGE1 $CONNECTORPACKAGE2 initial $PASSWORD $XMPASSWORD $NODEPS  $MYSQLPASSWORD $DEBUG\n"
 expect {
 	-re "InfiniDB Install Successfully Completed" 	{ } abort
 	-re "ERROR"   { send_user "FAILED: error returned from installer, execute with debug mode on to determine error\n" ; exit 1 }

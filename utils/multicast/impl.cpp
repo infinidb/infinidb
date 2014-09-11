@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: impl.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+// $Id: impl.cpp 2386 2011-02-03 17:56:55Z rdempsey $
 
 /* This code is based on udpcast-20090830. Most of the source code in that release
    contains no copyright or licensing notices at all. The exception is fec.c, which
@@ -1779,7 +1779,7 @@ int transmitDataBlock(sender_state_t sendst, struct slice *slice, int i)
     struct net_config *config = sendst->config;
     struct dataBlock msg;
 
-    idbassert(i < MAX_SLICE_SIZE);
+    assert(i < MAX_SLICE_SIZE);
     
     msg.opCode  = htons(CMD_DATA);
     msg.sliceNo = htonl(slice->sliceNo);
@@ -1914,7 +1914,7 @@ struct slice *makeSlice(sender_state_t sendst, int sliceNo) {
     pc_consume(sendst->free_slices_pc, 1);
     i = pc_getConsumerPosition(sendst->free_slices_pc);
     slice = &sendst->slices[i];
-    idbassert(slice->state == slice::SLICE_FREE);
+    assert(slice->state == slice::SLICE_FREE);
     BZERO(*slice);
     pc_consumed(sendst->free_slices_pc, 1);
 
@@ -1994,7 +1994,7 @@ THREAD_RETURN netSenderMain(void	*args0)
     if(config->sliceSize > config->max_slice_size)
 	config->sliceSize = config->max_slice_size;
 
-    idbassert(config->sliceSize <= MAX_SLICE_SIZE);
+    assert(config->sliceSize <= MAX_SLICE_SIZE);
 
     do {
 	/* first, cleanup rexmit Slice if needed */
@@ -2376,7 +2376,7 @@ struct slice *initSlice(struct clientState *clst,
 			       struct slice *slice,
 			       int sliceNo)
 {
-    idbassert(slice->state == slice::SLICE_FREE || slice->state == slice::SLICE_RECEIVING);
+    assert(slice->state == slice::SLICE_FREE || slice->state == slice::SLICE_RECEIVING);
 
     slice->magic = SLICEMAGIC;
     slice->state = slice::SLICE_RECEIVING;
@@ -2413,7 +2413,7 @@ struct slice *newSlice(struct clientState *clst, int sliceNo)
     i = pc_getConsumerPosition(clst->free_slices_pc);
     pc_consumed(clst->free_slices_pc, 1);
     slice = &clst->slices[i];
-    idbassert(slice->state == slice::SLICE_FREE);
+    assert(slice->state == slice::SLICE_FREE);
 
     /* wait for free data memory */
     slice->base = pc_getConsumerPosition(clst->fifo->freeMemQueue);
@@ -2449,11 +2449,11 @@ struct slice *rcvFindSlice(struct clientState *clst, int sliceNo)
     if(sliceNo <= clst->currentSliceNo) {
 	struct slice *slice = clst->currentSlice;
 	int pos = slice - clst->slices;
-	idbassert(slice == NULL || slice->magic == SLICEMAGIC);
+	assert(slice == NULL || slice->magic == SLICEMAGIC);
 	while(slice->sliceNo != sliceNo) {
 	    if(slice->state == slice::SLICE_FREE)
 		return NULL;
-	    idbassert(slice->magic == SLICEMAGIC);
+	    assert(slice->magic == SLICEMAGIC);
 	    pos--;
 	    if(pos < 0)
 		pos += NR_SLICES;
@@ -2489,7 +2489,7 @@ struct slice *rcvFindSlice(struct clientState *clst, int sliceNo)
 void setSliceBytes(struct slice *slice, 
 			  struct clientState *clst,
 			  int bytes) {
-    idbassert(slice->magic == SLICEMAGIC);
+    assert(slice->magic == SLICEMAGIC);
     if(slice->bytesKnown) {
 	if(slice->bytes != bytes) {
 		//TODO: FIXME
@@ -2560,13 +2560,13 @@ void checkSliceComplete(struct clientState *clst,
 {
     int blocksInSlice;
 
-    idbassert(slice->magic == SLICEMAGIC);
+    assert(slice->magic == SLICEMAGIC);
     if(slice->state != slice::SLICE_RECEIVING) 
 	/* bad starting state */
 	return; 
 
     /* is this slice ready ? */
-    idbassert(clst->net_config->blockSize != 0);
+    assert(clst->net_config->blockSize != 0);
     blocksInSlice = (slice->bytes + clst->net_config->blockSize - 1) / 
 	clst->net_config->blockSize;
     if(blocksInSlice == slice->blocksTransferred) {
@@ -2576,17 +2576,17 @@ void checkSliceComplete(struct clientState *clst,
 	    slice->state = slice::SLICE_DONE;
 	else {
 #ifdef BB_FEATURE_UDPCAST_FEC
-	    idbassert(clst->use_fec == 1);
+	    assert(clst->use_fec == 1);
 	    slice->state = SLICE_FEC;
 #else
-	    idbassert(0);
+	    assert(0);
 #endif
 	}
 	advanceReceivedPointer(clst);
 #ifdef BB_FEATURE_UDPCAST_FEC
 	if(clst->use_fec) {
 	    int n = pc_getProducerPosition(clst->fec_data_pc);
-	    idbassert(slice->state == SLICE_DONE || slice->state == SLICE_FEC);
+	    assert(slice->state == SLICE_DONE || slice->state == SLICE_FEC);
 	    clst->fec_slices[n] = slice;
 	    pc_produce(clst->fec_data_pc, 1);
 	} else
@@ -2605,7 +2605,7 @@ int processDataBlock(struct clientState *clst,
     struct slice *slice = rcvFindSlice(clst, sliceNo);
     unsigned char *shouldAddress, *isAddress;
 
-    idbassert(slice == NULL || slice->magic == SLICEMAGIC);
+    assert(slice == NULL || slice->magic == SLICEMAGIC);
 
     if(slice == NULL || 
        slice->state == slice::SLICE_FREE ||
@@ -2660,14 +2660,14 @@ int processDataBlock(struct clientState *clst,
     if(slice->fec_stripes) {
 	int stripe = blockNo % slice->fec_stripes;
 	slice->missing_data_blocks[stripe]--;
-	idbassert(slice->missing_data_blocks[stripe] >= 0);
+	assert(slice->missing_data_blocks[stripe] >= 0);
 	if(slice->missing_data_blocks[stripe] <
 	   slice->fec_blocks[stripe]) {
 	    int blockIdx;
 	    /* FIXME: FEC block should be enqueued in local queue here...*/
 	    slice->fec_blocks[stripe]--;
 	    blockIdx = stripe+slice->fec_blocks[stripe]*slice->fec_stripes;
-	    idbassert(slice->fec_descs[blockIdx].adr != 0);
+	    assert(slice->fec_descs[blockIdx].adr != 0);
 	    clst->localBlockAddresses[clst->localPos++] = 
 		slice->fec_descs[blockIdx].adr;
 	    slice->fec_descs[blockIdx].adr=0;
@@ -2698,7 +2698,7 @@ int sendRetransmit(struct clientState *clst,
 			  int rxmit) {
     struct client_config *client_config = clst->client_config;
 
-    idbassert(slice->magic == SLICEMAGIC);
+    assert(slice->magic == SLICEMAGIC);
     slice->retransmit.opCode = htons(CMD_RETRANSMIT);
     slice->retransmit.reserved = 0;
     slice->retransmit.sliceNo = htonl(slice->sliceNo);
@@ -2713,7 +2713,7 @@ int processReqAck(struct clientState *clst,
     int blocksInSlice;
     char *readySet = (char *) clst->data_hdr.msg_iov[1].iov_base;
 
-    idbassert(slice == NULL || slice->magic == SLICEMAGIC);
+    assert(slice == NULL || slice->magic == SLICEMAGIC);
 
     {
 	struct timeval tv;
@@ -2731,7 +2731,7 @@ int processReqAck(struct clientState *clst,
     }
 
     setSliceBytes(slice, clst, bytes);
-    idbassert(clst->net_config->blockSize != 0);
+    assert(clst->net_config->blockSize != 0);
     blocksInSlice = (slice->bytes + clst->net_config->blockSize - 1) / 
 	clst->net_config->blockSize;
     if (blocksInSlice == slice->blocksTransferred) {
@@ -2764,7 +2764,7 @@ int dispatchMessage(struct clientState *clst)
     if (clst->currentSlice != NULL &&
 	clst->currentSlice->freePos < MAX_SLICE_SIZE) {
 	struct slice *slice = clst->currentSlice;
-	idbassert(slice == NULL || slice->magic == SLICEMAGIC);
+	assert(slice == NULL || slice->magic == SLICEMAGIC);
 	clst->data_iov[1].iov_base = 
 	    ADR(slice->freePos, clst->net_config->blockSize);
     } else {

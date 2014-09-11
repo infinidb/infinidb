@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_in.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_in.cpp 3025 2012-03-23 20:07:43Z zzhu $
 *
 *
 ****************************************************************************/
@@ -40,8 +40,6 @@ using namespace execplan;
 #include "errorids.h"
 using namespace logging;
 
-#include "utils_utf8.h"
-using namespace funcexp;
 
 namespace
 {
@@ -53,7 +51,7 @@ namespace
 	
 	inline bool strEQ(string op1, string op2)
 	{
-		return utf8::idb_strcoll(op1.c_str(), op2.c_str()) == 0;
+		return strcoll(op1.c_str(), op2.c_str()) == 0;
 	}
 	
 	inline bool getBoolForIn(rowgroup::Row& row,
@@ -154,7 +152,7 @@ namespace
 				for (uint i = 1; i < pm.size(); i++)
 				{
 					isNull = false;
-					if ( utf8::idb_strcoll(val.c_str(), pm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
+					if ( strcoll(val.c_str(), pm[i]->data()->getStrVal(row, isNull).c_str()) == 0 && !isNull)
 						return true;
 					if (isNull && isNotIn)
 						return true; // will be reversed to false by the caller
@@ -187,7 +185,6 @@ CalpontSystemCatalog::ColType Func_in::operationType( FunctionParm& fp, CalpontS
 	
 	for (uint i = 0; i < fp.size(); i++)
 	{
-		//op.setOpType(op.operationType(), fp[i]->data()->resultType());
 		if (fp[i]->data()->resultType().colDataType != CalpontSystemCatalog::CHAR &&
 			fp[i]->data()->resultType().colDataType != CalpontSystemCatalog::VARCHAR)
 		{

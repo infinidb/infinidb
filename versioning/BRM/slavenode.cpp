@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: slavenode.cpp 1933 2013-07-08 20:16:28Z bpaul $
+ * $Id: slavenode.cpp 1509 2012-03-02 22:18:14Z pleblanc $
  *
  ****************************************************************************/
 
@@ -33,8 +33,6 @@
 #include "liboamcpp.h"
 #include "brmtypes.h"
 #include "rwlockmonitor.h"
-
-#include "utils_utf8.h"
 
 using namespace BRM;
 using namespace std;
@@ -72,9 +70,19 @@ void reset(int sig)
 int main(int argc, char **argv)
 {
 
-	// get and set locale language - BUG 5362
+	// get and set locale language
 	string systemLang = "C";
-	systemLang = funcexp::utf8::idb_setlocale();
+
+	oam::Oam oam;
+	try{
+			oam.getSystemConfig("SystemLang", systemLang);
+	}
+	catch(...)
+	{
+		systemLang = "C";
+	}
+
+	setlocale(LC_ALL, systemLang.c_str());
 
 	BRM::logInit ( BRM::SubSystemLogId_workerNode );
 
@@ -147,7 +155,7 @@ int main(int argc, char **argv)
 		}
 		catch (exception &e) {
 			ostringstream os;
-			os << "An error occurred: " << e.what();
+			os << "An error occured: " << e.what();
 			cerr << os.str() << endl;
 			log(os.str());
 			exit(1);

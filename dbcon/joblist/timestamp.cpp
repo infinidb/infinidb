@@ -16,10 +16,9 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: timestamp.cpp 8698 2012-07-10 14:47:53Z rdempsey $
+// $Id: timestamp.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 //
 
-#include <unistd.h>
 #include <sys/time.h>
 #include <ctime>
 #include <string>
@@ -68,7 +67,7 @@ const string JSTimeStamp::format(const struct timeval& tvbuf)
 	strftime(timeString, 50, "%F %T", &tmbuf);
 #endif
 	const int len = strlen(timeString);
-	snprintf(&timeString[len], (50-len), ".%06lu", tvbuf.tv_usec);
+	sprintf(&timeString[len], ".%06lu", tvbuf.tv_usec);
 	res = timeString;
 	return res;
 }
@@ -87,7 +86,7 @@ const string JSTimeStamp::tsdiffstr(const struct timeval& t2, const struct timev
 		ds--;
 		dus += 1000000;
 	}
-	snprintf(timeString, 50, "%d.%06d", ds, dus);
+	sprintf(timeString, "%d.%06d", ds, dus);
 	res = timeString;
 	return res;
 }

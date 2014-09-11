@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: constantfilter.cpp 8526 2012-05-17 02:28:10Z xlou $
+*   $Id: constantfilter.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -105,15 +105,14 @@ const string ConstantFilter::toString() const
 	return output.str();
 }
 
-//const string ConstantFilter::data() const
-//{
-   //string out = "";
-   // if (fOp) out = fOp->data();
-   // if (fFilterList.size() != 0)
-	 //   return string(out + " " + fFilterList.front()->lhs()->data());
-   // return "ConstantFilter";	    
-   //return fData;
-//}
+const string ConstantFilter::data() const
+{
+    string out = "";
+    if (fOp) out = fOp->data();
+    if (fFilterList.size() != 0)
+	    return string(out + " " + fFilterList.front()->lhs()->data());
+    return "ConstantFilter";	    
+}
 
 ostream& operator<<(ostream& output, const ConstantFilter& rhs)
 {

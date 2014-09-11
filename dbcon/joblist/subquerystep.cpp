@@ -110,7 +110,7 @@ void SubQueryStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl
@@ -219,8 +219,6 @@ uint SubAdapterStep::nextBand(messageqcpp::ByteStream &bs)
 		more = fOutputDL->next(fOutputIterator, &rgDataOut);
 		if (!more || (0 < fOutputJobStepAssociation.status() || die))
 		{
-			//@bug4459.
-			while (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);			
 			fEndOfResult = true;
 		}
 
@@ -360,11 +358,6 @@ void SubAdapterStep::execute()
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
-#ifdef VALGRIND
-			/* As of 1/21/14, some columns are left uninitialized.  Valgrind doesn't like that. 
-			Nothing seems broken, this would be a minor optimization opportunity. */
-			memset(rgDataOut.get(), 0, fRowGroupOut.getDataSize(fRowGroupIn.getRowCount()));
-#endif
 			fRowGroupOut.setData(rgDataOut.get());
 
 			fRowGroupIn.getRow(0, &rowIn);
@@ -447,7 +440,7 @@ void SubAdapterStep::addExpression(const JobStepVector& exps, JobInfo& jobInfo)
 	for (JobStepVector::const_iterator it = exps.begin(); it != exps.end(); it++)
 	{
 		ExpressionStep* e = dynamic_cast<ExpressionStep*>(it->get());
-		idbassert(e);
+		assert(e);
 
 		e->updateInputIndex(keyToIndexMap, jobInfo);
 		if (filter != NULL)
@@ -489,7 +482,7 @@ void SubAdapterStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl

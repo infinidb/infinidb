@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: functor_int.h 3643 2013-03-18 20:42:26Z bpaul $
+//  $Id: functor_int.h 3011 2012-02-29 22:02:53Z rdempsey $
 
 /** @file */
 
@@ -70,8 +70,6 @@ public:
 	virtual ~Func_instr() {}
 
 	execplan::CalpontSystemCatalog::ColType operationType(FunctionParm& fp, execplan::CalpontSystemCatalog::ColType& resultType);
-
-	size_t in_str(const std::string& str, const std::string& substr, size_t start);
 
 	int64_t getIntVal(rowgroup::Row& row,
 						FunctionParm& fp,

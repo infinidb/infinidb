@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: primitivemsg.h 8774 2012-07-31 21:00:09Z pleblanc $
+* $Id: primitivemsg.h 7956 2011-09-15 14:43:34Z pleblanc $
 */
 
 /** @file */
@@ -69,7 +69,6 @@ const int8_t COMPARE_NLIKE=(COMPARE_LIKE|COMPARE_NOT); //0x18
 #define BOP_NONE 0
 #define BOP_AND 1
 #define BOP_OR 2
-#define BOP_XOR 3
 
 //		OT (Output Type) values
 // 1 = RID, 2 = Token, 3 = Both
@@ -233,8 +232,8 @@ struct VBCPacketHeader
 
 struct ISMPacketHeader
 {
-	ISMPacketHeader(): Interleave(0), Flags(0), Command(0), Size(0), Type(0), MsgCount(0), Status(0) {}
-	uint32_t Interleave;
+	ISMPacketHeader(): Reserve(0), Flags(0), Command(0), Size(0), Type(0), MsgCount(0), Status(0) {}
+	uint16_t Reserve;
 	uint16_t Flags;
 	uint8_t Command;
 	uint16_t Size;
@@ -253,7 +252,6 @@ struct PrimitiveHeader
 	uint32_t VerID;                             // DB Version ID used for this Session/Statement
 	uint32_t StepID;                            // Internal Primitive Sequence number
 	uint32_t UniqueID;                          // Unique ID for DEC and BPP
-	uint32_t Priority;							// Priority level of the user
 };
 
 #if 0

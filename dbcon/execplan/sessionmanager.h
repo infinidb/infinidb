@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmanager.h 8924 2012-09-19 18:25:54Z pleblanc $
+ * $Id: sessionmanager.h 8434 2012-04-03 18:31:24Z dcathey $
  *
  *****************************************************************************/
 
@@ -30,7 +30,6 @@
 #include "calpontsystemcatalog.h"
 #include "brm.h"
 #include "brmtypes.h"
-#include "boost/shared_array.hpp"
 
 namespace execplan {
 
@@ -204,7 +203,9 @@ public:
 	 * @return A pointer to the array.  Note: The caller is responsible for
 	 * deallocating it.  Use delete[].
 	 */
-	boost::shared_array<BRM::SIDTIDEntry> SIDTIDMap(int& len);
+	const BRM::SIDTIDEntry* SIDTIDMap(int& len);
+
+	char * getShmContents(int &len);
 	
 	/** @brief Returns a unique uint32_t.  It eventually wraps around, but who cares.
 	 *
@@ -234,7 +235,21 @@ public:
 	std::string getTxnIDFilename() const;
 	
 	const bool checkActiveTransaction(const SID sessionId, bool& bIsDbrmUp, BRM::SIDTIDEntry& blocker);
-	const bool isTransactionActive(const SID sessionId, bool& bIsDbrmUp);
+	/** @brief set a table to lock/unlock state
+	 * 
+	 * set the table to lock/unlock state depending on lock request. error code will be returned.
+	 */
+	int8_t setTableLock(const CalpontSystemCatalog::OID tableOID, const u_int32_t sessionID,
+		const u_int32_t processID, const std::string processName, bool lock);
+	
+	/** @brief get table lock information
+	 * 
+	 * if the table is locked, the processID, processName will be valid. error code will be returned.
+	 */
+	int8_t getTableLockInfo(const CalpontSystemCatalog::OID tableOID, u_int32_t & processID,
+		std::string& processName, bool& lockStatus, SID & sid);
+
+	void getTableLocksInfo ( std::vector<BRM::SIDTIDEntry> & sidTidentries );
 	
 private:
 	BRM::DBRM dbrm;

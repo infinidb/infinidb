@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_least.cpp 3956 2013-07-08 19:17:26Z bpaul $
+* $Id: func_least.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -35,9 +35,6 @@ using namespace rowgroup;
 
 #include "joblisttypes.h"
 using namespace joblist;
-
-#include "utils_utf8.h"
-using namespace funcexp;
 
 class to_lower
 {
@@ -110,7 +107,7 @@ std::string Func_least::getStrVal(rowgroup::Row& row,
 	{
 		string str1 = fp[i]->data()->getStrVal(row, isNull);
 
-		int tmp = utf8::idb_strcoll(leastStr.c_str(), str1.c_str());
+		int tmp = strcoll(leastStr.c_str(), str1.c_str());
 		if ( tmp > 0 )
 
 //		if ( leastStr > str1 )

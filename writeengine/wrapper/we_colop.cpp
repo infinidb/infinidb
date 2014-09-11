@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_colop.cpp 4734 2013-08-13 13:25:43Z chao $
+//  $Id: we_colop.cpp 4282 2012-10-29 16:31:57Z chao $
 
 /** @file */
 
@@ -34,8 +34,7 @@ using namespace std;
 #include "we_dbfileop.h"
 #include "we_dctnrycompress.h"
 #include "we_colopcompress.h"
-#include "idbcompress.h"
-#include "writeengine.h"
+
 namespace WriteEngine
 {
 	struct RefcolInfo
@@ -73,16 +72,38 @@ namespace WriteEngine
     *    NO_ERROR if success
     *    rowIdArray - allocation of the row id left here
     ***********************************************************/
-   int ColumnOp::allocRowId(const TxnID& txnid, Column& column, uint64_t totalRow, RID* rowIdArray, HWM& hwm, bool& newExtent, uint64_t& rowsLeft, HWM& newHwm, 
-			bool& newFile, ColStructList& newColStructList, DctnryStructList& newDctnryStructList, std::vector<DBRootExtentTracker*> & dbRootExtentTrackers, 
-			bool insertSelect, bool isBatchInsert, OID tableOid)
+   int ColumnOp::allocRowId(Column& column, uint64_t totalRow, RID* rowIdArray, int& hwm, bool& newExtent, Column& newCol, uint64_t& rowsLeft, HWM& newHwm, bool& newFile, bool insertSelect)
    {
    	//MultiFiles per OID: always append the rows to the end for now.
+ /*  	
+      int      totalBlock, i, j, counter = 0, totalRowPerBlock;
+      bool     bExit = false; //, bDirty = false;
+      unsigned char  buf[BYTE_PER_BLOCK];
+
+      totalBlock = blocksInFile(column.dataFile.pFile);
+
+      for(i = 0; i < totalBlock && !bExit; i++) {
+         readBlock(column.dataFile.pFile, buf, i);
+
+         totalRowPerBlock = BYTE_PER_BLOCK/column.colWidth;
+         for(j = 0; j < totalRowPerBlock && !bExit; j++) 
+            if (isEmptyRow(buf, j, column)) {
+               rowIdArray[counter] = getRowId(i, column.colWidth, j);
+
+               counter++;
+               if (counter >= totalRow) {
+                  if (i > hwm)
+                     hwm = i;
+
+                  bExit = true;
+               }
+            }
+      }
+*/
 	  // See if the current HWM block might be in an abbreviated extent that
 	  // needs to be expanded, if we end up adding enough rows.
 	  bool bCheckAbbrevExtent      = false;
-	  uint64_t  numBlksPerInitialExtent = INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK * column.colWidth;
-// DMC-SHARED_NOTHING_NOTE: Is it safe to assume only part0 seg0 is abbreviated?
+	  int  numBlksPerInitialExtent = INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK * column.colWidth;
 	  if ((column.dataFile.fPartition == 0) &&
           (column.dataFile.fSegment   == 0) &&
 	      ((hwm+1) <= numBlksPerInitialExtent))
@@ -92,21 +113,18 @@ namespace WriteEngine
 	  int counter = 0;
 	  uint64_t totalRowPerBlock = BYTE_PER_BLOCK/column.colWidth;
 	  uint64_t currentRows = totalRowPerBlock * hwm;
-	  uint64_t extentRows = BRMWrapper::getInstance()->getExtentRows();
-	  uint64_t numExtentsFilled = currentRows / extentRows;
+	  unsigned extentRows = BRMWrapper::getInstance()->getExtentRows();
+	  int numExtentsFilled = currentRows / extentRows;
 	  uint64_t rowsAvailable = extentRows - (numExtentsFilled * extentRows);
 	  rowsLeft = totalRow < rowsAvailable ? 0 : totalRow - rowsAvailable;
 	  newExtent = false;
-	  uint j = 0, i=0, rowsallocated = 0;
+	  uint j = 0, rowsallocated = 0;
 	  int rc = 0;
 	  newFile = false;
-	  Column newCol;
 	  unsigned char  buf[BYTE_PER_BLOCK];
 		
 		// ZZ. For insert select, skip the hwm block and start inserting from the next block
 		// to avoid self insert issue.
-		//For batch insert: if not first batch, use the saved last rid to start adding rows.
-		
 		if (!insertSelect)
 		{
 		  //..Search the HWM block for empty rows
@@ -170,180 +188,12 @@ namespace WriteEngine
 			 std::string segFile;
 			 rowsLeft = 0;
 			 int		allocSize = 0;
+             BRM::LBID_t startLbid;
+			 RETURN_ON_ERROR(extendColumn (
+				column, false, pFile, dbRoot, partition, segment,
+                segFile, newHwm, startLbid, newFile, allocSize));
+	 
 			 newExtent = true;
-			 if ((column.dataFile.fid < 3000) || (!isBatchInsert)) //systables or single insert
-			 {
-				dbRoot = column.dataFile.fDbRoot;
-			 }
-			 else
-			 {
-				//Find out where the rest rows go
-				BRM::LBID_t startLbid;
-				//need to put in a loop until newExtent is true
-				newExtent = dbRootExtentTrackers[0]->nextSegFile(dbRoot, partition, segment, newHwm, startLbid);
-				TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);
-				while (!newExtent)
-				{
-					/*partially filled extent encountered due to user moved dbroot. Set hwm to the end of the extent.
-						If compressed,fill the rest eith empty values.
-					*/	
-					unsigned int BLKS_PER_EXTENT = 0;
-					unsigned int nBlks = 0;
-					unsigned int nRem = 0;
-					FileOp fileOp;	
-					long long fileSizeBytes = 0;
-					
-					for (i=0; i < dbRootExtentTrackers.size(); i++)
-					{
-						if (i != 0)
-							dbRootExtentTrackers[i]->nextSegFile(dbRoot, partition, segment, newHwm, startLbid);
-						
-						// Round up HWM to the end of the current extent
-						BLKS_PER_EXTENT =(BRMWrapper::getInstance()->getExtentRows() * newColStructList[i].colWidth)/BYTE_PER_BLOCK;
-						nBlks = newHwm + 1;
-						nRem  = nBlks % BLKS_PER_EXTENT;
-						newHwm = nBlks - nRem + BLKS_PER_EXTENT - 1;
-						//save it to set in the end
-						ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newColStructList[i].dataOid);
-						ColExtInfo aExt;
-						aExt.dbRoot =dbRoot;
-						aExt.partNum = partition;
-						aExt.segNum = segment;
-						aExt.hwm = newHwm;
-						aExt.isNewExt = false;
-						aExt.current = false;
-						aColExtsInfo.push_back(aExt);
-						if (newColStructList[i].fCompressionType > 0)
-						{
-							i64 emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
-							string errorInfo;
-							rc = fileOp.fillCompColumnExtentEmptyChunks(newColStructList[i].dataOid, newColStructList[i].colWidth, 
-								emptyVal, dbRoot, partition, segment, newHwm, segFile, errorInfo);
-							if (rc != NO_ERROR)
-								return rc;
-						}
-						//@Bug 4758. Check whether this is a abbreviated extent
-						else if (newColStructList[i].fCompressionType == 0)
-						{
-							rc = fileOp.getFileSize3(newColStructList[i].dataOid, dbRoot, partition, segment, fileSizeBytes);
-							if (rc != NO_ERROR)
-								return rc;
-						
-							if (fileSizeBytes == (long long)  INITIAL_EXTENT_ROWS_TO_DISK * newColStructList[i].colWidth)
-							{
-								 FILE* pFile = fileOp.openFile( newColStructList[i].dataOid, dbRoot, partition, segment, segFile );
-								 if ( !pFile )
-								 {
-									rc = ERR_FILE_OPEN;
-									return rc;
-								 }
-								 i64 emptyVal = getEmptyRowValue(newColStructList[i].colDataType, newColStructList[i].colWidth);
-								 rc = fileOp.expandAbbrevColumnExtent( pFile, dbRoot, emptyVal, newColStructList[i].colWidth);
-								 //set hwm for this extent.
-								 fileOp.closeFile(pFile);
-								 if (rc != NO_ERROR)
-									return rc;	
-							}
-						}
-						tableMetaData->setColExtsInfo(newColStructList[i].dataOid, aColExtsInfo);
-					}
-					newExtent = dbRootExtentTrackers[0]->nextSegFile(dbRoot, partition, segment, newHwm, startLbid);	
-				}
-			 }
-			 
-			 std::vector<BRM::CreateStripeColumnExtentsArgOut> extents;
-			 if (newExtent)
-			 {
-				//extend all columns together
-				std::vector<BRM::CreateStripeColumnExtentsArgIn> cols;
-				BRM::CreateStripeColumnExtentsArgIn createStripeColumnExtentsArgIn;
-				for (i=0; i < newColStructList.size(); i++)
-				{
-					createStripeColumnExtentsArgIn.oid = newColStructList[i].dataOid;
-					createStripeColumnExtentsArgIn.width = newColStructList[i].colWidth;
-					cols.push_back(createStripeColumnExtentsArgIn);
-				}
-				
-				rc = BRMWrapper::getInstance()->allocateStripeColExtents(cols, dbRoot, partition, segment, extents);
-				newHwm = extents[0].startBlkOffset;
-				if (rc != NO_ERROR)
-					return rc;
-					
-				//Create column files
-				vector<BRM::LBID_t> lbids;
-				//BRM::CPInfoList_t cpinfoList;
-				//BRM::CPInfo cpInfo;
-				//cpInfo.max = numeric_limits<int64_t>::min();
-				//cpInfo.min = numeric_limits<int64_t>::max();
-				//cpInfo.seqNum = -1;	
-				for ( i=0; i < extents.size(); i++)
-				{
-					setColParam(newCol, 0, newColStructList[i].colWidth, newColStructList[i].colDataType, newColStructList[i].colType, 
-						newColStructList[i].dataOid, newColStructList[i].fCompressionType, dbRoot, partition, segment);
-					rc = extendColumn(newCol, false, false, extents[i].startBlkOffset, extents[i].startLbid, extents[i].allocSize, 
-						dbRoot, partition, segment, segFile, pFile, newFile);
-					if (rc != NO_ERROR)
-						return rc;
-					
-					//cpInfo.firstLbid = extents[i].startLbid;
-					//cpinfoList.push_back(cpInfo);
-					newColStructList[i].fColPartition = partition;
-					newColStructList[i].fColSegment = segment;
-					newColStructList[i].fColDbRoot = dbRoot;
-					newDctnryStructList[i].fColPartition = partition;
-					newDctnryStructList[i].fColSegment = segment;
-					newDctnryStructList[i].fColDbRoot = dbRoot;
-					lbids.push_back(extents[i].startLbid);
-				}
-				
-				//mark the extents to updating
-//rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList);
-				rc = BRMWrapper::getInstance()->markExtentsInvalid(lbids);
-				if (rc != NO_ERROR)
-					return rc;
-				//create corresponding dictionary files
-				if (newFile )
-				{
-					boost::scoped_ptr<WriteEngineWrapper> we (new WriteEngineWrapper());
-					for (i=0; i < newDctnryStructList.size(); i++)
-					{
-						if (newDctnryStructList[i].dctnryOid > 0)
-						{
-							rc = we->createDctnry(txnid, newDctnryStructList[i].dctnryOid, newDctnryStructList[i].colWidth, dbRoot, partition,
-                                 segment, newDctnryStructList[i].fCompressionType);
-							if ( rc != NO_ERROR)
-								return rc;
-						}	
-					}
-				}
-			 }
-			 
-			 //save the extent info for batch insert
-			if (isBatchInsert && newExtent)
-			{
-			  TableMetaData* tableMetaData= TableMetaData::makeTableMetaData(tableOid);	
-			  for (i=0; i < newColStructList.size(); i++)
-			  {		
-				ColExtsInfo aColExtsInfo = tableMetaData->getColExtsInfo(newColStructList[i].dataOid);
-				ColExtsInfo::iterator it = aColExtsInfo.begin();
-				while (it != aColExtsInfo.end())
-				{
-					if ((it->dbRoot == newColStructList[i].fColDbRoot) && (it->partNum == newColStructList[i].fColPartition) && (it->segNum == newColStructList[i].fColSegment))
-						break;
-					it++;
-				}
-				ColExtInfo aExt;
-				aExt.dbRoot = newColStructList[i].fColDbRoot;
-				aExt.partNum = newColStructList[i].fColPartition;
-				aExt.segNum = newColStructList[i].fColSegment;
-				aExt.hwm = extents[i].startBlkOffset;
-				aExt.isNewExt = true;
-				aExt.current = true;
-				aColExtsInfo.push_back(aExt);
-				tableMetaData->setColExtsInfo(newColStructList[i].dataOid, aColExtsInfo);
-			  }	 		
-			}
-			
 			 setColParam(newCol, 0, column.colWidth,column.colDataType, column.colType, 
 					 column.dataFile.fid, column.compressionType, dbRoot, partition, segment);
 			 rc = openColumnFile(newCol, segFile);
@@ -395,6 +245,7 @@ namespace WriteEngine
 						break;
 				} 
 			}
+			//RETURN_ON_ERROR(BRMWrapper::getInstance()->setLocalHWM_HWMt(column.dataFile.fid, partition, segment, newHwm)); 
 		}
 	  }
 	  
@@ -468,7 +319,7 @@ namespace WriteEngine
    {
       int rc, newWidth, allocSize;
       i64 emptyVal = 0;
-	  int compressionType = column.compressionType;
+     
       setColParam(column, colNo, colWidth, colDataType, colType);
       emptyVal = getEmptyRowValue(colDataType, colWidth);
       newWidth = getCorrectRowWidth(colDataType, colWidth);
@@ -476,7 +327,6 @@ namespace WriteEngine
       column.dataFile.fDbRoot    = dbRoot;
       column.dataFile.fPartition = partition;
       column.dataFile.fSegment   = 0;
-	  column.compressionType = compressionType;
       rc = createFile(column.dataFile.fid, allocSize, dbRoot, partition, emptyVal, newWidth);
       if (rc != NO_ERROR)
          return rc;
@@ -492,422 +342,419 @@ namespace WriteEngine
     *
     * @return
     */
-int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, void * defaultVal, const OID dictOid, 
-						const int dictColWidth, const string defaultValStr, bool autoincrement)
-{
-    unsigned char refColBuf[BYTE_PER_BLOCK]; //Refernce column buffer
-    unsigned char colBuf[BYTE_PER_BLOCK];
-    bool dirty = false;
-    HWM colHwm = 0;
-    RID maxRowId = 0;
-	int size = sizeof(Token);
-    i64 emptyVal;
-    i64 refEmptyVal;
+   int ColumnOp::fillColumn(Column& column, Column& refCol, void * defaultVal, long long & nextVal, const OID dictOid, const int dictColWidth)
+   {
+      unsigned char refColBuf[BYTE_PER_BLOCK]; //Refernce column buffer
+      unsigned char colBuf[BYTE_PER_BLOCK];
+      bool dirty = false;
+      int refHwm = 0;
+      int colHwm = 0;
+      RID maxRowId = 0;
 
-    long long startColFbo = 0;
-    long long startRefColFbo = 0;
+      i64 emptyVal;
+      i64 refEmptyVal;
 
-    int refBufOffset = 0;
-    int colBufOffset = 0;
-	unsigned currentnumExtent = 0; 
-	u_int32_t nexValNeeded = 0;
-	u_int64_t nextVal;
-    u_int32_t  partition;
-    u_int16_t  segment;
-    HWM        lastRefHwm;
-    int        rc = 0;
-	std::string segFile, errorMsg;
-	BRM::LBID_t    startLbid;
-	bool        newFile = true;
-	int		 allocSize = 0;
-	boost::scoped_ptr<Dctnry> dctnry;
-    if (m_compressionType == 0)
-      dctnry.reset(new DctnryCompress0);
-    else
-      dctnry.reset(new DctnryCompress1);
+      long long startColFbo = 0;
+      long long startRefColFbo = 0;
+      long long endColFbo = 0;
+      long long endRefColFbo = 0;
+
+      int refBufOffset = 0;
+      int colBufOffset = 0;
+	  bool autoincrement = false;
+	  if (nextVal > 0)
+		autoincrement = true;
+		
+      //Get the last partition and the last segment number and the last dbRoot number
+      // from the reference column oid
+      u_int16_t  lastDBRoot;
+      u_int32_t  lastPartition;
+      u_int16_t  totalSegments = 0;
+      u_int16_t  lastSegment;
+      int        lastHwm;
+      int        rc = 0;
+      uint16_t   colStartDBRoot = column.dataFile.fDbRoot;
+      uint16_t   currentDBRoot;
+      u_int32_t  startPartition;
+      u_int16_t  lastSegmentThisPart;
+	  std::vector<struct BRM::EMEntry> entries;
+	  vector<struct BRM::EMEntry>::iterator iter;
+	  typedef std::tr1::unordered_map<u_int32_t, u_int32_t> PartitionMap_t;
+	  PartitionMap_t partitionMap;
+      rc = BRMWrapper::getInstance()->getStartExtent(refCol.dataFile.fid, colStartDBRoot, startPartition, true);
+	  rc = BRMWrapper::getInstance()->getExtents(refCol.dataFile.fid, entries, false,false,true);
+	  //@Bug 3657. For autoincrement column, mark the first extent invalid
+	 
+	  BRM::LBID_t    startLbid;
+	  rc = BRMWrapper::getInstance()->getStartLbid(column.dataFile.fid, startPartition, 0, 0, startLbid);
+	  boost::scoped_ptr<BRM::DBRM> dbrmp(new BRM::DBRM());
+	  dbrmp->setExtentMaxMin(startLbid, numeric_limits<int64_t>::min()+1, numeric_limits<int64_t>::max()-1, -1);
+			
 	  
-	boost::scoped_ptr<ColumnOp> refColOp;
-    if (refCol.compressionType != 0)
-        refColOp.reset(new ColumnOpCompress1);
-    else
-        refColOp.reset(new ColumnOpCompress0);
-	//get dbroots from config
-	Config config;
-	config.initConfigCache();
-	std::vector<u_int16_t> rootList;
-	config.getRootIdList( rootList );
-	unsigned extentRows = BRMWrapper::getInstance()->getExtentRows();
-	emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
-    refEmptyVal = getEmptyRowValue(refCol.colDataType, refCol.colWidth);
-	//find the dbroots which have rows for refrence column
-	unsigned int i=0, k=0;
-	
-	for (i=0; i < rootList.size(); i++)
-	{
-		std::vector<struct BRM::EMEntry> refEntries;
-		rc = BRMWrapper::getInstance()->getExtents_dbroot(refCol.dataFile.fid, refEntries, rootList[i]);
-		std::vector<struct BRM::EMEntry>::const_iterator iter = refEntries.begin();
-		while ( iter != refEntries.end() )
+	  if (entries.size() > 0) //Find out which partition is dropped. 
+	  {
+			iter = entries.begin();
+			for (;iter != entries.end(); ++iter)
+			{
+				partitionMap[iter->partitionNum] = iter->partitionNum;
+			}
+	  }
+
+      unsigned dbrootCnt = Config::DBRootCount();
+      unsigned extentRows = BRMWrapper::getInstance()->getExtentRows();
+
+      rc = BRMWrapper::getInstance()->getLastLocalHWM_int(refCol.dataFile.fid, lastDBRoot, lastPartition, lastSegment, lastHwm);
+
+      std::vector<RefcolInfo>   refColInfo;
+      unsigned                  currentnumExtent = 0;
+      boost::scoped_ptr<Dctnry> dctnry;
+      if (m_compressionType == 0)
+         dctnry.reset(new DctnryCompress0);
+      else
+         dctnry.reset(new DctnryCompress1);
+      emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
+      refEmptyVal = getEmptyRowValue(refCol.colDataType, refCol.colWidth);
+      lastSegmentThisPart = lastSegment;
+	  PartitionMap_t::const_iterator it;
+      for (u_int32_t i = startPartition; i <= lastPartition; i++)
+      {
+		 it = partitionMap.find (i);
+		 if (it == partitionMap.end())
+			continue;
+		 //extend the column first
+		if (i > startPartition) //First one is created already
 		{
-			//fill in for the new column for each extent in the reference column
-			//organize the extents into a file
-			std::vector<struct BRM::EMEntry> fileExtents;
-			fileExtents.push_back(refEntries[0]);
-			//cout << "Get extent for ref oid:dbroot:part:seg = " << refCol.dataFile.fid<<":"<<rootList[0]<<":"<<refEntries[0].partitionNum
-			//<<":"<<refEntries[0].segmentNum<<endl;
-			for (k = 1; k < refEntries.size(); k++)
+			u_int16_t   dbRoot1;
+			u_int32_t   partition1 = i;
+			u_int16_t   segment1;
+			FILE*       pFile1 = NULL;
+			std::string segFile1;
+			HWM         hwm;
+			bool        newFile;
+			BRM::LBID_t startLbid;
+			int		 allocSize = 0;
+			RETURN_ON_ERROR(extendColumn(column, false, pFile1,
+                                         dbRoot1, partition1, segment1,
+                                         segFile1, hwm, startLbid, newFile, allocSize)) ;
+
+			//@Bug 2636, 3257 Check if need to create store file
+			if ((dictOid > 0) && newFile )
 			{
-				if ((refEntries[0].partitionNum == refEntries[k].partitionNum) && (refEntries[0].segmentNum == refEntries[k].segmentNum)) //already the same dbroot
-				{
-					fileExtents.push_back(refEntries[k]);
-				}
+				BRM::LBID_t startLbid;
+				RETURN_ON_ERROR(dctnry->createDctnry(dictOid, dictColWidth,
+                                                      dbRoot1, partition1, segment1, startLbid, newFile));
 			}
-			
-			//Process this file
-			lastRefHwm = fileExtents[0].HWM;
-			for (k = 1; k < fileExtents.size(); k++)
-			{
-				//Find the hwm of this file
-				if (fileExtents[k].HWM > lastRefHwm)
-					lastRefHwm = fileExtents[k].HWM;
-			}
-			
-			//create extents for the new column
-			// If we are processing the first extent in the first segment
-            // file, we check to see if we have enough rows (256K) to re-
-            // quire just create the initial abbrev extent for the new column.
-			std::vector<struct BRM::EMEntry> newEntries;
-            if (( refEntries.size() == 1) && (refEntries[0].partitionNum == 0) && (refEntries[0].segmentNum == 0))
-			{
-				//@Bug3565 use ref colwidth to calculate.
-				unsigned int numBlksForFirstExtent =
-                     (INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK) * refCol.colWidth;
-                if ((lastRefHwm+1) < numBlksForFirstExtent)
-                {
-                    rc = createColumn(column, 0, column.colWidth, column.colDataType,
-							WriteEngine::WR_CHAR, column.dataFile.fid, rootList[i], 0);
-					if (rc != NO_ERROR)
-						return rc;
-					//cout << "createColumn for oid " << column.dataFile.fid << endl;
-					BRM::EMEntry aEntry;
-					aEntry.partitionNum = partition = 0;
-					aEntry.segmentNum = segment = 0;
-					aEntry.dbRoot = rootList[i];
-					newEntries.push_back(aEntry);
-					if (dictOid >3000)  //Create dictionary file if needed
-					{
-						rc = dctnry->createDctnry(dictOid, dictColWidth,
-							rootList[i], partition, segment, startLbid, newFile);
-						if (rc != NO_ERROR)
-							return rc;
-						//tokenize default value if needed
-						if (defaultValStr.length() > 0)
-						{
-							DctnryStruct dctnryStruct;
-							dctnryStruct.dctnryOid = dictOid;
-							dctnryStruct.columnOid = column.dataFile.fid;
-							dctnryStruct.fColPartition = partition;
-							dctnryStruct.fColSegment = segment;
-							dctnryStruct.fColDbRoot = rootList[i];
-							dctnryStruct.colWidth = dictColWidth;
-							dctnryStruct.fCompressionType = column.compressionType;
-							DctnryTuple dctnryTuple;
-							memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
-							dctnryTuple.sigSize = defaultValStr.length();
-							WriteEngineWrapper wrapper;
-							rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
-							if (rc != NO_ERROR)
-								return rc;
-							memcpy(defaultVal, &dctnryTuple.token, size); 
-						}
-					}
-                }
-            }
-			   
-			if (newEntries.size() == 0)
-			{		
-				for (k = 0; k < fileExtents.size(); k++)
-				{
-					uint16_t dbroot = rootList[i];
-					partition = fileExtents[k].partitionNum;
-					segment = fileExtents[k].segmentNum;
-					if ( k == 0)
-					{
-						rc =  addExtent(column, dbroot, partition, segment,
-                         segFile, startLbid, newFile, allocSize) ;
-						if (rc != NO_ERROR)
-							return rc; //Clean up will be done throgh DDLProc
-						
-						//cout << "extendColumn for oid " << column.dataFile.fid << endl;
-						BRM::EMEntry aEntry;
-						aEntry.partitionNum = partition;
-						aEntry.segmentNum = segment;
-						aEntry.dbRoot = rootList[i];
-						newEntries.push_back(aEntry);
-						if ((dictOid >3000) && newFile) //Create dictionary file if needed
-						{
-							rc = dctnry->createDctnry(dictOid, dictColWidth,
-								rootList[i], partition, segment, startLbid, newFile);
-							if (rc != NO_ERROR)
-								return rc;
-							//tokenize default value if needed
-							if (defaultValStr.length() > 0)
-							{
-								DctnryStruct dctnryStruct;
-								dctnryStruct.dctnryOid = dictOid;
-								dctnryStruct.columnOid = column.dataFile.fid;
-								dctnryStruct.fColPartition = partition;
-								dctnryStruct.fColSegment = segment;
-								dctnryStruct.fColDbRoot = rootList[i];
-								dctnryStruct.colWidth = dictColWidth;
-								dctnryStruct.fCompressionType = column.compressionType;
-								DctnryTuple dctnryTuple;
-								memcpy(dctnryTuple.sigValue, defaultValStr.c_str(), defaultValStr.length());
-								WriteEngineWrapper wrapper;
-								dctnryTuple.sigSize = defaultValStr.length();
-								rc = wrapper.tokenize(txnid, dctnryStruct, dctnryTuple);
-								if (rc != NO_ERROR)
-									return rc;
-								memcpy(defaultVal, &dctnryTuple.token, size); 
-							}	
-						}
-					}
-					else //just add a extent to the file
-					{
-						rc = addExtent(column, dbroot, partition, segment,
-                         segFile, startLbid, newFile, allocSize) ;
-						if (rc != NO_ERROR)
-							return rc; //Clean up will be done throgh DDLProc
-					}
-				}
-			}
-			//Fill the new file with values
-			//Open new column file and reference column file
-			column.dataFile.fDbRoot = rootList[i];
-            column.dataFile.fPartition = newEntries[0].partitionNum;
-            column.dataFile.fSegment = newEntries[0].segmentNum;
-            RETURN_ON_ERROR(openColumnFile(column, segFile));
-			//cout << "Processing new col file " << segFile << endl;
-			refCol.dataFile.fDbRoot = rootList[i];
-			refCol.dataFile.fPartition = newEntries[0].partitionNum;
-            refCol.dataFile.fSegment = newEntries[0].segmentNum;
-            std::string segFileRef;
-            RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef));
-			//cout << "Processing ref file " << segFileRef << " and hwm is " << lastRefHwm << endl;
-			RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, lastRefHwm));
-			
-            refBufOffset = BYTE_PER_BLOCK - refCol.colWidth;
-            maxRowId = (lastRefHwm * BYTE_PER_BLOCK)/refCol.colWidth; //Local maxRowId
-			
-            while(refBufOffset > 0)
+		}
+         refColInfo.clear();
+         u_int16_t numExtentsFilled = Config::getExtentsPerSegmentFile();
+         if (i == lastPartition) //@Bug 2582 Need to know whether all segements in this partition has been filled at least one extent.
+         {
+            uint64_t totalRowPerBlock = BYTE_PER_BLOCK/refCol.colWidth;
+            uint64_t currentRows = totalRowPerBlock * (lastHwm+1); //hwm starts from 0
+
+            numExtentsFilled = (currentRows / extentRows);
+            if (currentRows%extentRows > 0)
+               numExtentsFilled++;
+
+            if (numExtentsFilled > 1)
             {
-				if (memcmp(&refColBuf[refBufOffset], &refEmptyVal, refCol.colWidth) != 0)
-                {
-                     maxRowId = maxRowId + (refBufOffset/refCol.colWidth);
-                        break;
-                }
-                refBufOffset -= refCol.colWidth;
+               totalSegments = Config::getFilesPerColumnPartition();
+               lastSegmentThisPart = totalSegments;
             }
+            else
+            {
+               totalSegments = lastSegment + 1; //Segment start from 0
+               lastSegmentThisPart = totalSegments;
+            }
+         }
+         else
+         {
+            totalSegments = Config::getFilesPerColumnPartition();
+            //the loop counter starts from 0
+            lastSegmentThisPart = totalSegments;
+         }
+         //   std::cout << "numExtentsFilled:   totalSegments:lastSegmentThisPart = " << numExtentsFilled<<":"<< totalSegments<<":"<<lastSegmentThisPart<<std::endl;
+         for (u_int16_t stripe = 0; stripe < numExtentsFilled; stripe++)
+         {
+            if ((stripe == (numExtentsFilled-1)) && (i == lastPartition))
+				lastSegmentThisPart = lastSegment+1;
 
-            //Compute local hwm for the new column
-            colHwm = (maxRowId * column.colWidth) / BYTE_PER_BLOCK;
-			//cout << " new col hwm is " << colHwm << endl;
-			currentnumExtent = (colHwm+1) * (BYTE_PER_BLOCK /column.colWidth) / extentRows;
-			startRefColFbo = 0;
-			startColFbo = 0;
-            //startRefColFbo = currentnumExtent * extentRows * refCol.colWidth / BYTE_PER_BLOCK;
-            //startColFbo = currentnumExtent * extentRows * column.colWidth / BYTE_PER_BLOCK;
-            //Initizliaing to BYTE_PER_BLOCK to force read the first time
-			refBufOffset = BYTE_PER_BLOCK;
-            colBufOffset = BYTE_PER_BLOCK;
-            dirty = false;
-			BRM::CPInfo cpInfo;
-			if (autoincrement)
-			{
-				u_int64_t nextValStart = 0;
-				while(startRefColFbo <= lastRefHwm || startColFbo <= colHwm)
-				{
-					//nexValNeeded = 0;
-					//cout << "current startRefColFbo:startColFbo:refBufOffset:colBufOffset = " << startRefColFbo <<":"<< startColFbo <<":"<<refBufOffset<<":"<<colBufOffset<< endl;
-					if ((refBufOffset + refCol.colWidth) > BYTE_PER_BLOCK)
-					{
-						//If current reference column block is fully processed get to the next one
-						//cout << "reading from ref " << endl;
-						RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, startRefColFbo));
-						startRefColFbo++;
-						refBufOffset = 0;
-						nexValNeeded = 0;
-					}
-					if ((colBufOffset + column.colWidth) > BYTE_PER_BLOCK)
-					{
-						//Current block of the new colum is full. Write it if dirty and then get the next block
-						if (dirty)
-						{
-							//cout << " writing to new col " << endl;
-							RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo-1));
-							dirty = false;
-						}
-						//cout << "reading from new col " << endl;
-						RETURN_ON_ERROR(readBlock(column.dataFile.pFile, colBuf, startColFbo));
+            for (u_int16_t j=0; j < totalSegments; j++)
+            {
+               //   std::cout << "now j:lastSegmentThisPart:stripe " << j <<":" << lastSegmentThisPart <<":" << stripe<< std::endl;
+               if ((stripe == (numExtentsFilled-1)) && (j > lastSegmentThisPart))
+                  break;
+
+               boost::scoped_ptr<ColumnOp> refColOp;
+               if (refCol.compressionType != 0)
+                  refColOp.reset(new ColumnOpCompress1);
+               else
+                  refColOp.reset(new ColumnOpCompress0);
+
+               //get correct dbroot
+               currentDBRoot = ((colStartDBRoot-1 + j) % dbrootCnt) + 1;
+               std::string segFile;
+               column.dataFile.fDbRoot = refCol.dataFile.fDbRoot = currentDBRoot;
+               column.dataFile.fPartition = refCol.dataFile.fPartition = i;
+               column.dataFile.fSegment = refCol.dataFile.fSegment = j;
+               //std::cout << "openning file i:j:fid:dbroot = " << i<<":"<<j<<":"<<column.dataFile.fid<<":"<<currentDBRoot<<std::endl;
+               RETURN_ON_ERROR(openColumnFile(column, segFile));
+
+               //std::cout << " filling partition:segment:stripe = " << i <<":" << j <<":" << stripe << std::endl;
+               std::string segFileRef;
+               RETURN_ON_ERROR(refColOp->openColumnFile(refCol, segFileRef));
+
+               //Computing the highest row-id in the reference column
+               //1. maxRowId is initialized to the row-id corresponding to last row in (hwm-1) block
+               //2. The hwm block is read and highest row-id is incremented to the last non-empty value in the hwm block
+
+               rc = BRMWrapper::getInstance()->getLocalHWM_int((OID)refCol.dataFile.fid,i, j, refHwm);
+               RefcolInfo refcolinfo;
+               if (refHwm > 0) {
+                  //maxRowId = (refHwm * BYTE_PER_BLOCK)/refCol.colWidth;
+                  refcolinfo.localHwm = refHwm;
+                  refcolinfo.numExtents = ((refHwm + 1) * (BYTE_PER_BLOCK /refCol.colWidth) / extentRows);
+                  refColInfo.push_back(refcolinfo);
+               }
+               else
+               {
+                  //@Bug 1762.
+                  refcolinfo.numExtents = 0;
+               }
+
+               rc = BRMWrapper::getInstance()->getLocalHWM_int((OID)column.dataFile.fid,i, j, colHwm);
+               currentnumExtent = (colHwm+1) * (BYTE_PER_BLOCK /column.colWidth) / extentRows;
+               //std::cout <<"here" << std::endl;
+
+               // If we are processing the first extent in the first segment
+               // file, we check to see if we have enough rows (256K) to re-
+               // quire expanding the initial abbrev extent for the new column.
+               if ((stripe == 0) &&
+                   (i      == 0) &&
+                   (j      == 0))
+               {
+			   //@Bug3565 use ref colwidth to calculate.
+                  int numBlksForFirstExtent =
+                     (INITIAL_EXTENT_ROWS_TO_DISK/BYTE_PER_BLOCK) * refCol.colWidth;
+                  if ((refHwm+1) > numBlksForFirstExtent)
+                  {
+                     column.dataFile.fDbRoot = currentDBRoot;
+                     RETURN_ON_ERROR(expandAbbrevExtent(column));
+                  }
+               }
+
+               if (currentnumExtent < refcolinfo.numExtents)
+               {
+                  //Fill this extent with default or null value
+                  startRefColFbo = currentnumExtent * extentRows * refCol.colWidth / BYTE_PER_BLOCK;
+                  startColFbo = currentnumExtent * extentRows * column.colWidth / BYTE_PER_BLOCK;
+                  endRefColFbo = (currentnumExtent+1) * extentRows * refCol.colWidth / BYTE_PER_BLOCK;
+                  endColFbo = (currentnumExtent+1) * extentRows * column.colWidth / BYTE_PER_BLOCK;
+                  //Initizliaing to BYTE_PER_BLOCK to force read the first time
+                  refBufOffset = BYTE_PER_BLOCK;
+                  colBufOffset = BYTE_PER_BLOCK;
+                  dirty = false;
+                  while(startRefColFbo < endRefColFbo || startColFbo < endColFbo)
+                  {
+                     if ((refBufOffset + refCol.colWidth) > BYTE_PER_BLOCK)
+                     {
+                        //If current reference column block is fully processed get to the next one
+                        RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, startRefColFbo));
+                        startRefColFbo++;
+                        refBufOffset = 0;
+                     }
+                     if ((colBufOffset + column.colWidth) > BYTE_PER_BLOCK)
+                     {
+                        //Current block of the new colum is full. Write it if dirty and then get the next block
+                        if (dirty)
+                        {
+                           RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo - 1));
+                           dirty = false;
+                        }
+                        RETURN_ON_ERROR(readBlock(column.dataFile.pFile, colBuf, startColFbo));
                         startColFbo++;
                         colBufOffset = 0;
-					}
-					if (nexValNeeded == 0)
-					{
-						int tmpBufOffset = 0;
-						while((tmpBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK)
-                           
-						{
-							if (memcmp(refColBuf + tmpBufOffset, &refEmptyVal, refCol.colWidth) != 0) //Find the number of nextVal needed.
-							{
-								nexValNeeded++;
-							//memcpy(colBuf + colBufOffset, defaultVal, column.colWidth);
-							//dirty = true;
-							}
-						
-							tmpBufOffset += refCol.colWidth;
-						}
-			
-						//reserve the next value, should have a AI sequence in controller from DDLProc
-						if (nexValNeeded > 0)
-						{
-							rc = BRMWrapper::getInstance()->getAutoIncrementRange(column.dataFile.fid, nexValNeeded, nextVal, errorMsg);
-							if (rc != NO_ERROR)
-								return rc;
-						}
-						nextValStart = nextVal;
-					}
-					//write the values to column
-					
-					
-					//colBufOffset = 0; @Bug 5436. Need to handle the new column width is different from reference column
-					while(((refBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK) &&
-                           ((colBufOffset + column.colWidth) <= BYTE_PER_BLOCK))
-					{
-						if (memcmp(refColBuf + refBufOffset, &refEmptyVal, refCol.colWidth) != 0) //Find the number of nextVal needed.
-						{
-							memcpy(defaultVal, &nextVal, 8);
-							nextVal++;
-							memcpy(colBuf + colBufOffset, defaultVal, column.colWidth);
-							dirty = true;
-						}
-						
-						refBufOffset += refCol.colWidth;
-						colBufOffset += column.colWidth;
-					}
-				}			
-				
-				cpInfo.max = nextValStart + nexValNeeded -1;
-				cpInfo.min = nextValStart;
-				cpInfo.seqNum = 0;		
-				
-			}
-			else
-			{
-				while(startRefColFbo <= lastRefHwm || startColFbo <= colHwm)
-				{
-					if ((refBufOffset + refCol.colWidth) > BYTE_PER_BLOCK)
-					{
-                    //If current reference column block is fully processed get to the next one
-                    RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, startRefColFbo));
-                    startRefColFbo++;
-                    refBufOffset = 0;
-					}
-					if ((colBufOffset + column.colWidth) > BYTE_PER_BLOCK)
-					{
-						//Current block of the new colum is full. Write it if dirty and then get the next block
-						if (dirty)
-						{
-							RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo-1));
-							dirty = false;
-						}
-						RETURN_ON_ERROR(readBlock(column.dataFile.pFile, colBuf, startColFbo));
-                        startColFbo++;
-                        colBufOffset = 0;
-					}
+                     }
 
-					while(((refBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK) &&
+                     while(((refBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK) &&
                            ((colBufOffset + column.colWidth) <= BYTE_PER_BLOCK))
-					{
-						if (memcmp(refColBuf + refBufOffset, &refEmptyVal, refCol.colWidth) != 0)
-						{
-                           /*if (autoincrement)
+                     {
+                        if (memcmp(refColBuf + refBufOffset, &refEmptyVal, refCol.colWidth) != 0)
+                        {
+                           //printf("setting dirty to ture");
+						   if (autoincrement)
 						   {
 								memcpy(defaultVal, &nextVal, 8);
 								nextVal++;
-						   } */
-							memcpy(colBuf + colBufOffset, defaultVal, column.colWidth);
+						   }
+						   
+						   memcpy(colBuf + colBufOffset, defaultVal, column.colWidth);
+                           dirty = true;
+
+                        }
+						else if (column.compressionType !=0)
+						{
+							memcpy(colBuf + colBufOffset, &emptyVal, column.colWidth);
 							dirty = true;
 						}
+						
+                        refBufOffset += refCol.colWidth;
+                        colBufOffset += column.colWidth;
+                     }
+                  }
+                  //Compute hwm for the new column
+                  if (colHwm == 0)
+                     colHwm += ((extentRows * column.colWidth) / BYTE_PER_BLOCK)-1;
+                  else
+                     colHwm += ((extentRows * column.colWidth) / BYTE_PER_BLOCK);
+
+                  //std::cout << "Before hwm" << std::endl;
+                  rc = BRMWrapper::getInstance()->setLocalHWM_int((OID)column.dataFile.fid,i,j,colHwm);
+                  //std::cout << "After hwm" << std::endl;
+                  if ((i != lastPartition) || (j !=  lastSegment) || stripe != (numExtentsFilled-1))
+                  {
+                     //extend the column
+                     //std::cout<<"extending column" <<std::endl;
+					 if ((stripe == (numExtentsFilled-1)) && (j == lastSegmentThisPart-1)) { }
+					 else {
+						u_int16_t   dbRoot1;
+						u_int32_t   partition1 = i;
+						u_int16_t   segment1;
+						FILE*       pFile1 = NULL;
+						std::string segFile1;
+						HWM         hwm;
+						bool        newFile;
+						BRM::LBID_t startLbid;
+						int		 allocSize = 0;
+						RETURN_ON_ERROR(extendColumn(column, false, pFile1,
+                                                  dbRoot1, partition1, segment1,
+                                                  segFile1, hwm, startLbid, newFile, allocSize)) ;
+
+						//@Bug 2636, 3257 Check if need to create store file
+						if ((dictOid > 0) && newFile )
+						{
+							BRM::LBID_t startLbid;
+							RETURN_ON_ERROR(dctnry->createDctnry(dictOid, dictColWidth,
+                                                             dbRoot1, partition1, segment1, startLbid, newFile));
+						}
+					 }
+                  }
+               }
+               else
+               {
+                  //std::cout <<"in else" << std::endl;
+                  //Fill until last row.
+                  RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, refHwm));
+                  refBufOffset = BYTE_PER_BLOCK - refCol.colWidth;
+                  maxRowId = (refHwm * BYTE_PER_BLOCK)/refCol.colWidth; //Local maxRowId
+                  while(refBufOffset > 0)
+                  {
+                     if (memcmp(&refColBuf[refBufOffset], &refEmptyVal, refCol.colWidth) != 0)
+                     {
+                        maxRowId = maxRowId + (refBufOffset/refCol.colWidth);
+                        break;
+                     }
+                     refBufOffset -= refCol.colWidth;
+                  }
+
+                  //Compute local hwm for the new column
+                  colHwm = (maxRowId * column.colWidth) / BYTE_PER_BLOCK;
+                  startRefColFbo = currentnumExtent * extentRows * refCol.colWidth / BYTE_PER_BLOCK;
+                  startColFbo = currentnumExtent * extentRows * column.colWidth / BYTE_PER_BLOCK;
+                  //Initizliaing to BYTE_PER_BLOCK to force read the first time
+                  refBufOffset = BYTE_PER_BLOCK;
+                  colBufOffset = BYTE_PER_BLOCK;
+                  dirty = false;
+                  while(startRefColFbo <= refHwm || startColFbo <= colHwm)
+                  {
+                     if ((refBufOffset + refCol.colWidth) > BYTE_PER_BLOCK)
+                     {
+                        //If current reference column block is fully processed get to the next one
+                        RETURN_ON_ERROR(refColOp->readBlock(refCol.dataFile.pFile, refColBuf, startRefColFbo));
+                        startRefColFbo++;
+                        refBufOffset = 0;
+                     }
+                     if ((colBufOffset + column.colWidth) > BYTE_PER_BLOCK)
+                     {
+                        //Current block of the new colum is full. Write it if dirty and then get the next block
+                        if (dirty)
+                        {
+                           RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo-1));
+                           dirty = false;
+                        }
+                        RETURN_ON_ERROR(readBlock(column.dataFile.pFile, colBuf, startColFbo));
+                        startColFbo++;
+                        colBufOffset = 0;
+                     }
+
+                     while(((refBufOffset + refCol.colWidth) <= BYTE_PER_BLOCK) &&
+                           ((colBufOffset + column.colWidth) <= BYTE_PER_BLOCK))
+                     {
+                        if (memcmp(refColBuf + refBufOffset, &refEmptyVal, refCol.colWidth) != 0)
+                        {
+                           if (autoincrement)
+						   {
+								memcpy(defaultVal, &nextVal, 8);
+								nextVal++;
+						   }
+						   memcpy(colBuf + colBufOffset, defaultVal, column.colWidth);
+                           dirty = true;
+                        }
 						else if (column.compressionType !=0) //@Bug 3866, fill the empty row value for compressed chunk
 						{
 							memcpy(colBuf + colBufOffset, &emptyVal, column.colWidth);
 							dirty = true;
 						}
-						refBufOffset += refCol.colWidth;
-						colBufOffset += column.colWidth;
-					}
-				}
-				cpInfo.max = numeric_limits<int64_t>::min();
-				cpInfo.min = numeric_limits<int64_t>::max();
-				cpInfo.seqNum = -1;
-            }
-            
-			if (dirty)
-            {
-                RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo - 1));
-                dirty = false;
-            }
+                        refBufOffset += refCol.colWidth;
+                        colBufOffset += column.colWidth;
+                     }
+                  }
+                  rc = BRMWrapper::getInstance()->setLocalHWM_int((OID)column.dataFile.fid,i,j,colHwm);
 
-            closeColumnFile(column);
-            refColOp->closeColumnFile(refCol);
-			std::map<FID,FID> oids;
-            rc = flushFile(rc, oids);
-			
-			//Mark extents invalid first
-			BRM::LBID_t    startLbid;
-			rc = BRMWrapper::getInstance()->getStartLbid(column.dataFile.fid, column.dataFile.fPartition, column.dataFile.fSegment, colHwm, startLbid);
-			if (autoincrement) //@Bug 4074. Mark it invalid first to set later
-			{
-				BRM::CPInfo cpInfo1;
-				cpInfo1.max = numeric_limits<int64_t>::min();
-				cpInfo1.min = numeric_limits<int64_t>::max();
-				cpInfo1.seqNum = -1;
-				cpInfo1.firstLbid = startLbid;
-				BRM::CPInfoList_t cpinfoList1;
-				cpinfoList1.push_back(cpInfo1);
-				rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList1);
-				if ( rc != NO_ERROR)
-					return rc;
-			}
-			
-			BRM::CPInfoList_t cpinfoList;
-			cpInfo.firstLbid = startLbid;
-			cpinfoList.push_back(cpInfo);
-			//cout << "calling setExtentsMaxMin for startLbid = " << startLbid << endl;
-			rc = BRMWrapper::getInstance()->setExtentsMaxMin(cpinfoList);
-			if ( rc != NO_ERROR)
-				return rc;
-				
-			//cout << "calling setLocalHWM for oid:hwm = " << column.dataFile.fid <<":"<<colHwm << endl;
-            rc = BRMWrapper::getInstance()->setLocalHWM((OID)column.dataFile.fid,column.dataFile.fPartition,
-				column.dataFile.fSegment,colHwm);	 
-			if ( rc != NO_ERROR)
-				return rc;
-			//erase the entries from this dbroot.
-			std::vector<struct BRM::EMEntry> refEntriesTrimed;
-			for (uint m=0; m<refEntries.size(); m++)
-			{
-				if ((refEntries[0].partitionNum != refEntries[m].partitionNum) || (refEntries[0].segmentNum != refEntries[m].segmentNum))
-					refEntriesTrimed.push_back(refEntries[m]);
-			}
-			refEntriesTrimed.swap(refEntries);
-			iter = refEntries.begin();
-		}
-	}
-	
-    return rc;
-}
+                  //not extendColumn if it is last partition and last segment file
+                  if ((i != lastPartition) || (j !=  lastSegment) || (stripe != numExtentsFilled-1))
+                  {
+					 if ( lastSegmentThisPart != j ) {
+						//extend the column
+						u_int16_t   dbRoot1;
+						u_int32_t   partition1 = i;
+						u_int16_t   segment1;
+						FILE*       pFile1 = NULL;
+						std::string segFile1;
+						HWM         hwm;
+						bool        newFile;
+						BRM::LBID_t startLbid;
+						int		   allocSize = 0;
+						RETURN_ON_ERROR(extendColumn(column, false, pFile1,
+                                                  dbRoot1, partition1, segment1,
+                                                  segFile1, hwm, startLbid, newFile, allocSize));
+						//@Bug 2636,3257 Check if need to create store file
+						if ((dictOid > 0) && newFile )
+						{
+							BRM::LBID_t startLbid;
+							RETURN_ON_ERROR(dctnry->createDctnry(dictOid, dictColWidth,
+                                                             dbRoot1, partition1, segment1, startLbid, newFile));
+						}
+					}
+                  }
+               }
+
+               if (dirty)
+               {
+                  RETURN_ON_ERROR(saveBlock(column.dataFile.pFile, colBuf, startColFbo - 1));
+                  dirty = false;
+               }
+
+               closeColumnFile(column);
+               refColOp->closeColumnFile(refCol);
+			   std::map<FID,FID> oids;
+               rc = flushFile(rc, oids);
+            }
+         }
+      }
+
+      return rc;
+   }
 
    /***********************************************************
     * DESCRIPTION:
@@ -956,12 +803,11 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 		return deleteFiles(dataFids);
    }
 
-	int ColumnOp::dropPartitions(const std::vector<OID>& dataFids, 
-	                             const std::vector<BRM::PartitionInfo>& partitions)
-	{
-		return deletePartitions(dataFids, partitions);
-	}
-
+   int ColumnOp::dropPartition(const std::vector<int32_t>& dataFids, const uint32_t partition)
+   {
+		return deletePartition(dataFids, partition);
+   }
+   
    int ColumnOp::deleteOIDsFromExtentMap(const std::vector<int32_t>& dataFids)
    {
 		int rc = 0;
@@ -969,136 +815,62 @@ int ColumnOp::fillColumn(const TxnID& txnid, Column& column, Column& refCol, voi
 		return rc;
    }
    
-/**************************************************************
- * DESCRIPTION:
- *    Add an extent to the specified column OID and DBRoot.
- *    Partition and segment number (and HWM) of the segment file containing
- *    the new extent are returned.
- * PARAMETERS:
- *    column    - input column attributes like OID and column width.
- *    leaveFileOpen - indicates whether db file is to be left open upon return
- *    firstFileOnPM - If first file on a PM, then first empty chunk is
- *        written out (if compressed), to give us a startup file on this PM,
- *        much like MySQL "create table" creates the very "first" file on a
- *        selected PM.
- *    hwm       - The HWM (or fbo) of the column segment file where the
- *                new extent begins.
- *    startLbid - The starting LBID for the new extent.
- *    allocSize - Number of blocks in new extent.
- *    dbRoot    - The DBRoot of the file with the new extent.
- *    partition - The partition num of the file with the new extent.
- *    segment   - The segment number of the file with the new extent.
- *    segFile   - Name of the segment file to which the extent is added.
- *    pFile     - FILE ptr to the file where the extent is added.
- *    newFile   - Indicates if extent is added to new or existing file.
- *    hdrs      - Contents of headers if file is compressed.
- * RETURN:
- *    NO_ERROR if success
- *    other number if fail
- **************************************************************/
-int ColumnOp::extendColumn(
-    const Column& column,
-    bool         leaveFileOpen,
-    bool         firstFileOnPM,
-    HWM          hwm,
-    BRM::LBID_t  startLbid,
-    int          allocSize,
-    uint16_t     dbRoot,
-    uint32_t     partition,
-    uint16_t     segment,
-    std::string& segFile,
-    FILE*&       pFile,
-    bool&        newFile,
-    char*        hdrs)
-{
-    i64 emptyVal = 0;
+   /***********************************************************
+    * DESCRIPTION:
+    *    Add an extent to the specified column OID.  The specific DBRoot,
+    *    partition, and segment number (and HWM) of the segment file containing
+    *    the new extent are returned.
+    * PARAMETERS:
+    *    column    - input column attributes like OID and column width.
+    *    isbulkload- indicates if this is a bulkload job or not.
+    *    pFile     - FILE ptr to the file where the extent is added.
+    *    dbRoot    - The DBRoot of the file with the new extent.
+    *    partition - The partition num of the file with the new extent.
+    *    segment   - The segment number of the file with the new extent.
+    *    segFile   - Name of the segment file to which the extent is added.
+    *    hwm       - The HWM (or fbo) of the column segment file where the
+    *                new extent begins.
+    *    startLbid - The starting LBID for the new extent.
+    *    newFile   - Indicates if extent is added to new or existing file.
+    *    hdrs      - Contents of headers if file is compressed.
+    * RETURN:
+    *    NO_ERROR if success
+    *    other number if fail
+    ***********************************************************/
+   int ColumnOp::extendColumn(
+      const Column& column,
+      bool         isbulkload,
+      FILE*&       pFile,
+      uint16_t&    dbRoot,
+      uint32_t&    partition,
+      uint16_t&    segment,
+      std::string& segFile,
+      HWM&         hwm,
+      BRM::LBID_t& startLbid,
+	  bool&        newFile,
+	  int&		   allocSize,
+      char*        hdrs)
+   {
+      i64 emptyVal = 0;
+      //int allocSize;
 
-    emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
-    int rc = extendFile(column.dataFile.fid,
-                        emptyVal,
-                        column.colWidth,
-                        hwm,
-                        startLbid,
-                        allocSize,
-                        dbRoot,
-                        partition,
-                        segment,
-                        segFile,
-                        pFile,
-                        newFile,
-                        hdrs);
-    if (rc != NO_ERROR)
-    {
-        if ((!leaveFileOpen) && (pFile))
-            closeFile( pFile );
-        return rc;
-    }
-
-    // If application code specifies this is the first file for this PM, then
-    // we write out an empty chunk to initialize the "startup" file on each PM.
-    if (firstFileOnPM)
-    {
-        // DMC_TEMP
-        // If firstFileOnPM is true, then newFile should have been set to true
-        // by extendFile().  We might add validation for this at some point.
-        if ((newFile) && (m_compressionType))
-        {
-            int nRows = compress::IDBCompressInterface::UNCOMPRESSED_INBUF_LEN /
-                column.colWidth;
-            if (hdrs)
-            {
-                rc = writeInitialCompColumnChunk( pFile,
-                    allocSize, nRows, emptyVal, column.colWidth, hdrs );
-            }
-            else
-            {
-                char localHdrs[compress::IDBCompressInterface::HDR_BUF_LEN*2];
-                rc = writeInitialCompColumnChunk( pFile,
-                    allocSize, nRows, emptyVal, column.colWidth, localHdrs );
-            }
-        }
-
-        // Only close file for DML/DDL; leave file open for bulkload
-        if (!leaveFileOpen)
-            closeFile( pFile );
-    }
-    else
-    {
-        // Only close file for DML/DDL; leave file open for bulkload
-        if (!leaveFileOpen)
-            closeFile( pFile );
-    }
-
-    return rc;
-}
-
-int ColumnOp::addExtent(
-    const Column& column,
-    uint16_t    dbRoot,
-    uint32_t    partition,
-    uint16_t    segment,
-    std::string& segFile,
-    BRM::LBID_t& startLbid,
-    bool&        newFile,
-    int&         allocSize,
-    char*        hdrs)
-{
-    i64 emptyVal = 0;
-
-    emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
-    int rc = addExtentExactFile(column.dataFile.fid,
-                        emptyVal,
-                        column.colWidth,
-                        allocSize,
-                        dbRoot,
-                        partition,
-                        segment,
-                        segFile,
-                        startLbid,
-                        newFile,
-                        hdrs);
-    return rc;
-}
+      emptyVal = getEmptyRowValue(column.colDataType, column.colWidth);
+	  int rc = extendFile(column.dataFile.fid,
+                         emptyVal,
+                         column.colWidth,
+                         isbulkload,
+                         allocSize,
+                         pFile,
+                         dbRoot,
+                         partition,
+                         segment,
+                         segFile,
+                         hwm,
+                         startLbid,
+                         newFile,
+                         hdrs);
+	 return rc;
+   }
 
    /***********************************************************
     * DESCRIPTION:
@@ -1220,23 +992,7 @@ int ColumnOp::addExtent(
          "r+b", ioBuffSize);
       segFile = column.dataFile.fSegFileName;
       if (column.dataFile.pFile == NULL)
-	  {
-		ostringstream oss;
-		oss << "oid: " << column.dataFile.fid << " with path " << segFile;
-		logging::Message::Args args;
-		logging::Message message(1);
-		args.add("Error opening file ");
-		args.add(oss.str());
-		args.add("");
-		args.add("");
-		message.format(args);
-		logging::LoggingID lid(21);
-        logging::MessageLog ml(lid);
-
-        ml.logErrorMessage( message );
          return ERR_FILE_OPEN;
-		 
-	}
 
       // open column bitmap file
 /*      column.bitmapFile.pFile = openFile(column.bitmapFile.fid);

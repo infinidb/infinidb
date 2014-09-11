@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: vss.h 1928 2013-06-30 21:20:52Z wweeks $
+ * $Id: vss.h 1746 2012-11-05 20:46:10Z pleblanc $
  *
  *****************************************************************************/
 
@@ -39,16 +39,6 @@
 #include "mastersegmenttable.h"
 #include "shmkeys.h"
 
-#ifdef NONE
-#undef NONE
-#endif
-#ifdef READ
-#undef READ
-#endif
-#ifdef WRITE
-#undef WRITE
-#endif
-
 // These config parameters need to be loaded
 
 //will get a small hash function performance boost by using powers of 2
@@ -64,7 +54,7 @@
 	
 #define VSS_INCREMENT (VSSTABLE_INCREMENT + VSSSTORAGE_INCREMENT)
 
-#if defined(_MSC_VER) && defined(xxxVSS_DLLEXPORT)
+#if defined(_MSC_VER) && defined(VSS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -105,7 +95,7 @@ public:
 #ifndef NDBUG
 		{ fVSS.grow(key, size); }
 #else
-		{ int rc=fVSS.grow(key, size); idbassert(rc==0); }
+		{ int rc=fVSS.grow(key, size); assert(rc==0); }
 #endif
 	inline void makeReadOnly() { fVSS.setReadOnly(); }
 	inline void clear(unsigned key, off_t size) { fVSS.clear(key, size); }
@@ -173,7 +163,7 @@ class VSS : public Undoable {
 		EXPORT ~VSS();
  		
 		EXPORT bool isLocked(const LBIDRange& l, VER_t txnID = -1) const;
-		EXPORT void removeEntry(LBID_t lbid, VER_t verID, std::vector<LBID_t> *flushList);
+		EXPORT void removeEntry(LBID_t lbid, VER_t verID);
 		
 		// Note, the use_vbbm switch should be used for unit testing the VSS only
 		EXPORT void removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm = true);
@@ -207,7 +197,7 @@ class VSS : public Undoable {
 		EXPORT int getShmid() const;
 #endif
 
-		EXPORT bool isEmpty(bool doLock = true);
+		EXPORT bool isEmpty(bool doLock = true); 
 		
 		/* Bug 2293.  VBBM will use this fcn to determine whether a block is 
 		 * currently in use. */
@@ -222,7 +212,7 @@ class VSS : public Undoable {
 		int *hashBuckets;
 		VSSEntry *storage;
 		bool r_only;
-		static boost::mutex mutex; // @bug5355 - made mutex static
+		boost::mutex mutex;
 
 		key_t currentVSSShmkey;
 		int vssShmid;

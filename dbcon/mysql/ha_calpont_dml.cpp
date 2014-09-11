@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_dml.cpp 8792 2012-08-07 18:34:27Z chao $
+ * $Id: ha_calpont_dml.cpp 8790 2012-08-07 18:32:22Z chao $
  */
 
 #include <string>
@@ -69,8 +69,6 @@ using namespace config;
 using namespace joblist;
 //#include "stopwatch.h"
 //using namespace logging;
-
-#include "dbrm.h"
 
 namespace
 {
@@ -262,22 +260,13 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 		pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(cmdStmt);
 	}
 	
-	pDMLPackage->setTableOid (ci.tableOid);
-	if (!ci.singleInsert)
-	{
-		pDMLPackage->set_isBatchInsert(true);
-	}
-		
-	if (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))	
-		pDMLPackage->set_isAutocommitOn(true);
-			
     ByteStream bytestream;
     bytestream << static_cast<u_int32_t>(sessionID);
     
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
-	idbassert( ci.dmlProc );
+	assert( ci.dmlProc );
 	
     ByteStream::byte b = 0;
 	string errormsg;
@@ -324,7 +313,6 @@ int ProcessCommandStatement(THD *thd, string& dmlStatement, cal_connection_info&
 		thd->killed = THD::KILL_QUERY;
 		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,  errormsg.c_str());
 	}
-
     return rc;
 }
 
@@ -370,16 +358,8 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 			pDMLPackage->set_Logending( true );
 		}
 		
-		if ( !ci.singleInsert )
-		{
-			pDMLPackage->set_isBatchInsert( true );
-		}
-		pDMLPackage->setTableOid (ci.tableOid);
 		if (lastBatch)
-		{
 			pDMLPackage->set_Logending( true );
-			
-		}
 		
 		if (lastBatch && (ci.rowsHaveInserted>0))
 			pDMLPackage->set_Logging( false );
@@ -391,24 +371,13 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		
 		if (thd->lex->sql_command == SQLCOM_INSERT_SELECT)
 			pDMLPackage->set_isInsertSelect(true);
-			
-		//Carry session autocommit info in the pkg to use in DMLProc
-		//cout << "Thread options = "  << thd->options << " and  OPTION_NOT_AUTOCOMMIT:OPTION_BEGIN = " << OPTION_NOT_AUTOCOMMIT << ":" << OPTION_BEGIN << endl;
-		if (!(thd->options & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))	
-		{
-			//cout << "autocommit is on" << endl;
-			pDMLPackage->set_isAutocommitOn(true);
-		}
-		else
-		{
-			//cout << "autocommit is off" << endl;
-		}
-		ByteStream bytestream, bytestreamRcv;
+
+		ByteStream bytestream;
 		bytestream << sessionID;
    
 		pDMLPackage->write(bytestream);
 		delete pDMLPackage;
-		idbassert( ci.dmlProc );
+		assert( ci.dmlProc );
 		
 		ByteStream::byte b = 0;
 		string errormsg;
@@ -416,89 +385,27 @@ int doProcessInsertValues ( TABLE* table, uint32_t size, cal_connection_info& ci
 		try
 		{
 			ci.dmlProc->write(bytestream);
-			bytestreamRcv = ci.dmlProc->read();
-			if ( bytestreamRcv.length() == 0 )
+			bytestream = ci.dmlProc->read();
+			if ( bytestream.length() == 0 )
 			{	
-				//check if it is first batch and DMLProc restarted. Only this case, get a new client and resend
-				if (ci.rowsHaveInserted == 0)
-				{
-					delete ci.dmlProc;
-					ci.dmlProc = new MessageQueueClient("DMLProc");
-					try
-					{
-						ci.dmlProc->write(bytestream);
-						bytestreamRcv = ci.dmlProc->read();
-						if ( bytestreamRcv.length() == 0 )
-						{	
-							rc = -1;
-							b=1;
-							errormsg = "Lost connection to DMLProc";
-						}
-						else
-						{
-							bytestreamRcv >> b;
-							bytestreamRcv >> rows;
-							bytestreamRcv >> errormsg;
-							rc = b;
-						}
-					}
-					catch (runtime_error&)
-					{
-						rc = -1;
-						thd->main_da.can_overwrite_status = true;
-						errormsg = "Lost connection to DMLProc";
-						b = 1;
-					}
-				}
+				rc = -1;
+				b=1;
+				errormsg = "Lost connection to DMLProc";
 			}
 			else
 			{
-				bytestreamRcv >> b;
-				bytestreamRcv >> rows;
-				bytestreamRcv >> errormsg;
+				bytestream >> b;
+				bytestream >> rows;
+				bytestream >> errormsg;
 				rc = b;
 			}
 		}
 		catch (runtime_error&)
 		{
-			//check if it is first batch and DMLProc restarted. Only this case, get a new client and resend
-			if (ci.rowsHaveInserted == 0)
-			{
-				delete ci.dmlProc;
-				ci.dmlProc = new MessageQueueClient("DMLProc");
-				try
-				{
-					ci.dmlProc->write(bytestream);
-					bytestreamRcv = ci.dmlProc->read();
-					if ( bytestreamRcv.length() == 0 )
-					{	
-						rc = -1;
-						b=1;
-						errormsg = "Lost connection to DMLProc";
-					}
-					else
-					{
-						bytestreamRcv >> b;
-						bytestreamRcv >> rows;
-						bytestreamRcv >> errormsg;
-						rc = b;
-					}
-				}
-				catch (runtime_error&)
-				{
-					rc = -1;
-					thd->main_da.can_overwrite_status = true;
-					errormsg = "Lost connection to DMLProc";
-					b = 1;
-				}	
-			}
-			else //really lost connection
-			{
-				rc = -1;
-				thd->main_da.can_overwrite_status = true;
-				errormsg = "Lost connection to DMLProc";
-				b = 1;
-			}
+			rc = -1;
+			thd->main_da.can_overwrite_status = true;
+			errormsg = "Lost connection to DMLProc";
+			b = 1;
 		}
 		catch (...)
 		{
@@ -546,12 +453,10 @@ int ha_calpont_impl_write_last_batch(TABLE* table, cal_connection_info& ci, bool
 		std::string schema;
 		schema = table->s->db.str;
 		//@Bug 2715 Check the saved error code.
-		//@Bug 4516 always send the last package to allow DMLProc receive all messages from WES
 		if (( ci.rc != 0 ) || abort )
 		{
-			rc = doProcessInsertValues( table, size , ci, true);		
-			
 			//@Bug 2722 Log the statement into datamod log
+			
 			//@Bug 4605 if error, rollback and no need to check whether the session is autocommit off 
 			
 			command = "ROLLBACK";
@@ -563,7 +468,7 @@ int ha_calpont_impl_write_last_batch(TABLE* table, cal_connection_info& ci, bool
 				ci.tableValuesMap.clear();
 				ci.colNameList.clear();
 			}
-			return rc;		
+			return rc;			
 		}
 		else
 		{
@@ -698,7 +603,7 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
-	idbassert( ci.dmlProc );
+	assert( ci.dmlProc );
 	int rc = 0;
     ByteStream::byte b = 0;
 	ByteStream::octbyte rows;
@@ -748,87 +653,29 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
  
  }
  
-//------------------------------------------------------------------------------
-// Clear the table lock associated with the specified table lock id.
-// Any bulk rollback that is pending will be applied before the table
-// lock is released.
-//------------------------------------------------------------------------------
- std::string  ha_calpont_impl_cleartablelock(
-	cal_impl_if::cal_connection_info& ci,
-	uint64_t tableLockID)
+ std::string  ha_calpont_impl_cleartablelock( cal_impl_if::cal_connection_info& ci, execplan::CalpontSystemCatalog::TableName& tablename)
  {
-	execplan::CalpontSystemCatalog::TableName tblName;
-	THD *thd        = current_thd;
+	THD *thd = current_thd;
 	ulong sessionID = tid2sid(thd->thread_id);
-	std::string tableLockInfo;
-	BRM::TableLockInfo lockInfo;
-
-	// Perform preliminary setup.  CalpontDMLPackage expects schema and table
-	// name to be provided, so we get the table OID for the specified table
-	// lock, and then get the table name for the applicable table OID.
-	std::string prelimTask;
-	try
-	{
-		BRM::DBRM brm;
-		prelimTask = "getting table locks from BRM.";
-		bool getLockInfo = brm.getTableLockInfo(tableLockID, &lockInfo);
-		if (!getLockInfo)
-		{
-			tableLockInfo = "No table lock found for specified table lock ID";
-			return tableLockInfo;
-		}
-
-		boost::shared_ptr<execplan::CalpontSystemCatalog> csc =
-			execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-		csc->identity(execplan::CalpontSystemCatalog::FE);
-
-		prelimTask = "getting table name from system catalog.";
-		tblName    = csc->tableName( lockInfo.tableOID );
-	}
-	catch (std::exception& ex)
-	{
-		std::string eMsg(ex.what());
-		eMsg += " Error ";
-		eMsg += prelimTask;
-
-		thd->main_da.can_overwrite_status = true;
-
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, eMsg.c_str());
-		return tableLockInfo;
-	}
-	catch (...)
-	{
-		std::string eMsg(" Error ");
-		eMsg += prelimTask;
-
-		thd->main_da.can_overwrite_status = true;
-
-		thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, eMsg.c_str());
-		return tableLockInfo;
-	}
-
+	CalpontDMLPackage* pDMLPackage; 
 	std::string dmlStatement( "CLEARTABLELOCK" );
 	VendorDMLStatement cmdStmt(dmlStatement, DML_COMMAND, sessionID);
-	CalpontDMLPackage* pDMLPackage =
-		CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer( cmdStmt );
-	pDMLPackage->set_SchemaName(tblName.schema);
-	pDMLPackage->set_TableName (tblName.table );
-
-	// Table lock ID is passed in the SQL statement attribute
-	std::ostringstream lockIDString;
-	lockIDString << tableLockID;
-	pDMLPackage->set_SQLStatement( lockIDString.str() );
-
+	pDMLPackage = CalpontDMLFactory::makeCalpontDMLPackageFromMysqlBuffer(cmdStmt);
+	pDMLPackage->set_SchemaName (tablename.schema);
+	pDMLPackage->set_TableName (tablename.table);
     ByteStream bytestream;
     bytestream << static_cast<u_int32_t>(sessionID);
     pDMLPackage->write(bytestream);
     delete pDMLPackage;
 	
-	idbassert( ci.dmlProc );
+	assert( ci.dmlProc );
 	
+	int rc = 0;
     ByteStream::byte b = 0;
 	ByteStream::octbyte rows;
 	std::string errorMsg;
+	std::string tableLockInfo;
+	//int dmlRowCount = 0;
 
     try
     {
@@ -836,10 +683,11 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
         bytestream = ci.dmlProc->read();
 		if ( bytestream.length() == 0 )
         {
+            rc = 1;
             thd->main_da.can_overwrite_status = true;
 
-            thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-				"Lost connection to DMLProc");
+            thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc");
+
         }
 		else
 		{
@@ -852,17 +700,17 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
     }
     catch (runtime_error&)
     {
+		rc =1 ;
 		thd->main_da.can_overwrite_status = true;
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-			"Lost connection to DMLProc");
+        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Lost connection to DMLProc");
     }
     catch (...)
     {
+		rc = 1;
 		thd->main_da.can_overwrite_status = true;
 
-        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR,
-			"Caught unknown error");
+        thd->main_da.set_error_status(thd, HA_ERR_INTERNAL_ERROR, "Caught unknown error");
     }
 	//@Bug 2606. Send error message back to sql session
 	if ( b != 0 )

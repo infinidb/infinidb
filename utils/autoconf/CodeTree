@@ -13,6 +13,7 @@ dbcon - most of the code for InfiniBD:
    plsql - WIP code to interface w/ Oracle
    sm - an abstraction layer for interfacing with ExeMgr
 ddlproc - main service loop for DDL
+dmlib - an abstraction layer to generate physical file names from OIDs
 dmlproc - main service loop for DML
 exemgr - main service loop for queries
 mysql - mostly header files copied from MySQL

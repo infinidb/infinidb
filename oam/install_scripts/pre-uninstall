@@ -1,62 +1,37 @@
-#!/bin/bash
+#! /bin/sh
 #
 # $Id: post-uninstall 421 2007-04-05 15:46:55Z dhill $
 #
 # Post-uninstall steps for calpont install
 
 prefix=/usr/local
-installdir=$prefix/Calpont
-rpmmode=install
-user=$USER
-if [ -z "$user" ]; then
-	user=root
-fi
-quiet=0
-
-for arg in "$@"; do
-	if [ `expr -- "$arg" : '--prefix='` -eq 9 ]; then
-		prefix="`echo $arg | awk -F= '{print $2}'`"
-		installdir=$prefix/Calpont
-	elif [ `expr -- "$arg" : '--rpmmode='` -eq 10 ]; then
-		rpmmode="`echo $arg | awk -F= '{print $2}'`"
-	elif [ `expr -- "$arg" : '--installdir='` -eq 13 ]; then
-		installdir="`echo $arg | awk -F= '{print $2}'`"
-		prefix=`dirname $installdir`
-	elif [ `expr -- "$arg" : '--user='` -eq 7 ]; then
-		user="`echo $arg | awk -F= '{print $2}'`"
-	elif [ `expr -- "$arg" : '--quiet'` -eq 7 ]; then
-		quiet=1
-	else
-		echo "post-install: ignoring unknown argument: $arg" 1>&2
-	fi
-done
-
 
 #stop services
-$installdir/bin/infinidb stop > /dev/null 2>&1
+/etc/init.d/infinidb stop > /dev/null 2>&1
 if test -f /etc/init.d/calpont-Mysql ; then
-	$installdir/myql/calpont-Mysql stop > /dev/null 2>&1
+	/etc/init.d/calpont-Mysql stop > /dev/null 2>&1
 fi
 
 # uninstall OS scripts updated by postConfigure
+DBRootStorageType=`/usr/local/Calpont/bin/getConfig -c /usr/local/Calpont/etc/Calpont.xml Installation DBRootStorageType`
+if [ "$DBRootStorageType" = "storage" ]; then
+	sed -i '/^[^#].*\/usr\/local\/Calpont\/data[^ ]/d' /etc/fstab
+fi
 if test -f /root/.bashrc.calpontSave ; then
 	mv -f /root/.bashrc.calpontSave /root/.bashrc > /dev/null 2>&1
-fi
-if test -f /etc/exports.calpontSave ; then
-	mv -f /etc/exports.calpontSave /etc/exports > /dev/null 2>&1
-else
-	rm -f /etc/exports > /dev/null 2>&1
-fi
-if test -f /etc/rc.d/rc.local.calpontSave ; then
-	mv -f /etc/rc.d/rc.local.calpontSave /etc/rc.d/rc.local > /dev/null 2>&1
 fi
 if test -f /etc/rc.local.calpontSave ; then
 	mv -f /etc/rc.local.calpontSave /etc/rc.local > /dev/null 2>&1
 fi
 
+#umount file systems
+rm -f ${prefix}/Calpont/data*/OAMdbrootCheck > /dev/null 2>&1
+umount -fl ${prefix}/Calpont/data*  > /dev/null 2>&1
+rm -f ${prefix}/Calpont/data*/OAMdbrootCheck > /dev/null 2>&1
+
 #remove log file directories
 #rm -rf /var/log/Calpont > /dev/null 2>&1
-#rm -f $installdir/mysql/db/*.err > /dev/null 2>&1
+#rm -f ${prefix}/Calpont/mysql/db/*.err > /dev/null 2>&1
 rm -f /var/log/Calpont/activeAlarms > /dev/null 2>&1
 rm -f /var/log/Calpont/*.log1 > /dev/null 2>&1
 
@@ -65,17 +40,18 @@ rm -f /etc/logrotate.d/calpont > /dev/null 2>&1
 rm -f /etc/cron.d/transactionLog > /dev/null 2>&1
 
 # delete Calpont shared memory segments
-pkill -9 ProcMon
-$installdir/bin/clearShm  > /dev/null 2>&1
+${prefix}/Calpont/bin/clearShm  > /dev/null 2>&1
 
 # delete prat files
-rm -f /etc/cron.d/ps > /dev/null 2>&1
-rm -f /etc/pscollect > /dev/null 2>&1
-/etc/init.d/crond reload  > /dev/null 2>&1
+rm -f /etc/pscollect
+if [ -f /etc/cron.d/ps ]; then
+	rm -f /etc/cron.d/ps
+	/etc/init.d/crond reload  > /dev/null 2>&1
+fi
 
 # delete tmp files
-rm -f $installdir/local/*.calpont
-rm -rf $installdir/local/etc/
+rm -f ${prefix}/Calpont/local/*.calpont
+rm -rf ${prefix}/Calpont/local/etc/
 rm -rf /tmp/bucketreuse
 rm -f /tmp/calpont.txt
 rm -f /tmp/dbbuilder.*
@@ -85,22 +61,15 @@ rm -f /tmp/pkgcheck
 rm -f /tmp/upgrade-status.log.*
 rm -f /tmp/mount.log
 rm -f /tmp/idb*
-rm -f $installdir/data/bulk/tmpjob/* >/dev/null 2>&1
+rm -f ${prefix}/Calpont/data/bulk/tmpjob/* >/dev/null 2>&1
 rm -rf /tmp/infinidb_tmp_files
-rm -f $installdir/local/moveDbrootTransactionLog
-
 
 # delete core files
-rm -f /var/log/Calpont/corefiles/* > /dev/null 2>&1
+rm -f /var/log/Calpont/corefiles/*
 
 #un-setup InfiniDB system logging
-if [ -x $installdir/bin/syslogSetup.sh ]; then
-	if [ $user = "root" ]; then
-		$installdir/bin/syslogSetup.sh uninstall >/dev/null 2>&1
-		rm -f /etc/init.d/infinidb > /dev/null 2>&1
-	else
-		sudo $installdir/bin/syslogSetup.sh uninstall >/dev/null 2>&1
-	fi
+if [ -x ${prefix}/Calpont/bin/syslogSetup.sh ]; then
+	${prefix}/Calpont/bin/syslogSetup.sh uninstall >/dev/null 2>&1
 fi
 
 if [ -x /sbin/chkconfig ]; then
@@ -109,16 +78,12 @@ if [ -x /sbin/chkconfig ]; then
 elif [ -x /usr/sbin/update-rc.d ]; then
 	/usr/sbin/update-rc.d -f infinidb remove > /dev/null 2>&1
 fi
+rm -f /etc/init.d/infinidb
 
-#make copy of Calpont.xml
-/bin/cp -f $installdir/etc/Calpont.xml $installdir/etc/Calpont.xml.rpmsave > /dev/null 2>&1
-/bin/cp -f $installdir/mysql/my.cnf $installdir/mysql/my.cnf.rpmsave > /dev/null 2>&1
-
-#umount file systems
-if [ $user = "root" ]; then
-	rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
-else
-	sudo rm -f $installdir/data*/OAMdbrootCheck > /dev/null 2>&1
+#make copy of Calpont.xml for non rpm installs
+if [ -z "$1" ]; then
+	/bin/cp -f ${prefix}/Calpont/etc/Calpont.xml ${prefix}/Calpont/etc/Calpont.xml.rpmsave > /dev/null 2>&1
+	/bin/cp -f ${prefix}/Calpont/mysql/my.cnf ${prefix}/Calpont/mysql/my.cnf.rpmsave > /dev/null 2>&1
 fi
 
 #tell user to run post configure script

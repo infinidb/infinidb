@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_char_length.cpp 3716 2013-04-18 16:35:52Z bpaul $
+* $Id: func_char_length.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -30,7 +30,6 @@ using namespace std;
 #include "functioncolumn.h"
 #include "rowgroup.h"
 #include "calpontsystemcatalog.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "dataconvert.h"
@@ -72,9 +71,9 @@ int64_t Func_char_length::getIntVal(rowgroup::Row& row,
 			if (isNull)
 				return 0;
 
-			size_t strwclen = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+			size_t strwclen = mbstowcs(0, tstr.c_str(), 0) + 1;
 			wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-			strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen);
+			strwclen = mbstowcs(wcbuf, tstr.c_str(), strwclen);
 
 			return (int64_t)strwclen;
 		}

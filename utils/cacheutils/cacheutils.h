@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: cacheutils.h 3518 2013-01-31 19:13:17Z pleblanc $
+// $Id: cacheutils.h 2794 2011-07-22 16:15:53Z chao $
 //
 /** @file */
 
@@ -47,7 +47,7 @@ namespace cacheutils
 	 * Use the config file and messaging to signal all PrimProc's to flush their caches of any of
 	 * the specified LBIDs.
 	 */
-	int flushPrimProcAllverBlocks(const std::vector<BRM::LBID_t> &list);
+	int flushPrimProcAllverBlocks(const BRM::BlockList_t& list);
 
 	/** @brief flush all versions of all lbids belonging to the given oids.
 	 *
@@ -59,7 +59,7 @@ namespace cacheutils
 	 *
 	 * Flush all versions of all lbids for the given OIDs and partition number.
 	 */
-	int flushPartition(const std::vector<BRM::OID_t> &, std::set<BRM::LogicalPartition>& partitionNum);
+	int flushPartition(const std::vector<BRM::OID_t> &, uint32_t partitionNum);
 
 	/** @brief drop file descriptor cache
 	 *

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-deliver.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: tdriver-deliver.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  ****************************************************************************/
 
@@ -530,7 +530,7 @@ void addElements(FIFO<UintRowGroup>* dl1)
 void deliveryStep_1()  //number column
 {
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 
 		ResourceManager rm;
 		dec = DistributedEngineComm::instance(rm);
@@ -566,7 +566,7 @@ void deliveryStep_1()  //number column
 void deliveryStep_2()   //string column
 {
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 
 		dec = DistributedEngineComm::instance();
 		cat = CalpontSystemCatalog::makeCalpontSystemCatalog(1);
@@ -618,7 +618,7 @@ void* addElementsThreadWrapper( void* pThreadData )
 void deliverTest(int numCols)   
 {
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ResourceManager rm;
 		dec = DistributedEngineComm::instance(rm);
 		cat = CalpontSystemCatalog::makeCalpontSystemCatalog(1);

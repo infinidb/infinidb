@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_md5.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_md5.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -436,7 +436,7 @@ void md5::Encode(uchar* dest, uint4* src, uint4 nLength)
 {
 	uint4 i, j;
 
-	idbassert(nLength % 4 == 0);
+	assert(nLength % 4 == 0);
 
 	for (i = 0, j = 0; j < nLength; i++, j += 4)
 	{
@@ -454,7 +454,7 @@ void md5::Decode(uint4* dest, uchar* src, uint4 nLength)
 {
 	uint4 i, j;
 
-	idbassert(nLength % 4 == 0);
+	assert(nLength % 4 == 0);
 
 	for (i = 0, j = 0; j < nLength; i++, j += 4)
 	{

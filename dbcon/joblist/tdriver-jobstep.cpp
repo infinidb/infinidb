@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-jobstep.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: tdriver-jobstep.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  ****************************************************************************/
 
@@ -72,7 +72,7 @@ public:
     void pColScan_1() 
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 
 		dec = DistributedEngineComm::instance(fRm);
 	// 	dec = DistributedEngineComm::instance("./config-dec.xml");
@@ -113,7 +113,7 @@ public:
 	void pColStep_1()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -161,7 +161,7 @@ public:
 	void pColStep_2() 
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -210,7 +210,7 @@ public:
 	void pColStep_as_ProjectionStep_1()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -551,7 +551,7 @@ void reduceStep_4()
 	void pnljoin_1()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int it;
 		bool more;
@@ -603,7 +603,7 @@ void reduceStep_4()
 	void pnljoin_2()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int i, it;
 		bool more;
@@ -667,7 +667,7 @@ void reduceStep_4()
 	void pnljoin_3()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		int i, it;
 		bool more;

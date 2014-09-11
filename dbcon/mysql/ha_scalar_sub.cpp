@@ -48,21 +48,23 @@ using namespace logging;
 
 namespace cal_impl_if
 {
-ScalarSub::ScalarSub(gp_walk_info& gwip) : WhereSubQuery(gwip), fReturnedColPos(0)
+ScalarSub::ScalarSub() : WhereSubQuery(), fReturnedColPos(0)
 {}
 
-ScalarSub::ScalarSub(gp_walk_info& gwip, Item_func* func) :
-	WhereSubQuery(gwip, func), fReturnedColPos(0)
+ScalarSub::ScalarSub(Item_func* func) :
+	WhereSubQuery(func), fReturnedColPos(0)
 {}
 
-ScalarSub::ScalarSub(gp_walk_info& gwip, const execplan::SRCP& column, Item_subselect* sub, Item_func* func):
-	WhereSubQuery(gwip, column, sub, func), fReturnedColPos(0)
+ScalarSub::ScalarSub(const execplan::SRCP& column, Item_subselect* sub, Item_func* func):
+	WhereSubQuery(column, sub, func), fReturnedColPos(0)
 {}
 
 ScalarSub::ScalarSub(const ScalarSub& rhs) :
-	WhereSubQuery(rhs.gwip(), rhs.fColumn, rhs.fSub, rhs.fFunc),
+	WhereSubQuery(rhs.fColumn, rhs.fSub, rhs.fFunc),
 	fReturnedColPos(rhs.fReturnedColPos)
-{}
+{
+	fGwip = rhs.gwip();
+}
 
 ScalarSub::~ScalarSub()
 {}
@@ -75,7 +77,7 @@ execplan::ParseTree* ScalarSub::transform()
 	// @todo need to handle scalar IN and BETWEEN specially
 	// this blocks handles only one subselect scalar
 	// arg[0]: column | arg[1]: subselect
-	//idbassert(fGwip.rcWorkStack.size() >= 2);
+	//assert(fGwip->rcWorkStack.size() >= 2);
 	if (fFunc->functype() == Item_func::BETWEEN)
 		return transform_between();
 	if (fFunc->functype() == Item_func::IN_FUNC)
@@ -83,15 +85,15 @@ execplan::ParseTree* ScalarSub::transform()
 	
 	ReturnedColumn* rhs = NULL;
 	ReturnedColumn* lhs = NULL;
-	if (!fGwip.rcWorkStack.empty())
+	if (!fGwip->rcWorkStack.empty())
 	{
-		rhs = fGwip.rcWorkStack.top();
-		fGwip.rcWorkStack.pop();
+		rhs = fGwip->rcWorkStack.top();
+		fGwip->rcWorkStack.pop();
 	}
-	if (!fGwip.rcWorkStack.empty())
+	if (!fGwip->rcWorkStack.empty())
 	{
-		lhs = fGwip.rcWorkStack.top();
-		fGwip.rcWorkStack.pop();
+		lhs = fGwip->rcWorkStack.top();
+		fGwip->rcWorkStack.pop();
 	}
 
 	PredicateOperator *op = new PredicateOperator(fFunc->func_name());	
@@ -128,19 +130,19 @@ execplan::ParseTree* ScalarSub::transform()
 
 execplan::ParseTree* ScalarSub::transform_between()
 {
-	//idbassert(fGwip.rcWorkStack.size() >= 3);
-	if (fGwip.rcWorkStack.size() < 3)
+	//assert(fGwip->rcWorkStack.size() >= 3);
+	if (fGwip->rcWorkStack.size() < 3)
 	{
-		fGwip.fatalParseError = true;
-		fGwip.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
+		fGwip->fatalParseError = true;
+		fGwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
 		return NULL;
 	}
-	ReturnedColumn* op3 = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();
-	ReturnedColumn* op2 = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();
-	ReturnedColumn* op1 = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();
+	ReturnedColumn* op3 = fGwip->rcWorkStack.top();
+	fGwip->rcWorkStack.pop();
+	ReturnedColumn* op2 = fGwip->rcWorkStack.top();
+	fGwip->rcWorkStack.pop();
+	ReturnedColumn* op1 = fGwip->rcWorkStack.top();
+	fGwip->rcWorkStack.pop();
 	fColumn.reset(op1);
 	
 	ParseTree* lhs = NULL;
@@ -178,9 +180,9 @@ execplan::ParseTree* ScalarSub::transform_between()
 	
 	if (!rhs || !lhs)
 	{
-		fGwip.fatalParseError = true;
-		fGwip.parseErrorText = "non-supported scalar subquery";
-		fGwip.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
+		fGwip->fatalParseError = true;
+		fGwip->parseErrorText = "non-supported scalar subquery";
+		fGwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
 		return NULL;
 	}
 	ParseTree* pt = new ParseTree (new LogicOperator("and"));
@@ -191,14 +193,14 @@ execplan::ParseTree* ScalarSub::transform_between()
 
 execplan::ParseTree* ScalarSub::transform_in()
 {
-	fGwip.fatalParseError = true;
-	fGwip.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
+	fGwip->fatalParseError = true;
+	fGwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
 	return NULL;
 }
 
 execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 {
-	idbassert(fColumn.get() && fSub && fFunc);
+	assert(fColumn.get() && fSub && fFunc);
 	
 	vector<SRCP> cols;
 	Filter *filter;
@@ -208,8 +210,8 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 		// IDB only supports (c1,c2..) =/!= (subquery)
 		if (fFunc->functype() != Item_func::EQ_FUNC && fFunc->functype() != Item_func::NE_FUNC)
 		{
-			fGwip.fatalParseError = true;
-			fGwip.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_OPERATOR_WITH_LIST);
+			fGwip->fatalParseError = true;
+			fGwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_OPERATOR_WITH_LIST);
 			return NULL;
 		}
 		cols = rcol->columnVec();
@@ -217,36 +219,28 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 	else
 		cols.push_back(fColumn);
 		
-	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);
+	SCSEP scsep;
+	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
+	csep->sessionID(fGwip->sessionid);
 	csep->location(CalpontSelectExecutionPlan::WHERE);
 	csep->subType (CalpontSelectExecutionPlan::SINGLEROW_SUBS);
 	
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fGwip.thd;
+	gwi.thd = fGwip->thd;
 	gwi.subQuery = this;
-	
-	// @4827 merge table list to gwi in case there is FROM sub to be referenced
-	// in the FROM sub
-	uint derivedTbCnt = fGwip.derivedTbList.size();
-	uint tbCnt = fGwip.tbList.size();
-
-	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
-	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
-	
-	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSub->get_select_lex()), *csep) != 0)
 	{
 		//@todo more in error handling
 		if (!gwi.fatalParseError)
 		{
-			fGwip.fatalParseError = true;
-			fGwip.parseErrorText = "Error occured in ScalarSub::transform()";
+			fGwip->fatalParseError = true;
+			fGwip->parseErrorText = "Error occured in ScalarSub::transform()";
 		}
 		else
 		{
-			fGwip.fatalParseError = gwi.fatalParseError;
-			fGwip.parseErrorText = gwi.parseErrorText;
+			fGwip->fatalParseError = gwi.fatalParseError;
+			fGwip->parseErrorText = gwi.parseErrorText;
 		}
 		return NULL;
 	}
@@ -267,31 +261,22 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 						break;
 				if (j == gwi.correlatedTbNameVec.size())
 				{
-					fGwip.fatalParseError = true;
-					fGwip.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
+					fGwip->fatalParseError = true;
+					fGwip->parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_SCALAR);
 					return NULL;
 				}
 			}
 		}
 	}
 	
-	// remove outer query tables
-	CalpontSelectExecutionPlan::TableList tblist;
-	if (csep->tableList().size() >= tbCnt)
-		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
-	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
-	
-	csep->tableList(tblist);
-	csep->derivedTableList(derivedTbList);
+	scsep.reset(csep);
 	
 	if (fSub->is_correlated)
 	{
 		SelectFilter *subFilter = new SelectFilter();
 		subFilter->correlated(true);
 		subFilter->cols(cols);
-		subFilter->sub(csep);
+		subFilter->sub(scsep);
 		subFilter->op(SOP(op));
 		subFilter->returnedColPos(fReturnedColPos);
 		filter = subFilter;
@@ -300,7 +285,7 @@ execplan::ParseTree* ScalarSub::buildParseTree(PredicateOperator* op)
 	{
 		SimpleScalarFilter *subFilter = new SimpleScalarFilter();
 		subFilter->cols(cols);
-		subFilter->sub(csep);
+		subFilter->sub(scsep);
 		subFilter->op(SOP(op));
 		filter = subFilter;
 	}

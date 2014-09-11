@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_log.h 4506 2013-02-02 00:11:15Z bpaul $
+* $Id: we_log.h 3403 2011-12-21 16:58:13Z xlou $
 *
 *******************************************************************************/
 /** @file */
@@ -52,8 +52,8 @@ const	std::string MSG_LEVEL_STR[] = {
 	"ERR ",
 	"CRIT" };
 
-/** @brief Class is used to format and write log messages to cpimport.bin log
- *  file.  When applicable, messages are also logged to syslog logs as well.
+/** @brief Class is used to format and write log messages to cpimport log file.
+ *  When applicable, messages are also logged to syslog logs as well.
  */
 class Log : public WEObj
 {
@@ -69,7 +69,7 @@ public:
     EXPORT ~Log();
 
    /**
-    * @brief Log a cpimport.bin logfile message; logs errors to syslog as well
+    * @brief Log a cpimport logfile message; logs errors to syslog as well
     */
     EXPORT void     logMsg( const char* msg, int code, MsgLevel level );
     EXPORT void     logMsg( const char* msg, MsgLevel level )
@@ -85,13 +85,6 @@ public:
     EXPORT void     setLogFileName( const char* logfile,
                                 const char* errlogfile,
                                 bool consoleFlag = true );
-
-    // BUG 5022
-    /**
-     * @brief Set log files close other than calling d'tor
-     */
-    EXPORT void 	closeLog();
-
 
 private:
     void            logSyslog ( const std::string& msg,

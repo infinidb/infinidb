@@ -15,61 +15,58 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: jobstep.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: jobstep.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 #include <iostream>
 #include <string>
 #include <boost/thread.hpp>
 using namespace std;
 
-#include "calpontsystemcatalog.h"
-#include "calpontselectexecutionplan.h"
+#include "jobstep.h"
 #include "messagelog.h"
 #include "messageids.h"
 #include "timestamp.h"
-#include "oamcache.h"
-#include "jobstep.h"
 using namespace logging;
 
 namespace joblist
 {
 boost::mutex JobStep::mutex; //=PTHREAD_MUTEX_INITIALIZER;
 
-//void JobStep::intToStr( DataList_t& inList, StringBucketDataList& outList )
-//{
-//	int it = -1;
-//	bool more;
-//	ElementType e;
-//	int64_t token;
-//	char buffer[21]; // 19 digits in a 64-bit number + sign + nul
-//	int n = 0;
-//	try{
-//		it = inList.getIterator();
-//	}catch(exception& ex) {
-//		cerr << "JobStep::intToStr: caught exception: "
-//			<< ex.what() << endl;
-//		throw;
-//	}catch(...) {
-//		cerr << "JobStep::intToStr: caught exception" << endl;
-//		throw;
-//	}
-//	
-//	more = inList.next(it, &e);
-//	while (more)
-//	{
-//		token = e.second;
-//		n = snprintf(buffer, 21,
-//#if __LP64__
-//			"%ld",
-//#else
-//			"%lld",
-//#endif
-//			token);
-//		outList.insert(StringElementType(e.first, buffer));
-//		more = inList.next(it, &e);
-//	}
-//	
-//	return;
-//}
+void JobStep::intToStr( DataList_t& inList, StringBucketDataList& outList )
+{
+	int it = -1;
+	bool more;
+	ElementType e;
+	int64_t token;
+	char buffer[21]; // 19 digits in a 64-bit number + sign + nul
+	int n = 0;
+	try{
+		it = inList.getIterator();
+	}catch(exception& ex) {
+		cerr << "JobStep::intToStr: caught exception: "
+			<< ex.what() << endl;
+		throw;
+	}catch(...) {
+		cerr << "JobStep::intToStr: caught exception" << endl;
+		throw;
+	}
+	
+	more = inList.next(it, &e);
+	while (more)
+	{
+		token = e.second;
+		n = snprintf(buffer, 21,
+#if __LP64__
+			"%ld",
+#else
+			"%lld",
+#endif
+			token);
+		outList.insert(StringElementType(e.first, buffer));
+		more = inList.next(it, &e);
+	}
+	
+	return;
+}
 	
 ostream& operator<<(ostream& os, const JobStep* rhs)
 {
@@ -179,9 +176,3 @@ void JobStep::abort()
 {
 	die = true;
 }
-
-bool JobStep::traceOn() const
-{
-	return fTraceFlags & execplan::CalpontSelectExecutionPlan::TRACE_LOG;
-}
-

@@ -7,14 +7,14 @@ OutFile InfiniDB64-ent.exe
 
 !define DISPLAY_URL http://www.calpont.com/
 
-!define DISPLAY_VERSION 3.5.3
-VIAddVersionKey "FileVersion" "3.5.3-1 GA"
-VIProductVersion "3.5.3.0"
+!define DISPLAY_VERSION 2.2
+VIAddVersionKey "FileVersion" "2.2.0-0"
+VIProductVersion "2.2.0.0"
 
-VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} GA"
+VIAddVersionKey "ProductVersion" "${DISPLAY_VERSION} Beta"
 VIAddVersionKey "CompanyName" "Calpont Corp."
 VIAddVersionKey "FileDescription" "Calpont InfiniDB Enterprise Windows 64-bit Installer"
-VIAddVersionKey "LegalCopyright" "Copyright (c) 2010-2013"
+VIAddVersionKey "LegalCopyright" "Copyright (c) 2010, 2011"
 VIAddVersionKey "ProductName" "InfiniDB"
 
 XPStyle on
@@ -71,9 +71,8 @@ File C:\InfiniDB\x64\EnterpriseRelease\editem.exe
 File C:\InfiniDB\x64\EnterpriseRelease\ExeMgr.exe
 File C:\InfiniDB\x64\EnterpriseRelease\load_brm.exe
 File C:\InfiniDB\x64\EnterpriseRelease\oid2file.exe
-File C:\InfiniDB\x64\EnterpriseRelease\WriteEngineServer.exe
-File C:\InfiniDB\x64\EnterpriseRelease\DecomSvr.exe
 File C:\InfiniDB\x64\EnterpriseRelease\PrimProc.exe
+File C:\InfiniDB\x64\EnterpriseRelease\DecomSvr.exe
 File C:\InfiniDB\x64\EnterpriseRelease\save_brm.exe
 File C:\InfiniDB\x64\EnterpriseRelease\viewtablelock.exe
 File C:\InfiniDB\x64\EnterpriseRelease\winfinidb.exe
@@ -104,13 +103,14 @@ File C:\InfiniDB\mysql-5.1.39\client\Release\mysqltest.exe
 File C:\InfiniDB\mysql-5.1.39\storage\archive\Release\ha_archive.dll
 File C:\InfiniDB\mysql-5.1.39\storage\federated\Release\ha_federated.dll
 File C:\InfiniDB\mysql-5.1.39\storage\innodb_plugin\Release\ha_innodb_plugin.dll
-File C:\InfiniDB\mysql-5.1.39\libmysql\Release\libmysql.dll
 
+File C:\InfiniDB\x64\EnterpriseRelease\libbrm.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libcalmysql.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libconfigcpp.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libddlpackageproc.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libdmlpackageproc.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libjoblist.dll
+File C:\InfiniDB\x64\EnterpriseRelease\liboamcpp.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libwriteengine.dll
 File C:\InfiniDB\x64\EnterpriseRelease\libudfsdk.dll
 File C:\InfiniDB\libxml2-2.7.6\libxml2.dll
@@ -175,9 +175,6 @@ File /r C:\InfiniDB\mysql-5.1.39\sql\share\ukrainian
 SetOutPath $INSTDIR\tmp
 SetOutPath $INSTDIR\sql
 File C:\InfiniDB\src\dbcon\mysql\dumpcat_mysql.sql
-File C:\InfiniDB\src\dbcon\mysql\calsetuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calremoveuserpriority.sql
-File C:\InfiniDB\src\dbcon\mysql\calshowprocesslist.sql
 
 WriteRegStr HKLM Software\Calpont\InfiniDB "" $INSTDIR
 WriteRegStr HKLM Software\Calpont\InfiniDB "CalpontHome" $INSTDIR\etc
@@ -266,11 +263,13 @@ Delete $INSTDIR\bin\DMLProc.exe
 Delete $INSTDIR\bin\dumpcol.exe
 Delete $INSTDIR\bin\editem.exe
 Delete $INSTDIR\bin\ExeMgr.exe
+Delete $INSTDIR\bin\libbrm.dll
 Delete $INSTDIR\bin\libcalmysql.dll
 Delete $INSTDIR\bin\libconfigcpp.dll
 Delete $INSTDIR\bin\libddlpackageproc.dll
 Delete $INSTDIR\bin\libdmlpackageproc.dll
 Delete $INSTDIR\bin\libjoblist.dll
+Delete $INSTDIR\bin\liboamcpp.dll
 Delete $INSTDIR\bin\libwriteengine.dll
 Delete $INSTDIR\bin\libudfsdk.dll
 Delete $INSTDIR\bin\libxml2.dll
@@ -292,9 +291,8 @@ Delete $INSTDIR\bin\mysqlshow.exe
 Delete $INSTDIR\bin\mysqlslap.exe
 Delete $INSTDIR\bin\mysqltest.exe
 Delete $INSTDIR\bin\oid2file.exe
-Delete $INSTDIR\bin\DecomSvr.exe
 Delete $INSTDIR\bin\PrimProc.exe
-Delete $INSTDIR\bin\WriteEngineServer.exe
+Delete $INSTDIR\bin\DecomSvr.exe
 Delete $INSTDIR\bin\save_brm.exe
 Delete $INSTDIR\bin\vcredist_x64.exe
 Delete $INSTDIR\bin\viewtablelock.exe
@@ -314,7 +312,6 @@ Delete $INSTDIR\bin\idbmysql.bat
 Delete $INSTDIR\bin\ha_archive.dll
 Delete $INSTDIR\bin\ha_federated.dll
 Delete $INSTDIR\bin\ha_innodb_plugin.dll
-Delete $INSTDIR\bin\libmysql.dll
 
 Delete $INSTDIR\etc\ErrorMessage.txt
 Delete $INSTDIR\etc\MessageFile.txt
@@ -354,9 +351,6 @@ RMDir /r $INSTDIR\share\swedish
 RMDir /r $INSTDIR\share\ukrainian
 
 Delete $INSTDIR\sql\dumpcat_mysql.sql
-Delete $INSTDIR\sql\calsetuserpriority.sql
-Delete $INSTDIR\sql\calremoveuserpriority.sql
-Delete $INSTDIR\sql\calshowprocesslist.sql
 
 Delete $INSTDIR\my_save.ini
 Rename $INSTDIR\my.ini $INSTDIR\my_save.ini

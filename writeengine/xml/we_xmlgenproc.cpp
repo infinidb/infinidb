@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- *   $Id: we_xmlgenproc.cpp 3806 2012-05-01 12:23:02Z dcathey $
+ *   $Id: we_xmlgenproc.cpp 3603 2012-03-06 16:39:32Z dcathey $
  *
  ******************************************************************************/
 #define WRITEENGINEXMLGENPROC_DLLEXPORT
@@ -45,7 +45,7 @@ namespace
 
 namespace WriteEngine
 {
-
+
 //------------------------------------------------------------------------------
 // XMLGen constructor
 //------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ XMLGenProc::~XMLGenProc()
 {
     xmlFreeDoc(fDoc);
 }
-
+
 //------------------------------------------------------------------------------
 // startXMLFile
 // Creates xmlDocPtr (fDoc) that we will use in generating our XML file.
@@ -161,7 +161,7 @@ void XMLGenProc::startXMLFile( )
     xmlTextWriterWriteAttribute(fWriter, BAD_CAST xmlTagTable[TAG_NAME],
         BAD_CAST fInputMgr->getSchema().c_str() );
 }
-
+
 //------------------------------------------------------------------------------
 // makeTableData
 // Create XML tag for a table.
@@ -179,7 +179,7 @@ void XMLGenProc::makeTableData(const CalpontSystemCatalog::TableName& table)
     {
         try
         {
-            boost::shared_ptr<CalpontSystemCatalog> cat =
+            CalpontSystemCatalog* cat =
                 CalpontSystemCatalog::makeCalpontSystemCatalog(
                 BULK_SYSCAT_SESSION_ID);
             cat->identity(CalpontSystemCatalog::EC);
@@ -224,7 +224,7 @@ void XMLGenProc::makeTableData(const CalpontSystemCatalog::TableName& table)
 
     kount++;
 }
-
+
 //------------------------------------------------------------------------------
 // sortColumnsByPosition
 // Sort list of columns by column position.
@@ -250,7 +250,7 @@ void XMLGenProc::sortColumnsByPosition(SysCatColumnList &columns)
     
     tempCols.clear();
 }
-
+
 //------------------------------------------------------------------------------
 // makeColumnData
 // Create XML tag for the columns in a table.
@@ -324,38 +324,14 @@ bool XMLGenProc::makeColumnData(const CalpontSystemCatalog::TableName& table)
                     BAD_CAST xmlTagTable[TAG_DVAL_OID], "%d",
                     col->colType.ddn.dictOID );
             }
-
-            // Include NotNull and Default value
-            const std::string col_defaultValue(col->colType.defaultValue);
-
-            if (col->colType.constraintType ==
-                execplan::CalpontSystemCatalog::NOTNULL_CONSTRAINT)
-            {
-                int notNull = 1;
-                xmlTextWriterWriteFormatAttribute(fWriter,
-                    BAD_CAST xmlTagTable[TAG_NOT_NULL], "%d", notNull);
-                if (!col_defaultValue.empty())
-                {
-                    xmlTextWriterWriteAttribute(fWriter,
-                        BAD_CAST xmlTagTable[TAG_DEFAULT_VALUE],
-                        BAD_CAST col_defaultValue.c_str());
-                }
-            }
-            else if (col->colType.constraintType ==
-                execplan::CalpontSystemCatalog::DEFAULT_CONSTRAINT)
-            {
-                xmlTextWriterWriteAttribute(fWriter,
-                    BAD_CAST xmlTagTable[TAG_DEFAULT_VALUE],
-                    BAD_CAST col_defaultValue.c_str());
-            }
-        } // end of "if fSysCatRpt"
+        }
 
         xmlTextWriterEndElement(fWriter);
     }
     xmlTextWriterEndElement(fWriter); //table 
     return true;
 }
-
+
 //------------------------------------------------------------------------------
 // getColumnsForTable
 // Access the system catalog in order to get the OID, column type, and column
@@ -377,7 +353,7 @@ void XMLGenProc::getColumnsForTable(
 
     try
     {
-        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+        CalpontSystemCatalog* systemCatalogPtr =
             CalpontSystemCatalog::makeCalpontSystemCatalog(
             BULK_SYSCAT_SESSION_ID);
         systemCatalogPtr->identity(CalpontSystemCatalog::EC);
@@ -416,7 +392,7 @@ void XMLGenProc::getColumnsForTable(
         throw std::runtime_error( oss.str() );
     }
 }
-
+
 //------------------------------------------------------------------------------
 // Generate Job XML File Name
 //------------------------------------------------------------------------------
@@ -439,7 +415,7 @@ std::string XMLGenProc::genJobXMLFileName( ) const
     // path if so given
     xmlFileName = p.string();
 #else
-    if (!p.has_root_path())
+    if (!p.has_root_directory())
     {
         char cwdPath[4096];
         getcwd(cwdPath, sizeof(cwdPath));
@@ -455,7 +431,7 @@ std::string XMLGenProc::genJobXMLFileName( ) const
 
 	return xmlFileName;
 }
-
+
 //------------------------------------------------------------------------------
 // writeXMLFile
 //------------------------------------------------------------------------------

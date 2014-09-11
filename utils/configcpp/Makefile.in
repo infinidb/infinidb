@@ -77,7 +77,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libconfigcpp_la_LIBADD =
-am_libconfigcpp_la_OBJECTS = configcpp.lo xmlparser.lo configstream.lo
+am_libconfigcpp_la_OBJECTS = configcpp.lo
 libconfigcpp_la_OBJECTS = $(am_libconfigcpp_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -225,8 +225,8 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libconfigcpp.la
-libconfigcpp_la_SOURCES = configcpp.cpp xmlparser.cpp configstream.cpp
-include_HEADERS = configcpp.h xmlparser.h configstream.h
+libconfigcpp_la_SOURCES = configcpp.cpp
+include_HEADERS = configcpp.h
 all: all-am
 
 .SUFFIXES:
@@ -297,8 +297,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configcpp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configstream.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xmlparser.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \

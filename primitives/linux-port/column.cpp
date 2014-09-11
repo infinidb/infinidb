@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: column.cpp 1855 2012-04-04 18:20:09Z rdempsey $
+ * $Id: column.cpp 1723 2011-08-24 22:04:44Z pleblanc $
  *
  ****************************************************************************/
 #include <iostream>
@@ -673,7 +673,7 @@ inline int64_t nextColValueHelper(int type,
 		return nextColValue<1>(type, ridArray, NVALS, index, done, isNull, isEmpty, rid, OutputType, val8,
 			itemsPerBlk);
 	default:
-		idbassert(0);
+		assert(0);
 	}
 	/*NOTREACHED*/
 	return 0;
@@ -1121,7 +1121,7 @@ void PrimitiveProcessor::p_Col(NewColRequestHeader *in, NewColResultHeader *out,
 		p_Col_ridArray<1>(in, out, outSize, written, block, fStatsPtr, itemsPerBlk, parsedColumnFilter, fp);
 		break;
 	default:
-		idbassert(0);
+		assert(0);
 		break;
 	}
 	if (fStatsPtr)

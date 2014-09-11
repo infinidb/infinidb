@@ -34,13 +34,22 @@
 #include "messageobj.h"
 #endif
 
-#if defined(_MSC_VER) && defined(xxxSNMPMANAGER_DLLEXPORT)
+#if defined(_MSC_VER) && defined(SNMPMANAGER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
 #endif
 
 namespace snmpmanager {
+
+#ifdef _MSC_VER
+	const std::string defaultPath("C:\\Calpont\\etc\\");
+	const std::string localPath("C:\\Calpont\\local\\");
+#else
+	const std::string defaultPath("/usr/local/Calpont/etc/");
+	const std::string localPath("/usr/local/Calpont/local/");
+#endif
+
 
 /** @brief type define
  *

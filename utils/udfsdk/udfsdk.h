@@ -13,12 +13,12 @@
  * 2. add the UDF function implementation in udfsdk.cpp
  * 3. add the connector stub for this UDF function in udfsdk.cpp
  * 4. build the dynamic library libudfsdk
- * 5. put the library in /usr/local/Calpont/lib of all modules
+ * 5. put the library in /usr/local/Calpont/lib
  * 6. restart all the InfiniDB servers and MySQL server
  * 7. notify mysqld about the new functions with the commands like:
  *
- *    CREATE FUNCTION idb_add returns REAL soname 'libudfsdk.so';
- *    CREATE FUNCTION idb_isnull returns BOOL soname 'libudfsdk.so';
+ *    CREATE FUNCTION IDB_ADD returns STRING soname 'libudfsdk.so';
+ *    CREATE FUNCTION IDB_ISNULL returns BOOL soname 'libudfsdk.so';
  *
  * The UDF functions run distributedly in the InfiniDB engine. The evaluation
  * is row by row. Aggregate UDF is currently not supported. Two examples are

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: aggregatefilterstep.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: aggregatefilterstep.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  ****************************************************************************/
 
@@ -134,8 +134,8 @@ AggregateFilterStep::AggregateFilterStep(const JobStepAssociation &in,
 				fFifoRowCount(0)
 {
     fCsc = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);   
-    idbassert(fInJSA.outSize() == 1);
-    idbassert(fOutJSA.outSize() == 1);
+    assert(fInJSA.outSize() == 1);
+    assert(fOutJSA.outSize() == 1);
     initialize();
 }
 
@@ -261,7 +261,7 @@ try
 
     // @note only cover one column aggregate function (int and string type) 
     // @todo more complex logic to decide result type for expression.
-    idbassert(fAggMetas.size() == 1);
+    assert(fAggMetas.size() == 1);
     std::vector<boost::thread *> runners;	
     int type = -1;
     switch (fOp)

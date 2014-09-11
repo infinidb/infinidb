@@ -109,21 +109,6 @@ nobase_include_HEADERS = \
 	boost/asio.hpp \
 	boost/assert.hpp \
 	boost/assign.hpp \
-	boost/assign/list_inserter.hpp \
-	boost/assign/ptr_list_inserter.hpp \
-	boost/assign/list_of.hpp \
-	boost/assign/assignment_exception.hpp \
-	boost/assign/std.hpp \
-	boost/assign/ptr_list_of.hpp \
-	boost/assign/ptr_map_inserter.hpp \
-	boost/assign/std/list.hpp \
-	boost/assign/std/stack.hpp \
-	boost/assign/std/set.hpp \
-	boost/assign/std/slist.hpp \
-	boost/assign/std/vector.hpp \
-	boost/assign/std/map.hpp \
-	boost/assign/std/deque.hpp \
-	boost/assign/std/queue.hpp \
 	boost/bimap.hpp \
 	boost/bind.hpp \
 	boost/bind/apply.hpp \
@@ -2785,15 +2770,6 @@ nobase_include_HEADERS = \
 	boost/units/units_fwd.hpp \
 	boost/unordered_map.hpp \
 	boost/unordered_set.hpp \
-	boost/unordered/unordered_set.hpp \
-	boost/unordered/unordered_set_fwd.hpp \
-	boost/unordered/unordered_map_fwd.hpp \
-	boost/unordered/detail/allocator_helpers.hpp \
-	boost/unordered/detail/move.hpp \
-	boost/unordered/detail/config.hpp \
-	boost/unordered/detail/hash_table_impl.hpp \
-	boost/unordered/detail/hash_table.hpp \
-	boost/unordered/unordered_map.hpp \
 	boost/utility.hpp \
 	boost/utility/addressof.hpp \
 	boost/utility/base_from_member.hpp \
@@ -2810,38 +2786,6 @@ nobase_include_HEADERS = \
 	boost/utility/typed_in_place_factory.hpp \
 	boost/utility/value_init.hpp \
 	boost/variant.hpp \
-	boost/variant/variant.hpp \
-	boost/variant/visitor_ptr.hpp \
-	boost/variant/static_visitor.hpp \
-	boost/variant/recursive_variant.hpp \
-	boost/variant/get.hpp \
-	boost/variant/variant_fwd.hpp \
-	boost/variant/bad_visit.hpp \
-	boost/variant/detail/substitute.hpp \
-	boost/variant/detail/enable_recursive_fwd.hpp \
-	boost/variant/detail/cast_storage.hpp \
-	boost/variant/detail/make_variant_list.hpp \
-	boost/variant/detail/backup_holder.hpp \
-	boost/variant/detail/bool_trait_undef.hpp \
-	boost/variant/detail/apply_visitor_unary.hpp \
-	boost/variant/detail/generic_result_type.hpp \
-	boost/variant/detail/variant_io.hpp \
-	boost/variant/detail/substitute_fwd.hpp \
-	boost/variant/detail/forced_return.hpp \
-	boost/variant/detail/apply_visitor_binary.hpp \
-	boost/variant/detail/move.hpp \
-	boost/variant/detail/enable_recursive.hpp \
-	boost/variant/detail/visitation_impl.hpp \
-	boost/variant/detail/has_trivial_move.hpp \
-	boost/variant/detail/config.hpp \
-	boost/variant/detail/initializer.hpp \
-	boost/variant/detail/bool_trait_def.hpp \
-	boost/variant/detail/over_sequence.hpp \
-	boost/variant/detail/has_nothrow_move.hpp \
-	boost/variant/detail/apply_visitor_delayed.hpp \
-	boost/variant/apply_visitor.hpp \
-	boost/variant/recursive_wrapper.hpp \
-	boost/variant/recursive_wrapper_fwd.hpp \
 	boost/version.hpp \
 	boost/visit_each.hpp \
 	boost/wave.hpp \

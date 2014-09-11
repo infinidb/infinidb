@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: sessionmanager.cpp 8924 2012-09-19 18:25:54Z pleblanc $
+ * $Id: sessionmanager.cpp 8434 2012-04-03 18:31:24Z dcathey $
  *
  ****************************************************************************/
 
@@ -81,9 +81,12 @@ const CalpontSystemCatalog::SCN SessionManager::sysCatVerID()
 
 const TxnID SessionManager::newTxnID(const SID session, bool block, bool isDDL) 
 {
+	TxnID tmp;	
 	TxnID ret;
 
-	ret = dbrm.newTxnID(session, block, isDDL);
+	tmp = dbrm.newTxnID(session, block, isDDL);
+	ret.id = tmp.id;
+	ret.valid = tmp.valid;
 	return ret;
 }
 
@@ -121,10 +124,16 @@ const TxnID SessionManager::getTxnID(const SID session)
 	return ret;
 }
 
-boost::shared_array<SIDTIDEntry> SessionManager::SIDTIDMap(int& len)
+const SIDTIDEntry* SessionManager::SIDTIDMap(int& len)
 {
 	// is this cast valid?
 	return dbrm.SIDTIDMap(len);
+}
+
+// delete with delete []
+char * SessionManager::getShmContents(int &len)
+{
+	return dbrm.getShmContents(len);
 }
 
 string SessionManager::getTxnIDFilename() const 
@@ -139,7 +148,6 @@ int SessionManager::verifySize()
 
 void SessionManager::reset()
 {
-	dbrm.sessionmanager_reset();
 }
 
 const uint32_t SessionManager::getUnique32()
@@ -152,7 +160,7 @@ const bool SessionManager::checkActiveTransaction( const SID sessionId, bool& bI
 	bIsDbrmUp = true;
 	int arrayLenth = 0;
 	bool ret = false;
-	boost::shared_array<SIDTIDEntry> sIDTIDMap;
+	const SIDTIDEntry* sIDTIDMap;
 
 	sIDTIDMap = SIDTIDMap( arrayLenth );
 	
@@ -160,12 +168,19 @@ const bool SessionManager::checkActiveTransaction( const SID sessionId, bool& bI
 	{
 		for ( int i = 0; i < arrayLenth; i++ )
 		{
-			if ( sIDTIDMap[i].txnid.valid && ( sIDTIDMap[i].sessionid != sessionId || sessionId == 0 ) )
+			if ( sIDTIDMap[i].txnid.valid && ( sIDTIDMap[i].sessionid != sessionId ) )
 			{
 				blocker = sIDTIDMap[i];
 				ret = true;
+				//FIXME: there's a bug somewhere: there can be multile entries in this
+				// table with the same valid flg & sid, but the first one has tableOID = 0
+				// and the _second_ one has the correct oid...
+				if (blocker.tableOID != 0)
+					break;
 			}
 		}
+	
+		delete [] sIDTIDMap;
 	}
 	else
 	{
@@ -175,32 +190,22 @@ const bool SessionManager::checkActiveTransaction( const SID sessionId, bool& bI
 	return ret;
 }
 
-const bool SessionManager::isTransactionActive(const SID sessionId, bool& bIsDbrmUp)
+int8_t SessionManager::setTableLock (  const OID_t tableOID, const u_int32_t sessionID,  const u_int32_t processID, const string processName, bool lock )
 {
-	bIsDbrmUp = true;
-	int arrayLenth = 0;
-	bool ret = false;
-	boost::shared_array<SIDTIDEntry> sIDTIDMap;
-
-	sIDTIDMap = SIDTIDMap(arrayLenth);
-
-	if (sIDTIDMap)
-	{
-		for ( int i = 0; i < arrayLenth; i++ )
-		{
-			if (sIDTIDMap[i].txnid.valid && (sIDTIDMap[i].sessionid == sessionId))
-			{
-				ret = true;
-				break;
-			}
-		}
-	}
-	else
-	{
-		bIsDbrmUp = false;
-	}
-
-	return ret;
+	return dbrm.setTableLock ( tableOID, sessionID, processID, processName, lock );
 }
+
+int8_t SessionManager::getTableLockInfo ( const OID_t tableOID, u_int32_t & processID,
+	std::string & processName, bool & lockStatus, SID & sid )
+{
+	return dbrm.getTableLockInfo ( tableOID, processID, processName, lockStatus, sid );
+
+}
+
+void  SessionManager::getTableLocksInfo (std::vector<SIDTIDEntry> & sidTidentries)
+{
+	dbrm.getTableLocksInfo( sidTidentries );
+}
+
 
 }  //namespace

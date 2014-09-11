@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: shmkeys.cpp 1753 2012-11-09 21:17:35Z rdempsey $
+// $Id: shmkeys.cpp 1756 2012-11-09 21:54:39Z rdempsey $
 
 #include <cstdlib>
 #include <string>
@@ -35,12 +35,10 @@ ShmKeys::ShmKeys()
 {
 	uint32_t BRM_UID = 0x0;
 
-#ifdef WANT_EM_BRM_UID
-	config::Config* cf = config::Config::makeConfig();
-	string brm_str = cf->getConfig("ExtentMap", "BRM_UID");
-	if (brm_str.length() > 0)
-		BRM_UID = static_cast<uint32_t>(config::Config::uFromText(brm_str));
-#endif
+//	config::Config* cf = config::Config::makeConfig();
+//	string brm_str = cf->getConfig("ExtentMap", "BRM_UID");
+//	if (brm_str.length() > 0)
+//		BRM_UID = static_cast<uint32_t>(config::Config::uFromText(brm_str));
 
 	KEYRANGE_VSS_BASE =          0x10000 | (BRM_UID << 20);
 	KEYRANGE_EXTENTMAP_BASE =    0x20000 | (BRM_UID << 20);
@@ -48,12 +46,12 @@ ShmKeys::ShmKeys()
 	KEYRANGE_VBBM_BASE =         0x40000 | (BRM_UID << 20);
 	KEYRANGE_CL_BASE =           0x50000 | (BRM_UID << 20);
 	MST_SYSVKEY =             0xff000000 | BRM_UID;
+	SESSIONMANAGER_SYSVKEY =  0xfe000000 | BRM_UID;
 	PROCESSSTATUS_SYSVKEY =   0xfd000000 | BRM_UID;
 	SYSTEMSTATUS_SYSVKEY =    0xfc000000 | BRM_UID;
 	SWITCHSTATUS_SYSVKEY =    0xfb000000 | BRM_UID;
 	STORAGESTATUS_SYSVKEY =   0xfa000000 | BRM_UID;
 	NICSTATUS_SYSVKEY =       0xf9000000 | BRM_UID;
-	DBROOTSTATUS_SYSVKEY =    0xf8000000 | BRM_UID;
 	DECOMSVRMUTEX_SYSVKEY =   0xf7000000 | BRM_UID;
 }
 

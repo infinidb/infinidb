@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowgroup.h 3238 2012-08-16 13:34:36Z bwilkinson $
+//  $Id: rowgroup.h 2978 2012-01-16 20:16:44Z zzhu $
 
 //
 // C++ Interface: rowgroup
@@ -49,7 +49,6 @@
 #include "joblisttypes.h"
 #include "bytestream.h"
 #include "calpontsystemcatalog.h"
-#include "exceptclasses.h"
 
 /* branch prediction macros for gcc.  Is there a better place for them? */
 #if !defined(__GNUC__) || (__GNUC__ == 2 && __GNUC_MINOR__ < 96)
@@ -102,7 +101,6 @@ class Row
 		inline uint getOffset(uint colIndex) const;
 		inline uint getScale(uint colIndex) const;
 		inline uint getPrecision(uint colIndex) const;
-		inline execplan::CalpontSystemCatalog::ColDataType getColType(uint colIndex);
 		inline execplan::CalpontSystemCatalog::ColDataType* getColTypes();
 		inline const execplan::CalpontSystemCatalog::ColDataType* getColTypes() const;
 
@@ -217,21 +215,6 @@ inline uint Row::getSize() const
 	return offsets[columnCount];
 }
 
-inline uint Row::getScale(uint col) const
-{
-	return scale[col];
-}
-
-inline uint Row::getPrecision(uint col) const
-{
-	return precision[col];
-}
-
-inline execplan::CalpontSystemCatalog::ColDataType Row::getColType(uint colIndex)
-{
-	return types[colIndex];
-}
-
 inline execplan::CalpontSystemCatalog::ColDataType* Row::getColTypes()
 {
 	return types;
@@ -258,6 +241,16 @@ inline bool Row::isLongString(uint colIndex) const
 	return (getColumnWidth(colIndex) > 8 && !isNumeric(colIndex));
 }
 
+inline uint Row::getScale(uint col) const
+{
+	return scale[col];
+}
+
+inline uint Row::getPrecision(uint col) const
+{
+	return precision[col];
+}
+
 template<int len>
 inline bool Row::equals(uint64_t val, uint colIndex) const
 {
@@ -268,14 +261,15 @@ inline bool Row::equals(uint64_t val, uint colIndex) const
 		case 4: return *((uint32_t *) &data[offsets[colIndex]]) == val;
 		case 8: return *((uint64_t *) &data[offsets[colIndex]]) == val;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::equals(): bad length.");
 	}
 }
 
 inline bool Row::equals(const std::string &val, uint colIndex) const
 {
-	return (strncmp(val.c_str(), (char *) &data[offsets[colIndex]], offsets[colIndex + 1] - offsets[colIndex]) == 0);
+	std::string val2 = getStringField(colIndex);
+	return (strcmp(val.c_str(), val2.c_str()) == 0);
 }
 
 template<int len>
@@ -288,7 +282,7 @@ inline uint64_t Row::getUintField(uint colIndex) const
 		case 4: return *((uint32_t *) &data[offsets[colIndex]]);
 		case 8: return *((uint64_t *) &data[offsets[colIndex]]);
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::getUintField(): bad length.");
 	}
 }
@@ -301,7 +295,7 @@ inline uint64_t Row::getUintField(uint colIndex) const
 		case 4: return *((uint32_t *) &data[offsets[colIndex]]);
 		case 8: return *((uint64_t *) &data[offsets[colIndex]]);
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::getUintField(): bad length.");
 	}
 }
@@ -316,7 +310,7 @@ inline int64_t Row::getIntField(uint colIndex) const
 		case 4: return *((int32_t *) &data[offsets[colIndex]]);
 		case 8: return *((int64_t *) &data[offsets[colIndex]]);
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::getIntField(): bad length.");
 	}
 }
@@ -330,7 +324,7 @@ inline int64_t Row::getIntField(uint colIndex) const
 		case 4: return *((int32_t *) &data[offsets[colIndex]]);
 		case 8: return *((int64_t *) &data[offsets[colIndex]]);
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::getIntField(): bad length.");
 	}
 }
@@ -411,7 +405,7 @@ inline void Row::setUintField_offset(uint64_t val, uint offset)
 		case 4: *((uint32_t *) &data[offset]) = val; break;
 		case 8: *((uint64_t *) &data[offset]) = val; break;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::setUintField called on a non-uint field");
 	}
 }
@@ -431,7 +425,7 @@ inline void Row::setUintField(uint64_t val, uint colIndex)
 		case 4: *((uint32_t *) &data[offsets[colIndex]]) = val; break;
 		case 8: *((uint64_t *) &data[offsets[colIndex]]) = val; break;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::setUintField called on a non-uint field");
 	}
 }
@@ -444,7 +438,7 @@ inline void Row::setUintField(uint64_t val, uint colIndex)
 		case 4: *((uint32_t *) &data[offsets[colIndex]]) = val; break;
 		case 8: *((uint64_t *) &data[offsets[colIndex]]) = val; break;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::setUintField: bad length");
 	}
 }
@@ -458,7 +452,7 @@ inline void Row::setIntField(int64_t val, uint colIndex)
 		case 4: *((int32_t *) &data[offsets[colIndex]]) = val; break;
 		case 8: *((int64_t *) &data[offsets[colIndex]]) = val; break;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::setIntField: bad length");
 	}
 }
@@ -471,7 +465,7 @@ inline void Row::setIntField(int64_t val, uint colIndex)
 		case 4: *((int32_t *) &data[offsets[colIndex]]) = val; break;
 		case 8: *((int64_t *) &data[offsets[colIndex]]) = val; break;
 		default:
-			idbassert(0);
+			assert(0);
 			throw std::logic_error("Row::setIntField: bad length");
 	}
 }
@@ -525,13 +519,13 @@ inline void Row::setVarBinaryField(const uint8_t* val, uint len, uint colIndex)
 inline void Row::copyField(uint destIndex, uint srcIndex) const
 {
 	uint n = offsets[destIndex + 1] - offsets[destIndex];
-	memmove(&data[offsets[destIndex]], &data[offsets[srcIndex]], n);
+	memcpy(&data[offsets[destIndex]], &data[offsets[srcIndex]], n);
 }
 
 inline void Row::copyField(uint8_t* destAddr, uint srcIndex) const
 {
 	uint n = offsets[srcIndex + 1] - offsets[srcIndex];
-	memmove(destAddr, &data[offsets[srcIndex]], n);
+	memcpy(destAddr, &data[offsets[srcIndex]], n);
 }
 
 inline void Row::setRid(uint64_t rid)
@@ -601,9 +595,6 @@ public:
 	uint getStatus() const;
 	void setStatus(uint16_t);
 
-	uint getDBRoot() const;
-	void setDBRoot(uint);
-
 	uint getDataSize() const;
 	uint getDataSize(uint64_t n) const;
 	uint getMaxDataSize() const;
@@ -668,11 +659,10 @@ private:
 	std::vector<uint> scale;
 	std::vector<uint> precision;
 
-	static const uint headerSize = 18;
+	static const uint headerSize = 14;
 	static const uint rowCountOffset = 0;
 	static const uint baseRidOffset = 4;
 	static const uint statusOffset = 12;
-	static const uint dbRootOffset = 14;
 };
 
 /** operator+
@@ -688,26 +678,26 @@ void applyMapping(const boost::shared_array<int> &mapping, const Row &in, Row *o
 every row, they're a measurable performance penalty */
 inline uint32_t RowGroup::getRowCount() const
 {
-// 	idbassert(data);
+// 	assert(data);
 // 	if (!data) throw std::logic_error("RowGroup::getRowCount(): data is NULL!");
 	return *((uint32_t *) &data[rowCountOffset]);
 }
 
 inline void RowGroup::incRowCount()
 {
-// 	idbassert(data);
+// 	assert(data);
 	++(*((uint32_t *) &data[rowCountOffset]));
 }
 
 inline void RowGroup::setRowCount(uint32_t num)
 {
-// 	idbassert(data);
+// 	assert(data);
 	*((uint32_t *) &data[rowCountOffset]) = num;
 }
 
 inline void RowGroup::getRow(uint rowNum, Row *r) const
 {
-// 	idbassert(data);
+// 	assert(data);
 	r->baseRid = getBaseRid();
 	r->data = &(data[headerSize + (rowNum * offsets[columnCount])]);
 }

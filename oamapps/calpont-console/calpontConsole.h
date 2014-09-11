@@ -1,5 +1,5 @@
 /******************************************************************************************
- * $Id: calpontConsole.h 2641 2012-09-05 21:45:28Z dhill $
+ * $Id: calpontConsole.h 2273 2012-02-22 19:37:17Z dhill $
  *
  ******************************************************************************************/
 /**
@@ -31,8 +31,6 @@
 #include "configcpp.h"
 #include "snmpmanager.h"
 #include "snmpglobal.h"
-#include "calpontsystemcatalog.h"
-#include "brmtypes.h"
 
 
 const int CmdSize = 80;
@@ -50,18 +48,19 @@ void    writeLog(std::string command);
 
 /** @brief location of the Process Configuration file
  */
-const std::string ConsoleCmdsFile= "ConsoleCmds.xml";
+//const string ConsoleCmdsFile= "/home/dhill/genii/oam/calpont-console/ConsoleCmds.xml";
+const std::string ConsoleCmdsFile= "/usr/local/Calpont/etc/ConsoleCmds.xml";
 
-void getFlags(const std::string* arguments, oam::GRACEFUL_FLAG& gracefulTemp, oam::ACK_FLAG& ackTemp, oam::CC_SUSPEND_ANSWER& suspendAnswer);
+void getFlags(const std::string* arguments, oam::GRACEFUL_FLAG& gracefulTemp, oam::ACK_FLAG& ackTemp);
 int confirmPrompt(std::string warningCommand);
 std::string dataPrompt(std::string promptCommand);
 int processCommand(std::string*);
 int ProcessSupportCommand(int CommandID, std::string arguments[]);
-void printAlarmSummary();
-void printCriticalAlarms();
+void getAlarmSummary();
+void getCriticalAlarms();
 void checkRepeat(std::string*, int);
-void printSystemStatus();
-void printProcessStatus(std::string port = "ProcStatusControl");
+void getSystemStatus();
+void getProcessStatus(std::string port = "ProcStatusControl");
 void printModuleCpuUsers(oam::TopProcessCpuUsers topprocesscpuusers);
 void printModuleCpu(oam::ModuleCpu modulecpu);
 void printModuleMemoryUsers(oam::TopProcessMemoryUsers topprocessmemoryusers);
@@ -70,10 +69,6 @@ void printModuleDisk(oam::ModuleDisk moduledisk);
 void printModuleResources(oam::TopProcessCpuUsers topprocesscpuusers, oam::ModuleCpu modulecpu, oam::TopProcessMemoryUsers topprocessmemoryusers, oam::ModuleMemory modulememory, oam::ModuleDisk moduledisk);
 void printState(int state, std::string addInfo);
 std::string getParentOAMModule();
-bool checkForDisabledModules();
-oam::CC_SUSPEND_ANSWER AskSuspendQuestion(int CmdID);
-
-
 
 class to_lower
 {
@@ -105,12 +100,8 @@ const std::string supportCmds[] = {	"helpsupport",
 									"restartexemgrs",
 									"getprocessstatusstandby",
 									"distributeconfigfile",
-									"getpmdbrootconfig",
-									"getdbrootpmconfig",
-									"getsystemdbrootconfig",
 									"checkdbfunctional",
 									""
 };
-
 
 #endif

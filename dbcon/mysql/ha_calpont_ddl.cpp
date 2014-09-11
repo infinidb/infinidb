@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: ha_calpont_ddl.cpp 9079 2012-11-14 22:14:23Z rdempsey $
+ * $Id: ha_calpont_ddl.cpp 9096 2012-11-19 19:34:54Z rdempsey $
  */
 
 #include <string>
@@ -79,12 +79,6 @@ using namespace logging;
 using namespace BRM;
 
 #include "calpontsystemcatalog.h"
-#include "expressionparser.h"
-#include "calpontselectexecutionplan.h"
-#include "simplefilter.h"
-#include "simplecolumn.h"
-#include "expressionparser.h"
-#include "constantcolumn.h"
 using namespace execplan;
 
 namespace
@@ -94,8 +88,6 @@ const short MAX_TINYINT = numeric_limits<int8_t>::max(); //127;
 const short MAX_SMALLINT = numeric_limits<int16_t>::max(); //32767;
 const long long MAX_BIGINT = numeric_limits<int64_t>::max();//9223372036854775807LL
 
-typedef CalpontSelectExecutionPlan::ColumnMap::value_type CMVT_;
-
 #ifndef SKIP_AUTOI
 #include "ha_autoi.cpp"
 #endif
@@ -104,89 +96,6 @@ typedef CalpontSelectExecutionPlan::ColumnMap::value_type CMVT_;
 inline uint32_t tid2sid(const uint32_t tid)
 {
 	return CalpontSystemCatalog::idb_tid2sid(tid);
-}
-
-
-uint convertDataType(int dataType)
-{
-	uint calpontDataType;
-
-	switch (dataType)
-	{
-		case ddlpackage::DDL_CHAR:
-			calpontDataType = CalpontSystemCatalog::CHAR;
-			break;
-
-		case ddlpackage::DDL_VARCHAR:
-			calpontDataType = CalpontSystemCatalog::VARCHAR;
-			break;
-
-		case ddlpackage::DDL_VARBINARY:
-			calpontDataType = CalpontSystemCatalog::VARBINARY;
-			break;
-
-		case ddlpackage::DDL_BIT:
-			calpontDataType = CalpontSystemCatalog::BIT;
-			break;
-
-		case ddlpackage::DDL_REAL:
-		case ddlpackage::DDL_DECIMAL:
-		case ddlpackage::DDL_NUMERIC:
-		case ddlpackage::DDL_NUMBER:
-			calpontDataType = CalpontSystemCatalog::DECIMAL;
-			break;
-
-		case ddlpackage::DDL_FLOAT:
-			calpontDataType = CalpontSystemCatalog::FLOAT;
-			break;
-
-		case ddlpackage::DDL_DOUBLE:
-			calpontDataType = CalpontSystemCatalog::DOUBLE;
-			break;
-
-		case ddlpackage::DDL_INT:
-		case ddlpackage::DDL_INTEGER:
-			calpontDataType = CalpontSystemCatalog::INT;
-			break;
-
-		case ddlpackage::DDL_BIGINT:
-			calpontDataType = CalpontSystemCatalog::BIGINT;
-			break;
-
-		case ddlpackage::DDL_MEDINT:
-			calpontDataType = CalpontSystemCatalog::MEDINT;
-			break;
-
-		case ddlpackage::DDL_SMALLINT:
-			calpontDataType = CalpontSystemCatalog::SMALLINT;
-			break;
-
-		case ddlpackage::DDL_TINYINT:
-			calpontDataType = CalpontSystemCatalog::TINYINT;
-			break;
-
-		case ddlpackage::DDL_DATE:
-			calpontDataType = CalpontSystemCatalog::DATE;
-			break;
-
-		case ddlpackage::DDL_DATETIME:
-			calpontDataType = CalpontSystemCatalog::DATETIME;
-			break;
-
-		case ddlpackage::DDL_CLOB:
-			calpontDataType = CalpontSystemCatalog::CLOB;
-			break;
-
-		case ddlpackage::DDL_BLOB:
-			calpontDataType = CalpontSystemCatalog::BLOB;
-			break;
-
-		default:
-			throw runtime_error("Unsupported datatype!");
-
-	}
-
-	return calpontDataType;
 }
 
 int parseCompressionComment ( std::string comment )
@@ -284,265 +193,6 @@ bool validateNextValue( int type, int64_t value )
 	return validValue;
 }
 
-bool anyRowInTable(string& schema, string& tableName, int sessionID)
-{
-	//find a column in the table
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	csc->identity(execplan::CalpontSystemCatalog::FE);
-	CalpontSystemCatalog::TableName aTableName;
-	algorithm::to_lower(schema);
-	algorithm::to_lower(tableName);
-	aTableName.schema = schema;
-	aTableName.table = tableName;
-	CalpontSystemCatalog::RIDList ridList = csc->columnRIDs(aTableName, true);
-	CalpontSystemCatalog::TableColName tableColName =  csc->colName(ridList[0].objnum);
-	
-	CalpontSelectExecutionPlan csep;          
-    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
-    CalpontSelectExecutionPlan::ColumnMap colMap;  
-	
-	SessionManager sm;
-	BRM::TxnID txnID;
-	txnID = sm.getTxnID(sessionID);
-	if (!txnID.valid)
-	{
-		txnID.id = 0;
-		txnID.valid = true;
-	}
-	CalpontSystemCatalog::SCN verID;
-	verID = sm.verID();
-	csep.txnID(txnID.id);
-	csep.verID(verID);
-	csep.sessionID(sessionID);
-	
-	string firstCol = tableColName.schema+"."+tableColName.table+"."+tableColName.column;
-	SimpleColumn* col[1];
-    col[0] = new SimpleColumn(firstCol, sessionID); 
-	SRCP srcp;
-    srcp.reset(col[0]);
-    colMap.insert(CMVT_(firstCol, srcp));
-	csep.columnMapNonStatic(colMap);
-	returnedColumnList.push_back(srcp);
-    csep.returnedCols(returnedColumnList);
-	
-	CalpontSelectExecutionPlan::TableList tablelist;
-	tablelist.push_back(make_aliastable(schema, tableName, ""));
-	csep.tableList(tablelist);
-	
-	boost::shared_ptr<messageqcpp::MessageQueueClient> exemgrClient (new messageqcpp::MessageQueueClient("ExeMgr1"));
-	ByteStream msg, emsgBs;
-	ByteStream::quadbyte qb = 4;
-	msg << qb;
-	rowgroup::RowGroup *rowGroup = 0;
-	bool anyRow = false;
-	
-	exemgrClient->write(msg);
-	ByteStream msgPlan;
-	csep.serialize(msgPlan);
-	exemgrClient->write(msgPlan);	
-	msg.restart();
-	msg = exemgrClient->read(); //error handling
-	emsgBs = exemgrClient->read();	
-	ByteStream::quadbyte qb1;
-							
-	if (emsgBs.length() == 0)
-	{
-		//exemgrClient->shutdown();
-		//delete exemgrClient;
-		//exemgrClient = 0;
-		throw runtime_error("Lost conection to ExeMgr.");
-	}
-	string emsgStr;
-	emsgBs >> emsgStr;			
-	if (msg.length() == 4)
-	{
-		msg >> qb1;
-		if (qb1 != 0) 
-		{
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			throw runtime_error(emsgStr);
-		}
-	}
-		
-	while (true)
-	{
-		msg.restart();
-		msg = exemgrClient->read();
-		if ( msg.length() == 0 )
-		{
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			throw runtime_error("Lost conection to ExeMgr.");
-		}
-		else
-		{
-			if (!rowGroup)
-			{
-				//This is mete data
-				rowGroup = new rowgroup::RowGroup();
-				rowGroup->deserialize(msg);
-				qb = 100;
-				msg.restart();
-				msg << qb;
-				exemgrClient->write(msg);
-				continue;
-			}
-			rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
-				
-			if (rowGroup->getStatus() != 0)
-			{
-				msg.advance(rowGroup->getDataSize());
-				msg >> emsgStr;
-				//exemgrClient->shutdown();
-				//delete exemgrClient;
-				//exemgrClient = 0;
-				throw runtime_error(emsgStr);
-			}
-
-			if (rowGroup->getRowCount() > 0)
-				anyRow = true;
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			return anyRow;
-		}
-	}		
-}
-
-bool anyNullInTheColumn (string& schema, string& table, string& columnName, int sessionID)
-{
-	CalpontSelectExecutionPlan csep;          
-    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
-    CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
-    CalpontSelectExecutionPlan::ColumnMap colMap;  
-	algorithm::to_lower(schema);
-	algorithm::to_lower(table);
-	algorithm::to_lower(columnName);
-	
-	SessionManager sm;
-	BRM::TxnID txnID;
-	txnID = sm.getTxnID(sessionID);
-	if (!txnID.valid)
-	{
-		txnID.id = 0;
-		txnID.valid = true;
-	}
-	CalpontSystemCatalog::SCN verID;
-	verID = sm.verID();
-	csep.txnID(txnID.id);
-	csep.verID(verID);
-	csep.sessionID(sessionID);
-	
-	string firstCol = schema+"."+table+"."+columnName;
-	SimpleColumn* col[1];
-    col[0] = new SimpleColumn(firstCol, sessionID); 
-	SRCP srcp;
-    srcp.reset(col[0]);
-    colMap.insert(CMVT_(firstCol, srcp));
-	csep.columnMapNonStatic(colMap);
-	returnedColumnList.push_back(srcp);
-    csep.returnedCols(returnedColumnList);
-	
-	SimpleFilter *sf = new SimpleFilter();
-	shared_ptr<Operator> sop(new PredicateOperator("isnull"));
-	sf->op(sop);
-	ConstantColumn *rhs = new ConstantColumn("", ConstantColumn::NULLDATA);
-	sf->lhs(col[0]->clone());
-	sf->rhs(rhs);
-	
-	filterTokenList.push_back(sf);
-	csep.filterTokenList(filterTokenList); 
-	
-	CalpontSelectExecutionPlan::TableList tablelist;
-	tablelist.push_back(make_aliastable(schema, table, ""));
-	csep.tableList(tablelist);
-	
-	boost::shared_ptr<messageqcpp::MessageQueueClient> exemgrClient (new messageqcpp::MessageQueueClient("ExeMgr1"));
-	ByteStream msg, emsgBs;
-	ByteStream::quadbyte qb = 4;
-	msg << qb;
-	rowgroup::RowGroup *rowGroup = 0;
-	bool anyRow = false;
-	
-	exemgrClient->write(msg);
-	ByteStream msgPlan;
-	csep.serialize(msgPlan);
-	exemgrClient->write(msgPlan);	
-	msg.restart();
-	msg = exemgrClient->read(); //error handling
-	emsgBs = exemgrClient->read();	
-	ByteStream::quadbyte qb1;
-							
-	if (emsgBs.length() == 0)
-	{
-		//exemgrClient->shutdown();
-		//delete exemgrClient;
-		//exemgrClient = 0;
-		throw runtime_error("Lost conection to ExeMgr.");
-	}
-	string emsgStr;
-	emsgBs >> emsgStr;			
-	if (msg.length() == 4)
-	{
-		msg >> qb1;
-		if (qb1 != 0) 
-		{
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			throw runtime_error(emsgStr);
-		}
-	}
-		
-	while (true)
-	{
-		msg.restart();
-		msg = exemgrClient->read();
-		if ( msg.length() == 0 )
-		{
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			throw runtime_error("Lost conection to ExeMgr.");
-		}
-		else
-		{
-			if (!rowGroup)
-			{
-				//This is mete data
-				rowGroup = new rowgroup::RowGroup();
-				rowGroup->deserialize(msg);
-				qb = 100;
-				msg.restart();
-				msg << qb;
-				exemgrClient->write(msg);
-				continue;
-			}
-			rowGroup->setData(const_cast<uint8_t*>(msg.buf())); 
-				
-			if (rowGroup->getStatus() != 0)
-			{
-				msg.advance(rowGroup->getDataSize());
-				msg >> emsgStr;
-				//exemgrClient->shutdown();
-				//delete exemgrClient;
-				//exemgrClient = 0;
-				throw runtime_error(emsgStr);
-			}
-
-			if (rowGroup->getRowCount() > 0)
-				anyRow = true;
-			//exemgrClient->shutdown();
-			//delete exemgrClient;
-			//exemgrClient = 0;
-			return anyRow;
-		}
-	}	
-}
-
 int ProcessDDLStatement(string& ddlStatement, string& schema, const string& table, int sessionID,
 	 string& emsg, int compressionTypeIn = 0, bool isAnyAutoincreCol = false, int64_t nextvalue = 1, std::string autoiColName = "")
 {
@@ -553,8 +203,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
   int rc = 0;
   IDBCompressInterface idbCompress;
   parser.Parse(ddlStatement.c_str());
-  if (!thd->infinidb_vtable.cal_conn_info)
-		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
   cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
   if(parser.Good())
   {
@@ -578,22 +226,17 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 			//  the statement
 			bool autoIncre = false;
 			int64_t startValue = 1;
-    		if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 )
+    		if (createTable->fTableDef->fColumns[i]->fConstraints.size() > 0 ||
+				(createTable->fTableDef->fColumns[i]->fDefaultValue &&
+					!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull))
     		{
-				//support default value and NOT NULL constraint			
-				for (uint j=0; j < createTable->fTableDef->fColumns[i]->fConstraints.size(); j++)
-				{
-					if (createTable->fTableDef->fColumns[i]->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
-					{
-						rc = 1;
-						thd->main_da.can_overwrite_status = true;
+    			rc = 1;
+  	 			thd->main_da.can_overwrite_status = true;
 
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
-						ci->alterTableState = cal_connection_info::NOT_ALTER;
-						ci->isAlter = false;
-						return rc;	
-					}
-				}				
+	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+				ci->alterTableState = cal_connection_info::NOT_ALTER;
+				ci->isAlter = false;
+	 			return rc;	
     		}
 			
 			//check varbinary data type
@@ -619,66 +262,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				ci->isAlter = false;
 	 			return rc;	
 			}
-			
-			if (createTable->fTableDef->fColumns[i]->fDefaultValue)
-			{
-				if ((!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull) && (createTable->fTableDef->fColumns[i]->fType->fType == ddlpackage::DDL_VARBINARY))
-				{
-					rc = 1;
-					thd->main_da.can_overwrite_status = true;
-
-					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
-					ci->alterTableState = cal_connection_info::NOT_ALTER;
-					ci->isAlter = false;
-					return rc;	
-				}
-			
-				if (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull)
-				{
-					//validate the default value, if out of range, just error out
-					uint dataType;
-					dataType = convertDataType(createTable->fTableDef->fColumns[i]->fType->fType);
-					CalpontSystemCatalog::ColType colType;
-					colType.colDataType = (CalpontSystemCatalog::ColDataType) dataType;
-					colType.colWidth = createTable->fTableDef->fColumns[i]->fType->fLength;
-					colType.precision = createTable->fTableDef->fColumns[i]->fType->fPrecision;
-					colType.scale = createTable->fTableDef->fColumns[i]->fType->fScale;
-					boost::any convertedVal;
-					bool pushWarning = false;
-					try {
-						convertedVal = DataConvert::convertColumnData(colType, createTable->fTableDef->fColumns[i]->fDefaultValue->fValue, pushWarning, false, false );
-					}
-					catch(std::exception&)
-					{
-						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-						ci->alterTableState = cal_connection_info::NOT_ALTER;
-						ci->isAlter = false;
-						return rc;	
-					}	
-					if (pushWarning)
-					{
-						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-						ci->alterTableState = cal_connection_info::NOT_ALTER;
-						ci->isAlter = false;
-						return rc;	
-					}
-					if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00")) || 
-									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (createTable->fTableDef->fColumns[i]->fDefaultValue->fValue =="0000-00-00 00:00:00")))
-					{
-						rc = 1;
-						thd->main_da.can_overwrite_status = true;
-						thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-						ci->alterTableState = cal_connection_info::NOT_ALTER;
-						ci->isAlter = false;
-						return rc;	
-					}
-				}
-			}
-			
 			//Parse the column comment
 			string comment = createTable->fTableDef->fColumns[i]->fComment;
 			int compressionType = compressionTypeIn;
@@ -747,20 +330,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 							isAnyAutoincreCol = true;
 							autoiColName = createTable->fTableDef->fColumns[i]->fName;
 							matchedCol = true;
-						}
-						
-						//Check whether the column has default value. If there is, error out
-						if (createTable->fTableDef->fColumns[i]->fDefaultValue)
-						{
-							if (!createTable->fTableDef->fColumns[i]->fDefaultValue->fNull)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Autoincrement column cannot have a default value.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;
-							}
 						}
 					}
 				}
@@ -895,123 +464,12 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				bool autoIncre  = false;
 				if ( (addColumnPtr->fColumnDef->fConstraints.size() > 0 ) || addColumnPtr->fColumnDef->fDefaultValue )
 				{
-					//support default value and NOT NULL constraint	
-					for (uint j=0; j < addColumnPtr->fColumnDef->fConstraints.size(); j++)
-					{
-						if (addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType != DDL_NOT_NULL)
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}
-						//if not null constraint, user has to provide a default value
-						if ((addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType == DDL_NOT_NULL) && (!addColumnPtr->fColumnDef->fDefaultValue))
-						{
-	
-							//do select count(*) from the table to check whether there are existing rows. if there is, error out.
-							bool anyRow  = false;
-							try {
-								anyRow = anyRowInTable(alterTable->fTableName->fSchema, alterTable->fTableName->fName, sessionID);
-							}
-							catch (runtime_error& ex)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;							
-							}
-							catch (...)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any rows in the table.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;	
-							}
-							if (anyRow)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Table is not empty. New column has to have a default value if NOT NULL required.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;	
-							}
-						}
-						else if ((addColumnPtr->fColumnDef->fConstraints[j]->fConstraintType == DDL_NOT_NULL) &&(addColumnPtr->fColumnDef->fDefaultValue))
-						{
-							if (addColumnPtr->fColumnDef->fDefaultValue->fValue.length() == 0) //empty string is NULL in infinidb
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "New column has to have a default value if NOT NULL required.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;	
-							}
-						}
-					}
-					
-					if (addColumnPtr->fColumnDef->fDefaultValue)
-					{
-						if ((!addColumnPtr->fColumnDef->fDefaultValue->fNull) && (addColumnPtr->fColumnDef->fType->fType == ddlpackage::DDL_VARBINARY))
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Varbinary column cannot have default value.");
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}
-					
-						//validate the default value, if out of range, just error out
-						uint dataType;
-						dataType = convertDataType(addColumnPtr->fColumnDef->fType->fType);
-						CalpontSystemCatalog::ColType colType;
-						colType.colDataType = (CalpontSystemCatalog::ColDataType) dataType;
-						colType.colWidth = addColumnPtr->fColumnDef->fType->fLength;
-						colType.precision = addColumnPtr->fColumnDef->fType->fPrecision;
-						colType.scale = addColumnPtr->fColumnDef->fType->fScale;
-						boost::any convertedVal;
-						bool pushWarning = false;
-						try {
-							convertedVal = DataConvert::convertColumnData(colType, addColumnPtr->fColumnDef->fDefaultValue->fValue, pushWarning, false, false );
-						}
-						catch(std::exception&)
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}	
-						if (pushWarning)
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}
-						if (((colType.colDataType == execplan::CalpontSystemCatalog::DATE) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00")) || 
-									((colType.colDataType == execplan::CalpontSystemCatalog::DATETIME) && (addColumnPtr->fColumnDef->fDefaultValue->fValue =="0000-00-00 00:00:00")))
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The default value is out of range for the specified data type.");
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}
-					}
+					rc = 1;
+					thd->main_da.can_overwrite_status = true;
+					thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
+					ci->alterTableState = cal_connection_info::NOT_ALTER;
+					ci->isAlter = false;
+					return rc;	
 				}
 				//Handle compression type
 				string comment = addColumnPtr->fColumnDef->fComment;
@@ -1084,8 +542,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1162,7 +619,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				ci->isAlter = false;
 	 			return rc;
     		}
-/*    		else if ( dynamic_cast<AtaSetColumnDefault*> (actionList[i]) )
+    		else if ( dynamic_cast<AtaSetColumnDefault*> (actionList[i]) )
     		{
     			rc = 1;
   	 			thd->main_da.can_overwrite_status = true;
@@ -1171,16 +628,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				ci->isAlter = false;
 	 			return rc;
     		}  
-			else if ( dynamic_cast<AtaDropColumnDefault*> (actionList[i]) )
-    		{
-    			rc = 1;
-  	 			thd->main_da.can_overwrite_status = true;
-	 			thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
-				ci->alterTableState = cal_connection_info::NOT_ALTER;
-				ci->isAlter = false;
-	 			return rc;
-    		}  
-*/
 			else if ( ddlpackage::AtaAddColumns *addColumnsPtr = dynamic_cast<AtaAddColumns*>(actionList[i]))
 			{
 				if ((addColumnsPtr->fColumns).size() > 1)
@@ -1290,8 +737,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1427,8 +873,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1472,57 +917,6 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 				
 				renameColumnsPtr->fNewType->fNextvalue = startValue;
 				renameColumnsPtr->fNewType->fCompressiontype = compressionType;
-				
-				if (renameColumnsPtr->fConstraints.size() > 0)
-				{
-					for (uint j=0; j < renameColumnsPtr->fConstraints.size(); j++)
-					{
-						if (renameColumnsPtr->fConstraints[j]->fConstraintType == DDL_NOT_NULL)
-						{
-							//If NOT NULL constraint is added, check whether the existing rows has null vlues. If there is, error out the query.
-							bool anyNullVal = false;
-							try {
-								anyNullVal = anyNullInTheColumn (alterTable->fTableName->fSchema, alterTable->fTableName->fName, renameColumnsPtr->fName, sessionID);
-							}
-							catch (runtime_error& ex)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, ex.what());
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;							
-							}
-							catch (...)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "Unknown exception caught when checking any existing null values in the column.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;	
-							}
-							if (anyNullVal)
-							{
-								rc = 1;
-								thd->main_da.can_overwrite_status = true;
-								thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, "The existing rows in this column has null value already.");
-								ci->alterTableState = cal_connection_info::NOT_ALTER;
-								ci->isAlter = false;
-								return rc;								
-							}
-						}
-						else
-						{
-							rc = 1;
-							thd->main_da.can_overwrite_status = true;
-							thd->main_da.set_error_status(thd, HA_ERR_UNSUPPORTED, (IDBErrorInfo::instance()->errorMsg(ERR_CONSTRAINTS)).c_str());
-							ci->alterTableState = cal_connection_info::NOT_ALTER;
-							ci->isAlter = false;
-							return rc;	
-						}
-					}
-				}
 			}
 			else
 			{
@@ -1604,7 +998,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 	if (b ==ddlpackageprocessor::DDLPackageProcessor::WARNING)
 	{
 		rc = 0;
-		string errmsg ("Error occured during file deletion. Restart DMLProc or use command tool ddlcleanup to clean up. " );
+		string errmsg ("Error occured during file deletion. Restart DDLProc or use command tool ddlcleanup to clean up. " );
 		push_warning(thd, MYSQL_ERROR::WARN_LEVEL_WARN, 9999, errmsg.c_str());
 	}
     return rc;
@@ -1646,13 +1040,13 @@ pair<string, string> parseTableName(const string& tn)
 	tokenizer tokens(tn, sep);
 	tokenizer::iterator tok_iter = tokens.begin();
 	++tok_iter;
-	idbassert(tok_iter != tokens.end());
+	assert(tok_iter != tokens.end());
 	db = *tok_iter;
 	++tok_iter;
-	idbassert(tok_iter != tokens.end());
+	assert(tok_iter != tokens.end());
 	tb = *tok_iter;
 	++tok_iter;
-	idbassert(tok_iter == tokens.end());
+	assert(tok_iter == tokens.end());
 	return make_pair(db, tb);
 }
 
@@ -1702,7 +1096,7 @@ int ha_calpont_impl_create_(const char *name, TABLE *table_arg, HA_CREATE_INFO *
 		algorithm::to_upper(tablecomment);
 	}
 	//@Bug 2553 Add a parenthesis around option to group them together
-	string alterpatstr("ALTER[[:space:]]+TABLE[[:space:]]+.*[[:space:]]+((ADD)|(DROP)|(CHANGE)|(ALTER))[[:space:]]+");
+	string alterpatstr("ALTER[[:space:]]+TABLE[[:space:]]+.*[[:space:]]+((ADD)|(DROP)|(CHANGE))[[:space:]]+");
 	string createpatstr("CREATE[[:space:]]+TABLE[[:space:]]");
 	bool schemaSyncOnly = false;
 	bool isCreate = true;
@@ -1913,6 +1307,7 @@ extern "C"
 __declspec(dllexport)
 #endif
 long long calonlinealter(UDF_INIT* initid, UDF_ARGS* args,
+					char* result, unsigned long* length,
 					char* is_null, char* error)
 {
 	string stmt(args->args[0], args->lengths[0]);

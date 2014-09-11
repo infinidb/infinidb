@@ -28,7 +28,6 @@ namespace fs=boost::filesystem;
 using namespace config;
 
 #include "sedit.h"
-#include "idbregistry.h"
 using namespace winport;
 
 #include "fixup.h"
@@ -84,16 +83,6 @@ int fixupCalpontXML()
 			val = "5";
 			cf->setConfig(section, parm, val);
 			cout << "Fixing " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup Count
-		parm = "Count";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "1";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
 		}
 
 		//Fixup PMS2
@@ -210,94 +199,6 @@ int fixupCalpontXML()
 #else
 		if (val == "128M")
 #endif
-		{
-			cf->delConfig(section, parm);
-			cout << "Deleting " << section << "." << parm << endl;
-		}
-
-		//Fixup Installation.UMStorageType
-		section = "Installation";
-		parm = "UMStorageType";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "internal";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup DBRootStorageType
-		parm = "DBRootStorageType";
-		val = cf->getConfig(section, parm);
-		if (val == "local")
-		{
-			val = "internal";
-			cf->setConfig(section, parm, val);
-			cout << "Fixing " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup WES
-		section = "pm1_WriteEngineServer";
-		parm = "IPAddr";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "127.0.0.1";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "Port";
-			val = "8630";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup TableLockSaveFile
-		section = "SystemConfig";
-		parm = "TableLockSaveFile";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = IDBreadRegistry("") + "/dbrm/tablelocks";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup SystemModuleConfig
-		section = "SystemModuleConfig";
-		parm = "ModuleDBRootCount1-1";
-		val = cf->getConfig(section, parm);
-		if (val.empty())
-		{
-			val = "0";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "ModuleDBRootCount1-2";
-			val = "0";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "ModuleDBRootCount1-3";
-			val = "1";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "ModuleDBRootID1-1-1";
-			val = "0";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "ModuleDBRootID1-1-2";
-			val = "0";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-			parm = "ModuleDBRootID1-1-3";
-			val = "1";
-			cf->setConfig(section, parm, val);
-			cout << "Adding " << section << "." << parm << " = " << val << endl;
-		}
-
-		//Fixup NVBF
-		section = "VersionBuffer";
-		parm = "NumVersionBufferFiles";
-		val = cf->getConfig(section, parm);
-		if (!val.empty())
 		{
 			cf->delConfig(section, parm);
 			cout << "Deleting " << section << "." << parm << endl;

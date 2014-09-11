@@ -45,7 +45,6 @@ public:
     /** @brief entry point for the DDLProcessor
       */
     void process();
-	int commitTransaction(uint32_t txnID, std::string & errorMsg);
 
     /** @brief get the ddl package thread pool size
       */
@@ -71,17 +70,29 @@ private:
       */
     DDLProcessor();
 
+    /** @brief stop accepting incoming DDL packages
+      *
+      * @param ios the io socket to send repsonse
+      */
+    void stopAcceptingPackages(messageqcpp::IOSocket& ios);
+
+    /** @brief resume accepting incoming DDL packages
+      *
+      * @param ios the io socket to send response
+      */
+    void resumeAcceptingPackages(messageqcpp::IOSocket& ios);
+
+
     /** @brief the thread pool for processing ddl packages
       */
     threadpool::ThreadPool fDdlPackagepool;
 
     int fPackageMaxThreads;     /** @brief max number of threads to process ddl packages */
     int fPackageWorkQueueSize;  /** @brief max number of ddl packages waiting in the work queue */
+    bool fAcceptPackages;       /** @brief if true, accept dml packages */
 
     messageqcpp::MessageQueueServer fMqServer;
-    boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-	WriteEngine::WEClients* fWEClient;
-	uint fPMCount;
+    execplan::CalpontSystemCatalog* csc;
 };
 
 

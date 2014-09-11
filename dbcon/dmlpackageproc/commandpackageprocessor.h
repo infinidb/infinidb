@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: commandpackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+*   $Id: commandpackageprocessor.h 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -26,13 +26,10 @@
 #define COMMANDPACKAGEPROCESSOR_H
 #include <string>
 #include <vector>
-#include <set>
 #include <boost/any.hpp>
 #include <boost/algorithm/string.hpp>
 #include "dmlpackageprocessor.h"
 #include "dmltable.h"
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition.hpp>
 
 #if defined(_MSC_VER) && defined(COMMANDPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -59,17 +56,7 @@ public:
 protected:
 
 private:
-	void viewTableLock(const dmlpackage::CalpontDMLPackage& cpackage,
-		DMLResult& result );
-	void clearTableLock(uint64_t uniqueId,
-		const dmlpackage::CalpontDMLPackage& cpackage,
-		DMLResult& result );
-	void establishTableLockToClear(uint64_t tableLockID,
-		BRM::TableLockInfo& lockInfo);
 
-	// Tracks active cleartablelock commands by storing set of table lock IDs
-	static std::set<uint64_t> fActiveClearTableLockCmds;
-	static boost::mutex       fActiveClearTableLockCmdMutex;
 };
 
 }

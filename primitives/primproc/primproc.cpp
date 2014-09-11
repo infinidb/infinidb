@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primproc.cpp 2124 2013-07-08 19:47:42Z bpaul $
+ *   $Id: primproc.cpp 1817 2012-01-17 22:19:08Z pleblanc $
  *
  *
  ***********************************************************************/
@@ -63,8 +63,6 @@ using namespace primitiveprocessor;
 #include "liboamcpp.h"
 using namespace oam;
 
-#include "utils_utf8.h"
-
 namespace primitiveprocessor
 {
 
@@ -72,11 +70,6 @@ extern uint BPPCount;
 extern uint blocksReadAhead;
 extern uint defaultBufferSize;
 extern uint connectionsPerUM;
-extern uint highPriorityThreads;
-extern uint medPriorityThreads;
-extern uint lowPriorityThreads;
-extern int  directIOFlag;
-
 
 DebugLevel gDebugLevel;
 Logger* mlp;
@@ -115,8 +108,6 @@ int toInt(const string& val)
 void setupSignalHandlers()
 {
 #ifndef _MSC_VER
-		signal(SIGHUP, SIG_IGN);
-
         struct sigaction ign;
 
         memset(&ign, 0, sizeof(ign));
@@ -323,7 +314,24 @@ int getNumCores()
 int main(int argc, char* argv[])
 {
 	// get and set locale language
-	systemLang = funcexp::utf8::idb_setlocale();
+    systemLang = "C";
+
+	Oam oam;
+    try{
+        oam.getSystemConfig("SystemLang", systemLang);
+    }
+    catch(...)
+    {
+		systemLang = "C";
+	}
+
+    setlocale(LC_ALL, systemLang.c_str());
+
+    printf ("Locale is : %s\n", systemLang.c_str() );
+
+	//BUG 2991
+	setlocale(LC_NUMERIC, "C");
+
     if ( systemLang != "en_US.UTF-8" &&
         systemLang.find("UTF") != string::npos )
         utf8 = true;
@@ -341,14 +349,15 @@ int main(int argc, char* argv[])
 	if (rc) {
 		Message::Args args;
 		args.add(rc);
-		//mlp->logMessage(logging::M0016, args);
+		mlp->logMessage(logging::M0016, args);
 	}
 
 	int serverThreads = 1;
 	int serverQueueSize = 10;
+	int processorThreads = 16;
 	int processorWeight = 8*1024;
 	int processorQueueSize = 10*1024;
-	int BRPBlocksPct = 70;
+	int BRPBlocksPct = 86;
 	uint32_t BRPBlocks = 1887437;
 	int BRPThreads = 16;
 	int cacheCount = 1;
@@ -372,7 +381,6 @@ int main(int argc, char* argv[])
 	BPPCount = 16;
 	int numCores = -1;
 	int configNumCores = -1;
-	uint highPriorityPercentage, medPriorityPercentage, lowPriorityPercentage;
 
 	gDebugLevel = primitiveprocessor::NONE;
 
@@ -383,7 +391,11 @@ int main(int argc, char* argv[])
 	temp = toInt(cf->getConfig(primitiveServers, "ServerQueueSize"));
 	if (temp > 0)
 		serverQueueSize = temp;
-
+#if 0
+	temp = toInt(cf->getConfig(primitiveServers, "ProcessorThreads"));
+	if (temp > 0)
+		processorThreads = temp;
+#endif
 	temp = toInt(cf->getConfig(primitiveServers, "ProcessorThreshold"));
 	if (temp > 0)
 		processorWeight = temp;
@@ -396,25 +408,10 @@ int main(int argc, char* argv[])
 	if (temp > 0)
 		gDebugLevel = (DebugLevel)temp;
 
-	highPriorityPercentage = 0;
-	temp = toInt(cf->getConfig(primitiveServers, "HighPriorityPercentage"));
-	if (temp >= 0)
-		highPriorityPercentage = temp;
-
-	medPriorityPercentage = 0;
-	temp = toInt(cf->getConfig(primitiveServers, "MediumPriorityPercentage"));
-	if (temp >= 0)
-		medPriorityPercentage = temp;
-
-	lowPriorityPercentage = 0;
-	temp = toInt(cf->getConfig(primitiveServers, "LowPriorityPercentage"));
-	if (temp >= 0)
-		lowPriorityPercentage = temp;
-
 	temp = toInt(cf->getConfig(ExtentMapStr, "ExtentRows"));
 	if (temp > 0)
 		extentRows = temp;
-
+		
 	temp = toInt(cf->getConfig(primitiveServers, "ConnectionsPerPrimProc"));
 	if (temp > 0)
 		connectionsPerUM = temp;
@@ -517,14 +514,10 @@ int main(int argc, char* argv[])
 	if (temp >= 0)
 		maxPct = temp;
 
-	// @bug4507, configurable pm aggregation AggregationMemoryCheck
-	int aggPct = 95;
-	temp = toInt(cf->getConfig(primitiveServers, "AggregationMemoryCheck"));
-	if (temp >= 0)
-		aggPct = temp;
-
 	//...Start the thread to monitor our memory usage
-	new boost::thread(primitiveprocessor::MonitorProcMem(maxPct, aggPct, mlp));
+	boost::thread* rssMonThd;
+	if (maxPct > 0)
+		rssMonThd = new boost::thread(primitiveprocessor::MonitorProcMem(maxPct,mlp));
 
 	// config file priority is 40..1 (highest..lowest)
 	string sPriority = cf->getConfig(primitiveServers, "Priority");
@@ -585,64 +578,40 @@ int main(int argc, char* argv[])
 	//based on the #cores, calculate some thread parms
 	if (numCores > 0)
 	{
+		processorThreads = 2 * numCores;
+		BPPCount = 2 * numCores;
 		BRPThreads = 2 * numCores;
-		//there doesn't seem much benefit to having more than this, and sometimes it causes problems.
-		//DBBC.NumThreads can override this cap
-		BRPThreads = std::min(BRPThreads, 32);
 	}
 
-	// the default is ~10% low, 30% medium, 60% high, (where 2*cores = 100%)
-	if (highPriorityPercentage == 0 && medPriorityPercentage == 0 &&
-	  lowPriorityPercentage == 0) {
-		lowPriorityThreads = max(1, (2*numCores)/10);
-		medPriorityThreads = max(1, (2*numCores)/3);
-		highPriorityThreads = (2 * numCores) - lowPriorityThreads - medPriorityThreads;
-	}
-	else {
-		uint totalThreads = (uint) ((lowPriorityPercentage + medPriorityPercentage +
-		  highPriorityPercentage) / 100.0 * (2*numCores));
+	//possibly override any calculated values
+	temp = toInt(cf->getConfig(primitiveServers, "ProcessorThreads"));
+	if (temp > 0)
+		processorThreads = temp;
 
-		if (totalThreads == 0)
-			totalThreads = 1;
-
-		lowPriorityThreads = (uint) (lowPriorityPercentage/100.0 * (2*numCores));
-		medPriorityThreads = (uint) (medPriorityPercentage/100.0 * (2*numCores));
-		highPriorityThreads = totalThreads - lowPriorityThreads - medPriorityThreads;
-	}
-
-	BPPCount = highPriorityThreads + medPriorityThreads + lowPriorityThreads;
-
-	// let the user override if they want
 	temp = toInt(cf->getConfig(primitiveServers, "BPPCount"));
-	if (temp > 0 && temp < (int) BPPCount)
+	if (temp > 0 && temp <= processorThreads)
 		BPPCount = temp;
+	else 
+		BPPCount = processorThreads;
 
 	temp = toInt(cf->getConfig(dbbc, "NumThreads"));
 	if (temp > 0)
 		BRPThreads = temp;
-
-#ifndef _MSC_VER
-	// @bug4598, switch for O_DIRECT to support gluster fs.
-	// directIOFlag == O_DIRECT, by default
-	strVal = cf->getConfig(primitiveServers, "DirectIO");
-	if ((strVal == "n") || (strVal == "N")) 
-		directIOFlag = 0;
-#endif
 
 	loadUDFs();
 #ifdef _MSC_VER
 	InitializeCriticalSection(&preadCSObject);
 #endif
 	cout << "Starting PrimitiveServer: st = " << serverThreads << ", sq = " << serverQueueSize <<
-		", pw = " << processorWeight << ", pq = " << processorQueueSize <<
+		", pt = " << processorThreads << ", pw = " << processorWeight << ", pq = " << processorQueueSize <<
 		", nb = " << BRPBlocks << ", nt = " << BRPThreads << ", nc = " << cacheCount <<
 		", ra = " << blocksReadAhead <<  ", db = " << deleteBlocks << ", mb = " << maxBlocksPerRead <<
 		", rd = " << rotatingDestination << ", tr = " << PTTrace << ", mc = " << boolalpha << multicast << 
 		", ml = " << multicastloop << ", ss = " << PMSmallSide << ", bp = " << BPPCount << endl;
 
-	PrimitiveServer server(serverThreads, serverQueueSize, processorWeight, processorQueueSize,
-		rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead, blocksReadAhead,
-		deleteBlocks, PTTrace, prefetchThreshold, multicast, multicastloop, PMSmallSide);
+	PrimitiveServer server(serverThreads, serverQueueSize, processorThreads, processorWeight,
+		processorQueueSize, rotatingDestination, BRPBlocks, BRPThreads, cacheCount, maxBlocksPerRead,
+		blocksReadAhead, deleteBlocks, PTTrace, prefetchThreshold, multicast, multicastloop, PMSmallSide);
 
 #ifdef QSIZE_DEBUG
 	thread* qszMonThd;

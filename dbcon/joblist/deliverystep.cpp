@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: deliverystep.cpp 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: deliverystep.cpp 7711 2011-05-18 15:58:05Z xlou $
  */
 
 #include <iostream>
@@ -346,7 +346,7 @@ uint DeliveryStep::nextBand(ByteStream &bs)
 			time_t t = time(0);
 			char timeString[50];
 			ctime_r(&t, timeString);
-			timeString[strlen(timeString)-1 ] = '\0';
+			timeString[ strlen(timeString)-1 ] = '\0';
 
 			FifoDataList* pFifo    = 0;
 			uint totalBlockedReadCount  = 0;
@@ -436,7 +436,7 @@ const TableBand DeliveryStep::nextBand()
 			time_t t = time(0);
 			char timeString[50];
 			ctime_r(&t, timeString);
-			timeString[strlen(timeString)-1 ] = '\0';
+			timeString[ strlen(timeString)-1 ] = '\0';
 
 			FifoDataList* pFifo    = 0;
 			uint totalBlockedReadCount  = 0;

@@ -199,7 +199,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 toolsdir = @toolsdir@
-SUBDIRS = boost_idb startup common configcpp loggingcpp messageqcpp threadpool rwlock dataconvert joiner rowgroup cacheutils multicast funcexp compress batchloader ddlcleanup mysqlcl_idb querystats
+SUBDIRS = boost_idb common configcpp loggingcpp messageqcpp threadpool rwlock dataconvert joiner rowgroup cacheutils multicast funcexp compress
 all: all-recursive
 
 .SUFFIXES:

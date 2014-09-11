@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: main.cpp 2020 2012-11-09 21:18:22Z rdempsey $
+// $Id: main.cpp 2023 2012-11-09 21:55:44Z rdempsey $
 
 #include "config.h"
 
@@ -205,6 +205,7 @@ int main(int argc, char** argv)
 	tg.join_all();
 
 	shmDoit(BrmKeys.MST_SYSVKEY,           "MST        ");
+	shmDoit(BrmKeys.SESSIONMANAGER_SYSVKEY,"SESMGR     ");
 	if (!cFlg)
 	{
 		shmDoit(BrmKeys.PROCESSSTATUS_SYSVKEY, "PROC_STAT  ");
@@ -212,7 +213,6 @@ int main(int argc, char** argv)
 		shmDoit(BrmKeys.SWITCHSTATUS_SYSVKEY,  "SW_STAT    ");
 		shmDoit(BrmKeys.STORAGESTATUS_SYSVKEY, "STORE_STAT ");
 		shmDoit(BrmKeys.NICSTATUS_SYSVKEY,     "NIC_STAT   ");
-		shmDoit(BrmKeys.DBROOTSTATUS_SYSVKEY,  "DBROOT_STAT");
 	}
 	shmDoit(BrmKeys.DECOMSVRMUTEX_SYSVKEY, "DCMSVRMUTEX");
 
@@ -222,6 +222,7 @@ int main(int argc, char** argv)
 	semDoit(BrmKeys.KEYRANGE_VBBM_BASE,       "VBBM       ");
 	semDoit(BrmKeys.KEYRANGE_VSS_BASE,        "VSS        ");
 	semDoit(BrmKeys.MST_SYSVKEY,              "MST        ");
+	semDoit(BrmKeys.SESSIONMANAGER_SYSVKEY,   "SESMGR     ");
 	if (!cFlg)
 	{
 		semDoit(BrmKeys.PROCESSSTATUS_SYSVKEY, "PROC_STAT  ");
@@ -229,7 +230,6 @@ int main(int argc, char** argv)
 		semDoit(BrmKeys.SWITCHSTATUS_SYSVKEY,  "SW_STAT    ");
 		semDoit(BrmKeys.STORAGESTATUS_SYSVKEY, "STORE_STAT ");
 		semDoit(BrmKeys.NICSTATUS_SYSVKEY,     "NIC_STAT   ");
-		shmDoit(BrmKeys.DBROOTSTATUS_SYSVKEY,  "DBROOT_STAT");
 	}
 
 	return 0;

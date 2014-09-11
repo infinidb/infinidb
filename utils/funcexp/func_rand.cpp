@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_rand.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: func_rand.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -82,7 +82,7 @@ double Func_rand::getDoubleVal(rowgroup::Row& row,
 	// rand without parameter. thd->rand are passed in. The 3rd is a simple column for fetching
 	else
 	{
-		idbassert(parm.size() == 3);
+		assert(parm.size() == 3);
 		if (fSeed1 == 0)
 		{
 			fSeed1 = parm[0]->data()->getIntVal(row, isNull);

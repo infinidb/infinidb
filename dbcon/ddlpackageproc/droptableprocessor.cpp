@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: droptableprocessor.cpp 8923 2012-09-19 18:14:01Z dcathey $
+ *   $Id: droptableprocessor.cpp 8672 2012-06-27 14:35:06Z chao $
  *
  *
  ***********************************************************************/
@@ -27,18 +27,11 @@
 #include "messagelog.h"
 #include "sqllogger.h"
 #include "cacheutils.h"
-#include "we_messages.h"
-#include "bytestream.h"
-#include "we_ddlcommandclient.h"
-#include "oamcache.h"
 using namespace cacheutils;
 using namespace std;
 using namespace execplan;
 using namespace logging;
 using namespace WriteEngine;
-using namespace messageqcpp;
-using namespace oam;
-using namespace boost;
 
 namespace ddlpackageprocessor
 {
@@ -46,22 +39,21 @@ namespace ddlpackageprocessor
     DropTableProcessor::DDLResult DropTableProcessor::processPackage(ddlpackage::DropTableStatement& dropTableStmt)
     {
         SUMMARY_INFO("DropTableProcessor::processPackage");
-		
+
         DDLResult result;
         result.result = NO_ERROR;   
         std::string err;
         VERBOSE_INFO(dropTableStmt);
-
+		
         // Commit current transaction.
-        // all DDL statements cause an implicit commit
+        // all DDL statements cause an implicut commit
         VERBOSE_INFO("Getting current txnID");
-		ByteStream::byte rc = 0;
+		int rc = 0;
         BRM::TxnID txnID;
 		txnID.id= fTxnid.id;
 		txnID.valid= fTxnid.valid;
-		int rc1 = 0;
-		rc1= fDbrm.isReadWrite();
-		if (rc1 != 0 )
+		rc = fDbrm.isReadWrite();
+		if (rc != 0 )
 		{
 			logging::Message::Args args;
 			logging::Message message(9);
@@ -72,27 +64,19 @@ namespace ddlpackageprocessor
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
-		
+		//@Bug 3890
 		SQLLogger logger(dropTableStmt.fSql, fDDLLoggingId, dropTableStmt.fSessionID, txnID.id);
 		
 		std::vector <CalpontSystemCatalog::OID> oidList;
 		CalpontSystemCatalog::RIDList tableColRidList;
 		CalpontSystemCatalog::DictOIDList dictOIDList;
 		execplan::CalpontSystemCatalog::ROPair roPair;
-		std::string errorMsg;
-		ByteStream bytestream;
-		uint64_t uniqueId = fDbrm.getUnique64();
-		fWEClient->addQueue(uniqueId);
-		int pmNum = 1;
-		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-		uint64_t tableLockId = 0;
-		OamCache * oamcache = OamCache::makeOamCache();
-		std::vector<int> moduleIds = oamcache->getModuleIds();
-		bool lockReleased = true;
+		std::string  processName("DDLProc");
+		u_int32_t  processID = 0;
         try 
         {	
 			//check table lock
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
 			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 			systemCatalogPtr->sessionID(dropTableStmt.fSessionID);
 			CalpontSystemCatalog::TableName tableName;
@@ -100,76 +84,66 @@ namespace ddlpackageprocessor
 			tableName.table = dropTableStmt.fTableName->fName;
 			roPair = systemCatalogPtr->tableRID( tableName );
 
-			u_int32_t  processID = ::getpid();
-			int32_t   txnid = txnID.id;
-			int32_t sessionId = dropTableStmt.fSessionID;
-			std::string  processName("DDLProc");
-			int i = 0;
-				
-			std::vector<uint> pms;
-			for (unsigned i=0; i < moduleIds.size(); i++)
-			{
-				pms.push_back((uint)moduleIds[i]);
-			}
-				
-			try {
-				tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-			}
-			catch (std::exception&)
-			{
-				throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			
-			if ( tableLockId  == 0 )
-			{
-				int waitPeriod = 10;
-				int sleepTime = 100; // sleep 100 milliseconds between checks
-				int numTries = 10;  // try 10 times per second
-				waitPeriod = Config::getWaitPeriod();
-				numTries = 	waitPeriod * 10;
-				struct timespec rm_ts;
-
-				rm_ts.tv_sec = sleepTime/1000;
-				rm_ts.tv_nsec = sleepTime%1000 *1000000;
-
-				for (; i < numTries; i++)
+			int i = 0; 
+			rc = fSessionManager.setTableLock( roPair.objnum, dropTableStmt.fSessionID, processID, processName, true );
+					
+			if ( rc == BRM::ERR_TABLE_LOCKED_ALREADY )
+			{	
+				int waitPeriod = 10 * 1000;
+				waitPeriod = Config::getWaitPeriod() * 1000;				
+				//retry until time out (microsecond)
+            			
+				for ( ; i < waitPeriod; i+=100 )
 				{
-#ifdef _MSC_VER
-					Sleep(rm_ts.tv_sec * 1000);
-#else
-					struct timespec abs_ts;
-					do
-					{
-						abs_ts.tv_sec = rm_ts.tv_sec;
-						abs_ts.tv_nsec = rm_ts.tv_nsec;
-					}
-					while(nanosleep(&abs_ts,&rm_ts) < 0);
-#endif
-					try {
-						processID = ::getpid();
-						txnid = txnID.id;
-						sessionId = dropTableStmt.fSessionID;;
-						processName = "DDLProc";
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-					}
-					catch (std::exception&)
-					{
-						throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-					}
-
-					if (tableLockId > 0)
+					usleep(100);
+						
+					rc = fSessionManager.setTableLock( roPair.objnum, dropTableStmt.fSessionID, processID, processName, true );
+						
+					if ( rc == 0 )
 						break;
 				}
-				if (i >= numTries) //error out
+    
+				if ( i >= waitPeriod ) //error out
 				{
+					bool  lockStatus;
+					ostringstream oss;
+					u_int32_t sid;
+					rc = fSessionManager.getTableLockInfo( roPair.objnum, processID, processName, lockStatus, sid);	
+					if ( lockStatus )
+					{
+						oss << " table " << dropTableStmt.fTableName->fSchema << "." << dropTableStmt.fTableName->fName << " is locked by " << processName << " with  ProcessID " << processID;
+						if ((processName == "DMLProc") && (processID > 0))
+						{
+							oss << " due to active bulkrollback.";
+						}
+						oss << endl;
+					}
+		
 					logging::Message::Args args;
-					args.add(processName);
-					args.add((uint64_t)processID);
-					args.add(sessionId);
-					throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_TABLE_LOCKED,args));
-				}			
+					logging::Message message(9);
+					args.add(oss.str());
+					message.format(args);
+
+					result.result = DROP_ERROR;
+					result.message = message;
+					//release the transaction
+					fSessionManager.rolledback(txnID);
+					return result;
+				}					
+					
 			}
-			
+			else if ( rc  == BRM::ERR_FAILURE)
+			{
+					logging::Message::Args args;
+					logging::Message message(1);
+					args.add("Drop table Failed due to BRM failure");
+					result.result = DROP_ERROR;
+					result.message = message;
+					//release the transaction
+					fSessionManager.rolledback(txnID);
+					return result;
+			}
+
         	// 1. Get the OIDs for the columns
         	// 2. Get the OIDs for the dictionaries
         	// 3. Save the OIDs to a log file
@@ -188,7 +162,6 @@ namespace ddlpackageprocessor
         	tableColRidList = systemCatalogPtr->columnRIDs( userTableName );
 
         	dictOIDList = systemCatalogPtr->dictOIDs( userTableName );
-			Oam oam;
 
 			//Save qualified tablename, all column, dictionary OIDs, and transaction ID into a file in ASCII format
 			for ( unsigned i=0; i < tableColRidList.size(); i++ )
@@ -202,279 +175,128 @@ namespace ddlpackageprocessor
 					oidList.push_back( dictOIDList[i].dictOID );
 			}
 			
-			//get a unique number
+			//Save the oids to a file
+			createOpenLogFile( roPair.objnum, userTableName );
+			writeLogFile ( userTableName, oidList );
+			
         	VERBOSE_INFO("Removing the SYSTABLE meta data");
-#ifdef IDB_DDL_DEBUG
-cout << "Removing the SYSTABLEs meta data" << endl;
-#endif
-			bytestream << (ByteStream::byte)WE_SVR_DELETE_SYSTABLES;
-			bytestream << uniqueId;
-			bytestream << (u_int32_t) dropTableStmt.fSessionID;
-			bytestream << (u_int32_t)txnID.id;
-			bytestream << dropTableStmt.fTableName->fSchema;
-			bytestream << dropTableStmt.fTableName->fName;
-			
-			//Find out where systable is
-			BRM::OID_t sysOid = 1001;
-			ByteStream::byte rc = 0;
-			
-			u_int16_t  dbRoot;
-			rc = fDbrm.getSysCatDBRoot(sysOid, dbRoot);  
-			if (rc != 0)
-			{
-				result.result =(ResultCode) rc;
-				logging::Message::Args args;
-				logging::Message message(9);
-				args.add("Error while calling getSysCatDBRoot");
-				args.add(errorMsg);
-				result.message = message;
-				//release transaction
-				fSessionManager.rolledback(txnID);
-				return result;
-			}
-			
-			boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-			pmNum = (*dbRootPMMap)[dbRoot];
-			try
-			{
-				//cout << "deleting systable entries with txnid " << txnID.id << endl;
-				fWEClient->write(bytestream, (uint)pmNum);
-#ifdef IDB_DDL_DEBUG
-cout << "Drop table sending WE_SVR_DELETE_SYSTABLES to pm " << pmNum << endl;
-#endif				
-				while (1)
-				{
-					bsIn.reset(new ByteStream());
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-						break;
-					}			
-					else {
-						*bsIn >> rc;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-						}
-						break;
-					}
-				}
-			}
-			catch (runtime_error& ex) //write error
-			{
-#ifdef IDB_DDL_DEBUG
-cout << "Drop table got exception" << endl;
-#endif
-				rc = NETWORK_ERROR;
-				errorMsg = ex.what();
-			}
-			catch (...)
-			{
-				rc = NETWORK_ERROR;
-#ifdef IDB_DDL_DEBUG
-cout << "Drop table got unknown exception" << endl;
-#endif
-			}
-		
-			if (rc != 0)
-			{
-				logging::Message::Args args;
-				logging::Message message(9);
-				args.add("Error in dropping table from systables.");
-				args.add(errorMsg);
-				message.format(args);
-				result.result = (ResultCode)rc;
-				result.message = message;
-				//release table lock and session
-				fSessionManager.rolledback(txnID);
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-				fWEClient->removeQueue(uniqueId);
-				return result;				
-			}
-			
-			rc = commitTransaction(uniqueId, txnID);
-			//cout << "commiting transaction " << txnID.id << " and valid is " << txnID.valid << endl;
-			if (rc != 0)
-				fSessionManager.rolledback(txnID);
-			else
-				fSessionManager.committed(txnID);
-							
-			if (rc != 0) 
-			{
-				logging::Message::Args args;
-				logging::Message message(9);
-				ostringstream oss;
-				oss << " Commit failed with error code " << rc;					
-				args.add(oss.str());
-				fSessionManager.rolledback(txnID);
-				bool lockReleased = true;
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-				message.format(args);
-				result.result = (ResultCode)rc;
-				result.message = message;
-				fWEClient->removeQueue(uniqueId);
-				return result;
-			}
-			
-			// Log the DDL statement
-			logging::logDDL(dropTableStmt.fSessionID, txnID.id, dropTableStmt.fSql, dropTableStmt.fOwner);
-		}
-		catch (std::exception& ex)
-		{
-			result.result = DROP_ERROR;
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(ex.what());
-			fSessionManager.rolledback(txnID);
-			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-			}
-			catch (std::exception&)
-			{
-				args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			message.format( args );
-			result.message = message;
-			fWEClient->removeQueue(uniqueId);
-			return result;
-		}
-		catch (...)
-		{
-			result.result = DROP_ERROR;
-			errorMsg = "Error in getting information from system catalog or from dbrm.";
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(errorMsg);
-			fSessionManager.rolledback(txnID);
-			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-			}
-			catch (std::exception&)
-			{
-				args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			message.format( args );
-			result.message = message;
-			fWEClient->removeQueue(uniqueId);
-			return result;
-		}
-		
-		try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-		}
-		catch (std::exception&)
-		{
-			result.result = DROP_ERROR;
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			fSessionManager.rolledback(txnID);
-			message.format( args );
-			result.message = message;
-			fWEClient->removeQueue(uniqueId);
-			return result;
-		}		
-		
-		//Save the oids to a file
-		try {
-			createWriteDropLogFile( roPair.objnum, uniqueId, oidList );
-		}
-		catch (std::exception& ex)
-		{
-			result.result = WARNING;
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(ex.what());
-			result.message = message;
-			fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);
-			return result;
-		}
-		//Drop files
-		bytestream.restart();
-		bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
-		bytestream << uniqueId;
-		bytestream << (uint32_t) oidList.size();
-		for (unsigned i=0; i < oidList.size(); i++)
-		{
-			bytestream << (uint32_t) oidList[i];
-		}
-#ifdef IDB_DDL_DEBUG
-cout << "Drop table removing column files" << endl;
-#endif		
-		uint msgRecived = 0;
-		try {
-			fWEClient->write_to_all(bytestream);
+        	removeSysTableMetaData( dropTableStmt.fSessionID, txnID.id, result, *dropTableStmt.fTableName );
+        	if (result.result != NO_ERROR)
+        	{
+            	err = "removeSysTableMetaData failed";
+            	throw std::runtime_error(err);
+        	}
 
-			bsIn.reset(new ByteStream());
-			ByteStream::byte tmp8;
-			while (1)
+        	VERBOSE_INFO("Removing the SYSCOLUM meta data");
+        	removeSysColMetaData( dropTableStmt.fSessionID, txnID.id, result, *dropTableStmt.fTableName );
+        	if (result.result != NO_ERROR)
+        	{
+            	err = "removeSysColMetaData failed";
+            	throw std::runtime_error(err);
+        	}
+		
+			// register the changes
+			rc = fWriteEngine.commit( txnID.id );
+			if ( rc != WriteEngine::NO_ERROR)
 			{
-				if (msgRecived == fWEClient->getPmCount())
-					break;
-				fWEClient->read(uniqueId, bsIn);
-				if ( bsIn->length() == 0 ) //read error
-				{
-					rc = NETWORK_ERROR;
-					fWEClient->removeQueue(uniqueId);
-					break;
-				}			
-				else {
-					*bsIn >> tmp8;
-					rc = tmp8;
-					if (rc != 0) {
-						*bsIn >> errorMsg;
-						fWEClient->removeQueue(uniqueId);
-						break;
-					}
-				else
-					msgRecived++;						
-				}
+				WErrorCodes   ec;
+				ostringstream oss;
+				oss << "Commit failed: " << ec.errorString(rc);
+				throw std::runtime_error(oss.str());
 			}
+//#ifdef _MSC_VER
+//			systemCatalogPtr->flushCache();
+//#endif
 		}
-		catch (std::exception& ex)
+		catch (exception& ex)
 		{
-			result.result = WARNING;
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(ex.what());
-			result.message = message;
-			fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);
+			cerr << "DropTableProcessor::processPackage: " << ex.what() << endl;
+			rc = fWriteEngine.rollbackTran(txnID.id, dropTableStmt.fSessionID);
+			ostringstream oss;
+			if (rc != 0 )
+			{
+				WriteEngine::WErrorCodes   ec;
+				oss << " problem with rollback. " << ec.errorString(rc);
+			}
+        	logging::Message::Args args;
+        	logging::Message message(1);
+        	args.add("Drop table failed: ");
+        	args.add( ex.what() );
+        	args.add(oss.str());
+        	args.add("");
+       	 	message.format( args );
+
+        	result.result = DROP_ERROR;
+        	result.message = message;
+        	
+        	fSessionManager.rolledback(txnID);
+			rc = fSessionManager.setTableLock( roPair.objnum, dropTableStmt.fSessionID, processID, processName, false );
+			//Remove log file
+			deleteLogFile();
 			return result;
 		}
 		catch (...)
 		{
-			result.result = WARNING;
-			errorMsg = "Error in getting information from system catalog or from dbrm.";
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Drop table failed due to ");
-			args.add(errorMsg);
-			result.message = message;
-			fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);
+			cerr << "DropTableProcessor::processPackage: caught unknown exception!" << endl;
+			rc = fWriteEngine.rollbackTran(txnID.id, dropTableStmt.fSessionID);
+			ostringstream oss;
+			if (rc != 0 )
+			{
+				WriteEngine::WErrorCodes   ec;
+				oss << " problem with rollback. " << ec.errorString(rc);
+			}
+        	logging::Message::Args args;
+        	logging::Message message(1);
+        	args.add("Drop table failed: ");
+        	args.add( "encountered unkown exception" );
+        	args.add(oss.str());
+        	args.add("");
+       	 	message.format( args );
+
+        	result.result = DROP_ERROR;
+        	result.message = message;
+        	fSessionManager.rolledback(txnID);
+			rc = fSessionManager.setTableLock( roPair.objnum, dropTableStmt.fSessionID, processID, processName, false );
+			//Remove log file
+			deleteLogFile();
 			return result;
 		}
-		//Drop PrimProc FD cache
-		rc = cacheutils::dropPrimProcFdCache();
-		//Flush primProc cache
-		rc = cacheutils::flushOIDsFromCache( oidList );
-		//Delete extents from extent map
-		rc = fDbrm.deleteOIDs(oidList);
-		
-		if (rc != 0)
+		// Log the DDL statement
+		logging::logDDL(dropTableStmt.fSessionID, txnID.id, dropTableStmt.fSql, dropTableStmt.fOwner);
+		rc = fSessionManager.setTableLock( roPair.objnum, dropTableStmt.fSessionID, processID, processName, false );
+		try {
+			VERBOSE_INFO("Removing files");
+			removeFiles( txnID.id, oidList );
+			//Flush PrimProc cache for those oids
+		    rc = cacheutils::flushOIDsFromCache( oidList );
+			VERBOSE_INFO("Removing extents");
+        	removeExtents( txnID.id, result, oidList );
+        	
+		}
+		catch (exception& ex) 
+        {
+#ifdef _MSC_VER
+			//FIXME: Windows can't delete a file that's still open by another process
+#else
+            logging::Message::Args args;
+        	logging::Message message(1);
+        	args.add( "Remove column files failed." );
+        	args.add( ex.what() );
+        	args.add("");
+       	 	message.format( args );
+
+        	result.result = WARNING;
+        	result.message = message;
+        	fSessionManager.rolledback(txnID);
+			return result;
+#endif
+        }
+		catch ( ... )
 		{
 			logging::Message::Args args;
         	logging::Message message(1);
-        	args.add("Table dropped with warning ");
-        	args.add( "Remove from extent map failed." );
+        	args.add("Drop table failed: ");
+        	args.add( "Remove column files failed." );
         	args.add("");
         	args.add("");
        	 	message.format( args );
@@ -482,16 +304,15 @@ cout << "Drop table removing column files" << endl;
         	result.result = WARNING;
         	result.message = message;
         	fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);
 			return result;
 		}
 		
 		//Remove the log file
-		fWEClient->removeQueue(uniqueId);
-		deleteLogFile(DROPTABLE_LOG, roPair.objnum, uniqueId);
+		deleteLogFile();
         //release the transaction
-        //fSessionManager.committed(txnID);
+        fSessionManager.committed(txnID);
         returnOIDs( tableColRidList, dictOIDList );
+
         return result;
 
     }
@@ -499,28 +320,25 @@ cout << "Drop table removing column files" << endl;
     TruncTableProcessor::DDLResult TruncTableProcessor::processPackage(ddlpackage::TruncTableStatement& truncTableStmt)
     {
         SUMMARY_INFO("TruncTableProcessor::processPackage");
-		// 1. lock the table
-		// 2. Get the OIDs for the columns
-        // 3. Get the OIDs for the dictionaries
-        // 4. Save the OIDs
-		// 5. Disable all partitions
+		// 1. Get the OIDs for the columns
+        // 2. Get the OIDs for the dictionaries
+        // 3. Save the OIDs
+        // 4. Flush PrimProc Cache
+        // 5. Update extent map
         // 6. Remove the column and dictionary files
-		// 7. Flush PrimProc Cache
-        // 8. Update extent map
-        // 9. Use the OIDs to create new column and dictionary files with abbreviate extent
-		// 10 Update next value if the table has autoincrement column
+        // 7. Use the OIDs to create new column and dictionary files with abbreviate extent
+		// 8. Update next value if the table has autoincrement column
 		
 		DDLResult result;
         result.result = NO_ERROR;   
         std::string err;
         VERBOSE_INFO(truncTableStmt);
-
-        // @Bug 4150. Check dbrm status before doing anything to the table.
-		int rc = 0;
-		rc = fDbrm.isReadWrite();
-		BRM::TxnID txnID;
+			
+        BRM::TxnID txnID;
 		txnID.id= fTxnid.id;
 		txnID.valid= fTxnid.valid;
+		int rc = 0;
+		rc = fDbrm.isReadWrite();
 		if (rc != 0 )
 		{
 			logging::Message::Args args;
@@ -532,31 +350,22 @@ cout << "Drop table removing column files" << endl;
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
- 
+		//@Bug 3890.
 		SQLLogger logger(truncTableStmt.fSql, fDDLLoggingId, truncTableStmt.fSessionID, txnID.id);
-		
 		std::vector <CalpontSystemCatalog::OID> columnOidList;
 		std::vector <CalpontSystemCatalog::OID> allOidList;
 		CalpontSystemCatalog::RIDList tableColRidList;
 		CalpontSystemCatalog::DictOIDList dictOIDList;
 		execplan::CalpontSystemCatalog::ROPair roPair;
 		std::string  processName("DDLProc");
-		u_int32_t  processID = ::getpid();;
-		int32_t   txnid = txnID.id;
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
+		u_int32_t  processID = 0;
+		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(truncTableStmt.fSessionID);
 		CalpontSystemCatalog::TableInfo tableInfo;
-		uint64_t uniqueId = fDbrm.getUnique64();
-		fWEClient->addQueue(uniqueId);
-		int pmNum = 1;
-		boost::shared_ptr<messageqcpp::ByteStream> bsIn;
-		string errorMsg;
-		uint32_t autoIncColOid = 0;
-		uint64_t tableLockId = 0;
-		OamCache * oamcache = OamCache::makeOamCache();
-		std::vector<int> moduleIds = oamcache->getModuleIds();
-		bool lockReleased = true;
+		CalpontSystemCatalog::TableName userTableName;
+        userTableName.schema = truncTableStmt.fTableName->fSchema;
+        userTableName.table = truncTableStmt.fTableName->fName;
         try 
         {	
 			//check table lock
@@ -565,78 +374,69 @@ cout << "Drop table removing column files" << endl;
 			tableName.schema = truncTableStmt.fTableName->fSchema;
 			tableName.table = truncTableStmt.fTableName->fName;
 			roPair = systemCatalogPtr->tableRID( tableName );
-			int32_t sessionId = truncTableStmt.fSessionID;
-			std::string  processName("DDLProc");
-			int i = 0;
-				
-			std::vector<uint> pms;
-			for (unsigned i=0; i < moduleIds.size(); i++)
-			{
-				pms.push_back((uint)moduleIds[i]);
-			}
-			try {
-				tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-			}
-			catch (std::exception&)
-			{
-				throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			
-			if ( tableLockId  == 0 )
-			{
-				int waitPeriod = 10;
-				int sleepTime = 100; // sleep 100 milliseconds between checks
-				int numTries = 10;  // try 10 times per second
-				waitPeriod = Config::getWaitPeriod();
-				numTries = 	waitPeriod * 10;
-				struct timespec rm_ts;
 
-				rm_ts.tv_sec = sleepTime/1000;
-				rm_ts.tv_nsec = sleepTime%1000 *1000000;
-
-				for (; i < numTries; i++)
+			int i = 0; 
+			rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, true );
+					
+			if ( rc == BRM::ERR_TABLE_LOCKED_ALREADY )
+			{	
+				int waitPeriod = 10 * 1000;
+				waitPeriod = Config::getWaitPeriod() * 1000;				
+				//retry until time out (microsecond)
+            			
+				for ( ; i < waitPeriod; i+=100 )
 				{
-#ifdef _MSC_VER
-					Sleep(rm_ts.tv_sec * 1000);
-#else
-					struct timespec abs_ts;
-					do
-					{
-						abs_ts.tv_sec = rm_ts.tv_sec;
-						abs_ts.tv_nsec = rm_ts.tv_nsec;
-					}
-					while(nanosleep(&abs_ts,&rm_ts) < 0);
-#endif
-					try {
-						processID = ::getpid();
-						txnid = txnID.id;
-						sessionId = truncTableStmt.fSessionID;
-						processName = "DDLProc";
-						tableLockId = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, &sessionId, &txnid, BRM::LOADING );
-					}
-					catch (std::exception&)
-					{
-						throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-					}
-
-					if (tableLockId > 0)
+					usleep(100);
+						
+					rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, true );
+						
+					if ( rc == 0 )
 						break;
 				}
-				if (i >= numTries) //error out
+    
+				if ( i >= waitPeriod ) //error out
 				{
+					bool  lockStatus;
+					ostringstream oss;
+					u_int32_t sid;
+					rc = fSessionManager.getTableLockInfo( roPair.objnum, processID, processName, lockStatus, sid);	
+					if ( lockStatus )
+					{
+						oss << " table " << truncTableStmt.fTableName->fSchema << "." << truncTableStmt.fTableName->fName << " is locked by " << processName << "  with  ProcessID " << processID;
+						if ((processName == "DMLProc") && (processID > 0))
+						{
+							oss << " due to active bulkrollback.";
+						}
+						oss << endl;
+					}
+					
 					logging::Message::Args args;
-					args.add(processName);
-					args.add((uint64_t)processID);
-					args.add(sessionId);
-					throw std::runtime_error(IDBErrorInfo::instance()->errorMsg(ERR_TABLE_LOCKED,args));
-				}			
+					logging::Message message(9);
+					args.add(oss.str());
+					message.format(args);
+
+					result.result = DROP_ERROR;
+					result.message = message;
+					//release the transaction
+					fSessionManager.rolledback(txnID);
+					return result;
+				}					
+					
 			}
-			CalpontSystemCatalog::TableName userTableName;
-			userTableName.schema = truncTableStmt.fTableName->fSchema;
-			userTableName.table = truncTableStmt.fTableName->fName;
+			else if ( rc  == BRM::ERR_FAILURE)
+			{
+					logging::Message::Args args;
+					logging::Message message(1);
+					args.add("Drop table Failed due to BRM failure");
+					result.result = DROP_ERROR;
+					result.message = message;
+					//release the transaction
+					fSessionManager.rolledback(txnID);
+					return result;
+			}
 
         	tableColRidList = systemCatalogPtr->columnRIDs( userTableName );
-			
+
         	dictOIDList = systemCatalogPtr->dictOIDs( userTableName );
 			for ( unsigned i=0; i < tableColRidList.size(); i++ )
 			{
@@ -654,299 +454,81 @@ cout << "Drop table removing column files" << endl;
 			//Check whether the table has autoincrement column
 			tableInfo = systemCatalogPtr->tableInfo(userTableName);
 		}
-		catch (std::exception& ex)
+		catch (exception& ex)
 		{
-			cerr << "TruncateTableProcessor::processPackage: " << ex.what() << endl;
+			cerr << "DropTableProcessor::processPackage: " << ex.what() << endl;
 		
         	logging::Message::Args args;
-        	logging::Message message(9);
+        	logging::Message message(1);
         	args.add("Truncate table failed: ");
         	args.add( ex.what() );
-        	args.add("");    	 	       	
-        	fSessionManager.rolledback(txnID);
-			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-			}
-			catch (std::exception&)
-			{
-				args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			fWEClient->removeQueue(uniqueId);			
-			message.format( args );
+        	args.add("");
+       	 	message.format( args );
 
         	result.result = TRUNC_ERROR;
         	result.message = message;
+        	
+        	fSessionManager.rolledback(txnID);
+			rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, false );
 			return result;
 		}
 		catch (...)
 		{
-			cerr << "TruncateTableProcessor::processPackage: caught unknown exception!" << endl;
+			cerr << "DropTableProcessor::processPackage: caught unknown exception!" << endl;
 			
         	logging::Message::Args args;
         	logging::Message message(1);
         	args.add("Truncate table failed: ");
         	args.add( "encountered unkown exception" );
         	args.add("");
-       	 	try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-			}
-			catch (std::exception&)
-			{
-				args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			}
-			fWEClient->removeQueue(uniqueId);			
-			message.format( args );
+       	 	message.format( args );
 
         	result.result = TRUNC_ERROR;
         	result.message = message;
+        	fSessionManager.rolledback(txnID);
+			rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, false );
 			return result;
 		}
 		
 		//Save the oids to a file
-		try {
-			createWriteTruncateTableLogFile( roPair.objnum, uniqueId, allOidList);
-		}
-		catch (std::exception& ex)
-		{
-			logging::Message::Args args;
-			logging::Message message(9);
-			args.add("Truncate table failed due to ");
-			args.add(ex.what());
-			fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);			
-			message.format( args );
-			//@bug 4515 Release the tablelock as nothing has done to this table.
-			try {
-				lockReleased =  fDbrm.releaseTableLock(tableLockId);
-			}
-			catch (std::exception&) {}
-			result.result = TRUNC_ERROR;
-			result.message = message;
-			return result;
-		} 
+		createOpenTruncateTableLogFile( roPair.objnum, userTableName );
+		writeLogFile ( userTableName, allOidList );
 		
-		ByteStream bytestream;
-		ByteStream::byte tmp8;
 		try {
+			VERBOSE_INFO("Removing files");
+			uint16_t dbroot = 0;
+			uint32_t partitionNum = 0;
+			fDbrm.getStartExtent(columnOidList[0], dbroot, partitionNum, true);
 			//Disable extents first
-			int rc1 = fDbrm.markAllPartitionForDeletion( allOidList);
-			if (rc1 != 0)
+			rc = fDbrm.markAllPartitionForDeletion( allOidList);
+			if (rc != 0)
 			{
 				string errMsg;
 				BRM::errString(rc, errMsg);
 				throw std::runtime_error(errMsg);
 			}
-
-			VERBOSE_INFO("Removing files");
-			bytestream << (ByteStream::byte)WE_SVR_WRITE_DROPFILES;
-			bytestream << uniqueId;
-			bytestream << (uint32_t) allOidList.size();
-			for (unsigned i=0; i < allOidList.size(); i++)
-			{
-				bytestream << (uint32_t) allOidList[i];
-			}
-		
-			uint msgRecived = 0;
-			try {
-				fWEClient->write_to_all(bytestream);
-
-				bsIn.reset(new ByteStream());
-				
-				while (1)
-				{
-					if (msgRecived == fWEClient->getPmCount())
-						break;
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						fWEClient->removeQueue(uniqueId);
-						break;
-					}			
-					else {
-						*bsIn >> tmp8;
-						rc = tmp8;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-							fWEClient->removeQueue(uniqueId);
-							break;
-						}
-					else
-						msgRecived++;						
-					}
-				}
-			}
-			catch (std::exception& ex)
-			{
-				logging::Message::Args args;
-				logging::Message message(9);
-				args.add("Truncate table failed due to ");
-				args.add(ex.what());
-				fSessionManager.rolledback(txnID);
-				fWEClient->removeQueue(uniqueId);			
-				message.format( args );
-
-				result.result = TRUNC_ERROR;
-				result.message = message;
-				deleteLogFile(TRUNCATE_LOG, roPair.objnum, uniqueId);
-				return result;
-			}
-			catch (...)
-			{
-				result.result = DROP_ERROR;
-				errorMsg = "Error in getting information from system catalog or from dbrm.";
-				logging::Message::Args args;
-				logging::Message message(9);
-				args.add("Truncate table failed due to ");
-				args.add(errorMsg);
-				fSessionManager.rolledback(txnID);
-				fWEClient->removeQueue(uniqueId);			
-				message.format( args );
-
-				result.result = TRUNC_ERROR;
-				result.message = message;
-				deleteLogFile(TRUNCATE_LOG, roPair.objnum, uniqueId);
-				return result;
-			}
-			//Drop PrimProc FD cache
-			rc = cacheutils::dropPrimProcFdCache();
-			//Flush primProc cache
-			rc = cacheutils::flushOIDsFromCache( allOidList );
-			//Delete extents from extent map
-			rc = fDbrm.deleteOIDs(allOidList);
-		
-			if (rc != 0)
-			{
-				logging::Message::Args args;
-				logging::Message message(1);
-				args.add("Table truncated with warning ");
-				args.add( "Remove from extent map failed." );
-				args.add("");
-				args.add("");
-				message.format( args );
-
-				result.result = WARNING;
-				result.message = message;
-				fSessionManager.rolledback(txnID);
-				fWEClient->removeQueue(uniqueId);
-				return result;
-			}
 			
-			//Get the number of tables in the database, the current table is included.
-			int tableCount = systemCatalogPtr->getTableCount();
-			Oam oam;
-			//Calculate which dbroot the columns should start
-			DBRootConfigList dbRootList = oamcache->getDBRootNums();
-		
-			uint16_t useDBRootIndex = tableCount % dbRootList.size();
-			//Find out the dbroot# corresponding the useDBRootIndex from oam
-			uint16_t useDBRoot = dbRootList[useDBRootIndex];
+			removeFiles( txnID.id, allOidList ); //will drop PrimProc FD cache
 			
-			bytestream.restart();
-			bytestream << (ByteStream::byte) WE_SVR_WRITE_CREATETABLEFILES;
-			bytestream << uniqueId;
-			uint32_t numOids = columnOidList.size() + dictOIDList.size();
-			bytestream << numOids;
-			CalpontSystemCatalog::ColType colType;
+			rc = cacheutils::flushOIDsFromCache(allOidList);	
 			
+			VERBOSE_INFO("Removing extents");
+        	removeExtents( txnID.id, result, allOidList );
+			
+			//Create all column and dictionary files
 			for (unsigned col  = 0; col < columnOidList.size(); col++)
 			{
-				colType = systemCatalogPtr->colType(columnOidList[col]);
-				if (colType.autoincrement)
-					autoIncColOid = colType.columnOID;
-				bytestream << (uint32_t)columnOidList[col];
-				bytestream << (u_int8_t) colType.colDataType;
-				bytestream << (u_int8_t) false;
-				bytestream << (uint32_t) colType.colWidth;
-				bytestream << (u_int16_t) useDBRoot;
-				bytestream << (uint32_t) colType.compressionType;			
+				CalpontSystemCatalog::ColType colType = systemCatalogPtr->colType(columnOidList[col]);
+				rc = fWriteEngine.createColumn(txnID.id, columnOidList[col], static_cast<WriteEngine::ColDataType>(colType.colDataType), colType.colWidth, dbroot, 0, colType.compressionType);	
 			}
-			
 			for (unsigned col  = 0; col <dictOIDList.size(); col++)
 			{
-				colType = systemCatalogPtr->colTypeDct(dictOIDList[col].dictOID);
-				bytestream << (uint32_t) dictOIDList[col].dictOID;
-				bytestream << (u_int8_t) colType.colDataType;
-				bytestream << (u_int8_t) true;
-				bytestream << (uint32_t) colType.colWidth;
-				bytestream << (u_int16_t) useDBRoot;
-				bytestream << (uint32_t) colType.compressionType;
+				CalpontSystemCatalog::ColType colType = systemCatalogPtr->colTypeDct(dictOIDList[col].dictOID);
+				rc = fWriteEngine.createDctnry(txnID.id, dictOIDList[col].dictOID, colType.colWidth, dbroot, 0, 0, colType.compressionType );	
 			}
 			
-			boost::shared_ptr<std::map<int, int> > dbRootPMMap = oamcache->getDBRootToPMMap();
-			pmNum = (*dbRootPMMap)[useDBRoot];
-			try
-			{
-#ifdef IDB_DDL_DEBUG
-cout << "Truncate table sending We_SVR_WRITE_CREATETABLEFILES to pm " << pmNum << endl;
-#endif
-				fWEClient->write(bytestream, pmNum);
-				while (1)
-				{
-					bsIn.reset(new ByteStream());
-					fWEClient->read(uniqueId, bsIn);
-					if ( bsIn->length() == 0 ) //read error
-					{
-						rc = NETWORK_ERROR;
-						errorMsg = "Lost connection to Write Engine Server while updating SYSTABLES";
-						break;
-					}			
-					else {
-						*bsIn >> tmp8;
-						rc = tmp8;
-						if (rc != 0) {
-							*bsIn >> errorMsg;
-						}
-						break;
-					}
-				}
-			
-				if (rc != 0) {
-					//drop the newly created files
-					bytestream.restart();
-					bytestream << (ByteStream::byte) WE_SVR_WRITE_DROPFILES;
-					bytestream << uniqueId;
-					bytestream << (uint32_t)(allOidList.size());
-					for (unsigned i = 0; i < (allOidList.size()); i++)
-					{
-						bytestream << (uint32_t)(allOidList[i]);
-					}
-					fWEClient->write(bytestream, pmNum);
-					while (1)
-					{
-						bsIn.reset(new ByteStream());
-						fWEClient->read(uniqueId, bsIn);
-						if ( bsIn->length() == 0 ) //read error
-						{	
-							break;
-						}			
-						else {
-							*bsIn >> tmp8;
-							//rc = tmp8;
-							break;
-						}
-					}
-					logging::Message::Args args;
-					logging::Message message(1);
-					args.add( "Truncate table failed." );
-					args.add( errorMsg);
-					args.add("");
-					message.format( args );
-
-					result.result = TRUNC_ERROR;
-					result.message = message;
-			//rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, false );
-					fSessionManager.rolledback(txnID);
-					return result;
-				}		
-			}
-			catch (runtime_error&)
-			{
-				rc = NETWORK_ERROR;
-				errorMsg = "Lost connection to Write Engine Server";
-			}
 		}
-		catch (std::exception& ex) 
+		catch (exception& ex) 
         {
 #ifdef _MSC_VER
 			//FIXME: Windows can't delete a file that's still open by another process
@@ -981,50 +563,21 @@ cout << "Truncate table sending We_SVR_WRITE_CREATETABLEFILES to pm " << pmNum <
         	fSessionManager.rolledback(txnID);
 			return result;
 		}
-		if (rc != 0)
-		{
-			rollBackTransaction( uniqueId, txnID, truncTableStmt.fSessionID); //What to do with the error code
-			fSessionManager.rolledback(txnID);
-		}
-		
 		//Check whether the table has autoincrement column
 		if (tableInfo.tablewithautoincr == 1)
 		{
 			//reset nextvalue to 1
-			WE_DDLCommandClient commandClient;
-			rc = commandClient.UpdateSyscolumnNextval(autoIncColOid,1);	
+			WriteEngineWrapper::AutoIncrementValue_t nextValueMap;
+			nextValueMap[roPair.objnum] = 1;
+			rc = fWriteEngine.updateNextValue (nextValueMap,truncTableStmt.fSessionID);			
 		}
 		// Log the DDL statement
 		logging::logDDL(truncTableStmt.fSessionID, txnID.id, truncTableStmt.fSql, truncTableStmt.fOwner);
-		try {
-			lockReleased =  fDbrm.releaseTableLock(tableLockId);
-		}
-		catch (std::exception&)
-		{
-			logging::Message::Args args;
-			logging::Message message(1);
-			args.add("Table truncated with warning ");
-			args.add( "Release table failed." );
-			args.add(IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE));
-			args.add("");
-			message.format( args );
-
-			result.result = WARNING;
-			result.message = message;
-			fSessionManager.rolledback(txnID);
-			fWEClient->removeQueue(uniqueId);
-		}
+		rc = fSessionManager.setTableLock( roPair.objnum, truncTableStmt.fSessionID, processID, processName, false );
         //release the transaction
         fSessionManager.committed(txnID);
-		fWEClient->removeQueue(uniqueId);
 		//Remove the log file
-		try {
-			deleteLogFile(TRUNCATE_LOG, roPair.objnum, uniqueId);
-		}
-		catch ( ... )
-		{
-		}
-
+		deleteLogFile();
         return result;
     }
 

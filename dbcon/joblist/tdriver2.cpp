@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: tdriver2.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: tdriver2.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -31,7 +31,7 @@ typedef CalpontSystemCatalog::OID OID_t;
 typedef CalpontSystemCatalog::ColType ColType_t;
 typedef CalpontSystemCatalog::ROPair ROPair_t;
 
-boost::shared_ptr<CalpontSystemCatalog> csc;
+CalpontSystemCatalog* csc;
 
 string toString(const string& tb, const string& col)
 {
@@ -68,7 +68,6 @@ int main(int argc, char** argv)
 	cout << toString(table, "numofrows") << endl;
 	cout << toString(table, "avgrowlen") << endl;
 	cout << toString(table, "numofblocks") << endl;
-	cout << toString(table, "autoincrement") << endl;
 	cout << endl;
 
 	table = "syscolumn";
@@ -94,10 +93,8 @@ int main(int argc, char** argv)
 	cout << toString(table, "nullcount") << endl;
 	cout << toString(table, "minvalue") << endl;
 	cout << toString(table, "maxvalue") << endl;
-	cout << toString(table, "compressiontype") << endl;
-	cout << toString(table, "nextvalue") << endl;
 	cout << endl;
-#if 0
+
 	table = "sysindexcol";
 	rp = csc->tableRID(make_table(calpontsys, table));
 	cout << "   " << table << ": " << rp.objnum << endl;
@@ -156,7 +153,7 @@ int main(int argc, char** argv)
 	cout << toString(table, "clusterfactor") << endl;
 	cout << toString(table, "lastanalysisdate") << endl;
 	cout << endl;
-#endif
+
 	return 0;
 }
 

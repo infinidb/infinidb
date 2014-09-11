@@ -43,7 +43,7 @@ class ByteStreamTestSuite : public CppUnit::TestFixture {
 CPPUNIT_TEST_SUITE( ByteStreamTestSuite );
 
 CPPUNIT_TEST( bs_1 );
-CPPUNIT_TEST( bs_1_1 );
+
 CPPUNIT_TEST( bs_2 );
 CPPUNIT_TEST( bs_3 );
 CPPUNIT_TEST( bs_4 );
@@ -149,52 +149,6 @@ void bs_1() {
 	bs << b;
 	CPPUNIT_ASSERT(bs.length() == 15);
 	b = 0;
-
-	bs >> o;
-	CPPUNIT_ASSERT(o == 0xdeadbeefbadc0ffeLL);
-	CPPUNIT_ASSERT(bs.length() == 7);
-	bs >> q;
-	CPPUNIT_ASSERT(q == 0xdeadbeef);
-	CPPUNIT_ASSERT(bs.length() == 3);
-	bs >> d;
-	CPPUNIT_ASSERT(d == 0xf00f);
-	CPPUNIT_ASSERT(bs.length() == 1);
-	bs >> b;
-	CPPUNIT_ASSERT(b == 0x0f);
-	CPPUNIT_ASSERT(bs.length() == 0);
-}
-
-void bs_1_1() {
-
-	bs.reset();
-
-	o = 0xdeadbeefbadc0ffeLL;
-	bs << o;
-	CPPUNIT_ASSERT(bs.length() == 8);
-	o = 0;
-
-	q = 0xdeadbeef;
-	bs << q;
-	CPPUNIT_ASSERT(bs.length() == 12);
-	q = 0;
-
-	d = 0xf00f;
-	bs << d;
-	CPPUNIT_ASSERT(bs.length() == 14);
-	d = 0;
-
-	b = 0x0f;
-	bs << b;
-	CPPUNIT_ASSERT(bs.length() == 15);
-	b = 0;
-
-	ByteStream bbs1;
-	bbs1 << bs;
-	CPPUNIT_ASSERT(bbs1.length() == bs.length() + 4);
-	bs.reset();
-	bbs1 >> bs;
-	CPPUNIT_ASSERT(bbs1.length() == 0);
-	CPPUNIT_ASSERT(bs.length() == 15);
 
 	bs >> o;
 	CPPUNIT_ASSERT(o == 0xdeadbeefbadc0ffeLL);
@@ -967,48 +921,6 @@ static void startServer_17()
 // 	cout << "startserver exiting" << endl;
 }
 
-struct Serv18thd
-{
-void operator()()
-{
-	ByteStream msg;
-	struct timespec ts = {1, 0};
-	while (*fKeepRunning)
-	{
-		try
-		{
-			msg.reset();
-			msg = fSock.read(&ts);
-		} catch (SocketClosed &e)
-		{
-		}
-		if (msg.length() > 0 && *fKeepRunning)
-			fSock.write(msg);
-	}
-}
-Serv18thd(const IOSocket& s, volatile bool* kr) : fSock(s), fKeepRunning(kr) {}
-~Serv18thd() {}
-IOSocket fSock;
-volatile bool* fKeepRunning;
-};
-
-static void startServer_18()
-{
-	boost::thread_group tg;
-	MessageQueueServer server("server3", "./Calpont.xml");
-	struct timespec ts = {1, 0};
-	IOSocket sock;
-	isRunning = true;
-	while (keepRunning)
-	{
-		sock = server.accept(&ts);
-		if (sock.socketParms().sd() > -1)
-			tg.create_thread(Serv18thd(sock, &keepRunning));
-	}
-	tg.join_all();
-	isRunning = false;
-}
-
 static void startBrokenServer()
 {
 	MessageQueueServer* inMq;
@@ -1100,8 +1012,6 @@ CPPUNIT_TEST_EXCEPTION( mq_14, std::runtime_error );
 CPPUNIT_TEST( mq_15 );
 CPPUNIT_TEST( mq_16 );	// test the fix for bug #224
 CPPUNIT_TEST( mq_17 );
-CPPUNIT_TEST( mq_18 );
-CPPUNIT_TEST( mq_19 );
 
 CPPUNIT_TEST_SUITE_END();
 
@@ -1568,48 +1478,6 @@ void mq_17()
 	delete srvThread;
 	srvThread = NULL;
         Config::deleteInstanceMap();
-}
-
-void mq_18()
-{
-
-	MessageQueueClient client1("server3", "./Calpont.xml");
-	MessageQueueClient client2("server3", "./Calpont.xml");
-
-	isRunning = false;
-	keepRunning = true;
-	srvThread = new boost::thread(startServer_18);
-	
-	while (!isRunning)
-		usleep(250000);
-
-	//connect 
-	bs << (uint8_t) 1;
-	client1.write(bs);
-	bs = client1.read();
-	bs << (uint8_t) 1;
-	client2.write(bs);
-	bs = client2.read();
-
-	// 
-	CPPUNIT_ASSERT(client1.isSameAddr(client2));
-
-	CPPUNIT_ASSERT(client1.addr2String() == "127.0.0.1");
-
-	keepRunning = false;
-	srvThread->join();
-	delete srvThread;
-	srvThread = NULL;
-        Config::deleteInstanceMap();
-}
-
-void mq_19()
-{
-	CPPUNIT_ASSERT(InetStreamSocket::ping("10.100.4.1", 0) == 0);
-	CPPUNIT_ASSERT(InetStreamSocket::ping("10.100.4.254", 0) == -1);
-	struct timespec ts = {20,0};
-	CPPUNIT_ASSERT(InetStreamSocket::ping("10.100.4.1", &ts) == 0);
-	CPPUNIT_ASSERT(InetStreamSocket::ping("10.100.4.254", &ts) == -1);
 }
 
 }; 

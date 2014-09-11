@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor.cpp 2012 2012-12-10 21:08:03Z xlou $
+// $Id: batchprimitiveprocessor.cpp 1944 2012-09-05 20:27:53Z pleblanc $
 // C++ Implementation: batchprimitiveprocessor
 //
 // Description: 
@@ -50,7 +50,6 @@ using namespace boost;
 #include "funcexpwrapper.h"
 #include "fixedallocator.h"
 #include "blockcacheclient.h"
-#include "monitorprocmem.h"
 
 #define MAX64 0x7fffffffffffffffLL
 #define MIN64 0x8000000000000000LL
@@ -108,6 +107,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
 	hasDictStep(false),
 	sockIndex(0)
 {
+	//pthread_mutex_init(&objLock, NULL);
+	//pthread_mutex_init(&counterLock, NULL);
 	pp.setLogicalBlockMode(true);
 	pp.setBlockPtr((int *) blockData);
 }
@@ -148,6 +149,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream &b, double prefetch,
 	hasDictStep(false),
 	sockIndex(0)
 {
+	//pthread_mutex_init(&objLock, NULL);
+	//pthread_mutex_init(&counterLock, NULL);
 	pp.setLogicalBlockMode(true);
 	pp.setBlockPtr((int *) blockData);
 	sendThread = bppst;
@@ -164,6 +167,7 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(const BatchPrimitiveProcessor &
 
 BatchPrimitiveProcessor::~BatchPrimitiveProcessor()
 {
+//	serialized.detach();  // TODO: explain why this matters.  Out of order destruction happening?
 	//FIXME: just do a sync fetch
 	counterLock.lock(); // need to make sure the loader has exited
 	while (busyLoaderCount > 0)
@@ -231,7 +235,8 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 	}
 
 	if (doJoin) {
-		objLock.lock();
+		//pthread_mutex_init(&addToJoinerLock, NULL);
+		objLock.lock(); //pthread_mutex_lock(&objLock);
 		if (ot == ROW_GROUP) {
 			bs >> joinerCount;
 // 			cout << "joinerCount = " << joinerCount << endl;
@@ -255,6 +260,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				bs >> tJoinerSizes[i];
  				//cout << "joiner size = " << tJoinerSizes[i] << endl;
 				bs >> joinTypes[i];
+				bs >> joinNullValues[i];
 				bs >> tmp8;
 				typelessJoin[i] = (bool) tmp8;
 				if (joinTypes[i] & WITHFCNEXP) {
@@ -265,7 +271,6 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				if (joinTypes[i] & SMALLOUTER)
 					hasSmallOuterJoin = true;
 				if (!typelessJoin[i]) {
-					bs >> joinNullValues[i];
 					bs >> largeSideKeyColumns[i];
  					//cout << "large side key is " << largeSideKeyColumns[i] << endl;
 					_pools[i].reset(new utils::SimplePool());
@@ -286,7 +291,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 			if (getTupleJoinRowGroupData) {
 				deserializeVector(bs, smallSideRGs);
 // 				cout << "deserialized " << smallSideRGs.size() << " small-side rowgroups\n";
-				idbassert(smallSideRGs.size() == joinerCount);
+				assert(smallSideRGs.size() == joinerCount);
 				smallSideRowLengths.reset(new uint[joinerCount]);
 				smallSideRowData.reset(new shared_array<uint8_t>[joinerCount]);
 				smallNullRowData.reset(new shared_array<uint8_t>[joinerCount]);
@@ -319,9 +324,6 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 			bs >> joinerSize;
 			joiner.reset(new Joiner((bool) tmp8));
 		}
-#ifdef __FreeBSD__
-		objLock.unlock();
-#endif
 	}
 
 	bs >> filterCount;
@@ -383,15 +385,14 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 	uint i;
 	vector<uint64_t> preloads;
 
-	objLock.lock();
+	objLock.lock(); //pthread_mutex_lock(&objLock);
 
 	writelock = w;
 	sock = s;
 	newConnection = true;
 
-	// skip the header, sessionID, stepID, uniqueID, and priority
-	bs.advance(sizeof(ISMPacketHeader) + 16);
-	bs >> dbRoot;
+	bs.advance(sizeof(ISMPacketHeader) + 12);  // skip the header, sessionID, stepID, and uniqueID
+
 	bs >> count;
 	if (hasRowGroup) {
 		uint32_t rgSize;
@@ -435,7 +436,7 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 		projectSteps[i]->resetCommand(bs);
 	}
 
-	idbassert(bs.length() == 0);
+	assert(bs.length() == 0);
 
 	/* init vars not part of the BS */
 	currentBlockOffset = 0;
@@ -446,9 +447,6 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream &bs, const SP_UM_MUTEX& w,
 		initFromRowGroup();
 
 	buildVSSCache(count);
-#ifdef __FreeBSD__
-	objLock.unlock();
-#endif
 }
 
 void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
@@ -465,14 +463,14 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 	} *arr;
 #pragma pack(pop)
 
-	addToJoinerLock.lock();
+	addToJoinerLock.lock(); //pthread_mutex_lock(&addToJoinerLock);
 	/* skip the header */
 	bs.advance(sizeof(ISMPacketHeader) + 3*sizeof(uint32_t));
 
 	bs >> count;
 	if (ot == ROW_GROUP) {
 		bs >> joinerNum;
-		idbassert(joinerNum < joinerCount);
+		assert(joinerNum < joinerCount);
 		arr = (JoinerElements *) bs.buf();
 // 		cout << "reading " << count << " elements from the bs, joinerNum is " << joinerNum << "\n";
 		for (i = 0; i < count; i++) {
@@ -503,7 +501,7 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 // 			cout << "copying full row data for joiner " << joinerNum << endl;
 			/* Need to update this assertion if there's a typeless join.  search
 			for nullFlag. */
-// 			idbassert(ssrdPos[joinerNum] + (count * smallSideRowLengths[joinerNum]) <=
+// 			assert(ssrdPos[joinerNum] + (count * smallSideRowLengths[joinerNum]) <=
 // 				smallSideRGs[joinerNum].getEmptySize() +
 // 				(smallSideRowLengths[joinerNum] * tJoinerSizes[joinerNum]));
 			memcpy(&smallSideRowData[joinerNum][ssrdPos[joinerNum]], bs.buf(),
@@ -529,8 +527,8 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream &bs)
 		}
 		bs.advance(count << 4);
 	}
-	idbassert(bs.length() == 0);
-	addToJoinerLock.unlock();
+	assert(bs.length() == 0);
+	addToJoinerLock.unlock(); //pthread_mutex_unlock(&addToJoinerLock);
 }
 
 void BatchPrimitiveProcessor::endOfJoiner()
@@ -538,34 +536,32 @@ void BatchPrimitiveProcessor::endOfJoiner()
 	/* Wait for all joiner elements to be added */
 	uint i;
 
-	addToJoinerLock.lock();
+	addToJoinerLock.lock(); //pthread_mutex_lock(&addToJoinerLock);
 	if (ot == ROW_GROUP)
 		for (i = 0; i < joinerCount; i++) {
 			if (!typelessJoin[i])
 				while ((tJoiners[i].get() == NULL || tJoiners[i]->size() !=
 				  tJoinerSizes[i])) {
-					addToJoinerLock.unlock();
+					addToJoinerLock.unlock(); //pthread_mutex_unlock(&addToJoinerLock);
 					usleep(2000);
-					addToJoinerLock.lock();
+					addToJoinerLock.lock(); //pthread_mutex_lock(&addToJoinerLock);
 				}
 			else
 				while ((tlJoiners[i].get() == NULL || tlJoiners[i]->size() !=
 				  tJoinerSizes[i])) {
-					addToJoinerLock.unlock();
+					addToJoinerLock.unlock(); //pthread_mutex_unlock(&addToJoinerLock);
 					usleep(2000);
-					addToJoinerLock.lock();
+					addToJoinerLock.lock(); //pthread_mutex_lock(&addToJoinerLock);
 				}
 		}
 	else
 		while (joiner.get() == NULL || joiner->size() != joinerSize) {
-			addToJoinerLock.unlock();
+			addToJoinerLock.unlock(); //pthread_mutex_unlock(&addToJoinerLock);
 			usleep(2000);
-			addToJoinerLock.lock();
+			addToJoinerLock.lock(); //pthread_mutex_lock(&addToJoinerLock);
 		}
-	addToJoinerLock.unlock();
-#ifndef __FreeBSD__
-	objLock.unlock();
-#endif
+	addToJoinerLock.unlock(); //pthread_mutex_unlock(&addToJoinerLock);
+	objLock.unlock(); //pthread_mutex_unlock(&objLock);
 }
 
 void BatchPrimitiveProcessor::initProcessor()
@@ -1382,7 +1378,7 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 		Add additional RowGroup processing here. 
 		TODO:  Try to clean up all of the switching */
 
-        if (doJoin && (fe2 || fAggregator)) {
+		if (doJoin && getTupleJoinRowGroupData) {
 			bool moreRGs = true;
 			ByteStream preamble = *serialized;
 			initGJRG();
@@ -1402,7 +1398,6 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 				if (fe2) {
 					/* functionize this -> processFE2()*/
 					fe2Output.resetRowGroup(baseRid);
-					fe2Output.setDBRoot(dbRoot);
 					fe2Output.getRow(0, &fe2Out);
 					fe2Input->getRow(0, &fe2In);
 					for (j = 0; j < joinedRG.getRowCount(); j++, fe2In.nextRow())
@@ -1414,20 +1409,10 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 						}
 				}
 				RowGroup &nextRG = (fe2 ? fe2Output : joinedRG);
-				nextRG.setDBRoot(dbRoot);
 				if (fAggregator) {
+					fAggregator->reset();
 					fAggregator->addRowGroup(&nextRG);
-
-					if ((currentBlockOffset+1) == count && moreRGs == false) {  // @bug4507, 8k
-						fAggregator->loadResult(*serialized);                   // @bug4507, 8k
-					}                                                           // @bug4507, 8k
-					else if (MonitorProcMem::flushAggregationMem()) {           // @bug4507, 8k
-						fAggregator->loadResult(*serialized);                   // @bug4507, 8k
-						fAggregator->reset();                                   // @bug4507, 8k
-					}                                                           // @bug4507, 8k
-					else {                                                      // @bug4507, 8k
-						fAggregator->loadEmptySet(*serialized);                 // @bug4507, 8k
-					}                                                           // @bug4507, 8k
+					fAggregator->loadResult(*serialized);
 				}
 				else {
 					*serialized << nextRG.getDataSize();
@@ -1440,7 +1425,6 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 					*serialized = preamble;
 				}
 			}
-
 			if (hasSmallOuterJoin) {
 				*serialized << ridCount;
 				for (i = 0; i < joinerCount; i++)
@@ -1465,7 +1449,6 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 			}
 			if (!fAggregator) {
 				*serialized << (uint8_t) 1;  // the "count this msg" var
-				fe2Output.setDBRoot(dbRoot);
 				*serialized << fe2Output.getDataSize();
 				serialized->append(fe2Output.getData(), fe2Output.getDataSize());
 			}
@@ -1473,27 +1456,13 @@ stopwatch->start("BatchPrimitiveProcessor::execute fourth part");
 
 		if (!doJoin && fAggregator) {
 			*serialized << (uint8_t) 1;  // the "count this msg" var
-
-			if (fe2)
-				fe2Output.setDBRoot(dbRoot);
-			else
-				outputRG.setDBRoot(dbRoot);
+			fAggregator->reset();
 			fAggregator->addRowGroup(&(fe2 ? fe2Output : outputRG));
-			if ((currentBlockOffset+1) == count) {                    // @bug4507, 8k
-				fAggregator->loadResult(*serialized);                 // @bug4507, 8k
-			}                                                         // @bug4507, 8k
-			else if (MonitorProcMem::flushAggregationMem()) {         // @bug4507, 8k
-				fAggregator->loadResult(*serialized);                 // @bug4507, 8k
-				fAggregator->reset();                                 // @bug4507, 8k
-			}                                                         // @bug4507, 8k
-			else  {                                                   // @bug4507, 8k
-				fAggregator->loadEmptySet(*serialized);               // @bug4507, 8k
-			}                                                         // @bug4507, 8k
+			fAggregator->loadResult(*serialized);
 		}
 
-		if (!fAggregator && !fe2) {
+		if (!getTupleJoinRowGroupData && !fAggregator && !fe2) {
 			*serialized << (uint8_t) 1;  // the "count this msg" var
-			outputRG.setDBRoot(dbRoot);
 			*serialized << outputRG.getDataSize();
 			serialized->append(outputRG.getData(), outputRG.getDataSize());
 			if (doJoin) {
@@ -1597,9 +1566,7 @@ stopwatch->stop("BatchPrimitiveProcessor::execute fourth part");
 		} catch (...) { }   // doesn't matter if this fails, just avoid crashing
 #endif
 
-#ifndef __FreeBSD__
 		objLock.unlock();
-#endif
 		throw n;   // need to pass this through to BPPSeeder
 	}
 	catch (IDBExcept& iex)
@@ -1626,10 +1593,6 @@ void BatchPrimitiveProcessor::writeErrorMsg(const string& error, uint16_t errCod
 	ISMPacketHeader ism;
 	PrimitiveHeader ph;
 
-	// we don't need every field of these headers.  Init'ing them anyway 
-	// makes memory checkers happy.
-	memset(&ism, 0, sizeof(ISMPacketHeader));
-	memset(&ph, 0, sizeof(PrimitiveHeader));
 	ph.SessionID = sessionID;
 	ph.StepID = stepID;
 	ph.UniqueID = uniqueID;
@@ -1651,10 +1614,6 @@ void BatchPrimitiveProcessor::writeProjectionPreamble()
 	ISMPacketHeader ism;
 	PrimitiveHeader ph;
 
-	// we don't need every field of these headers.  Init'ing them anyway 
-	// makes memory checkers happy.
-	memset(&ism, 0, sizeof(ISMPacketHeader));
-	memset(&ph, 0, sizeof(PrimitiveHeader));
 	ph.SessionID = sessionID;
 	ph.StepID = stepID;
 	ph.UniqueID = uniqueID;
@@ -1738,10 +1697,6 @@ void BatchPrimitiveProcessor::makeResponse()
 	ISMPacketHeader ism;
 	PrimitiveHeader ph;
 
-	// we don't need every field of these headers.  Init'ing them anyway 
-	// makes memory checkers happy.
-	memset(&ism, 0, sizeof(ISMPacketHeader));
-	memset(&ph, 0, sizeof(PrimitiveHeader));
 	ph.SessionID = sessionID;
 	ph.StepID = stepID;
 	ph.UniqueID = uniqueID;
@@ -1849,11 +1804,8 @@ int BatchPrimitiveProcessor::operator()()
 		stopwatch->start(msg);
 #endif
 
-		idbassert(count > 0);
+		assert(count > 0);
 	}
-
-	if (fAggregator && currentBlockOffset == 0)                     // @bug4507, 8k
-		fAggregator->reset();                                       // @bug4507, 8k
 
 	for (; currentBlockOffset < count; currentBlockOffset++) {
 		if (!(sessionID & 0x80000000)) {   // can't do this with syscat queries
@@ -1894,9 +1846,7 @@ int BatchPrimitiveProcessor::operator()()
 	}
 
 	vssCache.clear();
-#ifndef __FreeBSD__
 	objLock.unlock();
-#endif
 	freeLargeBuffers();
 #ifdef PRIMPROC_STOPWATCH
 	stopwatch->stop(msg);
@@ -1993,7 +1943,8 @@ SBPP BatchPrimitiveProcessor::duplicate()
 	}
 	bpp->doJoin = doJoin;
 	if (doJoin) {
-		bpp->objLock.lock();
+		//pthread_mutex_init(&bpp->addToJoinerLock, NULL);
+		bpp->objLock.lock(); //pthread_mutex_lock(&bpp->objLock);
 		bpp->joinerSize = joinerSize;
 		if (ot == ROW_GROUP) {
 			/* There are add'l join vars, but only these are necessary for processing
@@ -2031,9 +1982,6 @@ SBPP BatchPrimitiveProcessor::duplicate()
 		}
 		else
 			bpp->joiner = joiner;
-#ifdef __FreeBSD__
-		bpp->objLock.unlock();
-#endif
 	}
 
 	bpp->filterCount = filterCount;
@@ -2112,6 +2060,11 @@ bool BatchPrimitiveProcessor::operator==(const BatchPrimitiveProcessor &bpp) con
 		if (*projectSteps[i] != *bpp.projectSteps[i])
 			return false;
 	return true;
+}
+
+bool BatchPrimitiveProcessor::operator!=(const BatchPrimitiveProcessor &bpp) const
+{
+	return !(*this == bpp);
 }
 
 void BatchPrimitiveProcessor::asyncLoadProjectColumns()
@@ -2211,7 +2164,6 @@ void BatchPrimitiveProcessor::resetGJRG()
 	gjrgFull = false;
 	joinedRG.resetRowGroup(baseRid);
 	joinedRG.getRow(0, &joinedRow);
-	joinedRG.setDBRoot(dbRoot);
 }
 
 void BatchPrimitiveProcessor::initGJRG()
@@ -2289,6 +2241,15 @@ void BatchPrimitiveProcessor::buildVSSCache(uint loopCount)
 			vssCache.insert(make_pair(lbidList[i], vssData[i]));
 //	cout << "buildVSSCache inserted " << vssCache.size() << " elements" << endl;
 }
+
+#if 0
+void BatchPrimitiveProcessor::setError(const string& errorStr, uint16_t errCode)
+{
+	writeErrorMsg(errorStr, errCode);
+	pthread_mutex_unlock(&objLock);
+	error = errCode;
+}
+#endif
 
 }
 // vim:ts=4 sw=4:

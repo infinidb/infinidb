@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/timeb.h>
 #include <we_dbfileop.h>
 #include <we_index.h>
 #include <iostream>

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: messagelog.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: messagelog.cpp 2923 2011-11-10 14:15:10Z rdempsey $
 *
 ******************************************************************************************/
 #include <sstream>
@@ -26,12 +26,7 @@
 #include <syslog.h>
 #include <iostream>
 #include <unistd.h>
-#include <vector>
-#include <string>
 using namespace std;
-
-#include <boost/assign.hpp>
-namespace ba=boost::assign;
 
 #include "messagelog.h"
 #include "loggingid.h"
@@ -40,46 +35,6 @@ namespace ba=boost::assign;
 
 namespace {
 using namespace logging;
-
-/*
- * This list matches SubsystemIDs.txt, but has names matching Process Config DB
- */
-const vector<string> SubsystemID = ba::list_of
-	("Calpont")		// id =  0 default
-	("ddljoblist")		// id =  1
-	("ddlpackage")		// id =  2
-	("dmlpackage")		// id =  3
-	("execplan")		// id =  4
-	("joblist")		// id =  5
-	("resultset")		// id =  6
-	("calpontConsole")	// id =  7
-	("oamcpp")		// id =  8
-	("ServerMonitor")	// id =  9
-	("traphandler")		// id = 10
-	("snmpmanager")		// id = 11
-	("configcpp")		// id = 12
-	("loggingcpp")		// id = 13
-	("messageqcpp")		// id = 14
-	("DDLProc")		// id = 15
-	("ExeMgr")		// id = 16
-	("ProcessManager")	// id = 17
-	("ProcessMonitor")	// id = 18
-	("writeengine")		// id = 19
-	("DMLProc")		// id = 20
-	("dmlpackageproc")	// id = 21
-	("threadpool")		// id = 22
-	("ddlpackageproc")	// id = 23
-	("dbcon")		// id = 24
-	("DiskManager")		// id = 25
-	("RouteMsg")		// id = 26
-	("SQLBuffMgr")		// id = 27
-	("PrimProc")		// id = 28
-	("controllernode")	// id = 29
-	("workernode")		// id = 30
-	("messagequeue")	// id = 31
-	("writeengineserver")//id = 32
-	("writeenginesplit")// id = 33
-	;
 
 string timestr()
 {
@@ -111,7 +66,7 @@ void closeLog()
 
 void openLog(unsigned subsystemid, int localLogNum)
 {
-	if (subsystemid >= SubsystemID.size())
+	if (subsystemid > MAXSUBSYSTEMID)
 		subsystemid = 0;
 }
 
@@ -131,6 +86,47 @@ const string escape_pct(const string& in)
 }
 
 namespace logging {
+
+/*
+ * This list matches SubsystemIDs.txt, but has names matching Process Config DB
+ */
+const std::string SubsystemID[] =
+{
+	"Calpont",		// id =  0 default
+	"ddljoblist",		// id =  1
+	"ddlpackage",		// id =  2
+	"dmlpackage",		// id =  3
+	"execplan",		// id =  4
+	"joblist",		// id =  5
+	"resultset",		// id =  6
+	"calpontConsole",	// id =  7
+	"oamcpp",		// id =  8
+	"ServerMonitor",	// id =  9
+	"traphandler",		// id = 10
+	"snmpmanager",		// id = 11
+	"configcpp",		// id = 12
+	"loggingcpp",		// id = 13
+	"messageqcpp",		// id = 14
+	"DDLProc",		// id = 15
+	"ExeMgr",		// id = 16
+	"ProcessManager",	// id = 17
+	"ProcessMonitor",	// id = 18
+	"writeengine",		// id = 19
+	"DMLProc",		// id = 20
+	"dmlpackageproc",	// id = 21
+	"threadpool",		// id = 22
+	"ddlpackageproc",	// id = 23
+	"dbcon",		// id = 24
+	"DiskManager",		// id = 25
+	"RouteMsg",		// id = 26
+	"SQLBuffMgr",		// id = 27
+	"PrimProc",		// id = 28
+	"controllernode",	// id = 29
+	"workernode",		// id = 30
+	"messagequeue",		// id = 31
+};
+
+const unsigned MAXSUBSYSTEMID = (sizeof(SubsystemID) / sizeof(SubsystemID[0]) - 1);
 
 MessageLog::MessageLog(const LoggingID& initData, int localLogNum) :
 	fLogData(initData), fFacility(localLogNum)
@@ -212,6 +208,7 @@ void logDML(unsigned sessionId, unsigned txnId, const string& statement, const s
 
 	logging::LoggingID loggingId(subsystemId, sessionId, txnId, threadId);
 	logging::MessageLog messageLog(loggingId, LOG_LOCAL2);
+	// args.reset();
 	logging::Message m(M0017);
 	args.add("|" + owner + "|" + statement);
 	m.format(args);
@@ -227,6 +224,7 @@ void logDDL(unsigned sessionId, unsigned txnId, const string& statement, const s
 
 	logging::LoggingID loggingId(subsystemId, sessionId, txnId, threadId);
 	logging::MessageLog messageLog(loggingId, LOG_LOCAL2);
+	// args.reset();
 	logging::Message m(M0018);
 	args.add("|" + owner + "|" + statement);
 	m.format(args);
@@ -241,6 +239,7 @@ void logCommand(unsigned sessionId, unsigned txnId, const string& statement) {
 
 	logging::LoggingID loggingId(subsystemId, sessionId, txnId, threadId);
 	logging::MessageLog messageLog(loggingId, LOG_LOCAL2);
+	// args.reset();
 	logging::Message m(M0019);
 	args.add("|" + statement);
 	m.format(args);
@@ -255,6 +254,7 @@ void logEventToDataLog(unsigned messageId, const string& messageText) {
 
 	logging::LoggingID loggingId(subsystemId, 0, 0, threadId);
 	logging::MessageLog messageLog(loggingId, LOG_LOCAL2);
+	// args.reset();
 	logging::Message m(messageId);
 	args.add(messageText);
 	m.format(args);

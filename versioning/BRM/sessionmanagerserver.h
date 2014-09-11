@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: sessionmanagerserver.h 1704 2012-09-19 18:26:16Z pleblanc $
+ * $Id: sessionmanagerserver.h 1546 2012-04-03 18:32:59Z dcathey $
  *
  *****************************************************************************/
 
@@ -27,12 +27,15 @@
 #ifndef _SESSIONMANAGERSERVER_H
 #define _SESSIONMANAGERSERVER_H
 
-#include <map>
-#include "calpontsystemcatalog.h"
-#include "brmtypes.h"
-#include "boost/shared_array.hpp"
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/sync/interprocess_semaphore.hpp>
 
-#if defined(_MSC_VER) && defined(xxxSESSIONMANAGERSERVER_DLLEXPORT)
+#include "calpontsystemcatalog.h"
+#include "shmkeys.h"
+#include "brmtypes.h"
+
+#if defined(_MSC_VER) && defined(SESSIONMANAGERSERVER_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -41,6 +44,12 @@
 #ifdef _MSC_VER
 #pragma warning (push)
 #pragma warning (disable : 4200)
+#endif
+
+#ifndef __GNUC__
+#  ifndef __attribute__
+#    define __attribute__(x)
+#  endif
 #endif
 
 namespace BRM {
@@ -88,13 +97,10 @@ public:
 	/** @brief SID = Session ID */
 	typedef u_int32_t SID;
 
-	// State flags. These bit values are stored in Overlay::state and reflect the current state of the system
-	static const uint32_t SS_READY;				/// bit 0 => Set by dmlProc one time when dmlProc is ready
-	static const uint32_t SS_SUSPENDED;			/// bit 1 => Set by console when the system has been suspended by user.
-	static const uint32_t SS_SUSPEND_PENDING;	/// bit 2 => Set by console when user wants to suspend, but writing is occuring.
-	static const uint32_t SS_SHUTDOWN_PENDING;	/// bit 3 => Set by console when user wants to shutdown, but writing is occuring.
-	static const uint32_t SS_ROLLBACK;			/// bit 4 => In combination with a PENDING flag, force a rollback as soom as possible.
-	static const uint32_t SS_FORCE;				/// bit 5 => In combination with a PENDING flag, force a shutdown without rollback.
+	enum SystemState {
+		SS_NOT_READY,
+		SS_READY,
+	};
 
 	/** @brief Constructor
 	 *
@@ -194,10 +200,21 @@ public:
 	 * @return A pointer to the array.  Note: The caller is responsible for
 	 * deallocating it.  Use delete[].
 	 */
-	EXPORT boost::shared_array<SIDTIDEntry> SIDTIDMap(int &len);
+	EXPORT const BRM::SIDTIDEntry* SIDTIDMap(int& len);
+	
+	EXPORT char * getShmContents(int &len);
 
 	EXPORT const uint32_t getUnique32();
-	EXPORT const uint64_t getUnique64();
+
+	/** @brief Returns the number of active transactions.  Only useful in testing.
+	 * 
+	 * This returns the number of active transactions and verifies it against
+	 * the transaction semaphore's value and the value reported by shared->txnCount.
+	 * @note Throws logic_error if there's a mismatch, runtime_error on a 
+	 * semaphore operation error.
+	 * @return The number of active transactions.
+	 */
+	EXPORT int verifySize();
 
 	/** @brief Resets the semaphores to their original state.  For testing only.
 	 * 
@@ -206,58 +223,92 @@ public:
 	EXPORT void reset();
 
 	EXPORT std::string getTxnIDFilename() const;
+	/** @brief set a table to lock/unlock state
+	 * 
+	 * set the table to lock/unlock state depending on lock request. error code will be returned.
+	 */
+	EXPORT int8_t  setTableLock (  const OID_t tableOID, const u_int32_t sessionID,  const u_int32_t processID, const std::string processName, bool tolock ) ;
+	/** @brief update a table lock
+	 * 
+	 * validate and update the table lock if the original lock is not valid anymore. The lock is
+	 * consided to be still valid if the process hold the tablelock is still active. error code will be returned.
+	 */
+	EXPORT int8_t  updateTableLock (  const OID_t tableOID,  u_int32_t& processID, std::string & processName ) ;
+	
+	
+	/** @brief get table lock information
+	 * 
+	 * if the table is locked, the processID, processName will be valid. error code will be returned.
+	 */
+	EXPORT int8_t getTableLockInfo ( const OID_t tableOID, u_int32_t & processID,
+		std::string & processName, bool & lockStatus, SID & sid );
+	
+	EXPORT std::vector<BRM::SIDTIDEntry>  getTableLocksInfo ();
 
 	/** @brief set system state info
 	 * 
-	 * Sets the bits on in Overlay::systemState that are found on in 
-	 * state. That is Overlay::systemState | state.
+	 * used to keep cpimport from starting until DMLProc has finished rollback
 	 */
-	EXPORT void setSystemState(uint32_t state);
-
-	/** @brief set system state info
-	 *  
-	 * Clears the bits on in Overlay::systemState that are found on 
-	 * in state. That is Overlay::systemState & ~state. 
-	 */
-	EXPORT void clearSystemState(uint32_t state);
+	EXPORT int8_t setSystemState(int state);
 
 	/** @brief get system state info
 	 * 
-	 * Returns the Overlay::systemState flags
+	 * used to keep cpimport from starting until DMLProc has finished rollback
 	 */
-	EXPORT void getSystemState(uint32_t &state);
+	EXPORT int8_t getSystemState(int& state);
 	
-	EXPORT uint32_t getTxnCount();
-
 private:
 	SessionManagerServer(const SessionManagerServer&);
 	SessionManagerServer& operator=(const SessionManagerServer&);
 
-	void loadState();
-	void saveSystemState();
-	void finishTransaction(TxnID& txn);
-
-#ifdef _MSC_VER
-	volatile LONG unique32;
-	volatile LONG64 unique64;
-#else
-	uint32_t unique32;
-	uint64_t unique64;
-#endif
-
-	int maxTxns;  // the maximum number of concurrent transactions
+	int MaxTxns;  // the maximum number of concurrent transactions
+	static const int MaxRetries = 10; // the max number of retries on file IO
+	char* segmentFilename;
 	std::string txnidFilename;
 	int txnidfd;		// file descriptor for the "last txnid" file
-	execplan::CalpontSystemCatalog::SCN _verID;
-	execplan::CalpontSystemCatalog::SCN _sysCatVerID;
-	uint32_t systemState;
+	
+	/** @brief This struct describes the layout of the shared memory segment */
+	struct Overlay {
+		int txnCount;
+		execplan::CalpontSystemCatalog::SCN verID;
+		execplan::CalpontSystemCatalog::SCN sysCatVerID;
+		int systemState;
+		boost::interprocess::interprocess_semaphore sems[2];
+		BRM::SIDTIDEntry activeTxns[];
+	};
+	
+	Overlay* shared;
+	//int sems;   // refers to 2 semaphores; the first is a mutex that guards the shmseg
+				// the second is used to block processes when there are too many concurrent txns
+	//int shmid;
+	
+	void getSharedData(void);
+	void detachSegment(void);
+	inline void initSegment(void);
 
-	std::map<SID, execplan::CalpontSystemCatalog::SCN> activeTxns;
-	typedef std::map<SID, execplan::CalpontSystemCatalog::SCN>::iterator iterator;
-
-	boost::mutex mutex;
-	boost::condition_variable condvar;		// used to synthesize a semaphore
-	uint semValue;
+#ifdef DESTROYSHMSEG
+	void loadSegment(void);
+	void saveSegment(void);
+#endif
+	int makeSems(void);
+	void lock(void);
+	void unlock(void);
+	void finishTransaction(TxnID& txn, bool commit);
+	void printSIDTIDEntry ( const char* commentHdr, int entryIndex ) const;
+	bool lookupProcessStatus ( std::string   processName, u_int32_t     processId); // are fProcessId/fProcessName active
+	ShmKeys fShmKeys;
+#ifdef _MSC_VER
+	volatile LONG unique32;
+#else
+	uint32_t unique32 __attribute__((aligned));
+#endif
+#ifdef _MSC_VER
+	boost::mutex fPidMemLock;
+	DWORD* fPids;
+	DWORD fMaxPids;
+#endif
+	boost::interprocess::shared_memory_object fOverlayShm;
+	boost::interprocess::mapped_region fRegion;
 };
 
 }   //namespace

@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_common.h 9704 2013-07-17 19:18:23Z xlou $
+//  $Id: jlf_common.h 8326 2012-02-15 18:58:10Z xlou $
 
 
 /** @file jlf_common.h
@@ -104,18 +104,13 @@ typedef std::map<uint, TupleInfoVector> TupleInfoMap;
 struct UniqId
 {
 	int         fId;     // OID for real table, sequence # for subquery
-//	std::string fName;   // name (table alias + [column name, if column])
-	std::string fTable;  // table name (table alias)
-	std::string fSchema; // schema name
+	std::string fAlias;  // alias (table alias + [column alias, if column])
 	std::string fView;   // view name
-//	uint64_t	fEngine; // InfiniDB == 0
 	uint64_t    fSubId;  // subquery ID
 
 	UniqId() : fId(-1), fSubId(-1) {}
-	UniqId(int i, const std::string& t, const std::string& s, const std::string& v, uint64_t l=-1) :
-		fId(i), fTable(t), fSchema(s), fView(v), fSubId(l) {}
-	UniqId(const execplan::SimpleColumn* sc);
-	UniqId(int o, const execplan::SimpleColumn* sc);
+	UniqId(int id, const std::string& alias, const std::string& view, uint64_t sid = -1) :
+		fId(id), fAlias(alias), fView(view), fSubId(sid) {}
 };
 bool operator < (const struct UniqId& x, const struct UniqId& y);
 bool operator == (const struct UniqId& x, const struct UniqId& y);
@@ -136,13 +131,8 @@ struct TupleKeyInfo
 	TupleKeyMap tupleKeyMap;
 	std::vector<UniqId> tupleKeyVec;
 	std::vector<std::string>  tupleKeyToName;
-	std::vector<bool>  crossEngine;
-
-	// TODO: better orgineze this structs
 	std::map<uint, execplan::CalpontSystemCatalog::OID> tupleKeyToTableOid;
-	std::map<uint, execplan::CalpontSystemCatalog::ColType> colType;
-	std::map<uint, execplan::CalpontSystemCatalog::ColType> token2DictTypeMap; // i/c token only
-	std::map<uint, std::string> keyName;
+	std::map<uint32_t, std::string> keyName;
 	std::map<uint, uint> colKeyToTblKey;
 	std::map<uint, uint> dictKeyMap;    // map token key to dictionary key
 	DictOidToColOidMap dictOidToColOid; // map dictionary OID to column OID
@@ -165,6 +155,7 @@ struct JobInfo
 		txnId(0),
 		verId(0),
 		statementId(0),
+		csc(0),
 		maxBuckets(rm.getHjMaxBuckets()),
 		maxElems(rm.getHjMaxElems()),
 		flushInterval(rm.getJLFlushInterval()),
@@ -202,10 +193,10 @@ struct JobInfo
 	uint32_t  txnId;
 	uint32_t  verId;
 	uint32_t  statementId;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog* csc;
 	DeliveredTablesSet tables;
 	int       maxBuckets;
-	uint64_t maxElems;
+	ridtype_t maxElems;
 	JobStepVectorStack stack;
 	uint32_t  flushInterval;
 	uint32_t  fifoSize;
@@ -281,7 +272,7 @@ struct JobInfo
 	SJSTEP         havingStep;
 	JobStepVector  havingStepVec;
 
-	// bug 2634, 5311 and 5374, outjoin and predicates
+	// bug 2634, outjoin and isNull
 	std::set<uint> outerOnTable;
 	std::set<uint> tableHasIsNull;
 	JobStepVector  outerJoinExpressions;
@@ -335,7 +326,6 @@ private:
 	//JobInfo& operator=(const JobInfo& rhs);
 };
 
-
 //------------------------------------------------------------------------------
 // namespace scoped functions
 //------------------------------------------------------------------------------
@@ -364,42 +354,40 @@ bool isCharCol(const execplan::CalpontSystemCatalog::ColType& colType);
  *
  */
 execplan::CalpontSystemCatalog::OID tableOid(const execplan::SimpleColumn* sc,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> cat);
+	execplan::CalpontSystemCatalog* cat);
 
 /** @brief Returns the unique ID to be used in tupleInfo
  *
  */
 uint getTupleKey(const JobInfo& jobInfo,
 	const execplan::SimpleColumn* sc);
-//uint getTupleKey(const JobInfo& jobInfo,
-//	execplan::CalpontSystemCatalog::OID oid,
-//	const std::string& colName,
-//	const std::string& tblAlias,
-//	const std::string& schema,
-//	const std::string& view);
-
-uint getTableKey(const JobInfo& jobInfo,
-	execplan::CalpontSystemCatalog::OID tableOid,
+uint getTupleKey(const JobInfo& jobInfo,
+	execplan::CalpontSystemCatalog::OID oid,
+	const std::string& tblAlias,
+	const std::string& view,
+	const std::string& colAlias);
+uint getTupleKey(const JobInfo& jobInfo,
+	execplan::CalpontSystemCatalog::OID oid,
 	const std::string& alias,
-	const std::string& schema,
+	const std::string& view);
+uint getTableKey(const JobInfo& jobInfo,
+	execplan::CalpontSystemCatalog::OID oid,
+	const std::string& alias,
 	const std::string& view);
 uint getTableKey(const JobInfo& jobInfo,
 	uint cid);
-uint getTableKey(JobInfo& jobInfo,
-	JobStep* js);
-
 uint getExpTupleKey(const JobInfo& jobInfo,
 	uint64_t eid);
-
-uint makeTableKey(JobInfo& jobInfo,
-	const execplan::SimpleColumn* sc);
-uint makeTableKey(JobInfo& jobInfo,
-	execplan::CalpontSystemCatalog::OID tableOid,
+uint tableKey(JobInfo& jobInfo,
+	execplan::CalpontSystemCatalog::OID oid,
+	const std::string& sch_name,
 	const std::string& tbl_name,
 	const std::string& tbl_alias,
-	const std::string& sch_name,
-	const std::string& vw_name,
-	uint64_t engine = 0);
+	const std::string& vw_name);
+uint tableKey(JobInfo& jobInfo,
+	execplan::CalpontSystemCatalog::OID oid,
+	const std::string& tbl_alias,
+	const std::string& vw_name);
 
 /** @brief Returns the tupleInfo associate with the (table, column) key pair
  *
@@ -414,7 +402,7 @@ TupleInfo getExpTupleInfo(uint expKey, const JobInfo& jobInfo);
 /** @brief set tuple info for simple column
  *
  */
-TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
+TupleInfo setTupleInfo(execplan::CalpontSystemCatalog::ColType ct,
 	execplan::CalpontSystemCatalog::OID col_oid,
 	JobInfo& jobInfo,
 	execplan::CalpontSystemCatalog::OID tbl_oid,
@@ -424,7 +412,7 @@ TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
 /** @brief set tuple info for expressions
  *
  */
-TupleInfo setExpTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
+TupleInfo setExpTupleInfo(execplan::CalpontSystemCatalog::ColType ct,
 	uint64_t expressionId,
 	const std::string& alias,
 	JobInfo& jobInfo);

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: brmtypes.h 1736 2012-10-29 22:15:26Z zzhu $
+ * $Id: brmtypes.h 1623 2012-07-03 20:17:56Z pleblanc $
  *
  *****************************************************************************/
 
@@ -30,8 +30,6 @@
 #include <sys/types.h>
 #include <climits>
 #include <string>
-#include <time.h>
-#include "logicalpartition.h"
 
 #ifndef _MSC_VER
 #include <tr1/unordered_map>
@@ -74,7 +72,7 @@ namespace tr1
 #undef UNDO
 #endif
 
-#if defined(_MSC_VER) && defined(xxxBRMTYPES_DLLEXPORT)
+#if defined(_MSC_VER) && defined(BRMTYPES_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -114,19 +112,32 @@ struct InlineLBIDRange {
 			/// The TransactionID number
 			execplan::CalpontSystemCatalog::SCN		id;
 			/// True iff the id is valid.
-			bool							valid;
+			bool							valid;   
 			EXPORT _TxnID();
 		};
 		/** @brief A type describing a single transaction ID */
 		typedef struct _TxnID TxnID;
 		
 		/** @brief A type associating a session with a transaction.
+         *  txnid.valid is TRUE  for DML/DDL  transaction entries.
+		 *  txnid.valid is FALSE for cpimport transaction entries.
+		 *  A nonzero tableOID is used to denote an entry being used to write-
+		 *  lock a table being updated by DML, DDL, or cpimport.  So, for ex-
+		 *  ample, a DML transaction could have multiple entries with the
+		 *  initial transaction entry having a 0 tableOID, while the other
+		 *  entries would have nonzero tableOID's for the affected tables.
 		 */
 		struct _SIDTIDEntry {
 			/// The Transaction ID.  txnid.valid determines whether or not this SIDTIDEntry is valid
 			TxnID			txnid;
 			/// The session doing the transaction
 			SID				sessionid;	
+			/// tableOID the table OID involved in the transaction or cpimport
+			execplan::CalpontSystemCatalog::OID   tableOID;
+			/// processID the process ID which locked the table, only valid when table is locked.
+			u_int32_t  processID;
+			///processName the process name which locked the table, only valid when table is locked.
+			char   processName[MAX_PROCNAME];
 			EXPORT _SIDTIDEntry();
 			EXPORT void init();
 		};
@@ -191,30 +202,6 @@ struct ExtentInfo {
 };
 typedef std::tr1::unordered_map<execplan::CalpontSystemCatalog::OID, ExtentInfo> ExtentsInfoMap_t;
 
-enum LockState {
-	LOADING,
-	CLEANUP
-};
-
-struct TableLockInfo : public messageqcpp::Serializeable {
-	uint64_t id;
-	uint32_t tableOID;
-	std::string ownerName;
-	uint32_t ownerPID;
-	int32_t ownerSessionID;
-	int32_t ownerTxnID;
-	LockState state;
-	time_t creationTime;
-	std::vector<uint32_t> dbrootList;
-
-	bool overlaps(const TableLockInfo &, const std::set<uint32_t> &sPMList) const;
-	EXPORT void serialize(messageqcpp::ByteStream &bs) const;
-	EXPORT void deserialize(messageqcpp::ByteStream &bs);
-	EXPORT void serialize(std::ostream &) const;
-	EXPORT void deserialize(std::istream &);
-	bool operator<(const TableLockInfo &) const;
-};
-
 /// A Serializeable version of InlineLBIDRange
 class LBIDRange : public messageqcpp::Serializeable {
 
@@ -250,29 +237,6 @@ struct BulkSetHWMArg {
 	HWM_t hwm;
 };
 
-/* Arg type for DBRM::bulkUpdateDBRoot() */
-struct BulkUpdateDBRootArg {
-	LBID_t   startLBID; // starting LBID for the extent to update
-	uint16_t dbRoot;    // the new dbRoot
-
-	inline bool operator<(const BulkUpdateDBRootArg &b) const
-		{ return startLBID < b.startLBID; }
-	BulkUpdateDBRootArg(LBID_t l = 0, uint16_t d = 0) : startLBID(l), dbRoot(d) {}
-};
-
-/* Input Arg type for DBRM::createStripeColumnExtents() */
-struct CreateStripeColumnExtentsArgIn {
-	OID_t    oid;	// column OID
-	uint32_t width; // column width in bytes
-};
-
-/* Output Arg type for DBRM:createStripeColumnExtents() */
-struct CreateStripeColumnExtentsArgOut {
-	LBID_t   startLbid;      // starting LBID of allocated extent
-	int      allocSize;      // number of blocks in allocated extent
-	uint32_t startBlkOffset; // starting file block offset for allocated extent
-};
-
 /// A container for LBIDRanges
 typedef std::vector<LBIDRange> LBIDRange_v; 
 
@@ -291,45 +255,6 @@ class VBRange : public messageqcpp::Serializeable {
 		EXPORT virtual void serialize(messageqcpp::ByteStream& bs) const;
 		EXPORT virtual void deserialize(messageqcpp::ByteStream& bs);
 };
-
-// Structure used to return HWM information for each DbRoot in a PM
-struct EmDbRootHWMInfo {
-	uint32_t	partitionNum; // last partition in dbRoot
-	uint16_t	dbRoot;       // applicable dbRoot
-	uint16_t	segmentNum;   // last segment file in dbRoot
-	HWM_t		localHWM;     // local HWM in last file for this dbRoot
-	uint32_t	fbo;          // starting block offset to HWM extent
-	LBID_t		startLbid;    // starting LBID for HWM extent
-	uint64_t	totalBlocks;  // cumulative block count for this dbRoot
-                              //   0 block count means no extents in this dbRoot
-	int			hwmExtentIndex;//Internal use (idx to HWM extent in extent map)
-	EmDbRootHWMInfo()              { init(0); }
-	EmDbRootHWMInfo(uint16_t root) { init(root); }
-	void init (uint16_t root) {
-		partitionNum= 0;
-		dbRoot      = root;
-		segmentNum  = 0;
-		localHWM    = 0;
-		fbo         = 0;
-		startLbid   = 0;
-		hwmExtentIndex = -1;
-		totalBlocks = 0; }
-	bool operator> (const EmDbRootHWMInfo& rhs) const
-	{
-		if (partitionNum > rhs.partitionNum)
-			return true;
-		if (partitionNum == rhs.partitionNum && segmentNum > rhs.segmentNum)
-			return true;
-		if (partitionNum == rhs.partitionNum && segmentNum == rhs.segmentNum && localHWM > rhs.localHWM)
-			return true;
-		if (partitionNum == rhs.partitionNum && segmentNum == rhs.segmentNum && localHWM == rhs.localHWM && totalBlocks > rhs.totalBlocks)
-			return true;
-			
-		return false;
-	}
-};
-
-typedef std::vector<EmDbRootHWMInfo> EmDbRootHWMInfo_v;  
 
 /// A container for VBRanges
 typedef std::vector<VBRange> VBRange_v;  
@@ -352,7 +277,7 @@ typedef std::vector<VBRange> VBRange_v;
 struct ImageDelta {
 	void *start;
 	int size;
-	char data[ID_MAXSIZE];	/// Has to be as large as the largest change
+	char data[ID_MAXSIZE];	/// XXXPAT: the largest thing currently copied into this is 36 bytes (EMEntry).  Adjust as neccesary...
 };
 
 // SubSystemLogId enumeration values should be in sync with SubsystemID[]
@@ -398,74 +323,44 @@ const uint8_t MARKEXTENTINVALID = 18;
 const uint8_t MARKMANYEXTENTSINVALID = 19;
 const uint8_t GETREADONLY = 20;
 const uint8_t SETEXTENTMAXMIN = 21;
+const uint8_t ROLLBACK_COLUMN_EXTENTS = 22;
+const uint8_t ROLLBACK_DICT_STORE_EXTENTS = 23;
 const uint8_t DELETE_EMPTY_COL_EXTENTS = 24;
 const uint8_t DELETE_EMPTY_DICT_STORE_EXTENTS = 25;
 const uint8_t SETMANYEXTENTSMAXMIN = 26;
+const uint8_t CREATE_COLUMN_EXTENT = 27;
 const uint8_t CREATE_DICT_STORE_EXTENT = 28;
 const uint8_t SET_LOCAL_HWM = 29;
 const uint8_t DELETE_OIDS = 30;
 const uint8_t TAKE_SNAPSHOT = 31;
-const uint8_t MERGEMANYEXTENTSMAXMIN = 32;
-const uint8_t DELETE_PARTITION = 33;
-const uint8_t MARK_PARTITION_FOR_DELETION = 34;
-const uint8_t RESTORE_PARTITION = 35;
-const uint8_t CREATE_COLUMN_EXTENT_DBROOT = 36; // @bug 4091: To be deprecated
-const uint8_t BULK_SET_HWM = 37;
-const uint8_t ROLLBACK_COLUMN_EXTENTS_DBROOT = 38;
-const uint8_t ROLLBACK_DICT_STORE_EXTENTS_DBROOT = 39;
-const uint8_t BULK_SET_HWM_AND_CP = 40;
-const uint8_t MARK_ALL_PARTITION_FOR_DELETION = 41;
-const uint8_t CREATE_COLUMN_EXTENT_EXACT_FILE = 42;
-const uint8_t DELETE_DBROOT = 43;
-const uint8_t CREATE_STRIPE_COLUMN_EXTENTS = 44;
+const uint8_t MERGEMANYEXTENTSMAXMIN = 44;
+const uint8_t DELETE_PARTITION = 45;
+const uint8_t MARK_PARTITION_FOR_DELETION = 46;
+const uint8_t RESTORE_PARTITION = 47;
+const uint8_t MARK_ALL_PARTITION_FOR_DELETION = 51;
+const uint8_t BULK_SET_HWM_AND_CP = 52;
+
 
 /* SessionManager interface */
-const uint8_t VER_ID = 45;
-const uint8_t NEW_TXN_ID = 46;
-const uint8_t COMMITTED = 47;
-const uint8_t ROLLED_BACK = 48;
-const uint8_t GET_TXN_ID = 49;
-const uint8_t SID_TID_MAP = 50;
-const uint8_t SM_RESET = 51;
-const uint8_t GET_UNIQUE_UINT32 = 52;
-const uint8_t SYSCAT_VER_ID = 53;
-const uint8_t GET_SYSTEM_STATE = 54;
-const uint8_t SET_SYSTEM_STATE = 55;
-const uint8_t GET_UNIQUE_UINT64 = 56;
-const uint8_t CLEAR_SYSTEM_STATE = 57;
-
-/* OID Manager interface */
-const uint8_t ALLOC_OIDS = 60;
-const uint8_t RETURN_OIDS = 61;
-const uint8_t OIDM_SIZE = 62;
-const uint8_t ALLOC_VBOID = 63;
-const uint8_t GETDBROOTOFVBOID = 64;
-const uint8_t GETVBOIDTODBROOTMAP = 65;
-
-/* New Table lock interface */
-const uint8_t GET_TABLE_LOCK = 70;
-const uint8_t RELEASE_TABLE_LOCK = 71;
-const uint8_t CHANGE_TABLE_LOCK_STATE = 72;
-const uint8_t CHANGE_TABLE_LOCK_OWNER = 73;
-const uint8_t GET_ALL_TABLE_LOCKS = 74;
-const uint8_t RELEASE_ALL_TABLE_LOCKS = 75;
-const uint8_t GET_TABLE_LOCK_INFO = 76;
-const uint8_t OWNER_CHECK = 77;   // the msg from the controller to worker
-
-/* Autoincrement interface (WIP) */
-const uint8_t START_AI_SEQUENCE = 80;
-const uint8_t GET_AI_RANGE = 81;
-const uint8_t RESET_AI_SEQUENCE = 82;
-const uint8_t GET_AI_LOCK = 83;
-const uint8_t RELEASE_AI_LOCK = 84;
-const uint8_t DELETE_AI_SEQUENCE = 85;
+const uint8_t VER_ID = 32;
+const uint8_t NEW_TXN_ID = 33;
+const uint8_t COMMITTED = 34;
+const uint8_t ROLLED_BACK = 35;
+const uint8_t GET_TXN_ID = 36;
+const uint8_t SID_TID_MAP = 37;
+const uint8_t GET_SHM_CONTENTS = 38;
+const uint8_t GET_UNIQUE_UINT32 = 39;
+const uint8_t SYSCAT_VER_ID = 40;
+const uint8_t SET_TABLE_LOCK = 41;
+const uint8_t GET_TABLE_LOCK = 42;
+const uint8_t GET_TABLE_LOCKS = 43;
+const uint8_t GET_SYSTEM_STATE = 48;
+const uint8_t SET_SYSTEM_STATE = 49;
+const uint8_t UPDATE_TABLE_LOCK = 50;
 
 /* Copylock interface */
 const uint8_t LOCK_LBID_RANGES = 90;
 const uint8_t RELEASE_LBID_RANGES = 91;
-
-/* More main BRM functions 100-110 */
-const uint8_t BULK_UPDATE_DBROOT = 100;
 
 
 /* Error codes returned by the DBRM functions. */
@@ -505,26 +400,6 @@ const int8_t ERR_NOT_EXIST_PARTITION = 12;
 const int8_t ERR_PARTITION_ENABLED = 13;
 const int8_t ERR_TABLE_NOT_LOCKED = 14;
 const int8_t ERR_SNAPSHOT_TOO_OLD = 15;
-const int8_t ERR_NO_PARTITION_PERFORMED = 16;
-
-// structure used to hold the information to identify a partition for shared-nothing
-struct PartitionInfo 
-{
-	LogicalPartition lp;
-	OID_t oid;
-	
-	void serialize (messageqcpp::ByteStream& b) const
-	{
-		lp.serialize(b);
-		b << (uint32_t)oid;
-	}
-
-	void unserialize (messageqcpp::ByteStream& b)
-	{
-		lp.unserialize(b);
-		b >> (uint32_t&)oid;
-	}
-};
 
 }
 

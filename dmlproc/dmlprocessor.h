@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: dmlprocessor.h 863 2012-10-02 21:30:34Z dhall $
+*   $Id: dmlprocessor.h 651 2011-11-04 20:51:41Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -24,7 +24,6 @@
 #ifndef DMLPROCESSOR_H
 #define DMLPROCESSOR_H
 
-#include <boost/scoped_ptr.hpp>
 #include "threadpool.h"
 #include "messagequeue.h"
 #include "bytestream.h"
@@ -38,11 +37,7 @@
 #include "commandpackageprocessor.h"
 #include "messagelog.h"
 #include "distributedenginecomm.h"
-#include "batchinsertprocessor.h"
-#include "dmlpackageprocessor.h"
 #include "calpontsystemcatalog.h"
-#include "dmlpackageprocessor.h"
-//#include "iosocket.h"
 
 namespace dmlprocessor
 {
@@ -91,34 +86,7 @@ private:
     int fPackageMaxThreads;    /** @brief max number of threads to process dml packages */
     int fPackageWorkQueueSize; /** @brief max number of packages waiting in the work queue */
 
-    boost::scoped_ptr<messageqcpp::MessageQueueServer> fMqServer;
-};
-
-/** @brief Thread to process a single dml package.
- *  Created and run from DMLProcessor
-  */
-class PackageHandler
-{
-public:
-    PackageHandler(const messageqcpp::IOSocket& ios, boost::shared_ptr<messageqcpp::ByteStream> bs, messageqcpp::ByteStream::quadbyte packageType,
-		joblist::DistributedEngineComm *ec, uint64_t maxDeleteRows, uint32_t sessionID, execplan::CalpontSystemCatalog::SCN txnId);
-	~PackageHandler();
-
-    void run();
-	void rollbackPending();
-	
-	execplan::CalpontSystemCatalog::SCN getTxnid() {return fTxnid;}
-	uint32_t getSessionID() {return fSessionID;}
-private:
-    messageqcpp::IOSocket fIos;
-    boost::shared_ptr<messageqcpp::ByteStream> fByteStream;
-	boost::scoped_ptr<dmlpackageprocessor::DMLPackageProcessor> fProcessor;
-    messageqcpp::ByteStream::quadbyte fPackageType;
-    joblist::DistributedEngineComm *fEC;
-    uint64_t fMaxDeleteRows;
-	uint32_t fSessionID;
-	execplan::CalpontSystemCatalog::SCN fTxnid;
-	execplan::SessionManager sessionManager;
+    messageqcpp::MessageQueueServer* fMqServer;
 };
 
 /** @brief processes dml packages as they arrive
@@ -137,41 +105,23 @@ public:
       */
     void operator()();
 
-	static void log(const std::string& msg, logging::LOG_TYPE level);
 private:
+    /** @brief stop accepting incoming DML packages
+      *
+      * @param ios the io socket to send repsonse
+      */
+    void stopAcceptingPackages(messageqcpp::IOSocket& ios);
+
+    /** @brief resume accepting incoming DML packages
+      *
+      * @param ios the io socket to send response
+      */
+    void resumeAcceptingPackages(messageqcpp::IOSocket& ios);
+
 	messageqcpp::IOSocket fIos;
 	execplan::SessionManager sessionManager;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-
-	// A map to hold pointers to all active PackageProcessors
-	static std::map<uint32_t, PackageHandler*> packageHandlerMap;
-	static boost::mutex packageHandlerMapLock;
-
-    friend struct CancellationThread;
+	execplan::CalpontSystemCatalog* csc;
 };
-
-class RollbackTransactionProcessor : public dmlpackageprocessor::DMLPackageProcessor
-{
-
-public:
-	RollbackTransactionProcessor() : DMLPackageProcessor() {}
-    /** @brief process an Rollback transactions
-     *
-     * @param cpackage the UpdateDMLPackage to process
-     */
-	 inline DMLResult processPackage(dmlpackage::CalpontDMLPackage& cpackage)
-	 {
-		DMLResult result;
-		result.result = NO_ERROR;
-		return result;
-	 }
-	 
-	 void processBulkRollback (BRM::TableLockInfo lockInfo, BRM::DBRM & dbrm, uint64_t uniqueId, 
-			oam::OamCache::dbRootPMMap_t& dbRootPMMap, bool & lockReleased);
-	
-protected:
-};
-
 
 } // namespace dmlprocessor
 

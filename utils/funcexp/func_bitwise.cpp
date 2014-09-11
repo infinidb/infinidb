@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_bitwise.cpp 3279 2012-09-13 15:28:57Z bwilkinson $
+* $Id: func_bitwise.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -38,98 +38,13 @@ using namespace rowgroup;
 #include "errorids.h"
 using namespace logging;
 
-#include "dataconvert.h"
-using namespace dataconvert;
 
 namespace funcexp
 {
 
-// @bug 4703 - the actual bug was only in the DATETIME case
-// part of this statement below, but instead of leaving 5 identical
-// copies of this code, extracted into a single utility function
-// here.  This same method is potentially useful in other methods
-// and could be extracted into a utility class with its own header
-// if that is the case - this is left as future exercise
-bool getUIntValFromParm(
-		Row&  row,
-		const execplan::SPTP& parm,
-		uint64_t& value,
-		bool& isNull)
-{
-	switch (parm->data()->resultType().colDataType)
-	{
-		case execplan::CalpontSystemCatalog::BIGINT:
-		case execplan::CalpontSystemCatalog::INT:
-		case execplan::CalpontSystemCatalog::MEDINT:
-		case execplan::CalpontSystemCatalog::TINYINT:
-		case execplan::CalpontSystemCatalog::SMALLINT:
-		case execplan::CalpontSystemCatalog::DOUBLE:
-		case execplan::CalpontSystemCatalog::FLOAT:
-		{
-			value = parm->data()->getIntVal(row, isNull);
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::VARCHAR:
-		case execplan::CalpontSystemCatalog::CHAR:
-		{
-			value = parm->data()->getIntVal(row, isNull);
-			if (isNull)
-			{
-				isNull = true;
-			}
-			else
-			{
-				value = 0;
-			}
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DECIMAL:
-		{
-			IDB_Decimal d = parm->data()->getDecimalVal(row, isNull);
-			int64_t tmpval = d.value / power(d.scale);
-			int lefto = (d.value - tmpval * power(d.scale)) / power(d.scale-1);
-			if ( tmpval >= 0 && lefto > 4 )
-				tmpval++;
-			if ( tmpval < 0 && lefto < -4 )
-				tmpval--;
-			value = tmpval;
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DATE:
-		{
-			int32_t time = parm->data()->getDateIntVal(row, isNull);
-
-			Date d(time);
-			value = d.convertToMySQLint();
-		}
-		break;
-
-		case execplan::CalpontSystemCatalog::DATETIME:
-		{
-			int64_t time = parm->data()->getDatetimeIntVal(row, isNull);
-
-			// @bug 4703 - missing year when convering to int
-			DateTime dt(time);
-			value = dt.convertToMySQLint();
-		}
-		break;
-
-		default:
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-
 //
 // BITAND
 //
-
 
 CalpontSystemCatalog::ColType Func_bitand::operationType( FunctionParm& fp, CalpontSystemCatalog::ColType& resultType )
 {
@@ -141,22 +56,114 @@ int64_t Func_bitand::getIntVal(Row& row,
 									bool& isNull,
 									CalpontSystemCatalog::ColType& operationColType)
 {
+
+	vector<int64_t> values;
+
 	if ( parm.size() < 2 ) {
 		isNull = true;
 		return 0;
 	}
 
-	uint64_t val1 = 0;
-	uint64_t val2 = 0;
-	if (!getUIntValFromParm(row, parm[0], val1, isNull) ||
-		!getUIntValFromParm(row, parm[1], val2, isNull))
+	for (uint i = 0; i < parm.size(); i++)
 	{
-		std::ostringstream oss;
-		oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
-		throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		switch (parm[i]->data()->resultType().colDataType)
+		{
+			case execplan::CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				values.push_back(parm[i]->data()->getIntVal(row, isNull));
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			{
+				int64_t value = parm[i]->data()->getIntVal(row, isNull);
+				if (isNull)
+				{
+					isNull = true;
+					return value;
+				}
+				values.push_back(0);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[i]->data()->getDecimalVal(row, isNull);
+				int64_t value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( value >= 0 && lefto > 4 )
+					value++;
+				if ( value < 0 && lefto < -4 )
+					value--;
+				values.push_back(value);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATE:
+			{
+				int64_t time = parm[i]->data()->getDateIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0;
+				
+				year = (uint32_t)((time >> 16) & 0xffff);
+				month = (uint32_t)((time >> 12) & 0xf);
+				day = (uint32_t)((time >> 6) & 0x3f);
+	
+				values.push_back((year*10000)+(month*100)+day);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATETIME:
+			{
+				int64_t time = parm[i]->data()->getDatetimeIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0, 
+						hour = 0, 
+						min = 0, 
+						sec = 0;
+			
+						year = (uint32_t)((time >> 48) & 0xffff);
+						month = (uint32_t)((time >> 44) & 0xf);
+						day = (uint32_t)((time >> 38) & 0x3f);
+						hour = (uint32_t)((time >> 32) & 0x3f);
+						min = (uint32_t)((time >> 26) & 0x3f);
+						sec = (uint32_t)((time >> 20) & 0x3f);
+	
+	//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+				values.push_back((month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec);		
+			}
+			break;
+	
+			default:
+			{
+				std::ostringstream oss;
+				oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+				throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+			}
+		}
 	}
 
-	return val1 & val2;
+	vector<int64_t>::iterator p = values.begin();
+	int64_t retValue = *p;
+	p++;
+	while ( p != values.end() )
+	{
+		retValue = retValue & *p;
+		p++;
+	}
+
+	return retValue;
 }
 
 
@@ -175,22 +182,105 @@ int64_t Func_leftshift::getIntVal(Row& row,
 									bool& isNull,
 									CalpontSystemCatalog::ColType& operationColType)
 {
+
+	vector<uint64_t> values;
+
 	if ( parm.size() < 2 ) {
 		isNull = true;
 		return 0;
 	}
 
-	uint64_t val1 = 0;
-	uint64_t val2 = 0;
-	if (!getUIntValFromParm(row, parm[0], val1, isNull) ||
-		!getUIntValFromParm(row, parm[1], val2, isNull))
+	for (uint i = 0; i < parm.size(); i++)
 	{
-		std::ostringstream oss;
-		oss << "leftshift: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
-		throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		switch (parm[i]->data()->resultType().colDataType)
+		{
+			case execplan::CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				values.push_back(parm[i]->data()->getIntVal(row, isNull));
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			{
+				int64_t value = parm[i]->data()->getIntVal(row, isNull);
+				if (isNull)
+				{
+					isNull = true;
+					return value;
+				}
+				values.push_back(0);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[i]->data()->getDecimalVal(row, isNull);
+				int64_t value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( value >= 0 && lefto > 4 )
+					value++;
+				if ( value < 0 && lefto < -4 )
+					value--;
+				values.push_back(value);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATE:
+			{
+				int64_t time = parm[i]->data()->getDateIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0;
+				
+				year = (uint32_t)((time >> 16) & 0xffff);
+				month = (uint32_t)((time >> 12) & 0xf);
+				day = (uint32_t)((time >> 6) & 0x3f);
+	
+				values.push_back((year*10000)+(month*100)+day);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATETIME:
+			{
+				int64_t time = parm[i]->data()->getDatetimeIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0, 
+						hour = 0, 
+						min = 0, 
+						sec = 0;
+			
+						year = (uint32_t)((time >> 48) & 0xffff);
+						month = (uint32_t)((time >> 44) & 0xf);
+						day = (uint32_t)((time >> 38) & 0x3f);
+						hour = (uint32_t)((time >> 32) & 0x3f);
+						min = (uint32_t)((time >> 26) & 0x3f);
+						sec = (uint32_t)((time >> 20) & 0x3f);
+	
+	//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+				values.push_back((month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec);		
+			}
+			break;
+	
+			default:
+			{
+				std::ostringstream oss;
+				oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+				throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+			}
+		}
 	}
 
-	return val1 << val2;
+	return values[0] << values[1];
 }
 
 
@@ -209,22 +299,105 @@ int64_t Func_rightshift::getIntVal(Row& row,
 									bool& isNull,
 									CalpontSystemCatalog::ColType& operationColType)
 {
+
+	vector<uint64_t> values;
+
 	if ( parm.size() < 2 ) {
 		isNull = true;
 		return 0;
 	}
 
-	uint64_t val1 = 0;
-	uint64_t val2 = 0;
-	if (!getUIntValFromParm(row, parm[0], val1, isNull) ||
-		!getUIntValFromParm(row, parm[1], val2, isNull))
+	for (uint i = 0; i < parm.size(); i++)
 	{
-		std::ostringstream oss;
-		oss << "rightshift: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
-		throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		switch (parm[i]->data()->resultType().colDataType)
+		{
+			case execplan::CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				values.push_back(parm[i]->data()->getIntVal(row, isNull));
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			{
+				int64_t value = parm[i]->data()->getIntVal(row, isNull);
+				if (isNull)
+				{
+					isNull = true;
+					return value;
+				}
+				values.push_back(0);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[i]->data()->getDecimalVal(row, isNull);
+				int64_t value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( value >= 0 && lefto > 4 )
+					value++;
+				if ( value < 0 && lefto < -4 )
+					value--;
+				values.push_back(value);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATE:
+			{
+				int64_t time = parm[i]->data()->getDateIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0;
+				
+				year = (uint32_t)((time >> 16) & 0xffff);
+				month = (uint32_t)((time >> 12) & 0xf);
+				day = (uint32_t)((time >> 6) & 0x3f);
+	
+				values.push_back((year*10000)+(month*100)+day);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATETIME:
+			{
+				int64_t time = parm[i]->data()->getDatetimeIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0, 
+						hour = 0, 
+						min = 0, 
+						sec = 0;
+			
+						year = (uint32_t)((time >> 48) & 0xffff);
+						month = (uint32_t)((time >> 44) & 0xf);
+						day = (uint32_t)((time >> 38) & 0x3f);
+						hour = (uint32_t)((time >> 32) & 0x3f);
+						min = (uint32_t)((time >> 26) & 0x3f);
+						sec = (uint32_t)((time >> 20) & 0x3f);
+	
+	//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+				values.push_back((month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec);		
+			}
+			break;
+	
+			default:
+			{
+				std::ostringstream oss;
+				oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+				throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+			}
+		}
 	}
 
-	return val1 >> val2;
+	return values[0] >> values[1];
 }
 
 
@@ -243,22 +416,105 @@ int64_t Func_bitor::getIntVal(Row& row,
 									bool& isNull,
 									CalpontSystemCatalog::ColType& operationColType)
 {
+
+	vector<uint64_t> values;
+
 	if ( parm.size() < 2 ) {
 		isNull = true;
 		return 0;
 	}
 
-	uint64_t val1 = 0;
-	uint64_t val2 = 0;
-	if (!getUIntValFromParm(row, parm[0], val1, isNull) ||
-		!getUIntValFromParm(row, parm[1], val2, isNull))
+	for (uint i = 0; i < parm.size(); i++)
 	{
-		std::ostringstream oss;
-		oss << "bitor: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
-		throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		switch (parm[i]->data()->resultType().colDataType)
+		{
+			case execplan::CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				values.push_back(parm[i]->data()->getIntVal(row, isNull));
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			{
+				int64_t value = parm[i]->data()->getIntVal(row, isNull);
+				if (isNull)
+				{
+					isNull = true;
+					return value;
+				}
+				values.push_back(0);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[i]->data()->getDecimalVal(row, isNull);
+				int64_t value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( value >= 0 && lefto > 4 )
+					value++;
+				if ( value < 0 && lefto < -4 )
+					value--;
+				values.push_back(value);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATE:
+			{
+				int64_t time = parm[i]->data()->getDateIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0;
+				
+				year = (uint32_t)((time >> 16) & 0xffff);
+				month = (uint32_t)((time >> 12) & 0xf);
+				day = (uint32_t)((time >> 6) & 0x3f);
+	
+				values.push_back((year*10000)+(month*100)+day);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATETIME:
+			{
+				int64_t time = parm[i]->data()->getDatetimeIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0, 
+						hour = 0, 
+						min = 0, 
+						sec = 0;
+			
+						year = (uint32_t)((time >> 48) & 0xffff);
+						month = (uint32_t)((time >> 44) & 0xf);
+						day = (uint32_t)((time >> 38) & 0x3f);
+						hour = (uint32_t)((time >> 32) & 0x3f);
+						min = (uint32_t)((time >> 26) & 0x3f);
+						sec = (uint32_t)((time >> 20) & 0x3f);
+	
+	//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+				values.push_back((month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec);		
+			}
+			break;
+	
+			default:
+			{
+				std::ostringstream oss;
+				oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+				throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+			}
+		}
 	}
 
-	return val1 | val2;
+	return values[0] | values[1];
 }
 
 
@@ -277,22 +533,105 @@ int64_t Func_bitxor::getIntVal(Row& row,
 									bool& isNull,
 									CalpontSystemCatalog::ColType& operationColType)
 {
+
+	vector<uint64_t> values;
+
 	if ( parm.size() < 2 ) {
 		isNull = true;
 		return 0;
 	}
 
-	uint64_t val1 = 0;
-	uint64_t val2 = 0;
-	if (!getUIntValFromParm(row, parm[0], val1, isNull) ||
-		!getUIntValFromParm(row, parm[1], val2, isNull))
+	for (uint i = 0; i < parm.size(); i++)
 	{
-		std::ostringstream oss;
-		oss << "bitxor: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
-		throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+		switch (parm[i]->data()->resultType().colDataType)
+		{
+			case execplan::CalpontSystemCatalog::BIGINT:
+			case execplan::CalpontSystemCatalog::INT:
+			case execplan::CalpontSystemCatalog::MEDINT:
+			case execplan::CalpontSystemCatalog::TINYINT:
+			case execplan::CalpontSystemCatalog::SMALLINT:
+			case execplan::CalpontSystemCatalog::DOUBLE:
+			case execplan::CalpontSystemCatalog::FLOAT:
+			{
+				values.push_back(parm[i]->data()->getIntVal(row, isNull));
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::VARCHAR:
+			case execplan::CalpontSystemCatalog::CHAR:
+			{
+				int64_t value = parm[i]->data()->getIntVal(row, isNull);
+				if (isNull)
+				{
+					isNull = true;
+					return value;
+				}
+				values.push_back(0);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DECIMAL:
+			{
+				IDB_Decimal d = parm[i]->data()->getDecimalVal(row, isNull);
+				int64_t value = d.value / power(d.scale);
+				int lefto = (d.value - value * power(d.scale)) / power(d.scale-1);
+				if ( value >= 0 && lefto > 4 )
+					value++;
+				if ( value < 0 && lefto < -4 )
+					value--;
+				values.push_back(value);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATE:
+			{
+				int64_t time = parm[i]->data()->getDateIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0;
+				
+				year = (uint32_t)((time >> 16) & 0xffff);
+				month = (uint32_t)((time >> 12) & 0xf);
+				day = (uint32_t)((time >> 6) & 0x3f);
+	
+				values.push_back((year*10000)+(month*100)+day);
+			}
+			break;
+	
+			case execplan::CalpontSystemCatalog::DATETIME:
+			{
+				int64_t time = parm[i]->data()->getDatetimeIntVal(row, isNull);
+	
+				int32_t year = 0, 
+						month = 0, 
+						day = 0, 
+						hour = 0, 
+						min = 0, 
+						sec = 0;
+			
+						year = (uint32_t)((time >> 48) & 0xffff);
+						month = (uint32_t)((time >> 44) & 0xf);
+						day = (uint32_t)((time >> 38) & 0x3f);
+						hour = (uint32_t)((time >> 32) & 0x3f);
+						min = (uint32_t)((time >> 26) & 0x3f);
+						sec = (uint32_t)((time >> 20) & 0x3f);
+	
+	//			return (int64_t) (year*1000000000000)+(month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec;
+				values.push_back((month*100000000)+(day*1000000)+(hour*10000)+(min*100)+sec);		
+			}
+			break;
+	
+			default:
+			{
+				std::ostringstream oss;
+				oss << "bitand: datatype of " << execplan::colDataTypeToString(operationColType.colDataType);
+				throw logging::IDBExcept(oss.str(), ERR_DATATYPE_NOT_SUPPORT);
+			}
+		}
 	}
 
-	return val1 ^ val2;
+	return values[0] ^ values[1];
 }
 
 

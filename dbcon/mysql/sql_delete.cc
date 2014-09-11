@@ -31,9 +31,8 @@
   relies on the caller to close the thread tables. This is done in the
   end of dispatch_command().
 */
-// @InfiniDB. Make conds argument reference to pointer so the optimization
-// result can be passed in to the InfiniDB connector.
-bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *& conds,
+
+bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
                   SQL_LIST *order, ha_rows limit, ulonglong options,
                   bool reset_auto_increment)
 {
@@ -434,8 +433,7 @@ cleanup:
       zero since the exact number is unknown.
     */
     //@InfiniDB change. @bug4790 Only change for InfiniDB table.
-    // @bug5117. Add isInfiniDBDML to make sure it's InfiniDB dml stmt.
-    if (!(thd->infinidb_vtable.isInfiniDBDML))
+    if (!(table_list && table_list->table && table_list->table->isInfiniDB()))
       thd->row_count_func= reset_auto_increment ? 0 : deleted;
     my_ok(thd, (ha_rows) thd->row_count_func);
     DBUG_PRINT("info",("%ld records deleted",(long) deleted));
@@ -1019,7 +1017,7 @@ bool multi_delete::send_eof()
   {
     // @Infinidb change. 
     if ( deleted )
-      thd->row_count_func= deleted;
+        thd->row_count_func= deleted;
     ::my_ok(thd, (ha_rows) thd->row_count_func);
   }
   return 0;
@@ -1042,10 +1040,7 @@ static bool mysql_truncate_by_delete(THD *thd, TABLE_LIST *table_list)
   table_list->lock_type= TL_WRITE;
   mysql_init_select(thd->lex);
   thd->clear_current_stmt_binlog_row_based();
-  // @InfiniDB. Make conds argument reference to pointer so the optimization
-  // result can be passed in to the InfiniDB connector.
-  COND *cond = NULL;
-  error= mysql_delete(thd, table_list, cond, NULL, HA_POS_ERROR, LL(0), TRUE);
+  error= mysql_delete(thd, table_list, NULL, NULL, HA_POS_ERROR, LL(0), TRUE);
   ha_autocommit_or_rollback(thd, error);
   end_trans(thd, error ? ROLLBACK : COMMIT);
   thd->current_stmt_binlog_row_based= save_binlog_row_based;

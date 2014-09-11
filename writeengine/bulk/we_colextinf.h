@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
- * $Id: we_colextinf.h 4496 2013-01-31 19:13:20Z pleblanc $
+ * $Id: we_colextinf.h 3615 2012-03-09 16:41:14Z dcathey $
  *
  ******************************************************************************/
 
@@ -65,11 +65,11 @@ public:
                        fNewExtent(true)   { }
 
     // Used to create entry for an existing extent we are going to add data to.
-    ColExtInfEntry(BRM::LBID_t lbid, bool bIsNewExtent) :
+    ColExtInfEntry(BRM::LBID_t lbid) :
                        fLbid(lbid),
                        fMinVal(LLONG_MIN),
                        fMaxVal(LLONG_MIN),
-                       fNewExtent(bIsNewExtent)  { }
+                       fNewExtent(false)  { }
 
     // Used to create entry for a new extent, with LBID not yet allocated
     ColExtInfEntry(int64_t minVal, int64_t maxVal) :
@@ -107,8 +107,7 @@ public:
     virtual ~ColExtInfBase( )                               { }
 
     virtual void addFirstEntry   ( RID     lastInputRow,
-                                   BRM::LBID_t lbid,
-                                   bool    bIsNewExtent )   { }
+                                   BRM::LBID_t lbid )       { }
     virtual void addOrUpdateEntry( RID     lastInputRow,
                                    int64_t minVal,
                                    int64_t maxVal )         { }
@@ -145,12 +144,9 @@ public:
     /** @brief Add an entry for first extent, for the specified Row and LBID.
      *  @param lastInputRow Last input Row for old extent we are adding data to
      *  @param lbid         LBID of the relevant extent.
-     *  @param bIsNewExtent Treat as new or existing extent when CP min/max is
-     *                      sent to BRM
      */
     virtual void addFirstEntry( RID         lastInputRow,
-                                BRM::LBID_t lbid,
-                                bool        bIsNewExtent );
+                                BRM::LBID_t lbid );
 
     /** @brief Add or update an entry for the specified Row and its min/max val.
      *         If new extent, LBID will be added later when extent is allocated.

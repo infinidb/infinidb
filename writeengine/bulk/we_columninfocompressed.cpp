@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
-* $Id: we_columninfocompressed.cpp 4244 2012-10-11 13:00:35Z dcathey $
+* $Id: we_columninfocompressed.cpp 3386 2011-12-18 23:58:12Z dcathey $
 *
 *******************************************************************************/
 
@@ -28,8 +28,6 @@
 #include "we_rbmetawriter.h"
 #include "we_stats.h"
 
-#include "we_tableinfo.h"
-
 #include "idbcompress.h"
 using namespace compress;
 
@@ -37,28 +35,25 @@ using namespace compress;
 
 namespace WriteEngine
 {
-
+
 //------------------------------------------------------------------------------
 // ColumnInfoCompressed constructor
 //------------------------------------------------------------------------------
 ColumnInfoCompressed::ColumnInfoCompressed(Log*             logger,
                                            int              idIn,
                                            const JobColumn& columnIn,
-                                           DBRootExtentTracker* pDBRootExtTrk,
-                                           TableInfo*		pTableInfo):
-                                           //RBMetaWriter*    rbMetaWriter) :
-    ColumnInfo(logger, idIn, columnIn, pDBRootExtTrk, pTableInfo),
-    fRBMetaWriter(pTableInfo->rbMetaWriter())
+                                           RBMetaWriter*    rbMetaWriter) : 
+    ColumnInfo(logger, idIn, columnIn), fRBMetaWriter(rbMetaWriter)
 {
 }
-
+
 //------------------------------------------------------------------------------
 // ColumnInfoCompressed destructor
 //------------------------------------------------------------------------------
 ColumnInfoCompressed::~ColumnInfoCompressed()
 {
 }
-
+
 //------------------------------------------------------------------------------
 // Close the current compressed Column file after first compressing/flushing
 // any remaining data, and re-writing the headers as well.
@@ -75,9 +70,9 @@ int ColumnInfoCompressed::closeColumnFile(bool bCompletingExtent,bool bAbort)
             // part of preliminary block skipping, then we won't have a Column-
             // BufferManger object yet.  One will be created when the file is
             // reopened to begin importing.
-            if (fColBufferMgr)
+            if (colBufferMgr)
             {
-                rc = fColBufferMgr->finishFile( bCompletingExtent );
+                rc = colBufferMgr->finishFile( bCompletingExtent );
                 if (rc != NO_ERROR)
                 {
                     WErrorCodes ec;
@@ -96,10 +91,17 @@ int ColumnInfoCompressed::closeColumnFile(bool bCompletingExtent,bool bAbort)
 
         ColumnInfo::closeColumnFile(bCompletingExtent, bAbort);
     }
+    else
+    {
+        if (!bAbort)
+        {
+            rc = ERR_FILE_NULL;
+        }
+    }
 
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Prepare the initial compressed column segment file for import.
 //------------------------------------------------------------------------------
@@ -122,7 +124,7 @@ int ColumnInfoCompressed::setupInitialColumnFile( HWM oldHwm, HWM hwm )
             this, column.width, fLog, column.compressionType);
         RETURN_ON_ERROR( mgr->setDbFile(curCol.dataFile.pFile, hwm, hdr) );
     }
-    fColBufferMgr = mgr;
+    colBufferMgr = mgr;
 
     IDBCompressInterface compressor;
     int abbrevFlag =
@@ -154,9 +156,9 @@ int ColumnInfoCompressed::setupInitialColumnFile( HWM oldHwm, HWM hwm )
     // buffer later on in ColumnBufferCompressed::initToBeCompressedBuffer()
     long long byteOffset = (long long)hwm * (long long)BYTE_PER_BLOCK;
 
-    fSizeWritten      = byteOffset;
-    fSizeWrittenStart = fSizeWritten;
-    availFileSize     = fileSize - fSizeWritten;
+    sizeWritten      = byteOffset;
+    sizeWrittenStart = sizeWritten;
+    availFileSize    = fileSize - sizeWritten;
 
     if (fLog->isDebug( DEBUG_1 ))
     {
@@ -167,7 +169,7 @@ int ColumnInfoCompressed::setupInitialColumnFile( HWM oldHwm, HWM hwm )
             "; part-"   << curCol.dataFile.fPartition <<
             "; seg-"    << curCol.dataFile.fSegment   <<
             "; abbrev-" << abbrevFlag   <<
-            "; begByte-"<< fSizeWritten <<
+            "; begByte-"<< sizeWritten  <<
             "; endByte-"<< fileSize     <<
             "; freeBytes-" << availFileSize;
         fLog->logMsg( oss.str(), MSGLVL_INFO2 );
@@ -175,32 +177,31 @@ int ColumnInfoCompressed::setupInitialColumnFile( HWM oldHwm, HWM hwm )
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Reinitializes ColBuf buffer, and resets
 // file offset data member attributes where new extent will start.
 //------------------------------------------------------------------------------
 int ColumnInfoCompressed::resetFileOffsetsNewExtent(const char* hdr)
 {
-    fSavedHWM         = curCol.dataFile.hwm;
+    savedHWM         = curCol.dataFile.hwm;
     setFileSize( curCol.dataFile.hwm, false );
-    long long byteOffset = (long long)fSavedHWM * (long long)BYTE_PER_BLOCK;
-    fSizeWritten      = byteOffset;
-    fSizeWrittenStart = fSizeWritten;
-    availFileSize     = fileSize - fSizeWritten;
+    long long byteOffset = (long long)savedHWM * (long long)BYTE_PER_BLOCK;
+    sizeWritten      = byteOffset;
+    sizeWrittenStart = sizeWritten;
+    availFileSize    = fileSize - sizeWritten;
 
     // If we are adding an extent as part of preliminary block skipping, then
     // we won't have a ColumnBufferManager object yet, but that's okay, because
     // we are only adding the empty extent at this point.
-    if (fColBufferMgr)
+    if (colBufferMgr)
     {
-        RETURN_ON_ERROR( fColBufferMgr->setDbFile(curCol.dataFile.pFile,
+        RETURN_ON_ERROR( colBufferMgr->setDbFile(curCol.dataFile.pFile,
                          curCol.dataFile.hwm, hdr) );
 
         // Reinitialize ColBuf for the next extent
         long long startFileOffset;
-        RETURN_ON_ERROR( fColBufferMgr->resetToBeCompressedColBuf(
-                         startFileOffset ) );
+        RETURN_ON_ERROR( colBufferMgr->resetColBuf( startFileOffset ) );
 
         // Set the file offset to point to the chunk we are adding or updating
         RETURN_ON_ERROR( colOp->setFileOffset(curCol.dataFile.pFile,
@@ -209,7 +210,7 @@ int ColumnInfoCompressed::resetFileOffsetsNewExtent(const char* hdr)
 
     return NO_ERROR;
 }
-
+
 //------------------------------------------------------------------------------
 // Save HWM chunk for compressed dictionary store files, so that the HWM chunk
 // can be restored by bulk rollback if an error should occur.
@@ -219,26 +220,17 @@ int ColumnInfoCompressed::saveDctnryStoreHWMChunk()
 #ifdef PROFILE
     Stats::startParseEvent(WE_STATS_COMPRESS_DCT_BACKUP_CHUNK);
 #endif
-    int rc = NO_ERROR;
-    try
-    {
-        fRBMetaWriter->backupDctnryHWMChunk( column.dctnry.dctnryOid,
-            curCol.dataFile.fDbRoot,
-            curCol.dataFile.fPartition,
-            curCol.dataFile.fSegment );
-    }
-    catch (WeException& ex)
-    {
-        fLog->logMsg(ex.what(), ex.errorCode(), MSGLVL_ERROR);
-        rc = ex.errorCode();
-    }
+    int rc = fRBMetaWriter->backupDctnryHWMChunk( column.dctnry.dctnryOid,
+        curCol.dataFile.fDbRoot,
+        curCol.dataFile.fPartition,
+        curCol.dataFile.fSegment );
 #ifdef PROFILE
     Stats::stopParseEvent(WE_STATS_COMPRESS_DCT_BACKUP_CHUNK);
 #endif
         
     return rc;
 }
-
+
 //------------------------------------------------------------------------------
 // Truncate specified dictionary store file for this column.
 // Only applies to compressed columns.
@@ -440,80 +432,6 @@ int ColumnInfoCompressed::truncateDctnryStore(
     }
 
     fTruncateDctnryFileOp.closeFile( dFile );
-
-    return NO_ERROR;
-}
-
-//------------------------------------------------------------------------------
-// Fill out existing partial extent to extent boundary, so that we can resume
-// inserting rows on an extent boundary basis.  This use case should only take
-// place when a DBRoot with a partial extent has been moved from one PM to
-// another.
-//------------------------------------------------------------------------------
-int ColumnInfoCompressed::extendColumnOldExtent(
-    uint16_t    dbRootNext,
-    uint32_t    partitionNext,
-    uint16_t    segmentNext,
-    HWM         hwmNextIn )
-{
-    const unsigned int BLKS_PER_EXTENT =
-    (BRMWrapper::getInstance()->getExtentRows() * column.width)/BYTE_PER_BLOCK;
-
-    // Round up HWM to the end of the current extent
-    unsigned int nBlks = hwmNextIn + 1;
-    unsigned int nRem  = nBlks % BLKS_PER_EXTENT;
-    HWM hwmNext        = 0;
-    if (nRem > 0)
-        hwmNext = nBlks - nRem + BLKS_PER_EXTENT - 1;
-    else
-        hwmNext = nBlks - 1;
-
-    std::ostringstream oss;  
-    oss << "Padding compressed partial extent to extent boundary in OID-" <<
-           curCol.dataFile.fid <<
-        "; DBRoot-" << dbRootNext    <<
-        "; part-"   << partitionNext <<
-        "; seg-"    << segmentNext   <<
-        "; hwm-"    << hwmNext;
-    fLog->logMsg( oss.str(), MSGLVL_INFO2 );
-
-    curCol.dataFile.pFile        = 0;
-    curCol.dataFile.fDbRoot      = dbRootNext;
-    curCol.dataFile.fPartition   = partitionNext;
-    curCol.dataFile.fSegment     = segmentNext;
-    curCol.dataFile.hwm          = hwmNext;
-    curCol.dataFile.fSegFileName.clear();
-
-    std::string segFileName;
-    std::string errTask;
-    int rc = colOp->fillCompColumnExtentEmptyChunks(
-        curCol.dataFile.fid,
-        curCol.colWidth,
-        column.emptyVal,
-        curCol.dataFile.fDbRoot,
-        curCol.dataFile.fPartition,
-        curCol.dataFile.fSegment,
-        curCol.dataFile.hwm,
-        segFileName,
-        errTask);
-    if (rc != NO_ERROR)
-    {
-        WErrorCodes ec;
-        std::ostringstream oss;
-        oss << "extendColumnOldExtent: error padding extent (" <<
-            errTask << "); " <<
-            "column OID-" << curCol.dataFile.fid               <<
-            "; DBRoot-"   << curCol.dataFile.fDbRoot           <<
-            "; part-"     << curCol.dataFile.fPartition        <<
-            "; seg-"      << curCol.dataFile.fSegment          <<
-            "; newHwm-"   << curCol.dataFile.hwm               <<
-            "; "          << ec.errorString(rc);
-        fLog->logMsg( oss.str(), rc, MSGLVL_CRITICAL );
-        fpTableInfo->fBRMReporter.addToErrMsgEntry(oss.str());
-        return rc;
-    }
-
-    addToSegFileList( curCol.dataFile, hwmNext );
 
     return NO_ERROR;
 }

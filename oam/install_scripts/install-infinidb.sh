@@ -260,12 +260,35 @@ done
 
 ${prefix}/Calpont/bin/post-mysql-install --prefix=$prefix --rpmmode=$rpmmode --password=$password
 
-echo " "
-echo "SETUP INFINIDB SYSTEM LOGGING"
-
 #setup syslog
 
-${prefix}/Calpont/bin/syslogSetup.sh install
+syslog_conf=
+if [ -f /etc/syslog.conf ]; then
+	syslog_conf=/etc/syslog.conf
+elif [ -d /etc/rsyslog.d ]; then
+	syslog_conf=/etc/rsyslog.d/calpont.conf
+elif [ -f /etc/rsyslog.conf ]; then
+	syslog_conf=/etc/rsyslog.conf
+else
+	echo "*** No System Logging (syslog / rsyslog) found, setup skipped ***"
+fi
+if [ ! -z "$syslog_conf" ] ; then
+	egrep -qs 'Calpont Database Platform Logging' ${syslog_conf}
+	if [ $? -ne 0 ]; then
+		#set the syslog for calpont logging
+		rm -f ${syslog_conf}.calpontSave
+		cp ${syslog_conf} ${syslog_conf}.calpontSave >/dev/null 2>&1
+		echo "# Calpont Database Platform Logging
+local1.=crit /var/log/Calpont/crit.log
+local1.=err /var/log/Calpont/err.log
+local1.=warning /var/log/Calpont/warning.log
+local1.=info /var/log/Calpont/info.log
+local1.=debug /var/log/Calpont/debug.log
+local2.=crit /var/log/Calpont/data/data_mods.log" >> ${syslog_conf}
+	fi
+	/etc/init.d/syslog restart > /dev/null 2>&1
+	/etc/init.d/rsyslog restart > /dev/null 2>&1
+fi
 
 for file in snmpdx.conf; do
 	rm -f ${prefix}/Calpont/local/${file}.save
@@ -307,6 +330,10 @@ cnt=`/bin/ls -1 /mnt/tmp | wc -l`
 if [ $cnt -eq 0 ]; then
 	rm -rf /mnt/tmp >/dev/null 2>&1
 fi
+
+#make a backup of fstab for ProcMon
+rm -f /etc/fstab.calpontSave
+cp /etc/fstab /etc/fstab.calpontSave
 
 echo " "
 echo "InfiniDB Installation Completed"

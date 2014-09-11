@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: largedatalist.h 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: largedatalist.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -46,6 +46,7 @@
 #include "datalistimpl.h"
 #include "configcpp.h"
 #include "elementcompression.h"
+#include "bucketreuse.h"
 #include "resourcemanager.h"
 
 #include "exceptclasses.h"
@@ -64,7 +65,7 @@
 #endif
 
 namespace joblist {
-extern const std::string defaultTempDiskPath;   // defined in resourcemanager.cpp
+extern const std::string defaultTempDiskPath;   // defined in bucketreuse.cpp
 const uint32_t defaultMaxElements = 0x2000000;  // 32M
 
 // Enumeration used to specify element type compression mode for elements

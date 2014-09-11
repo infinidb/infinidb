@@ -77,16 +77,18 @@ void makeAntiJoin(const ParseTree* n)
 	}
 }
 
-InSub::InSub(gp_walk_info& gwip) : WhereSubQuery(gwip) 
+InSub::InSub() : WhereSubQuery() 
 {}
 
-InSub::InSub(gp_walk_info& gwip, Item_func* func) :
-	WhereSubQuery(gwip, func)
+InSub::InSub(Item_func* func) :
+	WhereSubQuery(func)
 {}
 
 InSub::InSub(const InSub& rhs) :
-	WhereSubQuery(rhs.gwip(), rhs.fColumn, rhs.fSub, rhs.fFunc)
-{}
+	WhereSubQuery(rhs.fColumn, rhs.fSub, rhs.fFunc)
+{
+	fGwip = rhs.gwip();
+}
 
 InSub::~InSub()
 {}
@@ -102,74 +104,57 @@ execplan::ParseTree* InSub::transform()
 	// @todo need to handle scalar IN and BETWEEN specially
 	// this blocks handles only one subselect scalar
 	// arg[0]: column | arg[1]: subselect
-	//assert (fFunc->arg_count == 2 && fGwip.rcWorkStack.size() >= 2);
-	if (fFunc->arg_count != 2 || fGwip.rcWorkStack.size() < 2)
+	//assert (fFunc->arg_count == 2 && fGwip->rcWorkStack.size() >= 2);
+	if (fFunc->arg_count != 2 || fGwip->rcWorkStack.size() < 2)
 	{
-		fGwip.fatalParseError = true;
-		fGwip.parseErrorText = "Unsupported item in IN subquery";
+		fGwip->fatalParseError = true;
+		fGwip->parseErrorText = "Unsupported item in IN subquery";
 		return NULL;
 	}
 	
-	ReturnedColumn* rhs = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();
+	ReturnedColumn* rhs = fGwip->rcWorkStack.top();
+	fGwip->rcWorkStack.pop();
 	delete rhs;
-	ReturnedColumn* lhs = fGwip.rcWorkStack.top();
-	fGwip.rcWorkStack.pop();	
+	ReturnedColumn* lhs = fGwip->rcWorkStack.top();
+	fGwip->rcWorkStack.pop();	
 	delete lhs;	
 	
 	fSub = (Item_subselect*)(fFunc->arguments()[1]);
-	idbassert(fSub && fFunc);
+	assert(fSub && fFunc);
 	
-	SCSEP csep (new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);	
+	SCSEP scsep;
+	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
+	csep->sessionID(fGwip->sessionid);	
 	csep->location(CalpontSelectExecutionPlan::WHERE);
 	csep->subType (CalpontSelectExecutionPlan::IN_SUBS);
 	
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fGwip.thd;
+	gwi.thd = fGwip->thd;
 	gwi.subQuery = this;
-	
-	// @4827 merge table list to gwi in case there is FROM sub to be referenced
-	// in the FROM sub
-	uint derivedTbCnt = fGwip.derivedTbList.size();
-	uint tbCnt = fGwip.tbList.size();
 
-	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
-	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
-
-	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSub->get_select_lex()), *csep) != 0)
 	{
-		fGwip.fatalParseError = true;
+		fGwip->fatalParseError = true;
 		if (gwi.fatalParseError && !gwi.parseErrorText.empty())
-			fGwip.parseErrorText = gwi.parseErrorText;
-		else
-			fGwip.parseErrorText = "Error occured in InSub::transform()";
+			fGwip->parseErrorText = gwi.parseErrorText;
+		else			
+			fGwip->parseErrorText = "Error occured in InSub::transform()";
 		return NULL;
 	}
-	
-	// remove outer query tables
-	CalpontSelectExecutionPlan::TableList tblist;
-	if (csep->tableList().size() >= tbCnt)
-		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
-	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
-	
-	csep->tableList(tblist);
-	csep->derivedTableList(derivedTbList);
 		
+	scsep.reset(csep);
 	ExistsFilter *subFilter = new ExistsFilter();
-	subFilter->sub(csep);
+	subFilter->sub(scsep);
 	
 	if (gwi.subQuery->correlated())
 		subFilter->correlated(true);
 	else
 		subFilter->correlated(false);
-	if (fGwip.clauseType == HAVING && subFilter->correlated())
+	if (fGwip->clauseType == HAVING && subFilter->correlated())
 	{
-		fGwip.fatalParseError = true;
-		fGwip.parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_NON_SUPPORT_HAVING);
+		fGwip->fatalParseError = true;
+		fGwip->parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_NON_SUPPORT_HAVING);
 	}
 	
 	return new ParseTree(subFilter);	
@@ -188,25 +173,16 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
 		// trigcond(or_cond) is the only form we recognize for now
 		if (func->arg_count > 2)
 		{
-			fGwip.fatalParseError = true;
-			fGwip.parseErrorText = "Unsupported item in IN subquery";
+			fGwip->fatalParseError = true;
+			fGwip->parseErrorText = "Unsupported item in IN subquery";
 			return;
 		}
 		Item_cond* cond;
 		
 		if (func->functype() == Item_func::TRIG_COND_FUNC)
-		{
-			Item* item;
-			if (func->arguments()[0]->type() == Item::REF_ITEM)
-				item = (Item_ref*)(func->arguments()[0])->real_item();
-			else
-				item = func->arguments()[0];
-			cond = (Item_cond*)(item);
-		}
+			cond = (Item_cond*)(func->arguments()[0]);
 		else
-		{
 			cond = (Item_cond*)(func);
-		}
 		if (cond->functype() == Item_func::COND_OR_FUNC)
 		{
 			// (cache=item) case. do nothing. ignore trigcond()?
@@ -227,7 +203,7 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
 					return;
 				delete sf;
 				sf = dynamic_cast<SimpleFilter*>(pt->right()->data());
-				//idbassert(sf && sf->op()->op() == execplan::OP_EQ);
+				//assert(sf && sf->op()->op() == execplan::OP_EQ);
 				if (!sf || sf->op()->op() != execplan::OP_EQ)
 					return;
 					
@@ -272,9 +248,9 @@ void InSub::handleFunc(gp_walk_info* gwip, Item_func* func)
  */
 void InSub::handleNot()
 {
-	ParseTree *pt = fGwip.ptWorkStack.top();
+	ParseTree *pt = fGwip->ptWorkStack.top();
 	ExistsFilter *subFilter = dynamic_cast<ExistsFilter*>(pt->data());
-	idbassert(subFilter);
+	assert(subFilter);
 	subFilter->notExists(true);
 	SCSEP csep = subFilter->sub();
 	const ParseTree* ptsub = csep->filters();

@@ -6,17 +6,7 @@
 # Validates that FilesPerColumnPartition setting is not set lower than existing extents.
 #
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
+test -f /usr/local/Calpont/post/functions && . /usr/local/Calpont/post/functions
 
 scrname=`basename $0`
 tname="validate-partition-size"
@@ -26,7 +16,6 @@ if firstboot; then
         exit 0
 fi
 
-exit 0
 
 cplogger -i 48 $scrname "$tname"
 

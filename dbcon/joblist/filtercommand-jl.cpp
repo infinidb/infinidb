@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: filtercommand-jl.cpp 8410 2012-03-22 12:57:23Z pleblanc $
+*   $Id: filtercommand-jl.cpp 8272 2012-01-19 16:28:34Z xlou $
 *
 *
 ***********************************************************************/
@@ -42,7 +42,7 @@ FilterCommandJL::~FilterCommandJL()
 }
 
 
-void FilterCommandJL::setLBID(uint64_t rid, uint dbroot)
+void FilterCommandJL::setLBID(uint64_t rid)
 {
 }
 

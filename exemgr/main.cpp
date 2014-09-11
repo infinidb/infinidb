@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /**********************************************************************
-*   $Id: main.cpp 992 2013-07-08 20:08:38Z bpaul $
+*   $Id: main.cpp 932 2013-01-09 17:44:45Z zzhu $
 *
 *
 ***********************************************************************/
@@ -75,6 +75,7 @@ using namespace execplan;
 #include "joblist.h"
 #include "joblistfactory.h"
 #include "distributedenginecomm.h"
+#include "bucketreuse.h"
 #include "resourcemanager.h"
 using namespace joblist;
 #include "liboamcpp.h"
@@ -85,15 +86,11 @@ using namespace oam;
 using namespace logging;
 #include "procstat.h"
 using namespace procstat;
-#include "querystats.h"
-using namespace querystats;
 
 #include <boost/scoped_ptr.hpp>
 
 #include "activestatementcounter.h"
 #include "femsghandler.h"
-
-#include "utils_utf8.h"
 
 namespace {
 
@@ -224,21 +221,17 @@ struct SessionThread
 	IOSocket fIos;
 	DistributedEngineComm *fEc;
 	ResourceManager&  fRm;
-	querystats::QueryStats fStats;
 
 	// Variables used to store return stats
 	bool       fStatsRetrieved;
+	QueryStats fStats;
 
 	//...Reinitialize stats for start of a new query
-	void initStats ( uint32_t sessionId, string& sqlText )
+	void initStats ( uint32_t sessionId )
 	{
 		initMaxMemPct ( sessionId );
 
 		fStats.reset();
-		fStats.setStartTime();
-		//fStats.rm(&fRm);
-		fStats.fSessionID = sessionId;
-		fStats.fQuery = sqlText;
 		fStatsRetrieved  = false;
 	}
 
@@ -281,32 +274,21 @@ struct SessionThread
 
 	//...Get and log query stats to specified output stream
 	void getAndLogQueryStats (
+		uint32_t sessionId,	    // session ID associated with query
 		SJLP&    jl,			// joblist associated with query
 		ostream& os,		    // output stream to log output to
 		const    string& label, // header label to print in front of log output
 		bool     includeNewLine,//include line breaks in query stats string
 		bool     vtableModeOn,
-		bool     wantExtendedStats,
-		uint64_t rowsReturned)
+		bool     wantExtendedStats)
 	{
 		// Get stats if not already acquired for current query
 		if ( !fStatsRetrieved )
 		{
-			if (wantExtendedStats)
-			{
-				//wait for the ei data to be written by another thread (brain-dead)
-				struct timespec req = { 0, 250000 }; //250 usec
-#ifdef _MSC_VER
-				Sleep(20); //20ms on Windows
-#else
-				nanosleep(&req, 0);
-#endif
-			}
 			// Get % memory usage during current query for sessionId
 			jl->querySummary( wantExtendedStats );
 			fStats = jl->queryStats();
-			fStats.fMaxMemPct = getMaxMemPct( fStats.fSessionID );
-			fStats.fRows = rowsReturned;
+			fStats.fMaxMemPct = getMaxMemPct( sessionId );
 			fStatsRetrieved = true;
 		}
 
@@ -367,6 +349,8 @@ struct SessionThread
 				CalpontSystemCatalog::removeCalpontSystemCatalog((sessionId ^ 0x80000000));
 			}
 		}
+		//CalpontSystemCatalog::removeCalpontSystemCatalog(sessionId);
+		//CalpontSystemCatalog::removeCalpontSystemCatalog((sessionId ^ 0x80000000));
 	}
 
 private:
@@ -406,10 +390,11 @@ private:
 
 		if (up)
 			roundedValue++;
-		
-		ostringstream oss;
-		oss << roundedValue << units[i];
-		return oss.str();
+
+		char buf[30] = {0};
+		sprintf(buf, "%lu%s", roundedValue, units[i]);
+
+		return string(buf);
 	}
 
 	//...Round off to nearest (1024*1024) MB
@@ -444,7 +429,7 @@ private:
 		}
 	}
 	
-	void buildSysCache(const CalpontSelectExecutionPlan& csep, boost::shared_ptr<CalpontSystemCatalog> csc)
+	void buildSysCache(const CalpontSelectExecutionPlan& csep, CalpontSystemCatalog* csc)
 	{
 		const CalpontSelectExecutionPlan::ColumnMap& colMap = csep.columnMap();
 		CalpontSelectExecutionPlan::ColumnMap::const_iterator it;
@@ -533,12 +518,6 @@ public:
 				}
 new_plan:
 				csep.unserialize(bs);
-				
-				// check limit clause and determin if ExeMgr needs to stop sending before finish
-				// @bug5176. Do limit only for select.
-				bool hasLimit = (csep.queryType() == "SELECT") &&
-				                (!csep.hasOrderBy()) && (csep.limitNum() != (uint64_t (-1)));
-				uint64_t requestRowCount = csep.limitStart() + csep.limitNum(); 
 
 				if (gDebug > 1 || (gDebug && (csep.sessionID()&0x80000000)==0))
 					cout << "### For session id " << csep.sessionID() << ", got a CSEP" << endl;
@@ -548,7 +527,7 @@ new_plan:
 				// skip system catalog queries.
 				if ((csep.sessionID()&0x80000000)==0)
 				{
-					boost::shared_ptr<CalpontSystemCatalog> csc =
+					CalpontSystemCatalog* csc =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(csep.sessionID());
 					buildSysCache(csep, csc);
 				}
@@ -562,19 +541,12 @@ new_plan:
 					incSessionThreadCnt = false;
 				}
 
+
 // 				bool needEndMsg = false;
 				bool needDbProfEndStatementMsg = false;
 				Message::Args args;
 				string sqlText = csep.data();
 				LoggingID li(16, csep.sessionID(), csep.txnID());
-
-				// Initialize stats for this query, including
-				// init sessionMemMap entry for this session to 0 memory %.
-				// We will need this later for traceOn() or if we receive a
-				// table request with qb=3 (see below). This is also recorded
-				// as query start time.
-				initStats( csep.sessionID(), sqlText );
-				fStats.fQueryType = csep.queryType();
 
 //				@bug 1775 Use SQLLogger instead
 // 				if (!sqlText.empty())
@@ -586,7 +558,7 @@ new_plan:
 // 					}
 // 					needEndMsg = true;
 // 				}
-				
+
 				// Log start and end statement if tracing is enabled.  Keep in
 				// mind the trace flag won't be set for system catalog queries.
 				if (csep.traceOn())
@@ -601,7 +573,7 @@ new_plan:
 									  li);
 					needDbProfEndStatementMsg = true;
 				}
-				
+
 				//Don't log subsequent self joins after first.
 				if (selfJoin)
 					sqlText = "";
@@ -610,9 +582,8 @@ new_plan:
 				// Initialize stats for this query, including
 				// init sessionMemMap entry for this session to 0 memory %.
 				// We will need this later for traceOn() or if we receive a
-				// table request with qb=3 (see below). This is also recorded
-				// as query start time.
-//				initStats( csep.sessionID() );
+				// table request with qb=3 (see below).
+				initStats( csep.sessionID() );
 
 				// Run the query, get the minimum RID list for each table
 				statementsRunningCount->incr(stmtCounted);
@@ -626,9 +597,6 @@ new_plan:
 						ByteStream::quadbyte tflg = 0;
 						jl = JobListFactory::makeJobList(
 								&csep, fRm, true, true);
-						// assign query stats
-						jl->queryStats(fStats);
-						
 						ByteStream tbs;
 
 						if ((jl->status()) == 0 && (jl->putEngineComm(fEc) == 0))
@@ -710,8 +678,7 @@ new_plan:
 				CalpontSystemCatalog::OID tableOID;
 				bool swallowRows = false;
 				DeliveredTableMap tm;
-				uint64_t totalBytesSent = 0;
-				uint64_t totalRowCount = 0;
+				unsigned long long totalBytesSent = 0;
 
 				// Project each table as the FE asks for it
 				for (;;)
@@ -780,14 +747,13 @@ new_plan:
 
 							//Log stats string to be sent back to front end
 							getAndLogQueryStats(
+								csep.sessionID(),
 								jl,
 								statsString,
 								"Query Stats",
 								false,
 								!(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_TUPLE_OFF),
-								(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG),
-								totalRowCount
-								);
+								(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG));
 
 							bs.restart();
 							bs << statsString.str();
@@ -802,19 +768,9 @@ new_plan:
 								bs << empty;
 								bs << empty;
 							}
-							
-							// send stats to connector for inserting to the querystats table
-							fStats.serialize(bs);
 							fIos.write(bs);
 
 							continue;
-						}
-						// for table mode handling
-						else if (qb == 4)
-						{
-							statementsRunningCount->decr(stmtCounted);
-							bs = fIos.read();
-							goto new_plan;
 						}
 						else // (qb > 3)
 						{
@@ -840,7 +796,7 @@ new_plan:
 
 					if (swallowRows) tm.erase(tableOID);
 
-				//	uint64_t totalRowCount = 0;
+					uint64_t totalRowCount = 0;
 
 					FEMsgHandler msgHandler(jl, &fIos);
 					if (tableOID == 100)
@@ -893,12 +849,11 @@ new_plan:
 								/* TODO: modularize the cleanup code, as well as
 								 * the rest of this fcn */
 								//cout << "saw the abort signal\n";
-								
-								decThreadCntPerSession( csep.sessionID() | 0x80000000 );
+								decThreadCntPerSession(csep.sessionID() | 0x80000000);
 								statementsRunningCount->decr(stmtCounted);
 								fIos.close();
 								return;
-						}
+							}
 							//cout << "connection drop\n";
 							throw runtime_error( errMsg.str() );
 						}
@@ -916,14 +871,8 @@ new_plan:
 							throw runtime_error( errMsg.str() );
 						}
 						totalRowCount += rowCount;
+
 						totalBytesSent += bs.length();
-						
-						// send stats if finish fetching for limit query
-						if (hasLimit && totalRowCount >= requestRowCount)
-						{
-							break;
-						}
-						
 						if (rowCount == 0)
 						{
 							msgHandler.stop();
@@ -954,13 +903,13 @@ new_plan:
 
 					//Log stats string to standard out
 					getAndLogQueryStats(
+						csep.sessionID(),
 						jl,
 						cout,
 						prefix.str(),
 						true,
 						!(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_TUPLE_OFF),
-						(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG),
-						totalRowCount);
+						(csep.traceFlags() & CalpontSelectExecutionPlan::TRACE_LOG));
 					//@Bug 1306. Added timing info for real time tracking.
 					struct tm ltm;
 					cout << " at " << asctime(localtime_r(&outputTime, &ltm)) << endl;
@@ -1169,14 +1118,6 @@ again:
 
 	void added_a_pm(int)
 	{
-		logging::LoggingID logid(21, 0, 0);
-		logging::Message::Args args1;
-		logging::Message msg(1);
-		args1.add("exeMgr caught SIGHUP. Resetting connections");
-		msg.format( args1 );
-		cout << msg.msg().c_str() << endl;
-		logging::Logger logger(logid.fSubsysID);
-		logger.logMessage(logging::LOG_TYPE_DEBUG, msg, logid);
 		if (ec) {
 			//set BUSY_INIT state while processing the add pm configuration change
 			Oam oam;
@@ -1215,7 +1156,6 @@ again:
 
 		// @bug5030 comment out the following signal hanlder to avoid
                 // deadlock when thread being interrupted by signal.
-
 	 	//memset(&ign, 0, sizeof(ign));
 	 	//ign.sa_handler = exit_;
 
@@ -1276,7 +1216,22 @@ int main(int argc, char* argv[])
 {
 	// get and set locale language
     string systemLang = "C";
-	systemLang = funcexp::utf8::idb_setlocale();
+	
+	Oam oam;
+    try{
+        oam.getSystemConfig("SystemLang", systemLang);
+    }
+    catch(...)
+    {
+		systemLang = "C";
+	}
+
+    setlocale(LC_ALL, systemLang.c_str());
+
+    cout << "Locale is : " << systemLang << endl;
+
+	//BUG 2991
+	setlocale(LC_NUMERIC, "C");
 
 	gDebug = 0;
 	bool eFlg = false;
@@ -1395,14 +1350,14 @@ int main(int argc, char* argv[])
 
 	ThreadPool tp(serverThreads, serverQueueSize);
 
-//	// bug 934. Let ExeMgr continue, even if BucketReuseManger cannot startup successfully
-//	try
-//	{
-//		BucketReuseManager::instance()->startup(rm);
-//	}
-//	catch (...)
-//	{
-//	}
+	// bug 934. Let ExeMgr continue, even if BucketReuseManger cannot startup successfully
+	try
+	{
+		BucketReuseManager::instance()->startup(rm);
+	}
+	catch (...)
+	{
+	}
 
 	cout << "Starting ExeMgr: st = " << serverThreads << ", sq = " <<
 		serverQueueSize << ", qs = " << rm.getEmExecQueueSize() << ", mx = " << maxPct << ", cf = " <<
@@ -1418,15 +1373,6 @@ int main(int argc, char* argv[])
 		catch (...)
 		{
 		}
-	}
-
-	// init mysql client if cross engine support is configured
-	try
-	{
-		joblist::init_mysqlcl_idb();
-	}
-	catch (...)
-	{
 	}
 
 // 	exQueueCount = 0;

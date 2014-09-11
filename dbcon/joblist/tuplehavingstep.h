@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.h 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: tuplehavingstep.h 7829 2011-06-30 20:09:00Z xlou $
 
 
 #ifndef JOBLIST_TUPLEHAVINGSTEP_H
@@ -25,6 +25,12 @@
 #include "expressionstep.h"
 
 // forward reference
+namespace  execplan
+{
+class SimpleColumn;
+class AggregateColumn;
+}
+
 namespace fucexp
 {
 class FuncExp;

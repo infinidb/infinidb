@@ -486,13 +486,13 @@ TypelessData makeTypelessKey(const Row &r, const vector<uint> &keyCols,
 			uint8_t *str = &(r.getData()[r.getOffset(keyCols[i])]);
 			uint width = r.getColumnWidth(keyCols[i]);
 			for (j = 0; j < width && str[j] != 0; j++) {
-                if (off >= keylen)
-                    goto toolong;
-                ret.data[off++] = str[j];
+				ret.data[off++] = str[j];
+				if (off > keylen)
+					goto toolong;
 			}
-            if (off >= keylen)
-                goto toolong;
 			ret.data[off++] = 0;
+			if (off > keylen)
+				goto toolong;
 		}
 		else {
 			if (off + 8 > keylen)
@@ -547,6 +547,13 @@ void TypelessData::deserialize(messageqcpp::ByteStream &b, utils::FixedAllocator
 	data = (uint8_t *) fa.allocate();
 	memcpy(data, b.buf(), len);
 	b.advance(len);
+}
+
+size_t TupleJoiner::hasher::operator()(const TypelessData &e) const
+{
+	char *data = (char *) e.data;
+	uint len = e.len;
+	return utils::Hasher()(data, len);
 }
 
 bool TupleJoiner::hasNullJoinColumn(const Row &r) const

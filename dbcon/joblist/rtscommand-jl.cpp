@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: rtscommand-jl.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: rtscommand-jl.cpp 8272 2012-01-19 16:28:34Z xlou $
 // C++ Implementation: rtscommand-jl
 //
 // Description: 
@@ -29,8 +29,6 @@
 //
 
 #include "bpp-jl.h"
-#include "tablecolumn.h"
-
 
 using namespace std;
 using namespace messageqcpp;
@@ -66,11 +64,11 @@ RTSCommandJL::~RTSCommandJL()
 {
 }
 
-void RTSCommandJL::setLBID(uint64_t data, uint dbroot)
+void RTSCommandJL::setLBID(uint64_t data)
 {
 	if (!passThru)
-		col->setLBID(data, dbroot);
-	dict->setLBID(data, dbroot);
+		col->setLBID(data);
+	dict->setLBID(data);
 }
 
 void RTSCommandJL::createCommand(ByteStream &bs) const

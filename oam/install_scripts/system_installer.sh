@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 #
-# $Id: system_installer.sh 2804 2012-03-22 12:57:42Z pleblanc $
+# $Id: system_installer.sh 1604 2009-09-04 13:55:50Z dhill $
 #
 # Install RPM and custom OS files on system
 # Argument 1 - Remote Module Name
@@ -22,11 +22,11 @@ spawn -noecho /bin/bash
 #
 if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 	# 
-	# erase package
+	# unmount disk
 	#
-	send_user "Erase Calpont Package on Module                 "
+	send_user "Unmount disk                                    "
 	expect -re "# "
-	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont'\n"
+	send "ssh $USERNAME@$SERVER ';umount -fl /mnt/tmp;umount -fl /usr/local/Calpont/data*'\n"
 	expect {
 		-re "Host key verification failed" { send_user "FAILED: Host key verification failed\n" ; exit }
 		-re "service not known" { send_user "FAILED: Invalid Host\n" ; exit }
@@ -37,6 +37,18 @@ if { $INSTALLTYPE == "initial" || $INSTALLTYPE == "uninstall" } {
 		}
 		-re "word: " { send "$PASSWORD\n" } abort
 	}
+	expect {
+		-re "Permission denied, please try again"   { send_user "ERROR: Invalid password\n" ; exit -1 }
+		-re "# "                  { send_user "DONE" } abort
+	}
+	send_user "\n"
+	# 
+	# erase package
+	#
+	send_user "Erase Calpont Package on Module                 "
+	expect -re "# "
+	send "ssh $USERNAME@$SERVER ' rpm -e --nodeps --allmatches calpont'\n"
+	expect -re "word: "
 	# password for ssh
 	send "$PASSWORD\n"
 	expect {

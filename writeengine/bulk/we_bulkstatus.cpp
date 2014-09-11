@@ -16,37 +16,41 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkstatus.cpp 3720 2012-04-04 18:18:49Z rdempsey $
+* $Id: we_bulkstatus.cpp 2873 2011-02-08 14:35:57Z rdempsey $
 *
 *******************************************************************************/
-
-#include <unistd.h>
-#include <cstdlib>
-
-#define WE_BULKSTATUS_DLLEXPORT
-#include "we_bulkstatus.h"
-#undef WE_BULKSTATUS_DLLEXPORT
+/** @file */
+#ifndef _WE_BULKSTATUS_H_
+#define _WE_BULKSTATUS_H_
 
 namespace WriteEngine
 {
-    /*static*/
-#ifdef _MSC_VER
-	volatile LONG BulkStatus::fJobStatus = EXIT_SUCCESS;
-#else
-	volatile int BulkStatus::fJobStatus = EXIT_SUCCESS;
-#endif
-//------------------------------------------------------------------------------
-// Set the job status
-//------------------------------------------------------------------------------
-/* static */
-void BulkStatus::setJobStatus(int jobStatus)
-{
-#ifdef _MSC_VER
-    (void)InterlockedCompareExchange (&fJobStatus, jobStatus, EXIT_SUCCESS);
-#else
-    (void)__sync_val_compare_and_swap(&fJobStatus, EXIT_SUCCESS, jobStatus);
- 
-#endif
-}
 
+// Defined this class to hold the global JobStatus flag rather then storing in
+// BulkLoad, because that would introduce circular dependencies, with the other
+// classes needing BulkLoad.  So put the JobStatus in a separate class.
+class BulkStatus
+{
+public:
+   static int     getJobStatus()           { return fJobStatus; }
+   static void setJobStatus(int jobStatus) { fJobStatus = jobStatus; }
+
+private:
+    /* @brief Global job status flag.
+    * Declared volatile to insure that all threads see when this flag is
+    * changed.  We don't worry about using a mutex since we are just using
+    * as a flag.  Making the variable volatile should suffice, to make it
+    * work with multiple threads.
+    */
+   static volatile int fJobStatus;
+};
+
+} // end of namespace
+
+#endif // _WE_BULKSTATUS_H_
+#include <cstdlib>
+
+namespace WriteEngine
+{
+    /*static*/ volatile int BulkStatus::fJobStatus = EXIT_SUCCESS;
 }

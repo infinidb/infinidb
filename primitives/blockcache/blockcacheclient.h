@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: blockcacheclient.h 2046 2013-01-31 19:13:16Z pleblanc $
+ *   $Id: blockcacheclient.h 1808 2012-01-10 00:10:20Z pleblanc $
  *
  *                                                                         *
  ***************************************************************************/
@@ -123,7 +123,7 @@ public:
 	/**
 	 * @brief flush all versions of the given lbids from the cache.
 	 **/
-	inline void flushManyAllversion(const BRM::LBID_t* laVptr, uint32_t cnt) {
+	inline void flushManyAllversion(const LbidAtVer* laVptr, uint32_t cnt) {
 		fBCCBrp->flushManyAllversion(laVptr, cnt); }
 
 	/**
@@ -135,8 +135,8 @@ public:
 	/**
 	 * @brief Flush all versions of a partition from the given OIDs.
 	 */
-	inline void flushPartition(const std::vector<BRM::OID_t> &oids, const std::set<BRM::LogicalPartition> partitions) {
-			fBCCBrp->flushPartition(oids, partitions); }
+	inline void flushPartition(const uint32_t *oids, uint32_t count, uint32_t partitionNum) {
+			fBCCBrp->flushPartition(oids, count, partitionNum); }
 
 private:
 

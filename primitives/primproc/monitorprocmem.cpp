@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: monitorprocmem.cpp 2012 2012-12-10 21:08:03Z xlou $
+ * $Id: monitorprocmem.cpp 1615 2011-03-04 19:22:52Z rdempsey $
  *
  *****************************************************************************/
 
@@ -43,9 +43,6 @@ using namespace std;
 namespace primitiveprocessor
 {
 
-unsigned MonitorProcMem::fMemAvailPct = 0;
-unsigned MonitorProcMem::fAggMemCheck = 0;
-
 //------------------------------------------------------------------------------
 // Thread entry point function, that drives a thread to periodically (every
 // 15 seconds by default) monitor the memory usage for the process we are
@@ -54,31 +51,25 @@ unsigned MonitorProcMem::fAggMemCheck = 0;
 //------------------------------------------------------------------------------
 void MonitorProcMem::operator()() const
 {
-	const unsigned logRssTooBig = logging::M0045;
-	const size_t mt = memTotal();
+    const unsigned logRssTooBig = logging::M0045;
+    const size_t mt = memTotal();
 
-	while (1)
-	{
-		if (fMaxPct > 0)
-		{
-			size_t rssMb = rss();
-			size_t pct = rssMb * 100 / mt;
-			if (pct > fMaxPct)
-			{
-				cerr << "PrimProc: Too much memory allocated!" << endl;
-				logging::Message::Args args;
-
-				fMsgLog->logMessage ( logRssTooBig,
-									 logging::Message::Args(),
-									 true );
-				exit(1);
-			}
-		}
-
-		fMemAvailPct = memAvailPct();
-
-		pause_();
-	}
+    while (1)
+    {
+        size_t rssMb = rss();
+        size_t pct = rssMb * 100 / mt;
+        if (pct > fMaxPct)
+        {
+            cerr << "PrimProc: Too much memory allocated!" << endl;
+            logging::Message::Args args;
+            
+            fMsgLog->logMessage ( logRssTooBig,
+                                 logging::Message::Args(),
+                                 true );
+            exit(1);
+        }
+        pause_();
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -136,20 +127,20 @@ size_t MonitorProcMem::rss() const
 	uint64_t rss;
 
 #if defined(_MSC_VER)
-	HANDLE hProcess;
-	PROCESS_MEMORY_COUNTERS pmc;
-	hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION |
-									PROCESS_VM_READ,
-									FALSE, fPid );
-	if (NULL == hProcess)
-		return 0;
+    HANDLE hProcess;
+    PROCESS_MEMORY_COUNTERS pmc;
+    hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION |
+                                    PROCESS_VM_READ,
+                                    FALSE, fPid );
+    if (NULL == hProcess)
+        return 0;
 
-	if ( GetProcessMemoryInfo( hProcess, &pmc, sizeof(pmc)) )
+    if ( GetProcessMemoryInfo( hProcess, &pmc, sizeof(pmc)) )
 		rss = pmc.WorkingSetSize;
 	else
 		rss = 0;
 
-	CloseHandle( hProcess );
+    CloseHandle( hProcess );
 #elif defined(__FreeBSD__)
 	ostringstream cmd;
 	cmd << "ps -a -o rss -p " << getpid() << " | tail +2";
@@ -183,101 +174,31 @@ size_t MonitorProcMem::rss() const
 //------------------------------------------------------------------------------
 void MonitorProcMem::pause_( ) const
 {
-	struct timespec req;
-	struct timespec rem;
+    struct timespec req;
+    struct timespec rem;
 
-	req.tv_sec  = fSleepSec;
-	req.tv_nsec = 0;
+    req.tv_sec  = fSleepSec;
+    req.tv_nsec = 0;
 
-	rem.tv_sec  = 0;
-	rem.tv_nsec = 0;
+    rem.tv_sec  = 0;
+    rem.tv_nsec = 0;
 
-	while (1)
-	{
+    while (1)
+    {
 #ifdef _MSC_VER
 		Sleep(req.tv_sec * 1000);
 #else
-		if (nanosleep(&req, &rem) != 0)
-		{
-			if (rem.tv_sec > 0 || rem.tv_nsec > 0)
-			{
-				req = rem;
-				continue;
-			}
-		}
+        if (nanosleep(&req, &rem) != 0)
+        {
+            if (rem.tv_sec > 0 || rem.tv_nsec > 0)
+            {
+                req = rem;
+                continue;
+            }
+        }
 #endif
-		break;
-	}
-}
-
-//------------------------------------------------------------------------------
-// Returns the system free memory %
-//------------------------------------------------------------------------------
-unsigned MonitorProcMem::memAvailPct() const
-{
-	uint64_t memTotal = 1;
-	uint64_t memFree  = 0;
-	uint64_t buffers  = 0;
-	uint64_t cached   = 0;
-
-#if defined(_MSC_VER)
-	MEMORYSTATUSEX memStat;
-	memStat.dwLength = sizeof(memStat);
-	if (GlobalMemoryStatusEx(&memStat))
-	{
-#ifndef _WIN64
-		memStat.ullTotalPhys = std::min(memStat.ullTotalVirtual, memStat.ullTotalPhys);
-#endif
-		//We now have the total phys mem in bytes
-		memTotal = memStat.ullTotalPhys;
-		memFree  = memStat.ullAvailPhys;
-#ifndef _WIN64
-		if (memFree > memTotal)
-			memFree = memTotal;
-#endif
-	}
-#elif defined(__FreeBSD__)
-	// FreeBSD is not supported, no optimization.
-	memFree = 0;
-#else
-	ifstream in("/proc/meminfo");
-	string x;
-
-	in >> x;         // MemTotal:
-	in >> memTotal;
-	in >> x;         // kB
-
-	in >> x;         // MemFree:
-	in >> memFree;
-	in >> x;         // kB
-
-	in >> x;         // Buffers:
-	in >> buffers;
-	in >> x;         // kB
-
-	in >> x;         // Cached:
-	in >> cached;
-#endif
-
-	// % available for application
-	return ((100 * (memFree + buffers + cached)) / memTotal);
-}
-
-//------------------------------------------------------------------------------
-// Returns the system used memory %
-//------------------------------------------------------------------------------
-unsigned MonitorProcMem::memUsedPct()
-{
-	return (100 - fMemAvailPct);
-}
-
-//------------------------------------------------------------------------------
-// Returns if need to flush aggregation memory
-//------------------------------------------------------------------------------
-bool MonitorProcMem::flushAggregationMem()
-{
-	// used memory > aggregation memory check
-	return (fMemAvailPct + fAggMemCheck < 100);
+        break;
+    }
 }
 
 } // end of namespace

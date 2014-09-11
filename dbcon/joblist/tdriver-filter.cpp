@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: tdriver-filter.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: tdriver-filter.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 
 #include <list>
 #include <sstream>
@@ -222,7 +222,7 @@ private:
 		timer.stop("iterating over result datalist");
 
 		cout << count << " rows qualified." << endl;
-		idbassert(count == assertCount);
+		assert(count == assertCount);
 	}
 
 	// Creates two string fifos with numRows and performs the passed comparison against their values.  
@@ -328,7 +328,7 @@ private:
 		timer.stop("iterating over result datalist");
 
 		cout << count << " rows qualified." << endl;
-		idbassert(count == assertCount);
+		assert(count == assertCount);
 	}
 
 	// Creates two double fifos with numRows and performs the passed comparison against their values.  
@@ -434,7 +434,7 @@ private:
 		timer.stop("iterating over result datalist");
 
 		cout << count << " rows qualified." << endl;
-		idbassert(count == assertCount);
+		assert(count == assertCount);
 	}
 
 public:

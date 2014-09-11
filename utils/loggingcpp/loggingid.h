@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
-* $Id: loggingid.h 3048 2012-04-04 15:33:45Z rdempsey $
+* $Id: loggingid.h 2926 2011-11-10 15:18:28Z rdempsey $
 *
 ******************************************************************************************/
 /**
@@ -28,6 +28,16 @@
 #include <string>
 
 namespace logging {
+
+/** @brief SubSystem IDs
+  * This list matches SubsystemIDs.txt, but has names matching Process Config DB
+  */
+extern const std::string SubsystemID[];
+
+/** @brief max index into SubsystemID[]
+  * Range of index into SubsystemID is 0 <= index <= MAXSUBSYSTEMID.
+  */
+extern const unsigned MAXSUBSYSTEMID;
 
 /** @brief a logging context structure
  *

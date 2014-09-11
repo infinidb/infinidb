@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*********************************************************************
- *   $Id: we_bulkloadbuffer.h 3951 2012-06-19 22:13:37Z dhall $
+ *   $Id: we_bulkloadbuffer.h 3826 2012-05-06 21:13:55Z dcathey $
  *
  ********************************************************************/
 #ifndef _WE_BULKLOADBUFFER_H
@@ -25,7 +25,7 @@
 #include "we_type.h"
 #include "limits"
 #include "string"
-#include "map"
+#include "utility"
 #include "vector"
 #include "boost/thread/mutex.hpp"
 #include "boost/ptr_container/ptr_vector.hpp"
@@ -128,7 +128,6 @@ private:
                                         //   (including fields to be ignored)
     unsigned int fNumColsInFile;        // Number of flds in input file targeted
                                         //   for db cols (omits default cols)
-    bool fbTruncationAsError;           // Treat string truncation as error
 
     //--------------------------------------------------------------------------
     // Private Functions
@@ -148,6 +147,12 @@ private:
                  bool nullFlag, unsigned char *output,
                  const JobColumn & column,
                  BLBufferStats& bufStats);
+
+    /** @brief Convert a Decimal string to it's equivalent integer value
+     */
+    long long convertDecimalString(const char* field,
+                                   int fieldLength,
+                                   int colScale);
 
     /** @brief Copy the overflow data
      */
@@ -300,18 +305,6 @@ public:
     const int getColumnLocker(const int & columnId) const
     { return fColumnLocks[columnId].locker; }
 
-    /** @brief set truncation as error for this import.
-     */
-    void setTruncationAsError(bool bTruncationAsError) 
-    { fbTruncationAsError = bTruncationAsError; }
-
-    /** @brief retrieve the tuncation as error setting for this
-     *  import. When set, this causes char and varchar strings
-     *  that are longer than the column definition to be treated
-     *  as errors instead of warnings.
-     */
-    bool getTruncationAsError() const
-    { return fbTruncationAsError; }
 };
 
 }

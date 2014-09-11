@@ -1,13 +1,11 @@
 #!/usr/bin/expect
 #
-# $Id$
+# $Id: calpontUninstall.sh 995 2008-09-13 01:57:47Z dhill $
 #
 # Uninstall Package from system
+# Argument 1 - Root Password of remote server
 
-set INFINIDB_INSTALL_DIR "/usr/local/Calpont"
-set env(INFINIDB_INSTALL_DIR) $INFINIDB_INSTALL_DIR
-
-set USERNAME $env(USER)
+set USERNAME root
 set PASSWORD " "
 set DEBUG 0
 
@@ -34,17 +32,14 @@ while true {
 		send_user "		password    - root password of the remote servers being un-installed'\n"
 		send_user "		-d		- Debug flag, output verbose information\n"
 		exit
-	} elseif { $arg($i) == "-p" } {
+	}
+	if { $arg($i) == "-p" } {
 		incr i
 		set PASSWORD $arg($i)
-	} elseif { $arg($i) == "-d" } {
-		set DEBUG 1
-	} elseif { $arg($i) == "-i" } {
-		incr i
-		set INSTALLDIR $arg($i)
-	} elseif { $arg($i) == "-u" } {
-		incr i
-		set USERNAME $arg($i)
+	} else {
+		if { $arg($i) == "-d" } {
+			set DEBUG 1
+		}
 	}
 	incr i
 }
@@ -53,13 +48,13 @@ log_user $DEBUG
 
 set timeout 2
 set INSTALL 2
-send "$INFINIDB_INSTALL_DIR/bin/getConfig DBRM_Controller NumWorkers\n"
+send "/usr/local/Calpont/bin/getConfig DBRM_Controller NumWorkers\n"
 expect {
         -re 1                         { set INSTALL 1 } abort
 }
 
 set PACKAGE "rpm"
-send "$INFINIDB_INSTALL_DIR/bin/getConfig Installation EEPackageType\n"
+send "/usr/local/Calpont/bin/getConfig Installation EEPackageType\n"
 expect {
         -re rpm                         { set PACKAGE rpm } abort
         -re deb                         { set PACKAGE deb } abort
@@ -77,12 +72,11 @@ send_user "\nPerforming InfiniDB System Uninstall\n\n"
 #
 send_user "Shutdown InfiniDB System                         "
 expect -re "# "
-send "$INFINIDB_INSTALL_DIR/bin/calpontConsole shutdownsystem y\n"
+send "/usr/local/Calpont/bin/calpontConsole shutdownsystem y\n"
 expect {
 	-re "shutdownSystem "       { send_user "DONE" } abort
 }
 send_user "\n"
-
 
 if { $INSTALL == "2"} {
 	set timeout 600
@@ -90,16 +84,16 @@ if { $INSTALL == "2"} {
 	# Run installer
 	#
 	send_user "Run System Uninstaller                           "
-	send "$INFINIDB_INSTALL_DIR/bin/installer $CALPONTRPM $CONNECTORRPM1 $CONNECTORRPM2 uninstall $PASSWORD n --nodeps dummymysqlpw $DEBUG\n"
+	send "/usr/local/Calpont/bin/installer $CALPONTRPM $CONNECTORRPM1 $CONNECTORRPM2 uninstall $PASSWORD dummyxmwd --nodeps dummymysqlpw $DEBUG\n"
 	expect {
 		-re "uninstall request successful" 			{ send_user "DONE" } abort
-		-re "ERROR"   								{ send_user "FAILED" ; exit -1 }
+		-re "error"   								{ send_user "FAILED" ; exit -1 }
 	}
 	send_user "\n"
 }
 
 if { $PACKAGE == "binary" } {
-	send "$INFINIDB_INSTALL_DIR/bin/pre-uninstall\n"
+	send "/usr/local/Calpont/bin/pre-uninstall\n"
 	expect {
 		-re "# "                  {  } abort
 	}

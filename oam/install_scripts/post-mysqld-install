@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/sh
 #
 # $Id: post-mysqld-install 1995 2010-07-02 13:59:21Z rdempsey $
 #
@@ -49,6 +49,7 @@ chown -R mysql:mysql $mysql_datadir
 # Initiate databases if needed
 ### Don't give the user the notes, we'll fix them ourselves...
 ${prefix}/Calpont/mysql/bin/mysql_install_db --rpm --user=mysql --defaults-file=${prefix}/Calpont/mysql/my.cnf --basedir=${prefix}/Calpont/mysql >/dev/null
+/sbin/ldconfig
 # Change permissions again to fix any new files.
 chown -R mysql:mysql $mysql_datadir
 
@@ -83,4 +84,5 @@ if [ -n "$libcalmysql" ]; then
 	ln -sf $libcalmysql libcalmysql.so
 fi
 
+/sbin/ldconfig
 exit 0

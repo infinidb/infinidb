@@ -1,18 +1,8 @@
 #!/bin/bash
 #
-# $Id: test-002.sh 2937 2012-05-30 18:17:09Z rdempsey $
+# $Id: test-002.sh 1484 2009-06-15 18:18:07Z rdempsey $
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
+test -f /usr/local/Calpont/post/functions && . /usr/local/Calpont/post/functions
 
 scrname=`basename $0`
 tname="check-brm"

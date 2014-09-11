@@ -18,9 +18,9 @@
 # $Id: Makefile.am 878 2009-04-03 20:34:32Z rdempsey $
 
 SUBDIRS = dbbuilder editem dbloadxml \
-          getConfig cplogger \
-          clearShm setConfig viewtablelock cleartablelock ddlcleanup \
-          idbmeminfo
+        getConfig cplogger \
+        clearShm setConfig viewtablelock cleartablelock ddlcleanup \
+	idbmeminfo
 
 test:
 

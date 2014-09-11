@@ -12,15 +12,10 @@
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8614</Port>
 	</DMLProc>
-	<pm1_WriteEngineServer>
-		<IPAddr>127.0.0.1</IPAddr>
-		<Port>8630</Port>
-	</pm1_WriteEngineServer>
 	<BatchInsert>
 		<RowsPerBatch>10000</RowsPerBatch>
 	</BatchInsert>
 	<PrimitiveServers>
-		<Count>1</Count>
 		<ProcessorThreshold>128</ProcessorThreshold>
 		<!-- <ProcessorThreads>16</ProcessorThreads> --> <!-- defaults to num cores * 2 -->
 		<ProcessorQueueSize>10K</ProcessorQueueSize>
@@ -29,7 +24,7 @@
 		<ColScanBufferSizeBlocks>512</ColScanBufferSizeBlocks>
 		<ColScanReadAheadBlocks>512</ColScanReadAheadBlocks>
 		<!-- <BPPCount>16</BPPCount> --> <!-- Default num cores * 2.  A cap on the number of simultaneous primitives per jobstep -->
-		<PrefetchThreshold>1</PrefetchThreshold>
+		<PrefetchThreshold>5</PrefetchThreshold>
 		<PTTrace>0</PTTrace>
 		<RotatingDestination>n</RotatingDestination>
 	</PrimitiveServers>
@@ -41,21 +36,24 @@
 		<SystemLang>C</SystemLang>
 		<SystemName>calpont-1</SystemName>
 		<ParentOAMModuleName>pm1</ParentOAMModuleName>
+		<StandbyOAMModuleName>unassigned</StandbyOAMModuleName>
 		<ModuleHeartbeatPeriod>10</ModuleHeartbeatPeriod>
 		<ModuleHeartbeatCount>3</ModuleHeartbeatCount>
 		<DBRootCount>1</DBRootCount>
-		<DBRoot1>$INSTALLDIR/data1</DBRoot1>
-		<DBRMRoot>$INSTALLDIR/data1/systemFiles/dbrm/BRM_saves</DBRMRoot>
-        <TableLockSaveFile>$INSTALLDIR/data1/systemFiles/dbrm/tablelocks</TableLockSaveFile>
+		<DBRoot1>/usr/local/Calpont/data1</DBRoot1>
+		<DBRMRoot>/usr/local/Calpont/data1/systemFiles/dbrm/BRM_saves</DBRMRoot>
         <DBRMTimeOut>20</DBRMTimeOut> <!-- in seconds -->
         <DBRMSnapshotInterval>100000</DBRMSnapshotInterval>
+		<RAIDCriticalThreshold>90</RAIDCriticalThreshold>
+		<RAIDMajorThreshold>80</RAIDMajorThreshold>
+		<RAIDMinorThreshold>70</RAIDMinorThreshold>
 		<TempDiskPath>/tmp</TempDiskPath>
 		<WorkingDir>/tmp</WorkingDir>
 		<TransactionArchivePeriod>10</TransactionArchivePeriod>
+		<NMSIPAddress>0.0.0.0</NMSIPAddress>
 		<TempSaveSize>128M</TempSaveSize>
 		<WaitPeriod>10</WaitPeriod>
 		<TempFileDir>/tmp/infinidb_tmp_files</TempFileDir>
-		<CalpontHome>$INSTALLDIR</CalpontHome>
 	</SystemConfig>
 	<SystemModuleConfig>
 		<ModuleType1>dm</ModuleType1>
@@ -79,8 +77,6 @@
 		<ModuleSwapMajorThreshold1>80</ModuleSwapMajorThreshold1>
 		<ModuleSwapMinorThreshold1>70</ModuleSwapMinorThreshold1>
 		<ModuleDiskMonitorFileSystem1-1>/</ModuleDiskMonitorFileSystem1-1>
-		<ModuleDBRootCount1-1>0</ModuleDBRootCount1-1>
-		<ModuleDBRootID1-1-1>0</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
 		<RunType2>LOADSHARE</RunType2>
@@ -102,8 +98,6 @@
 		<ModuleSwapMajorThreshold2>80</ModuleSwapMajorThreshold2>
 		<ModuleSwapMinorThreshold2>70</ModuleSwapMinorThreshold2>
 		<ModuleDiskMonitorFileSystem1-2>/</ModuleDiskMonitorFileSystem1-2>	
-		<ModuleDBRootCount1-2>0</ModuleDBRootCount1-2>
-		<ModuleDBRootID1-1-2>0</ModuleDBRootID1-1-2>
 		<ModuleType3>pm</ModuleType3>
 		<ModuleDesc3>Performance Module</ModuleDesc3>
 		<RunType3>SIMPLEX</RunType3>
@@ -125,8 +119,6 @@
 		<ModuleSwapMajorThreshold3>80</ModuleSwapMajorThreshold3>
 		<ModuleSwapMinorThreshold3>70</ModuleSwapMinorThreshold3>
 		<ModuleDiskMonitorFileSystem1-3>/</ModuleDiskMonitorFileSystem1-3>
-		<ModuleDBRootCount1-3>1</ModuleDBRootCount1-3>
-		<ModuleDBRootID1-1-3>1</ModuleDBRootID1-1-3>
 	</SystemModuleConfig>
 	<SystemExtDeviceConfig>
 		<Count>0</Count>
@@ -136,23 +128,24 @@
 	</SystemExtDeviceConfig>
 	<SessionManager>
 		<MaxConcurrentTransactions>1000</MaxConcurrentTransactions>
-		<SharedMemoryTmpFile>$INSTALLDIR/data1/systemFiles/dbrm/CalpontShm</SharedMemoryTmpFile>
-		<TxnIDFile>$INSTALLDIR/data1/systemFiles/dbrm/SMTxnID</TxnIDFile>
+		<SharedMemoryTmpFile>/usr/local/Calpont/data1/systemFiles/dbrm/CalpontShm</SharedMemoryTmpFile>
+		<TxnIDFile>/usr/local/Calpont/data1/systemFiles/dbrm/SMTxnID</TxnIDFile>
 	</SessionManager>
 	<SessionMonitor>
-		<SharedMemoryTmpFile>$INSTALLDIR/data1/systemFiles/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
+		<SharedMemoryTmpFile>/usr/local/Calpont/data1/systemFiles/dbrm/CalpontSessionMonitorShm</SharedMemoryTmpFile>
 		<TransactionAgeLimit>10</TransactionAgeLimit>
 	</SessionMonitor>
 	<VersionBuffer>
+		<NumVersionBufferFiles>4</NumVersionBufferFiles>
 		<VersionBufferFileSize>1GB</VersionBufferFileSize>
 	</VersionBuffer>
 	<OIDManager>
-		<OIDBitmapFile>$INSTALLDIR/data1/systemFiles/dbrm/oidbitmap</OIDBitmapFile>
+		<OIDBitmapFile>/usr/local/Calpont/data1/systemFiles/dbrm/oidbitmap</OIDBitmapFile>
 		<FirstOID>3000</FirstOID>
 	</OIDManager>
 	<WriteEngine>
-		<BulkRoot>$INSTALLDIR/data/bulk</BulkRoot>
-		<BulkRollbackDir>$INSTALLDIR/data/bulk/rollback</BulkRollbackDir>
+		<BulkRoot>/usr/local/Calpont/data/bulk</BulkRoot>
+		<BulkRollbackDir>/usr/local/Calpont/data/bulk/rollback</BulkRollbackDir>
 		<MaxFileSystemDiskUsagePct>98</MaxFileSystemDiskUsagePct>
 	</WriteEngine>
 	<DBRM_Controller>
@@ -179,7 +172,11 @@
 		<SystemStartupOffline>n</SystemStartupOffline>
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<ServerTypeInstall>2</ServerTypeInstall>
-		<DBRootStorageType>internal</DBRootStorageType>
+		<UserStorageType>local</UserStorageType>
+		<UserStorageLoc1>unassigned</UserStorageLoc1>
+		<DBRootStorageType>local</DBRootStorageType>
+		<DBRootStorageLoc1>unassigned</DBRootStorageLoc1>
+		<SharedNothing>n</SharedNothing>
 	</Installation>
 	<ExtentMap>
 		<FilesPerColumnPartition>4</FilesPerColumnPartition>
@@ -213,10 +210,4 @@
 		<!-- <RowAggrBuckets>32</RowAggrBuckets> --> <!-- Default value is number of cores * 4 -->
 		<!-- <RowAggrRowGroupsPerThread>20</RowAggrRowGroupsPerThread> --> <!-- Default value is 20 -->
 	</RowAggregation>
-	<CrossEngineSupport>
-		<Host>unassigned</Host>
-		<Port>3306</Port>
-		<User>unassigned</User>
-		<Password></Password>
-	</CrossEngineSupport>
 </Calpont>

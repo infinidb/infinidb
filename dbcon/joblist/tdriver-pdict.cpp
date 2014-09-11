@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: tdriver-pdict.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: tdriver-pdict.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  ****************************************************************************/
 
@@ -51,7 +51,7 @@ public:
 	void pDictStep_1()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		uint i, it;
 		bool more;

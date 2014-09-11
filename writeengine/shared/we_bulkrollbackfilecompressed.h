@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
-* $Id: we_bulkrollbackfilecompressed.h 3911 2012-06-10 19:12:14Z dcathey $
+* $Id: we_bulkrollbackfilecompressed.h 2865 2011-02-03 17:57:16Z rdempsey $
 */
 
 /** @file
@@ -37,7 +37,7 @@
 
 namespace WriteEngine
 {
-    class BulkRollbackMgr;
+	class BulkRollbackMgr;
 
 //------------------------------------------------------------------------------
 /** @brief Class used by BulkRollbackMgr to restore compressed db files.
@@ -47,87 +47,72 @@ class BulkRollbackFileCompressed : public BulkRollbackFile
 {
 public:
 
-    /** @brief BulkRollbackFile constructor
-     * @param mgr The controlling BulkRollbackMgr object.
-     */
-    BulkRollbackFileCompressed(BulkRollbackMgr* mgr);
+	/** @brief BulkRollbackFile constructor
+	 * @param mgr The controlling BulkRollbackMgr object.
+	 */
+	BulkRollbackFileCompressed(BulkRollbackMgr* mgr);
 
-    /** @brief BulkRollbackFile destructor
-     */
-    virtual     ~BulkRollbackFileCompressed();
+	/** @brief BulkRollbackFile destructor
+	 */
+	virtual     ~BulkRollbackFileCompressed();
 
-    /** @brief Do we reinit trailing blocks in the HWM extent for the specified
-     * segment file
-     *
-     * @param columnOID OID of the segment file in question
-     * @param dbRoot DBRoot for the segment file in question
-     * @param partNum Partition number for the segment file in question
-     * @param segNum Segment number for the segment file in question
-     */
-    virtual bool doWeReInitExtent( OID columnOID,
-                        u_int32_t   dbRoot,
-                        u_int32_t   partNum,
-                        u_int32_t   segNum) const;
-
-    /** @brief Reinitialize the specified column segment file starting at
-     * startOffsetBlk, and truncate trailing extents.
-     * @param columnOID OID of the relevant segment file
-     * @param dbRoot DBRoot of the relevant segment file
-     * @param partNum Partition number of the relevant segment file
-     * @param segNum Segment number of the relevant segment file
-     * @param startOffsetBlk Starting block offset where file is to be
-     *        reinitialized
-     * @param nBlocks Number of blocks to be reinitialized
-     * @param colType Column type of the relevant segment file
-     * @param colWidth Width in bytes of column.
-     * @param restoreHwmChk Restore HWM chunk
-     */
-    virtual void reInitTruncColumnExtent(OID columnOID,
+	/** @brief Reinitialize the specified column segment file starting at
+	 * startOffsetBlk, and truncate trailing extents.
+	 * @param columnOID OID of the relevant segment file
+	 * @param dbRoot DBRoot of the relevant segment file
+	 * @param partNum Partition number of the relevant segment file
+	 * @param segNum Segment number of the relevant segment file
+	 * @param startOffsetBlk Starting block offset where file is to be
+	 *        reinitialized
+	 * @param nBlocks Number of blocks to be reinitialized
+	 * @param colType Column type of the relevant segment file
+	 * @param colWidth Width in bytes of column.
+	 */
+	virtual int reInitTruncColumnExtent(OID columnOID,
                                 u_int32_t   dbRoot,
                                 u_int32_t   partNum,
                                 u_int32_t   segNum,
                                 long long   startOffsetBlk,
                                 int         nBlocks,
                                 ColDataType colType,
-                                u_int32_t   colWidth,
-                                bool        restoreHwmChk );
+                                u_int32_t   colWidth );
 
-    /** @brief Reinitialize the specified dictionary store segment file starting
-     * at startOffsetBlk, and truncate trailing extents.
-     * @param columnOID OID of the relevant segment file
-     * @param dbRoot DBRoot of the relevant segment file
-     * @param partNum Partition number of the relevant segment file
-     * @param segNum Segment number of the relevant segment file
-     * @param startOffsetBlk Starting block offset where file is to be
-     *        reinitialized
-     * @param nBlocks Number of blocks to be reinitialized
-     */
-    virtual void reInitTruncDctnryExtent(OID columnOID,
+	/** @brief Reinitialize the specified dictionary store segment file starting
+	 * at startOffsetBlk, and truncate trailing extents.
+	 * @param columnOID OID of the relevant segment file
+	 * @param dbRoot DBRoot of the relevant segment file
+	 * @param partNum Partition number of the relevant segment file
+	 * @param segNum Segment number of the relevant segment file
+	 * @param startOffsetBlk Starting block offset where file is to be
+	 *        reinitialized
+	 * @param nBlocks Number of blocks to be reinitialized
+	 */
+	virtual int reInitTruncDctnryExtent(OID columnOID,
                                 u_int32_t   dbRoot,
                                 u_int32_t   partNum,
                                 u_int32_t   segNum,
                                 long long   startOffsetBlk,
                                 int         nBlocks );
 
-    /** @brief Truncate the specified segment file to a specified num of bytes
-     * @param columnOID OID of the relevant segment file
-     * @param dbRoot DBRoot of the relevant segment file
-     * @param partNum Partition number of the relevant segment file
-     * @param segNum Segment number of the relevant segment file
-     * @param fileSizeBlocks Number of blocks to retain in the file
-     */
-    virtual void truncateSegmentFile( OID    columnOID,
+	/** @brief Truncate the specified segment file to a specified num of bytes
+	 * @param columnOID OID of the relevant segment file
+	 * @param dbRoot DBRoot of the relevant segment file
+	 * @param partNum Partition number of the relevant segment file
+	 * @param segNum Segment number of the relevant segment file
+	 * @param fileSizeBlocks Number of blocks to retain in the file
+	 */
+	virtual int truncateSegmentFile( OID    columnOID,
                                 u_int32_t   dbRoot,
                                 u_int32_t   partNum,
                                 u_int32_t   segNum,
                                 long long   filesSizeBlocks );
 
 private:
-    // Disable unnecessary copy constructor and assignment operator
-    BulkRollbackFileCompressed(const BulkRollbackFileCompressed& rhs);
-    BulkRollbackFileCompressed& operator=(const BulkRollbackFileCompressed& rhs);
+	// Disable unnecessary copy constructor and assignment operator
+	BulkRollbackFileCompressed(const BulkRollbackFileCompressed& rhs);
+	BulkRollbackFileCompressed& operator=(const BulkRollbackFileCompressed& rhs);
 
-    int restoreHWMChunk      (  FILE*       pFile,
+	int restoreHWMChunk      (  FILE*       pFile,
                                 OID         columnOID,
                                 u_int32_t   partNum,
                                 u_int32_t   segNum,
@@ -135,17 +120,17 @@ private:
                                 uint64_t&   restoredChunkLen,
                                 uint64_t&   restoredFileSize,
                                 std::string& errMsg );
-    int loadColumnHdrPtrs    (  FILE*       pFile,
+	int loadColumnHdrPtrs    (  FILE*       pFile,
                                 char*       hdrs,
                                 compress::CompChunkPtrList& chunkPtrs,
                                 std::string& errMsg) const;
-    int loadDctnryHdrPtrs    (  FILE*       pFile,
+	int loadDctnryHdrPtrs    (  FILE*       pFile,
                                 char*       controlHdr,
                                 compress::CompChunkPtrList& chunkPtrs,
                                 uint64_t&   ptrHdrSize,
                                 std::string& errMsg ) const;
 
-    compress::IDBCompressInterface fCompressor;
+	compress::IDBCompressInterface fCompressor;
 };
 
 } //end of namespace

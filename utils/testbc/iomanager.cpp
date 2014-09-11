@@ -119,8 +119,8 @@ void* thr_popper(void* arg) {
 	alignedbuff=(char*)(((((ptrdiff_t)realbuff.get() >> 12) << 12) & 0xffffffff) + pageSize);
 #endif
 
-	idbassert(((ptrdiff_t)alignedbuff - (ptrdiff_t)realbuff.get()) < (ptrdiff_t)pageSize);
-	idbassert(((ptrdiff_t)alignedbuff % pageSize) == 0);
+	assert(((ptrdiff_t)alignedbuff - (ptrdiff_t)realbuff.get()) < (ptrdiff_t)pageSize);
+	assert(((ptrdiff_t)alignedbuff % pageSize) == 0);
 
 	for ( ; ; ) {
 

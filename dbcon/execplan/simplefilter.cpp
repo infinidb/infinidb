@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: simplefilter.cpp 9261 2013-02-06 20:59:01Z xlou $
+*   $Id: simplefilter.cpp 8326 2012-02-15 18:58:10Z xlou $
 *
 *
 ***********************************************************************/
@@ -149,26 +149,7 @@ void SimpleFilter::rhs(ReturnedColumn* rhs)
 
 const string SimpleFilter::data() const
 {
-	string rhs, lhs;
-	if (dynamic_cast<ConstantColumn*>(fRhs) &&
-		  (fRhs->resultType().colDataType == CalpontSystemCatalog::VARCHAR ||
-		   fRhs->resultType().colDataType == CalpontSystemCatalog::CHAR ||
-		   fRhs->resultType().colDataType == CalpontSystemCatalog::VARBINARY ||
-		   fRhs->resultType().colDataType == CalpontSystemCatalog::DATE ||
-		   fRhs->resultType().colDataType == CalpontSystemCatalog::DATETIME))
-		rhs = "'" + fRhs->data() + "'";
-	else
-		rhs = fRhs->data();
-	if (dynamic_cast<ConstantColumn*>(fLhs) &&
-		  (fLhs->resultType().colDataType == CalpontSystemCatalog::VARCHAR ||
-		   fLhs->resultType().colDataType == CalpontSystemCatalog::CHAR ||
-		   fLhs->resultType().colDataType == CalpontSystemCatalog::VARBINARY ||
-		   fLhs->resultType().colDataType == CalpontSystemCatalog::DATE ||
-		   fLhs->resultType().colDataType == CalpontSystemCatalog::DATETIME))
-		lhs = "'" + fLhs->data() + "'";
-	else
-		lhs = fLhs->data();
-	return lhs + " " + fOp->data() + " " + rhs;
+	return string(fLhs->data() + fOp->data() + fRhs->data());
 }
 
 const string SimpleFilter::toString() const
@@ -304,7 +285,7 @@ void SimpleFilter::unserialize(messageqcpp::ByteStream& b)
 	}
 		
 	// construct regex constant for like operator
-	if (fOp->op() == OP_LIKE || fOp->op() == OP_NOTLIKE)
+	if (fOp->op() == OP_LIKE)
 	{
 		ConstantColumn *rcc = dynamic_cast<ConstantColumn*>(fRhs);
 		if (rcc)

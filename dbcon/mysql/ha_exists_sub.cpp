@@ -66,11 +66,11 @@ void checkCorrelation(const ParseTree* n, void* obj)
 	}
 }
 
-ExistsSub::ExistsSub(gp_walk_info& gwip) : WhereSubQuery(gwip) 
+ExistsSub::ExistsSub() : WhereSubQuery() 
 {}
 
-ExistsSub::ExistsSub(gp_walk_info& gwip, Item_subselect* sub) :
-	WhereSubQuery(gwip, sub)
+ExistsSub::ExistsSub(Item_subselect* sub) :
+	WhereSubQuery(sub)
 {}
 
 ExistsSub::~ExistsSub()
@@ -78,58 +78,41 @@ ExistsSub::~ExistsSub()
 
 execplan::ParseTree* ExistsSub::transform()
 {
-	idbassert(fSub);
+	assert(fSub);
 	
-	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);	
+	SCSEP scsep;
+	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
+	csep->sessionID(fGwip->sessionid);	
 	csep->location(CalpontSelectExecutionPlan::WHERE);
 	csep->subType (CalpontSelectExecutionPlan::EXISTS_SUBS);
 	
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fGwip.thd;
+	gwi.thd = fGwip->thd;
 	gwi.subQuery = this;
 	
-	// @4827 merge table list to gwi in case there is FROM sub to be referenced
-	// in the FROM sub
-	uint derivedTbCnt = fGwip.derivedTbList.size();
-	uint tbCnt = fGwip.tbList.size();
-
-	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
-	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
-
 	if (fSub->get_select_lex()->with_sum_func)
 	{
-		fGwip.fatalParseError = true;
-		fGwip.parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_AGG_EXISTS);
+		fGwip->fatalParseError = true;
+		fGwip->parseErrorText = logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_AGG_EXISTS);
 		return NULL;
 	}
 	
-	if (getSelectPlan(gwi, *(fSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSub->get_select_lex()), *csep) != 0)
 	{
-		fGwip.fatalParseError = true;
+		fGwip->fatalParseError = true;
 		if (gwi.fatalParseError && !gwi.parseErrorText.empty())
-			fGwip.parseErrorText = gwi.parseErrorText;
+			fGwip->parseErrorText = gwi.parseErrorText;
 		else
-			fGwip.parseErrorText = "Error occured in ExistsSub::transform()";
+			fGwip->parseErrorText = "Error occured in ExistsSub::transform()";
 		return NULL;
 	}
-	
-	// remove outer query tables
-	CalpontSelectExecutionPlan::TableList tblist;
-	if (csep->tableList().size() >= tbCnt)
-		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
-	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
-	
-	csep->tableList(tblist);
-	csep->derivedTableList(derivedTbList);
-
+		
+	scsep.reset(csep);
 	ExistsFilter *subFilter = new ExistsFilter();
 	subFilter->correlated(false);
-	subFilter->sub(csep);
-	const ParseTree* pt = csep->filters();
+	subFilter->sub(scsep);
+	const ParseTree* pt = scsep->filters();
 	if (pt)
 		pt->walk(checkCorrelation, subFilter);
 	return new ParseTree(subFilter);	
@@ -142,9 +125,9 @@ execplan::ParseTree* ExistsSub::transform()
  */
 void ExistsSub::handleNot()
 {
-	ParseTree *pt = fGwip.ptWorkStack.top();
+	ParseTree *pt = fGwip->ptWorkStack.top();
 	ExistsFilter *subFilter = dynamic_cast<ExistsFilter*>(pt->data());
-	idbassert(subFilter);
+	assert(subFilter);
 	subFilter->notExists(true);
 	SCSEP csep = subFilter->sub();
 	const ParseTree* ptsub = csep->filters();

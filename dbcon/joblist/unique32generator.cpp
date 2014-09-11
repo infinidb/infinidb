@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: unique32generator.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ * $Id: unique32generator.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -33,20 +33,20 @@
 
 namespace joblist {
 
-/* static */ UniqueNumberGenerator* UniqueNumberGenerator::fUnique32Generator = 0;
-/* static */ boost::mutex       UniqueNumberGenerator::fLock;
+/* static */ Unique32Generator* Unique32Generator::fUnique32Generator = 0;
+/* static */ boost::mutex       Unique32Generator::fLock;
 
 //------------------------------------------------------------------------------
 // Accessor to singleton handle
 //------------------------------------------------------------------------------
 /* static */
-UniqueNumberGenerator* UniqueNumberGenerator::instance()
+Unique32Generator* Unique32Generator::instance()
 {
 	boost::mutex::scoped_lock lk(fLock);
 
 	if ( !fUnique32Generator )
 	{
-		fUnique32Generator = new UniqueNumberGenerator();
+		fUnique32Generator = new Unique32Generator();
 	}
 
 	return fUnique32Generator;
@@ -58,7 +58,7 @@ UniqueNumberGenerator* UniqueNumberGenerator::instance()
 // valgrind may report a memory leak for not deleting our heap memory).
 //------------------------------------------------------------------------------
 /* static */
-void UniqueNumberGenerator::deleteInstance()
+void Unique32Generator::deleteInstance()
 {
 	boost::mutex::scoped_lock lk(fLock);
 
@@ -72,14 +72,9 @@ void UniqueNumberGenerator::deleteInstance()
 //------------------------------------------------------------------------------
 // Return a system-wide unique32 bit integer
 //------------------------------------------------------------------------------
-uint32_t UniqueNumberGenerator::getUnique32()
+uint32_t Unique32Generator::getUnique32()
 {
 	return fDbrm.getUnique32();
-}
-
-uint64_t UniqueNumberGenerator::getUnique64()
-{
-	return fDbrm.getUnique64();
 }
 
 } // namespace

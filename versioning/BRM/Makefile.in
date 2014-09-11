@@ -82,18 +82,16 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libbrm_la_LIBADD =
-am_libbrm_la_OBJECTS = libbrm_la-autoincrementmanager.lo \
-	libbrm_la-blockresolutionmanager.lo libbrm_la-brmshmimpl.lo \
-	libbrm_la-brmtypes.lo libbrm_la-copylocks.lo libbrm_la-dbrm.lo \
+am_libbrm_la_OBJECTS = libbrm_la-blockresolutionmanager.lo \
+	libbrm_la-brmshmimpl.lo libbrm_la-brmtypes.lo \
+	libbrm_la-copylocks.lo libbrm_la-dbrm.lo \
 	libbrm_la-extentmap.lo libbrm_la-lbidresourcegraph.lo \
-	libbrm_la-logicalpartition.lo libbrm_la-mastersegmenttable.lo \
-	libbrm_la-oidserver.lo libbrm_la-resourcenode.lo \
+	libbrm_la-mastersegmenttable.lo libbrm_la-resourcenode.lo \
 	libbrm_la-rgnode.lo libbrm_la-rwlockmonitor.lo \
 	libbrm_la-sessionmanagerserver.lo libbrm_la-shmkeys.lo \
 	libbrm_la-slavedbrmnode.lo libbrm_la-slavecomm.lo \
-	libbrm_la-tablelockserver.lo libbrm_la-tracer.lo \
-	libbrm_la-transactionnode.lo libbrm_la-undoable.lo \
-	libbrm_la-vbbm.lo libbrm_la-vss.lo
+	libbrm_la-tracer.lo libbrm_la-transactionnode.lo \
+	libbrm_la-undoable.lo libbrm_la-vbbm.lo libbrm_la-vss.lo
 libbrm_la_OBJECTS = $(am_libbrm_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
@@ -274,17 +272,14 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 lib_LTLIBRARIES = libbrm.la
-libbrm_la_SOURCES = autoincrementmanager.cpp \
-blockresolutionmanager.cpp \
+libbrm_la_SOURCES = blockresolutionmanager.cpp \
 brmshmimpl.cpp \
 brmtypes.cpp \
 copylocks.cpp \
 dbrm.cpp \
 extentmap.cpp \
 lbidresourcegraph.cpp \
-logicalpartition.cpp \
 mastersegmenttable.cpp \
-oidserver.cpp \
 resourcenode.cpp \
 rgnode.cpp \
 rwlockmonitor.cpp \
@@ -292,7 +287,6 @@ sessionmanagerserver.cpp \
 shmkeys.cpp \
 slavedbrmnode.cpp \
 slavecomm.cpp \
-tablelockserver.cpp \
 tracer.cpp \
 transactionnode.cpp \
 undoable.cpp \
@@ -308,7 +302,6 @@ brmtypes.h \
 copylocks.h \
 dbrm.h \
 extentmap.h \
-logicalpartition.h \
 mastersegmenttable.h \
 sessionmanagerserver.h \
 shmkeys.h \
@@ -318,28 +311,28 @@ vbbm.h \
 vss.h
 
 controllernode_SOURCES = masternode.cpp masterdbrmnode.cpp
-controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+controllernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 controllernode_LDADD = libbrm.la
 workernode_SOURCES = slavenode.cpp
-workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+workernode_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 workernode_LDADD = libbrm.la
 dbrmctl_SOURCES = dbrmctl.cpp
-dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+dbrmctl_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 dbrmctl_LDADD = libbrm.la
 reset_locks_SOURCES = reset_locks.cpp
-reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+reset_locks_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 reset_locks_LDADD = libbrm.la
 rollback_SOURCES = rollback.cpp
-rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+rollback_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 rollback_LDADD = libbrm.la
 save_brm_SOURCES = save_brm.cpp
-save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+save_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 save_brm_LDADD = libbrm.la
 load_brm_SOURCES = load_brm.cpp
-load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+load_brm_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 load_brm_LDADD = libbrm.la
 print_journal_SOURCES = print_journal.cpp
-print_journal_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+print_journal_LDFLAGS = $(idb_common_ldflags) $(idb_oam_libs) $(idb_brm_libs) $(netsnmp_libs)
 print_journal_LDADD = libbrm.la
 all: all-am
 
@@ -462,7 +455,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dbrmctl.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-autoincrementmanager.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-blockresolutionmanager.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-brmshmimpl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-brmtypes.Plo@am__quote@
@@ -470,9 +462,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-dbrm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-extentmap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-lbidresourcegraph.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-logicalpartition.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-mastersegmenttable.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-oidserver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-resourcenode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-rgnode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-rwlockmonitor.Plo@am__quote@
@@ -480,7 +470,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-shmkeys.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-slavecomm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-slavedbrmnode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-tablelockserver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-tracer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-transactionnode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libbrm_la-undoable.Plo@am__quote@
@@ -515,13 +504,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
-
-libbrm_la-autoincrementmanager.lo: autoincrementmanager.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-autoincrementmanager.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-autoincrementmanager.Tpo" -c -o libbrm_la-autoincrementmanager.lo `test -f 'autoincrementmanager.cpp' || echo '$(srcdir)/'`autoincrementmanager.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libbrm_la-autoincrementmanager.Tpo" "$(DEPDIR)/libbrm_la-autoincrementmanager.Plo"; else rm -f "$(DEPDIR)/libbrm_la-autoincrementmanager.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='autoincrementmanager.cpp' object='libbrm_la-autoincrementmanager.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-autoincrementmanager.lo `test -f 'autoincrementmanager.cpp' || echo '$(srcdir)/'`autoincrementmanager.cpp
 
 libbrm_la-blockresolutionmanager.lo: blockresolutionmanager.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-blockresolutionmanager.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-blockresolutionmanager.Tpo" -c -o libbrm_la-blockresolutionmanager.lo `test -f 'blockresolutionmanager.cpp' || echo '$(srcdir)/'`blockresolutionmanager.cpp; \
@@ -572,26 +554,12 @@ libbrm_la-lbidresourcegraph.lo: lbidresourcegraph.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-lbidresourcegraph.lo `test -f 'lbidresourcegraph.cpp' || echo '$(srcdir)/'`lbidresourcegraph.cpp
 
-libbrm_la-logicalpartition.lo: logicalpartition.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-logicalpartition.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-logicalpartition.Tpo" -c -o libbrm_la-logicalpartition.lo `test -f 'logicalpartition.cpp' || echo '$(srcdir)/'`logicalpartition.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libbrm_la-logicalpartition.Tpo" "$(DEPDIR)/libbrm_la-logicalpartition.Plo"; else rm -f "$(DEPDIR)/libbrm_la-logicalpartition.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='logicalpartition.cpp' object='libbrm_la-logicalpartition.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-logicalpartition.lo `test -f 'logicalpartition.cpp' || echo '$(srcdir)/'`logicalpartition.cpp
-
 libbrm_la-mastersegmenttable.lo: mastersegmenttable.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-mastersegmenttable.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-mastersegmenttable.Tpo" -c -o libbrm_la-mastersegmenttable.lo `test -f 'mastersegmenttable.cpp' || echo '$(srcdir)/'`mastersegmenttable.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libbrm_la-mastersegmenttable.Tpo" "$(DEPDIR)/libbrm_la-mastersegmenttable.Plo"; else rm -f "$(DEPDIR)/libbrm_la-mastersegmenttable.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='mastersegmenttable.cpp' object='libbrm_la-mastersegmenttable.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-mastersegmenttable.lo `test -f 'mastersegmenttable.cpp' || echo '$(srcdir)/'`mastersegmenttable.cpp
-
-libbrm_la-oidserver.lo: oidserver.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-oidserver.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-oidserver.Tpo" -c -o libbrm_la-oidserver.lo `test -f 'oidserver.cpp' || echo '$(srcdir)/'`oidserver.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libbrm_la-oidserver.Tpo" "$(DEPDIR)/libbrm_la-oidserver.Plo"; else rm -f "$(DEPDIR)/libbrm_la-oidserver.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='oidserver.cpp' object='libbrm_la-oidserver.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-oidserver.lo `test -f 'oidserver.cpp' || echo '$(srcdir)/'`oidserver.cpp
 
 libbrm_la-resourcenode.lo: resourcenode.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-resourcenode.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-resourcenode.Tpo" -c -o libbrm_la-resourcenode.lo `test -f 'resourcenode.cpp' || echo '$(srcdir)/'`resourcenode.cpp; \
@@ -641,13 +609,6 @@ libbrm_la-slavecomm.lo: slavecomm.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='slavecomm.cpp' object='libbrm_la-slavecomm.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-slavecomm.lo `test -f 'slavecomm.cpp' || echo '$(srcdir)/'`slavecomm.cpp
-
-libbrm_la-tablelockserver.lo: tablelockserver.cpp
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-tablelockserver.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-tablelockserver.Tpo" -c -o libbrm_la-tablelockserver.lo `test -f 'tablelockserver.cpp' || echo '$(srcdir)/'`tablelockserver.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libbrm_la-tablelockserver.Tpo" "$(DEPDIR)/libbrm_la-tablelockserver.Plo"; else rm -f "$(DEPDIR)/libbrm_la-tablelockserver.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='tablelockserver.cpp' object='libbrm_la-tablelockserver.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -c -o libbrm_la-tablelockserver.lo `test -f 'tablelockserver.cpp' || echo '$(srcdir)/'`tablelockserver.cpp
 
 libbrm_la-tracer.lo: tracer.cpp
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbrm_la_CXXFLAGS) $(CXXFLAGS) -MT libbrm_la-tracer.lo -MD -MP -MF "$(DEPDIR)/libbrm_la-tracer.Tpo" -c -o libbrm_la-tracer.lo `test -f 'tracer.cpp' || echo '$(srcdir)/'`tracer.cpp; \

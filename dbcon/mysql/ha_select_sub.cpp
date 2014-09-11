@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: ha_select_sub.cpp 9010 2012-10-19 18:40:12Z zzhu $
+*   $Id: ha_select_sub.cpp 7409 2011-02-08 14:38:50Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -44,61 +44,42 @@ using namespace logging;
 
 namespace cal_impl_if
 {
-SelectSubQuery::SelectSubQuery(gp_walk_info& gwip) : SubQuery(gwip), fSelSub (NULL)
+SelectSubQuery::SelectSubQuery() : fSelSub (NULL)
 {}
 
-SelectSubQuery::SelectSubQuery(gp_walk_info& gwip, Item_subselect* selSub) :
-	SubQuery(gwip),
+SelectSubQuery::SelectSubQuery(Item_subselect* selSub) :
 	fSelSub(selSub)
 {}
 
 SelectSubQuery::~SelectSubQuery()
 {}
 
-SCSEP SelectSubQuery::transform()
+CalpontSelectExecutionPlan* SelectSubQuery::transform()
 {
-	idbassert(fSelSub);
-	SCSEP csep(new CalpontSelectExecutionPlan());
-	csep->sessionID(fGwip.sessionid);	
+	assert(fSelSub);
+	CalpontSelectExecutionPlan* csep = new CalpontSelectExecutionPlan();
+	csep->sessionID(fGwip->sessionid);	
 	csep->subType (CalpontSelectExecutionPlan::SELECT_SUBS);
 	
 	// gwi for the sub query
 	gp_walk_info gwi;
-	gwi.thd = fGwip.thd;
+	gwi.thd = fGwip->thd;
 	gwi.subQuery = this;
 
-	// @4632 merge table list to gwi in case there is FROM sub to be referenced
-	// in the SELECT sub
-	uint derivedTbCnt = fGwip.derivedTbList.size();
-	uint tbCnt = fGwip.tbList.size();
-	
-	gwi.tbList.insert(gwi.tbList.begin(), fGwip.tbList.begin(), fGwip.tbList.end());
-	gwi.derivedTbList.insert(gwi.derivedTbList.begin(), fGwip.derivedTbList.begin(), fGwip.derivedTbList.end());
-
-	if (getSelectPlan(gwi, *(fSelSub->get_select_lex()), csep) != 0)
+	if (getSelectPlan(gwi, *(fSelSub->get_select_lex()), *csep) != 0)
 	{
 		if (!gwi.fatalParseError)
 		{
-			fGwip.fatalParseError = true;
-			fGwip.parseErrorText = "Error occured in SelectSubQuery::transform()";
+			fGwip->fatalParseError = true;
+			fGwip->parseErrorText = "Error occured in SelectSubQuery::transform()";
 		}
 		else
 		{
-			fGwip.fatalParseError = gwi.fatalParseError;
-			fGwip.parseErrorText = gwi.parseErrorText;
+			fGwip->fatalParseError = gwi.fatalParseError;
+			fGwip->parseErrorText = gwi.parseErrorText;
 		}
-		csep.reset();
-		return csep;
+		return NULL;
 	}
-	// remove outer query tables
-	CalpontSelectExecutionPlan::TableList tblist;
-	if (csep->tableList().size() >= tbCnt)
-		tblist.insert(tblist.begin(),csep->tableList().begin()+tbCnt, csep->tableList().end());
-	CalpontSelectExecutionPlan::SelectList derivedTbList;
-	if (csep->derivedTableList().size() >= derivedTbCnt)
-		derivedTbList.insert(derivedTbList.begin(), csep->derivedTableList().begin()+derivedTbCnt, csep->derivedTableList().end());
-	csep->tableList(tblist);
-	csep->derivedTableList(derivedTbList);
 	return csep;	
 }
 

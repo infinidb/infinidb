@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: tdriver-dec.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+// $Id: tdriver-dec.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 #include <iostream>
 #include <cassert>
 #include <stdexcept>
@@ -78,7 +78,7 @@ public:
 	void operator()()
 	{
 		ByteStream bs = fDec->read(fSessionId, fStepId);
-		idbassert(bs.length() == 0);
+		assert(bs.length() == 0);
 		return;
 	}
 private:
@@ -115,23 +115,23 @@ int main(int argc, char** argv)
 	Int16 sessionId, stepId;
 	bs = dec->read(12345, 10);
 	readBs(bs, sessionId, stepId);
-	idbassert(sessionId == 12345);
-	idbassert(stepId == 10);
+	assert(sessionId == 12345);
+	assert(stepId == 10);
 
 	bs = dec->read(12345, 1);
 	readBs(bs, sessionId, stepId);
-	idbassert(sessionId == 12345);
-	idbassert(stepId == 1);
+	assert(sessionId == 12345);
+	assert(stepId == 1);
 
 	bs = dec->read(12345, 0);
 	readBs(bs, sessionId, stepId);
-	idbassert(sessionId == 12345);
-	idbassert(stepId == 0);
+	assert(sessionId == 12345);
+	assert(stepId == 0);
 
 	bs = dec->read(12345, 3);
 	readBs(bs, sessionId, stepId);
-	idbassert(sessionId == 12345);
-	idbassert(stepId == 3);
+	assert(sessionId == 12345);
+	assert(stepId == 3);
 
 	unsigned i;
 	bs = buildBs(12345, 1);
@@ -147,8 +147,8 @@ int main(int argc, char** argv)
 	{
 		bs = dec->read(12345, 1);
 		readBs(bs, sessionId, stepId);
-		idbassert(sessionId == 12345);
-		idbassert(stepId == 1);
+		assert(sessionId == 12345);
+		assert(stepId == 1);
 	}
 
 	unsigned throws;
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
 			continue;
 		}
 	}
-	idbassert(throws > 0);
+	assert(throws > 0);
 
 	throws = 0;
 	for (i = 0; i < loopMax; i++)
@@ -183,10 +183,10 @@ int main(int argc, char** argv)
 			continue;
 		}
 		readBs(bs, sessionId, stepId);
-		idbassert(sessionId == 12345);
-		idbassert(stepId == (i % 10));
+		assert(sessionId == 12345);
+		assert(stepId == (i % 10));
 	}
-	idbassert(throws > 0);
+	assert(throws > 0);
 
 	ThdFun1 fun1(dec, 12345, 1);
 	thread thd1(fun1);

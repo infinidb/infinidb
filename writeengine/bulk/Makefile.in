@@ -56,7 +56,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = cpimport.bin$(EXEEXT)
+bin_PROGRAMS = cpimport$(EXEEXT)
 subdir = writeengine/bulk
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -71,31 +71,30 @@ LIBRARIES = $(noinst_LIBRARIES)
 ARFLAGS = cru
 libwe_bulk_a_AR = $(AR) $(ARFLAGS)
 libwe_bulk_a_LIBADD =
-am_libwe_bulk_a_OBJECTS = libwe_bulk_a-we_brmreporter.$(OBJEXT) \
-	libwe_bulk_a-we_bulkload.$(OBJEXT) \
-	libwe_bulk_a-we_bulkloadbuffer.$(OBJEXT) \
-	libwe_bulk_a-we_bulkstatus.$(OBJEXT) \
+am_libwe_bulk_a_OBJECTS = libwe_bulk_a-we_bulkload.$(OBJEXT) \
+	libwe_bulk_a-we_workers.$(OBJEXT) \
 	libwe_bulk_a-we_colopbulk.$(OBJEXT) \
+	libwe_bulk_a-we_tableinfo.$(OBJEXT) \
+	libwe_bulk_a-we_bulkloadbuffer.$(OBJEXT) \
 	libwe_bulk_a-we_colbuf.$(OBJEXT) \
 	libwe_bulk_a-we_colbufcompressed.$(OBJEXT) \
 	libwe_bulk_a-we_colbufmgr.$(OBJEXT) \
 	libwe_bulk_a-we_colbufmgrdctnry.$(OBJEXT) \
 	libwe_bulk_a-we_colbufsec.$(OBJEXT) \
-	libwe_bulk_a-we_colextinf.$(OBJEXT) \
 	libwe_bulk_a-we_columninfo.$(OBJEXT) \
 	libwe_bulk_a-we_columninfocompressed.$(OBJEXT) \
-	libwe_bulk_a-we_columnautoinc.$(OBJEXT) \
-	libwe_bulk_a-we_extentstripealloc.$(OBJEXT) \
-	libwe_bulk_a-we_tableinfo.$(OBJEXT) \
+	libwe_bulk_a-we_rbmetawriter.$(OBJEXT) \
+	libwe_bulk_a-we_bulkstatus.$(OBJEXT) \
+	libwe_bulk_a-we_colextinf.$(OBJEXT) \
 	libwe_bulk_a-we_tempxmlgendata.$(OBJEXT) \
-	libwe_bulk_a-we_workers.$(OBJEXT)
+	libwe_bulk_a-we_brmreporter.$(OBJEXT)
 libwe_bulk_a_OBJECTS = $(am_libwe_bulk_a_OBJECTS)
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_cpimport_bin_OBJECTS = cpimport_bin-cpimport.$(OBJEXT)
-cpimport_bin_OBJECTS = $(am_cpimport_bin_OBJECTS)
-cpimport_bin_DEPENDENCIES = libwe_bulk.a ../xml/libwe_xml.a
+am_cpimport_OBJECTS = cpimport-cpimport.$(OBJEXT)
+cpimport_OBJECTS = $(am_cpimport_OBJECTS)
+cpimport_DEPENDENCIES = libwe_bulk.a ../xml/libwe_xml.a
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -107,8 +106,8 @@ LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) \
 CXXLD = $(CXX)
 CXXLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(libwe_bulk_a_SOURCES) $(cpimport_bin_SOURCES)
-DIST_SOURCES = $(libwe_bulk_a_SOURCES) $(cpimport_bin_SOURCES)
+SOURCES = $(libwe_bulk_a_SOURCES) $(cpimport_SOURCES)
+DIST_SOURCES = $(libwe_bulk_a_SOURCES) $(cpimport_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -240,31 +239,12 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 noinst_LIBRARIES = libwe_bulk.a
-libwe_bulk_a_SOURCES = \
-	we_brmreporter.cpp \
-	we_bulkload.cpp \
-	we_bulkloadbuffer.cpp \
-	we_bulkstatus.cpp \
-	we_colopbulk.cpp \
-	we_colbuf.cpp \
-	we_colbufcompressed.cpp \
-	we_colbufmgr.cpp \
-	we_colbufmgrdctnry.cpp \
-	we_colbufsec.cpp \
-	we_colextinf.cpp \
-	we_columninfo.cpp \
-	we_columninfocompressed.cpp \
-	we_columnautoinc.cpp \
-	we_extentstripealloc.cpp \
-	we_tableinfo.cpp \
-	we_tempxmlgendata.cpp \
-	we_workers.cpp
-
+libwe_bulk_a_SOURCES = we_bulkload.cpp we_workers.cpp we_colopbulk.cpp we_tableinfo.cpp we_bulkloadbuffer.cpp we_colbuf.cpp we_colbufcompressed.cpp we_colbufmgr.cpp we_colbufmgrdctnry.cpp we_colbufsec.cpp we_columninfo.cpp we_columninfocompressed.cpp we_rbmetawriter.cpp we_bulkstatus.cpp we_colextinf.cpp we_tempxmlgendata.cpp we_brmreporter.cpp
 libwe_bulk_a_CPPFLAGS = $(march_flags) -D_FILE_OFFSET_BITS=64 $(AM_CPPFLAGS)
-cpimport_bin_SOURCES = cpimport.cpp
-cpimport_bin_LDFLAGS = $(idb_common_ldflags) -lwriteengine -lwriteengineclient -lcacheutils $(idb_exec_libs) $(AM_LDFLAGS)
-cpimport_bin_LDADD = libwe_bulk.a ../xml/libwe_xml.a
-cpimport_bin_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
+cpimport_SOURCES = cpimport.cpp
+cpimport_LDFLAGS = $(idb_common_ldflags) -lwriteengine -lcacheutils -ldm $(idb_exec_libs) $(AM_LDFLAGS)
+cpimport_LDADD = libwe_bulk.a ../xml/libwe_xml.a
+cpimport_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -333,9 +313,9 @@ clean-binPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
-cpimport.bin$(EXEEXT): $(cpimport_bin_OBJECTS) $(cpimport_bin_DEPENDENCIES) 
-	@rm -f cpimport.bin$(EXEEXT)
-	$(CXXLINK) $(cpimport_bin_LDFLAGS) $(cpimport_bin_OBJECTS) $(cpimport_bin_LDADD) $(LIBS)
+cpimport$(EXEEXT): $(cpimport_OBJECTS) $(cpimport_DEPENDENCIES) 
+	@rm -f cpimport$(EXEEXT)
+	$(CXXLINK) $(cpimport_LDFLAGS) $(cpimport_OBJECTS) $(cpimport_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -343,7 +323,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpimport_bin-cpimport.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpimport-cpimport.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_brmreporter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_bulkload.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Po@am__quote@
@@ -355,10 +335,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_colbufsec.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_colextinf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_colopbulk.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_columninfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_columninfocompressed.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_tableinfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_tempxmlgendata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwe_bulk_a-we_workers.Po@am__quote@
@@ -384,20 +363,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
-libwe_bulk_a-we_brmreporter.o: we_brmreporter.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_brmreporter.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" -c -o libwe_bulk_a-we_brmreporter.o `test -f 'we_brmreporter.cpp' || echo '$(srcdir)/'`we_brmreporter.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_brmreporter.cpp' object='libwe_bulk_a-we_brmreporter.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_brmreporter.o `test -f 'we_brmreporter.cpp' || echo '$(srcdir)/'`we_brmreporter.cpp
-
-libwe_bulk_a-we_brmreporter.obj: we_brmreporter.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_brmreporter.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" -c -o libwe_bulk_a-we_brmreporter.obj `if test -f 'we_brmreporter.cpp'; then $(CYGPATH_W) 'we_brmreporter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_brmreporter.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_brmreporter.cpp' object='libwe_bulk_a-we_brmreporter.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_brmreporter.obj `if test -f 'we_brmreporter.cpp'; then $(CYGPATH_W) 'we_brmreporter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_brmreporter.cpp'; fi`
-
 libwe_bulk_a-we_bulkload.o: we_bulkload.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkload.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkload.Tpo" -c -o libwe_bulk_a-we_bulkload.o `test -f 'we_bulkload.cpp' || echo '$(srcdir)/'`we_bulkload.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkload.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkload.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkload.Tpo"; exit 1; fi
@@ -412,33 +377,19 @@ libwe_bulk_a-we_bulkload.obj: we_bulkload.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkload.obj `if test -f 'we_bulkload.cpp'; then $(CYGPATH_W) 'we_bulkload.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkload.cpp'; fi`
 
-libwe_bulk_a-we_bulkloadbuffer.o: we_bulkloadbuffer.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkloadbuffer.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" -c -o libwe_bulk_a-we_bulkloadbuffer.o `test -f 'we_bulkloadbuffer.cpp' || echo '$(srcdir)/'`we_bulkloadbuffer.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkloadbuffer.cpp' object='libwe_bulk_a-we_bulkloadbuffer.o' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_workers.o: we_workers.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_workers.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" -c -o libwe_bulk_a-we_workers.o `test -f 'we_workers.cpp' || echo '$(srcdir)/'`we_workers.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" "$(DEPDIR)/libwe_bulk_a-we_workers.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_workers.cpp' object='libwe_bulk_a-we_workers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkloadbuffer.o `test -f 'we_bulkloadbuffer.cpp' || echo '$(srcdir)/'`we_bulkloadbuffer.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_workers.o `test -f 'we_workers.cpp' || echo '$(srcdir)/'`we_workers.cpp
 
-libwe_bulk_a-we_bulkloadbuffer.obj: we_bulkloadbuffer.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkloadbuffer.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" -c -o libwe_bulk_a-we_bulkloadbuffer.obj `if test -f 'we_bulkloadbuffer.cpp'; then $(CYGPATH_W) 'we_bulkloadbuffer.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkloadbuffer.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkloadbuffer.cpp' object='libwe_bulk_a-we_bulkloadbuffer.obj' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_workers.obj: we_workers.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_workers.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" -c -o libwe_bulk_a-we_workers.obj `if test -f 'we_workers.cpp'; then $(CYGPATH_W) 'we_workers.cpp'; else $(CYGPATH_W) '$(srcdir)/we_workers.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" "$(DEPDIR)/libwe_bulk_a-we_workers.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_workers.cpp' object='libwe_bulk_a-we_workers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkloadbuffer.obj `if test -f 'we_bulkloadbuffer.cpp'; then $(CYGPATH_W) 'we_bulkloadbuffer.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkloadbuffer.cpp'; fi`
-
-libwe_bulk_a-we_bulkstatus.o: we_bulkstatus.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkstatus.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" -c -o libwe_bulk_a-we_bulkstatus.o `test -f 'we_bulkstatus.cpp' || echo '$(srcdir)/'`we_bulkstatus.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkstatus.cpp' object='libwe_bulk_a-we_bulkstatus.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkstatus.o `test -f 'we_bulkstatus.cpp' || echo '$(srcdir)/'`we_bulkstatus.cpp
-
-libwe_bulk_a-we_bulkstatus.obj: we_bulkstatus.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkstatus.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" -c -o libwe_bulk_a-we_bulkstatus.obj `if test -f 'we_bulkstatus.cpp'; then $(CYGPATH_W) 'we_bulkstatus.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkstatus.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkstatus.cpp' object='libwe_bulk_a-we_bulkstatus.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkstatus.obj `if test -f 'we_bulkstatus.cpp'; then $(CYGPATH_W) 'we_bulkstatus.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkstatus.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_workers.obj `if test -f 'we_workers.cpp'; then $(CYGPATH_W) 'we_workers.cpp'; else $(CYGPATH_W) '$(srcdir)/we_workers.cpp'; fi`
 
 libwe_bulk_a-we_colopbulk.o: we_colopbulk.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colopbulk.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colopbulk.Tpo" -c -o libwe_bulk_a-we_colopbulk.o `test -f 'we_colopbulk.cpp' || echo '$(srcdir)/'`we_colopbulk.cpp; \
@@ -453,6 +404,34 @@ libwe_bulk_a-we_colopbulk.obj: we_colopbulk.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_colopbulk.cpp' object='libwe_bulk_a-we_colopbulk.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colopbulk.obj `if test -f 'we_colopbulk.cpp'; then $(CYGPATH_W) 'we_colopbulk.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colopbulk.cpp'; fi`
+
+libwe_bulk_a-we_tableinfo.o: we_tableinfo.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_tableinfo.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" -c -o libwe_bulk_a-we_tableinfo.o `test -f 'we_tableinfo.cpp' || echo '$(srcdir)/'`we_tableinfo.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_tableinfo.cpp' object='libwe_bulk_a-we_tableinfo.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_tableinfo.o `test -f 'we_tableinfo.cpp' || echo '$(srcdir)/'`we_tableinfo.cpp
+
+libwe_bulk_a-we_tableinfo.obj: we_tableinfo.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_tableinfo.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" -c -o libwe_bulk_a-we_tableinfo.obj `if test -f 'we_tableinfo.cpp'; then $(CYGPATH_W) 'we_tableinfo.cpp'; else $(CYGPATH_W) '$(srcdir)/we_tableinfo.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_tableinfo.cpp' object='libwe_bulk_a-we_tableinfo.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_tableinfo.obj `if test -f 'we_tableinfo.cpp'; then $(CYGPATH_W) 'we_tableinfo.cpp'; else $(CYGPATH_W) '$(srcdir)/we_tableinfo.cpp'; fi`
+
+libwe_bulk_a-we_bulkloadbuffer.o: we_bulkloadbuffer.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkloadbuffer.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" -c -o libwe_bulk_a-we_bulkloadbuffer.o `test -f 'we_bulkloadbuffer.cpp' || echo '$(srcdir)/'`we_bulkloadbuffer.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkloadbuffer.cpp' object='libwe_bulk_a-we_bulkloadbuffer.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkloadbuffer.o `test -f 'we_bulkloadbuffer.cpp' || echo '$(srcdir)/'`we_bulkloadbuffer.cpp
+
+libwe_bulk_a-we_bulkloadbuffer.obj: we_bulkloadbuffer.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkloadbuffer.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" -c -o libwe_bulk_a-we_bulkloadbuffer.obj `if test -f 'we_bulkloadbuffer.cpp'; then $(CYGPATH_W) 'we_bulkloadbuffer.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkloadbuffer.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkloadbuffer.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkloadbuffer.cpp' object='libwe_bulk_a-we_bulkloadbuffer.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkloadbuffer.obj `if test -f 'we_bulkloadbuffer.cpp'; then $(CYGPATH_W) 'we_bulkloadbuffer.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkloadbuffer.cpp'; fi`
 
 libwe_bulk_a-we_colbuf.o: we_colbuf.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colbuf.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colbuf.Tpo" -c -o libwe_bulk_a-we_colbuf.o `test -f 'we_colbuf.cpp' || echo '$(srcdir)/'`we_colbuf.cpp; \
@@ -524,20 +503,6 @@ libwe_bulk_a-we_colbufsec.obj: we_colbufsec.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colbufsec.obj `if test -f 'we_colbufsec.cpp'; then $(CYGPATH_W) 'we_colbufsec.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colbufsec.cpp'; fi`
 
-libwe_bulk_a-we_colextinf.o: we_colextinf.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colextinf.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" -c -o libwe_bulk_a-we_colextinf.o `test -f 'we_colextinf.cpp' || echo '$(srcdir)/'`we_colextinf.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" "$(DEPDIR)/libwe_bulk_a-we_colextinf.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_colextinf.cpp' object='libwe_bulk_a-we_colextinf.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colextinf.o `test -f 'we_colextinf.cpp' || echo '$(srcdir)/'`we_colextinf.cpp
-
-libwe_bulk_a-we_colextinf.obj: we_colextinf.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colextinf.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" -c -o libwe_bulk_a-we_colextinf.obj `if test -f 'we_colextinf.cpp'; then $(CYGPATH_W) 'we_colextinf.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colextinf.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" "$(DEPDIR)/libwe_bulk_a-we_colextinf.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_colextinf.cpp' object='libwe_bulk_a-we_colextinf.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colextinf.obj `if test -f 'we_colextinf.cpp'; then $(CYGPATH_W) 'we_colextinf.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colextinf.cpp'; fi`
-
 libwe_bulk_a-we_columninfo.o: we_columninfo.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_columninfo.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_columninfo.Tpo" -c -o libwe_bulk_a-we_columninfo.o `test -f 'we_columninfo.cpp' || echo '$(srcdir)/'`we_columninfo.cpp; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_columninfo.Tpo" "$(DEPDIR)/libwe_bulk_a-we_columninfo.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_columninfo.Tpo"; exit 1; fi
@@ -566,47 +531,47 @@ libwe_bulk_a-we_columninfocompressed.obj: we_columninfocompressed.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_columninfocompressed.obj `if test -f 'we_columninfocompressed.cpp'; then $(CYGPATH_W) 'we_columninfocompressed.cpp'; else $(CYGPATH_W) '$(srcdir)/we_columninfocompressed.cpp'; fi`
 
-libwe_bulk_a-we_columnautoinc.o: we_columnautoinc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_columnautoinc.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo" -c -o libwe_bulk_a-we_columnautoinc.o `test -f 'we_columnautoinc.cpp' || echo '$(srcdir)/'`we_columnautoinc.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo" "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_columnautoinc.cpp' object='libwe_bulk_a-we_columnautoinc.o' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_rbmetawriter.o: we_rbmetawriter.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_rbmetawriter.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo" -c -o libwe_bulk_a-we_rbmetawriter.o `test -f 'we_rbmetawriter.cpp' || echo '$(srcdir)/'`we_rbmetawriter.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_rbmetawriter.cpp' object='libwe_bulk_a-we_rbmetawriter.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_columnautoinc.o `test -f 'we_columnautoinc.cpp' || echo '$(srcdir)/'`we_columnautoinc.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_rbmetawriter.o `test -f 'we_rbmetawriter.cpp' || echo '$(srcdir)/'`we_rbmetawriter.cpp
 
-libwe_bulk_a-we_columnautoinc.obj: we_columnautoinc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_columnautoinc.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo" -c -o libwe_bulk_a-we_columnautoinc.obj `if test -f 'we_columnautoinc.cpp'; then $(CYGPATH_W) 'we_columnautoinc.cpp'; else $(CYGPATH_W) '$(srcdir)/we_columnautoinc.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo" "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_columnautoinc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_columnautoinc.cpp' object='libwe_bulk_a-we_columnautoinc.obj' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_rbmetawriter.obj: we_rbmetawriter.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_rbmetawriter.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo" -c -o libwe_bulk_a-we_rbmetawriter.obj `if test -f 'we_rbmetawriter.cpp'; then $(CYGPATH_W) 'we_rbmetawriter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_rbmetawriter.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_rbmetawriter.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_rbmetawriter.cpp' object='libwe_bulk_a-we_rbmetawriter.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_columnautoinc.obj `if test -f 'we_columnautoinc.cpp'; then $(CYGPATH_W) 'we_columnautoinc.cpp'; else $(CYGPATH_W) '$(srcdir)/we_columnautoinc.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_rbmetawriter.obj `if test -f 'we_rbmetawriter.cpp'; then $(CYGPATH_W) 'we_rbmetawriter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_rbmetawriter.cpp'; fi`
 
-libwe_bulk_a-we_extentstripealloc.o: we_extentstripealloc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_extentstripealloc.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo" -c -o libwe_bulk_a-we_extentstripealloc.o `test -f 'we_extentstripealloc.cpp' || echo '$(srcdir)/'`we_extentstripealloc.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo" "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_extentstripealloc.cpp' object='libwe_bulk_a-we_extentstripealloc.o' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_bulkstatus.o: we_bulkstatus.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkstatus.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" -c -o libwe_bulk_a-we_bulkstatus.o `test -f 'we_bulkstatus.cpp' || echo '$(srcdir)/'`we_bulkstatus.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkstatus.cpp' object='libwe_bulk_a-we_bulkstatus.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_extentstripealloc.o `test -f 'we_extentstripealloc.cpp' || echo '$(srcdir)/'`we_extentstripealloc.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkstatus.o `test -f 'we_bulkstatus.cpp' || echo '$(srcdir)/'`we_bulkstatus.cpp
 
-libwe_bulk_a-we_extentstripealloc.obj: we_extentstripealloc.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_extentstripealloc.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo" -c -o libwe_bulk_a-we_extentstripealloc.obj `if test -f 'we_extentstripealloc.cpp'; then $(CYGPATH_W) 'we_extentstripealloc.cpp'; else $(CYGPATH_W) '$(srcdir)/we_extentstripealloc.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo" "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_extentstripealloc.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_extentstripealloc.cpp' object='libwe_bulk_a-we_extentstripealloc.obj' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_bulkstatus.obj: we_bulkstatus.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_bulkstatus.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" -c -o libwe_bulk_a-we_bulkstatus.obj `if test -f 'we_bulkstatus.cpp'; then $(CYGPATH_W) 'we_bulkstatus.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkstatus.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo" "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_bulkstatus.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_bulkstatus.cpp' object='libwe_bulk_a-we_bulkstatus.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_extentstripealloc.obj `if test -f 'we_extentstripealloc.cpp'; then $(CYGPATH_W) 'we_extentstripealloc.cpp'; else $(CYGPATH_W) '$(srcdir)/we_extentstripealloc.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_bulkstatus.obj `if test -f 'we_bulkstatus.cpp'; then $(CYGPATH_W) 'we_bulkstatus.cpp'; else $(CYGPATH_W) '$(srcdir)/we_bulkstatus.cpp'; fi`
 
-libwe_bulk_a-we_tableinfo.o: we_tableinfo.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_tableinfo.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" -c -o libwe_bulk_a-we_tableinfo.o `test -f 'we_tableinfo.cpp' || echo '$(srcdir)/'`we_tableinfo.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_tableinfo.cpp' object='libwe_bulk_a-we_tableinfo.o' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_colextinf.o: we_colextinf.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colextinf.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" -c -o libwe_bulk_a-we_colextinf.o `test -f 'we_colextinf.cpp' || echo '$(srcdir)/'`we_colextinf.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" "$(DEPDIR)/libwe_bulk_a-we_colextinf.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_colextinf.cpp' object='libwe_bulk_a-we_colextinf.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_tableinfo.o `test -f 'we_tableinfo.cpp' || echo '$(srcdir)/'`we_tableinfo.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colextinf.o `test -f 'we_colextinf.cpp' || echo '$(srcdir)/'`we_colextinf.cpp
 
-libwe_bulk_a-we_tableinfo.obj: we_tableinfo.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_tableinfo.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" -c -o libwe_bulk_a-we_tableinfo.obj `if test -f 'we_tableinfo.cpp'; then $(CYGPATH_W) 'we_tableinfo.cpp'; else $(CYGPATH_W) '$(srcdir)/we_tableinfo.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo" "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_tableinfo.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_tableinfo.cpp' object='libwe_bulk_a-we_tableinfo.obj' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_colextinf.obj: we_colextinf.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_colextinf.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" -c -o libwe_bulk_a-we_colextinf.obj `if test -f 'we_colextinf.cpp'; then $(CYGPATH_W) 'we_colextinf.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colextinf.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo" "$(DEPDIR)/libwe_bulk_a-we_colextinf.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_colextinf.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_colextinf.cpp' object='libwe_bulk_a-we_colextinf.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_tableinfo.obj `if test -f 'we_tableinfo.cpp'; then $(CYGPATH_W) 'we_tableinfo.cpp'; else $(CYGPATH_W) '$(srcdir)/we_tableinfo.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_colextinf.obj `if test -f 'we_colextinf.cpp'; then $(CYGPATH_W) 'we_colextinf.cpp'; else $(CYGPATH_W) '$(srcdir)/we_colextinf.cpp'; fi`
 
 libwe_bulk_a-we_tempxmlgendata.o: we_tempxmlgendata.cpp
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_tempxmlgendata.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_tempxmlgendata.Tpo" -c -o libwe_bulk_a-we_tempxmlgendata.o `test -f 'we_tempxmlgendata.cpp' || echo '$(srcdir)/'`we_tempxmlgendata.cpp; \
@@ -622,33 +587,33 @@ libwe_bulk_a-we_tempxmlgendata.obj: we_tempxmlgendata.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_tempxmlgendata.obj `if test -f 'we_tempxmlgendata.cpp'; then $(CYGPATH_W) 'we_tempxmlgendata.cpp'; else $(CYGPATH_W) '$(srcdir)/we_tempxmlgendata.cpp'; fi`
 
-libwe_bulk_a-we_workers.o: we_workers.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_workers.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" -c -o libwe_bulk_a-we_workers.o `test -f 'we_workers.cpp' || echo '$(srcdir)/'`we_workers.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" "$(DEPDIR)/libwe_bulk_a-we_workers.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_workers.cpp' object='libwe_bulk_a-we_workers.o' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_brmreporter.o: we_brmreporter.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_brmreporter.o -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" -c -o libwe_bulk_a-we_brmreporter.o `test -f 'we_brmreporter.cpp' || echo '$(srcdir)/'`we_brmreporter.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_brmreporter.cpp' object='libwe_bulk_a-we_brmreporter.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_workers.o `test -f 'we_workers.cpp' || echo '$(srcdir)/'`we_workers.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_brmreporter.o `test -f 'we_brmreporter.cpp' || echo '$(srcdir)/'`we_brmreporter.cpp
 
-libwe_bulk_a-we_workers.obj: we_workers.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_workers.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" -c -o libwe_bulk_a-we_workers.obj `if test -f 'we_workers.cpp'; then $(CYGPATH_W) 'we_workers.cpp'; else $(CYGPATH_W) '$(srcdir)/we_workers.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo" "$(DEPDIR)/libwe_bulk_a-we_workers.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_workers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_workers.cpp' object='libwe_bulk_a-we_workers.obj' libtool=no @AMDEPBACKSLASH@
+libwe_bulk_a-we_brmreporter.obj: we_brmreporter.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT libwe_bulk_a-we_brmreporter.obj -MD -MP -MF "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" -c -o libwe_bulk_a-we_brmreporter.obj `if test -f 'we_brmreporter.cpp'; then $(CYGPATH_W) 'we_brmreporter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_brmreporter.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo" "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Po"; else rm -f "$(DEPDIR)/libwe_bulk_a-we_brmreporter.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='we_brmreporter.cpp' object='libwe_bulk_a-we_brmreporter.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_workers.obj `if test -f 'we_workers.cpp'; then $(CYGPATH_W) 'we_workers.cpp'; else $(CYGPATH_W) '$(srcdir)/we_workers.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwe_bulk_a_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o libwe_bulk_a-we_brmreporter.obj `if test -f 'we_brmreporter.cpp'; then $(CYGPATH_W) 'we_brmreporter.cpp'; else $(CYGPATH_W) '$(srcdir)/we_brmreporter.cpp'; fi`
 
-cpimport_bin-cpimport.o: cpimport.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_bin_CXXFLAGS) $(CXXFLAGS) -MT cpimport_bin-cpimport.o -MD -MP -MF "$(DEPDIR)/cpimport_bin-cpimport.Tpo" -c -o cpimport_bin-cpimport.o `test -f 'cpimport.cpp' || echo '$(srcdir)/'`cpimport.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cpimport_bin-cpimport.Tpo" "$(DEPDIR)/cpimport_bin-cpimport.Po"; else rm -f "$(DEPDIR)/cpimport_bin-cpimport.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cpimport.cpp' object='cpimport_bin-cpimport.o' libtool=no @AMDEPBACKSLASH@
+cpimport-cpimport.o: cpimport.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_CXXFLAGS) $(CXXFLAGS) -MT cpimport-cpimport.o -MD -MP -MF "$(DEPDIR)/cpimport-cpimport.Tpo" -c -o cpimport-cpimport.o `test -f 'cpimport.cpp' || echo '$(srcdir)/'`cpimport.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cpimport-cpimport.Tpo" "$(DEPDIR)/cpimport-cpimport.Po"; else rm -f "$(DEPDIR)/cpimport-cpimport.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cpimport.cpp' object='cpimport-cpimport.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_bin_CXXFLAGS) $(CXXFLAGS) -c -o cpimport_bin-cpimport.o `test -f 'cpimport.cpp' || echo '$(srcdir)/'`cpimport.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_CXXFLAGS) $(CXXFLAGS) -c -o cpimport-cpimport.o `test -f 'cpimport.cpp' || echo '$(srcdir)/'`cpimport.cpp
 
-cpimport_bin-cpimport.obj: cpimport.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_bin_CXXFLAGS) $(CXXFLAGS) -MT cpimport_bin-cpimport.obj -MD -MP -MF "$(DEPDIR)/cpimport_bin-cpimport.Tpo" -c -o cpimport_bin-cpimport.obj `if test -f 'cpimport.cpp'; then $(CYGPATH_W) 'cpimport.cpp'; else $(CYGPATH_W) '$(srcdir)/cpimport.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cpimport_bin-cpimport.Tpo" "$(DEPDIR)/cpimport_bin-cpimport.Po"; else rm -f "$(DEPDIR)/cpimport_bin-cpimport.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cpimport.cpp' object='cpimport_bin-cpimport.obj' libtool=no @AMDEPBACKSLASH@
+cpimport-cpimport.obj: cpimport.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_CXXFLAGS) $(CXXFLAGS) -MT cpimport-cpimport.obj -MD -MP -MF "$(DEPDIR)/cpimport-cpimport.Tpo" -c -o cpimport-cpimport.obj `if test -f 'cpimport.cpp'; then $(CYGPATH_W) 'cpimport.cpp'; else $(CYGPATH_W) '$(srcdir)/cpimport.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cpimport-cpimport.Tpo" "$(DEPDIR)/cpimport-cpimport.Po"; else rm -f "$(DEPDIR)/cpimport-cpimport.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cpimport.cpp' object='cpimport-cpimport.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_bin_CXXFLAGS) $(CXXFLAGS) -c -o cpimport_bin-cpimport.obj `if test -f 'cpimport.cpp'; then $(CYGPATH_W) 'cpimport.cpp'; else $(CYGPATH_W) '$(srcdir)/cpimport.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(cpimport_CXXFLAGS) $(CXXFLAGS) -c -o cpimport-cpimport.obj `if test -f 'cpimport.cpp'; then $(CYGPATH_W) 'cpimport.cpp'; else $(CYGPATH_W) '$(srcdir)/cpimport.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -831,7 +796,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-info-am
 	uninstall-info-am
 
 
-install_bulk: install
+cpinstall: install
 
 test:
 

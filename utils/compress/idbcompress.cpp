@@ -1,5 +1,5 @@
 /******************************************************************************************
-* $Id: idbcompress.cpp 3911 2013-06-18 15:38:31Z dcathey $
+* $Id: idbcompress.cpp 3478 2013-01-08 20:08:11Z rdempsey $
 *
 ******************************************************************************************/
 #include <cstring>
@@ -7,8 +7,10 @@
 #include <stdexcept>
 using namespace std;
 
+#include <boost/scoped_ptr.hpp>
+
 #include "blocksize.h"
-#include "logger.h"
+
 #include "snappy.h"
 #include "hasher.h"
 #include "version1.h"
@@ -31,7 +33,7 @@ const uint8_t CHUNK_MAGIC1 = 0xff;
 const int SIG_OFFSET = 0;
 const int CHECKSUM_OFFSET = 1;
 const int LEN_OFFSET = 5;
-const unsigned HEADER_SIZE = 9;
+const uint HEADER_SIZE = 9;
 
 /* version 1.2 of the chunk data changes the hash function used to calculate
  * checksums.  We can no longer use the algorithm used in ver 1.1.  Everything
@@ -70,17 +72,6 @@ void initCompressedDBFileHeader(void* hdrBuf, int compressionType, int hdrSize)
 	hdr->fHeader.fCompressionType = compressionType;
 	hdr->fHeader.fBlockCount      = 0;
 	hdr->fHeader.fHeaderSize      = hdrSize;
-}
-
-void log(const string &s) 
-{
-	logging::MessageLog logger((logging::LoggingID()));
-	logging::Message message;
-	logging::Message::Args args;
-
-	args.add(s);
-	message.format(args);
-	logger.logErrorMessage(message);
 }
 
 } // namespace
@@ -204,15 +195,9 @@ int IDBCompressInterface::uncompressBlock(const char* in, const size_t inLen, un
 		try {
 			comprc = v1::decompress(&in[HEADER_SIZE], storedLen, out, &ol);
 		} catch (runtime_error& rex) {
-			//cerr << "decomp caught exception: " << rex.what() << endl;
-			ostringstream os;
-			os << "decomp caught exception: " << rex.what();
-			log(os.str());
+			cerr << "decomp caught exception: " << rex.what() << endl;
 			comprc = false;
 		} catch (exception& ex) {
-			ostringstream os;
-			os << "decomp caught exception: " << ex.what();
-			log(os.str());
 			comprc = false;
 		} catch (...) {
 			comprc = false;
@@ -253,8 +238,7 @@ int IDBCompressInterface::verifyHdr(const void* hdrBuf) const
 }
 
 //------------------------------------------------------------------------------
-// Extract compression pointer information out of the pointer buffer that is
-// passed in.  ptrBuf points to the pointer section of the compression hdr.
+// Extract compression pointer information out of a double header buffer
 //------------------------------------------------------------------------------
 int IDBCompressInterface::getPtrList(const char* ptrBuf,
 	const int ptrBufSize,
@@ -280,46 +264,11 @@ int IDBCompressInterface::getPtrList(const char* ptrBuf,
 }
 
 //------------------------------------------------------------------------------
-// Extract compression pointer information out of the file compression hdr.
-// Function assume that the file is a column file that has just two 4096-hdrs,
-// one for the file header, and one for the list of pointers.
-// Wrapper of above method for backward compatibility.
+// Wrapper of above method for backward compatibility
 //------------------------------------------------------------------------------
-int IDBCompressInterface::getPtrList(const char* hdrBuf, CompChunkPtrList& chunkPtrs ) const
+int IDBCompressInterface::getPtrList(const char* ptrBuf, CompChunkPtrList& chunkPtrs ) const
 {
-	return getPtrList(hdrBuf+HDR_BUF_LEN, HDR_BUF_LEN, chunkPtrs);
-}
-
-//------------------------------------------------------------------------------
-// Count the number of chunk pointers in the pointer header(s)
-//------------------------------------------------------------------------------
-unsigned int IDBCompressInterface::getPtrCount(const char* ptrBuf,
-	const int ptrBufSize) const
-{
-	unsigned int chunkCount = 0;
-
-	const uint64_t* ptrs = reinterpret_cast<const uint64_t*>(ptrBuf);
-	const unsigned int NUM_PTRS = ptrBufSize / sizeof(uint64_t);
-	for (unsigned int i = 0; i < NUM_PTRS; i++)
-	{
-		if (ptrs[i+1] == 0) // 0 offset means end of data
-			break;
-
-		chunkCount++;
-	}
-
-	return chunkCount;
-}
-
-//------------------------------------------------------------------------------
-// Count the number of chunk pointers in the specified 8192 byte compression
-// file header, which carries a single 4096 byte compression chunk header.
-// This should not be used for compressed dictionary files which could have
-// more compression chunk headers.
-//------------------------------------------------------------------------------
-unsigned int IDBCompressInterface::getPtrCount(const char* hdrBuf) const
-{
-	return getPtrCount(hdrBuf+HDR_BUF_LEN, HDR_BUF_LEN);
+	return getPtrList(ptrBuf+HDR_BUF_LEN, HDR_BUF_LEN, chunkPtrs);
 }
 
 //------------------------------------------------------------------------------

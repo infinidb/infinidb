@@ -41,8 +41,6 @@ using namespace logging;
 using namespace dataconvert;
 
 #include "funchelpers.h"
-#include "utils_utf8.h"
-using namespace funcexp;
 
 namespace funcexp
 {
@@ -146,7 +144,7 @@ string Func_nullif::getStrVal(rowgroup::Row& row,
 		exp2 = exp2 + " 00:00:00";
 	}
 
-	if ( utf8::idb_strcoll(exp1.c_str() , exp2.c_str()) == 0 ) {
+	if ( strcoll(exp1.c_str() , exp2.c_str()) == 0 ) {
 		isNull = true;
 		return "";
 	}

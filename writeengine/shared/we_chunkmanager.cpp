@@ -15,9 +15,9 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: we_chunkmanager.cpp 4395 2012-12-13 21:10:31Z chao $
+//  $Id: we_chunkmanager.cpp 4397 2012-12-13 21:11:07Z chao $
 
-#include <unistd.h>
+
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <iostream>
@@ -26,6 +26,10 @@
 //#define NDEBUG
 #include <cassert>
 using namespace std;
+
+#include <boost/scoped_array.hpp>
+#include <boost/shared_array.hpp>
+using namespace boost;
 
 #include "logger.h"
 #include "cacheutils.h"
@@ -80,7 +84,7 @@ ChunkData* CompFileData::findChunk(int64_t id) const
 // ChunkManager constructor
 //------------------------------------------------------------------------------
 ChunkManager::ChunkManager() : fMaxActiveChunkNum(100), fLenCompressed(0), fIsBulkLoad(false),
-                               fDropFdCache(false), fIsInsert(false), fFileOp(0)
+                               fDropFdCache(false), fIsInsert(false), fIsDctnry(false), fFileOp(0)
 {
     fUserPaddings = Config::getNumCompressedPadBlks() * BYTE_PER_BLOCK;
     fCompressor.numUserPaddingBytes(fUserPaddings);
@@ -137,19 +141,11 @@ int ChunkManager::writeLog(TxnID txnId, string backUpFileType, string filename,
     oss << txnId;
     aDMLLogFileName += "DMLLog_" + oss.str();
     ofstream           aDMLLogFile;
-    errno = 0;
     aDMLLogFile.open(aDMLLogFileName.c_str(), ios::app);
 
-    int errRc = errno;
     if (!aDMLLogFile)
     {
-        std::string errnoMsg;
-        Convertor::mapErrnoToString(errRc, errnoMsg);
-        ostringstream oss;
-        oss << "trans " << txnId << ":File " << aDMLLogFileName
-            << " can't be opened (no exception thrown) due to " << errnoMsg;
-        logMessage(oss.str(), logging::LOG_TYPE_ERROR);
-        cerr << "DML log file " << aDMLLogFileName << " cannot be created due to " << errnoMsg << endl;
+        cerr << "DML log file cannot be created";
         return -1;
     }
     //Write the log
@@ -605,20 +601,18 @@ int ChunkManager::fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkD
 
     // remove the oldest one if the max active chunk number is reached.
     WE_COMP_DBG(cout << "fActiveChunks.size:" << fActiveChunks.size() << endl;)
-	//cout << "fetchChunkFromFile1: pFile = " << pFile << endl;
-	map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
-    if (fpIt == fFilePtrMap.end())
-    {
-        logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
-        return ERR_COMP_FILE_NOT_FOUND;
-    }
-	
-	CompFileData* fileData = fpIt->second;
-	
     if (fActiveChunks.size() >= fMaxActiveChunkNum)
-    {		
+    {
+        map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
+        if (fpIt == fFilePtrMap.end())
+        {
+            logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
+            return ERR_COMP_FILE_NOT_FOUND;
+        }
+
         list<std::pair<FileID, ChunkData*> >::iterator lIt = fActiveChunks.begin();
-        if (!fIsBulkLoad && !(fpIt->second->fDctnryCol))
+
+        if (!fIsBulkLoad && !fIsDctnry)
         {
             while ((lIt->first == fpIt->second->fFileID) && (lIt != fActiveChunks.end()))
                 lIt++;
@@ -632,7 +626,7 @@ int ChunkManager::fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkD
                 logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
                 return ERR_COMP_FILE_NOT_FOUND;
             }
-			
+
             if ((rc = writeChunkToFile(fIt->second, lIt->second)) != NO_ERROR)
             {
                 ostringstream oss;
@@ -658,24 +652,19 @@ int ChunkManager::fetchChunkFromFile(FILE* pFile, int64_t id, ChunkData*& chunkD
 #endif
     // get a new ChunkData object
     chunkData = new ChunkData(id);
-/*    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
-	cout << "fetchChunkFromFile2: pFile = " << pFile << endl;
+    map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
     if (fpIt == fFilePtrMap.end())
     {
-		
         fpIt = fFilePtrMap.begin();
         while (fpIt != fFilePtrMap.end())
         {
             fpIt++;
         }
-		cout << "fetchChunkFromFile: cannot fine pFile = " << pFile << endl;
         logMessage(ERR_COMP_FILE_NOT_FOUND, logging::LOG_TYPE_ERROR, __LINE__);
         return ERR_COMP_FILE_NOT_FOUND;
     }
 
-	pFile = fileDataPtr;
-    CompFileData* fileData = fpIt->second; */
-	pFile = fileData->fFilePtr; //update to get the reopened file ptr.
+    CompFileData* fileData = fpIt->second;
     fileData->fChunkList.push_back(chunkData);
     fActiveChunks.push_back(make_pair(fileData->fFileID, chunkData));
 
@@ -915,8 +904,8 @@ int ChunkManager::writeChunkToFile(CompFileData* fileData, ChunkData* chunkData)
 //------------------------------------------------------------------------------
 // Write the current compressed data in fBufCompressed to the specified segment
 // file offset (offset) and file (fileData).  For DML usage, "size" specifies
-// how many bytes to backup, for error recovery.  cpimport.bin does it's own
-// backup and error recovery, so "size" is not applicable for bulk import usage.
+// how many bytes to backup, for error recovery.  cpimport does it's own back-
+// up and error recovery, so "size" is not applicable for bulk import usage.
 //------------------------------------------------------------------------------
 int ChunkManager::writeCompressedChunk(CompFileData* fileData, int64_t offset, int64_t size)
 {
@@ -962,9 +951,16 @@ int ChunkManager::writeCompressedChunk(CompFileData* fileData, int64_t offset, i
         // write out the compressed data + padding
         if ((rc == NO_ERROR) && ((rc = writeCompressedChunk_(fileData, offset)) == NO_ERROR))
         {
-            if ((fflush(fileData->fFilePtr)) != 0) //@Bug3162.
+            if ((rc = fflush(fileData->fFilePtr)) == NO_ERROR) //@Bug3162.
             {
-				rc = ERR_FILE_WRITE;
+				//@Bug4126. Remove log file first to prevent inconsistency when process crashs 
+				//remove the log file
+                remove(aDMLLogFileName.c_str());
+                // remove the backup file
+                remove(chkFileName.c_str());
+            }
+            else
+            {
                 ostringstream oss;
                 oss << "Failed to flush " << fileData->fFileName << " @line: " << __LINE__;
                 logMessage(oss.str(), logging::LOG_TYPE_ERROR);
@@ -1108,7 +1104,7 @@ int ChunkManager::closeFile(CompFileData* fileData)
 // Write the chunk pointers headers for the specified file (fileData).
 // ln is the source code line number of the code invoking this operation
 // (ex __LINE__); this is used for logging error messages.  For DML usage,
-// backup for recovery is also performed.  This step is skipped for cpimport.bin
+// backup for recovery is also performed.  This step is skipped for cpimport
 // as bulk import performs its own backup and recovery operations.
 //------------------------------------------------------------------------------
 int ChunkManager::writeHeader(CompFileData* fileData, int ln)
@@ -1179,7 +1175,7 @@ int ChunkManager::writeHeader(CompFileData* fileData, int ln)
 // Write the chunk pointers headers for the specified file (fileData).
 // ln is the source code line number of the code invoking this operation
 // (ex __LINE__); this is used for logging error messages.  For DML usage,
-// backup for recovery is also performed.  This step is skipped for cpimport.bin
+// backup for recovery is also performed.  This step is skipped for cpimport
 // as bulk import performs its own backup and recovery operations.
 //------------------------------------------------------------------------------
 inline int ChunkManager::writeHeader_(CompFileData* fileData, int ptrSecSize)
@@ -1472,7 +1468,7 @@ int ChunkManager::restoreBlock(FILE* pFile, const unsigned char* writeBuf, i64 f
 int ChunkManager::getBlockCount(FILE* pFile)
 {
     map<FILE*, CompFileData*>::iterator fpIt = fFilePtrMap.find(pFile);
-    idbassert(fpIt != fFilePtrMap.end());
+    assert(fpIt != fFilePtrMap.end());
 
     return fCompressor.getBlockCount(fpIt->second->fFileHeader.fControlData);
 }
@@ -1483,6 +1479,12 @@ int ChunkManager::getBlockCount(FILE* pFile)
 void ChunkManager::fileOp(FileOp* fileOp)
 {
     fFileOp = fileOp;
+
+    // for dictionary columns entries are not updated, but adding new ones.
+    if (dynamic_cast<Dctnry*>(fFileOp) != NULL)
+    {
+        fIsDctnry = true;
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -1610,6 +1612,7 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
     {
         uint64_t chunkSize = 0;                // size of current chunk
         unsigned char* buf = NULL;             // output buffer
+        shared_array<unsigned char> fetchedChunkBuf;
 
         // Find the current chunk size, and allocate the data -- buf point to the data.
         if (chunksTouched[k] == NULL)
@@ -1726,10 +1729,8 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
         struct tm ltm;
         localtime_r(reinterpret_cast<time_t*>(&tv.tv_sec), &ltm);
         char tmText[24];
-        snprintf(tmText, sizeof(tmText), ".%04d%02d%02d%02d%02d%02d%06ld",
-        		ltm.tm_year+1900, ltm.tm_mon+1,
-                ltm.tm_mday, ltm.tm_hour, ltm.tm_min,
-                ltm.tm_sec, tv.tv_usec);
+        sprintf(tmText, ".%04d%02d%02d%02d%02d%02d%06ld", ltm.tm_year+1900, ltm.tm_mon+1,
+                ltm.tm_mday, ltm.tm_hour, ltm.tm_min, ltm.tm_sec, tv.tv_usec);
         string dbgFileName(tmpFileName + tmText);
 
         ostringstream oss;
@@ -1769,7 +1770,6 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
     }
 
     // update the file pointer map w/ new file pointer
-	//cout << "realloc1: remove ptr = " << fileData->fFilePtr << endl;
     fFilePtrMap.erase(fileData->fFilePtr);
     fclose(fileData->fFilePtr);
     fileData->fFilePtr = 0;
@@ -1855,7 +1855,7 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
             if (rc == NO_ERROR)
             {
                 fFilePtrMap.insert(make_pair(fileData->fFilePtr, fileData));
-				//cout << "realloc2: insert ptr = " << fileData->fFilePtr << endl;
+
                 // notify the PrimProc of unlinking original data file
                 fDropFdCache = true;
             }
@@ -1908,10 +1908,8 @@ int ChunkManager::reallocateChunks(CompFileData* fileData)
         struct tm ltm;
         localtime_r(reinterpret_cast<time_t*>(&tv.tv_sec), &ltm);
         char tmText[24];
-        snprintf(tmText, sizeof(tmText), ".%04d%02d%02d%02d%02d%02d%06ld",
-        		ltm.tm_year+1900, ltm.tm_mon+1,
-                ltm.tm_mday, ltm.tm_hour, ltm.tm_min,
-                ltm.tm_sec, tv.tv_usec);
+        sprintf(tmText, ".%04d%02d%02d%02d%02d%02d%06ld", ltm.tm_year+1900, ltm.tm_mon+1,
+                ltm.tm_mday, ltm.tm_hour, ltm.tm_min, ltm.tm_sec, tv.tv_usec);
         string dbgFileName(tmpFileName + tmText);
 
         ostringstream oss;

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_trim.cpp 3741 2013-04-25 20:36:44Z bpaul $
+* $Id: func_trim.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -49,94 +48,38 @@ std::string Func_trim::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-    // The number of characters (not bytes) in our input tstr.
-    // Not all of these are necessarily significant. We need to search for the 
-    // NULL terminator to be sure.
-    size_t strwclen; 
-    // this holds the number of characters (not bytes) in ourtrim tstr.
-    size_t trimwclen;
-
-	// The original string
-	string tstr = fp[0]->data()->getStrVal(row, isNull);
-
-	// The trim characters.
+	string str = fp[0]->data()->getStrVal(row, isNull);
 	string trim = (fp.size() > 1 ? fp[1]->data()->getStrVal(row, isNull) : " ");
-    
-	
-	if (isNull)
-        return "";
-    if (tstr.empty() || tstr.length() == 0)
-        return tstr;
 
-    // Rather than calling the wideconvert functions with a null buffer to 
-    // determine the size of buffer to allocate, we can be sure the wide
-    // char string won't be longer than:
-    strwclen = tstr.length(); // a guess to start with. This will be >= to the real count.
-    int bufsize = (strwclen+1) * sizeof(wchar_t);
-
-    // Convert the string to wide characters. Do all further work in wide characters
-    wchar_t* wcbuf = (wchar_t*)alloca(bufsize);
-    strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen+1);
-	// Bad char in mbc can return -1
-	if(strwclen == static_cast<size_t>(-1))
-		strwclen = 0;
-
-    // Convert the trim string to wide
-    trimwclen = trim.length();  // A guess to start.
-    int trimbufsize = (trimwclen+1) * sizeof(wchar_t);
-    wchar_t* wctrim = (wchar_t*)alloca(trimbufsize);
-    size_t trimlen = utf8::idb_mbstowcs(wctrim,trim.c_str(), trimwclen+1);
-	// Bad char in mbc can return -1
-	if(trimlen == static_cast<size_t>(-1))
-		trimlen = 0;
-    size_t trimCmpLen = trimlen * sizeof(wchar_t);
-
-    const wchar_t* oPtr = wcbuf;      // To remember the start of the string
-    const wchar_t* aPtr = oPtr;
-    const wchar_t* aEnd = wcbuf+strwclen-1;
-    size_t trimCnt = 0;
-
-	if(trimlen > 0)
+	// remove leading
+	for(;;)
 	{
-		if (trimlen == 1)
+		string::size_type pos = str.find (trim,0);
+		if (pos == 0)
 		{
-			// If trim is a single char, then don't spend the overhead for memcmp.
-			wchar_t chr = wctrim[0];
-			// remove leading
-			while (aPtr != aEnd && *aPtr == chr)
-			{
-				aPtr++;
-				++trimCnt;
-			}
-			// remove trailing
-			while (aEnd != aPtr && *aEnd == chr)
-			{
-				aEnd--;
-				++trimCnt;
-			}
+			str = str.substr (pos+1,str.length()-1);
 		}
 		else
-		{
-			aEnd-=(trimlen-1);	// So we don't compare past the end of the string.
-			// remove leading
-			while (aPtr <= aEnd && !memcmp(aPtr, wctrim, trimCmpLen))
-			{
-				aPtr+=trimlen;
-				trimCnt+=trimlen;
-			}
-			// remove trailing
-			while (aPtr <= aEnd && !memcmp(aEnd, wctrim, trimCmpLen))
-			{
-				aEnd-=trimlen;	//BUG 5241
-				trimCnt+=trimlen;
-			}
+		{                                     // no more whitespace
+			break;
 		}
 	}
-	// Bug 5110 - error in allocating enough memory for utf8 chars 
-	size_t aLen = strwclen-trimCnt;
-	wstring trimmed = wstring(aPtr, aLen);
-	// Turn back to a string
-	return utf8::wstring_to_utf8(trimmed.c_str());
+
+	// remove trailing
+	for(;;)
+	{
+		string::size_type pos = str.rfind (trim,str.length()-1);
+		if (pos == strlen(str.c_str())-1 && pos != string::npos)
+		{
+			str = str.substr (0,pos);
+		}
+		else
+		{                                     // no more whitespace
+			break;
+		}
+	}
+	return str;
+
 }							
 
 

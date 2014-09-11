@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************************
- * $Id: resourcemanager.h 9491 2013-05-06 20:57:41Z pleblanc $
+ * $Id: resourcemanager.h 7796 2011-06-20 22:39:00Z pleblanc $
  *
  ******************************************************************************************/
 /**
@@ -82,7 +82,7 @@ namespace joblist
   
   //BatchPrimitiveStep
   const uint32_t defaultRequestSize  = 1;
-  const uint32_t defaultMaxOutstandingRequests = 20;
+  const uint32_t defaultMaxOutstandingRequests = 5;
   const uint32_t defaultProcessorThreadsPerScan = 16;
   const uint32_t defaultJoinerChunkSize = 16 * 1024 * 1024;
 
@@ -108,7 +108,7 @@ namespace joblist
 
   const uint64_t defaultInitialCapacity = 1024 * 1024; 
   const int  defaultTWMaxBuckets = 256;
-  const int  defaultPSCount = 0;
+  const int  defaultPSCount = 1;
   const int  defaultConnectionsPerPrimProc = 1;
   const uint defaultLBID_Shift = 13;
   const uint64_t defaultExtentRows = 8 * 1024 * 1024;
@@ -128,7 +128,6 @@ namespace joblist
   const uint64_t defaultOrderByLimitMaxMemory = 1 * 1024 * 1024 * 1024ULL;
 
   const uint64_t defaultDECThrottleThreshold = 200000000;  // ~200 MB
-  
 
   /** @brief ResourceManager
    *	Returns requested values from Config 
@@ -155,7 +154,7 @@ namespace joblist
 
 
     int  	getEmServerThreads() const { return  getUintVal(fExeMgrStr, "ServerThreads", defaultEMServerThreads); }
-    int  	getEmServerQueueSize() const { return  getUintVal(fExeMgrStr, "ServerQueueSize", defaultEMServerQueueSize); }
+    int  	getEmServerQueueSize() const { return  getUintVal(fExeMgrStr, "ServerQueueSize", defaultEMServerQueueSize); }	
     int  	getEmSecondsBetweenMemChecks() const { return  getUintVal(fExeMgrStr, "SecondsBetweenMemChecks", defaultEMSecondsBetweenMemChecks); }
     int  	getEmMaxPct() const { return  getUintVal(fExeMgrStr, "MaxPct", defaultEMMaxPct); }
     EXPORT int  	getEmPriority() const;
@@ -169,7 +168,7 @@ namespace joblist
 	uint64_t	getPMJoinMemLimit() const { return pmJoinMemLimit; }
 
     uint32_t  	getJLFlushInterval() const { return  getUintVal(fJobListStr, "FlushInterval", defaultFlushInterval); }
-    uint32_t  	getJlFifoSize() const { return  getUintVal(fJobListStr, "FifoSize", defaultFifoSize); }
+    uint32_t  	getJlFifoSize() const { return  getUintVal(fJobListStr, "FifoSize", defaultFifoSize); }	
     uint32_t  	getJlScanLbidReqLimit() const { return  getUintVal(fJobListStr, "ScanLbidReqLimit",defaultScanLbidReqLimit); }
     uint32_t  	getJlScanLbidReqThreshold() const { return  getUintVal(fJobListStr,"ScanLbidReqThreshold", defaultScanLbidReqThreshold); }
 
@@ -201,7 +200,7 @@ namespace joblist
 	return "Y" == val; 
     }
 
-    std::string getScTempDiskPath() const { return  getStringVal(fSystemConfigStr, "TempDiskPath", defaultTempDiskPath  ); }
+    std::string getScTempDiskPath() const { return  getStringVal(fSystemConfigStr, "TempDiskPath", defaultTempDiskPath  ); }	
     uint64_t  	getScTempSaveSize() const { return  getUintVal(fSystemConfigStr, "TempSaveSize", defaultTempSaveSize); }
     std::string getScWorkingDir() const { return  getStringVal(fSystemConfigStr, "WorkingDir", defaultWorkingDir ); }
 
@@ -209,13 +208,10 @@ namespace joblist
     uint64_t  	getTwInitialCapacity() const { return  getUintVal(fTupleWSDLStr, "InitialCapacity", defaultInitialCapacity  ); } 
     int       	getTwMaxBuckets	() const { return  getUintVal(fTupleWSDLStr, "MaxBuckets", defaultTWMaxBuckets  ); }
     uint8_t   	getTwNumThreads() const { return  fTwNumThreads; } //getUintVal(fTupleWSDLStr, "NumThreads", defaultNumThreads  ); }
-    uint64_t  	getZdl_MaxElementsInMem() const { return  getUintVal(fZDLStr,"ZDL_MaxElementsInMem", defaultMaxElementsInMem  ); }
+    uint64_t  	getZdl_MaxElementsInMem() const { return  getUintVal(fZDLStr,"ZDL_MaxElementsInMem", defaultMaxElementsInMem  ); }	
     uint64_t  	getZdl_MaxElementsPerBucket () const { return  getUintVal(fZDLStr, "ZDL_MaxElementsPerBucket", defaultMaxElementsPerBuckert ); }
 
     uint64_t  	getExtentRows() const { return  getUintVal(fExtentMapStr, "ExtentRows", defaultExtentRows  ); }
-
-    uint32_t 	getDBRootCount() const { return getUintVal(fSystemConfigStr, "DBRootCount", 1); }
-    uint32_t 	getPMCount() const { return getUintVal(fPrimitiveServersStr, "Count", 1); }
 
     std::vector<std::string>	getHbrPredicate() const
       {
@@ -235,9 +231,9 @@ namespace joblist
 
 	uint64_t	getDECThrottleThreshold() const
 	{ return getUintVal(fJobListStr, "DECThrottleThreshold", defaultDECThrottleThreshold); }
-
+	
     EXPORT void  emServerThreads();
-    EXPORT void  emServerQueueSize();
+    EXPORT void  emServerQueueSize();	
     EXPORT void  emSecondsBetweenMemChecks();
     EXPORT void  emMaxPct();
     EXPORT void  emPriority();
@@ -248,7 +244,7 @@ namespace joblist
     EXPORT void  hjMaxElems();
     EXPORT void  hjFifoSizeLargeSide();
     EXPORT void  hjPmMaxMemorySmallSide();
-
+	
 	/* new HJ/Union/Aggregation mem interface, used by TupleBPS */
 	inline bool getMemory(int64_t amount) {
 #ifdef _MSC_VER
@@ -265,7 +261,7 @@ namespace joblist
 #endif
 	}
 	inline int64_t availableMemory() { return totalUmMemLimit; }
-
+	
 	/* old HJ mem interface, used by HashJoin */
 	uint64_t   getHjPmMaxMemorySmallSide(uint32_t sessionID)
 	  { return fHJPmMaxMemorySmallSideSessionMap.getSessionResource(sessionID); }
@@ -295,7 +291,7 @@ namespace joblist
 		fHJUmMaxMemorySmallSideDistributor.returnResource(mem); }
 
     EXPORT void  jlFlushInterval();
-    EXPORT void  jlFifoSize();
+    EXPORT void  jlFifoSize();	
     EXPORT void  jlScanLbidReqLimit();
     EXPORT void  jlScanLbidReqThreshold();
     EXPORT void  jlProjectBlockReqLimit();
@@ -317,7 +313,7 @@ namespace joblist
 
     EXPORT void  zdl_MaxElementsInMem();
     EXPORT void  zdl_MaxElementsPerBucket() ;
-
+	
     EXPORT void  hbrPredicate();
 
     void setTraceFlags(uint32_t flags) 
@@ -338,10 +334,6 @@ namespace joblist
     
     void aggNumRowGroups(uint numRowGroups) { fAggNumRowGroups = numRowGroups; }
     uint aggNumRowGroups() const { return fAggNumRowGroups; }
-
-	EXPORT bool getMysqldInfo(std::string& h, std::string& u, std::string& w, unsigned int& p) const;
-	EXPORT bool queryStatsEnabled() const;
-	EXPORT bool userPriorityEnabled() const;
 
   private:
 
@@ -396,7 +388,7 @@ namespace joblist
 	int64_t totalUmMemLimit;	// mem limit for join, union, and aggregation on the UM
 #endif
 	uint64_t pmJoinMemLimit;	// mem limit on individual PM joins
-
+	
 	/* multi-thread aggregate */
 	uint fAggNumThreads;
 	uint fAggNumBuckets;

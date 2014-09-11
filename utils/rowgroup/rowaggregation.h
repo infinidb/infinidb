@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowaggregation.h 3449 2012-12-10 21:08:06Z xlou $
+//  $Id: rowaggregation.h 2596 2011-05-17 17:18:07Z xlou $
 
 
 #ifndef ROWAGGREGATION_H
@@ -356,7 +356,6 @@ class RowAggregation : public messageqcpp::Serializeable
 		 * @parm bs(out) BytesStream that is to be written to.
 		 */
 		void loadResult(messageqcpp::ByteStream& bs);
-		void loadEmptySet(messageqcpp::ByteStream& bs);
 
 		/** @brief get output rowgroup
 		 *
@@ -384,7 +383,7 @@ class RowAggregation : public messageqcpp::Serializeable
 		virtual void doStatistics(const Row&, int64_t, int64_t, int64_t);
 		virtual void doBitOp(const Row&, int64_t, int64_t, int);
 		virtual bool countSpecial(const RowGroup* pRG)
-		{ fRow.setIntField<8>(fRow.getIntField<8>(0) + pRG->getRowCount(), 0); return true; }
+		{ fRow.setIntField<8>(pRG->getRowCount(), 0); return true; }
 
 		virtual bool newRowGroup();
 		virtual void clearAggMap() { if (fAggMapPtr) fAggMapPtr->clear(); }
@@ -436,11 +435,6 @@ class RowAggregation : public messageqcpp::Serializeable
 		boost::shared_ptr<utils::STLPoolAllocator<std::pair<uint8_t* const, uint8_t*> > > fAlloc;
 		// for keys in the map if they are allocated seperately
 		boost::shared_ptr<utils::STLPoolAllocator<uint8_t> > fKeyAlloc;
-
-		// for 8k poc
-		RowGroup                                        fEmptyRowGroup;
-		boost::scoped_array<uint8_t>                    fEmptyRowData;
-		Row                                             fEmptyRow;
 };
 
 
@@ -512,11 +506,7 @@ class RowAggregationUM : public RowAggregation
 		void attachGroupConcatAg();
 		void updateEntry(const Row& row);
 		bool countSpecial(const RowGroup* pRG)
-		{ fRow.setIntField<8>(
-		    fRow.getIntField<8>(
-		        fFunctionCols[0]->fOutputColumnIndex) + pRG->getRowCount(),
-		        fFunctionCols[0]->fOutputColumnIndex);
-		  return true; }
+		{ fRow.setIntField<8>(fRow.getIntField<8>(0) + pRG->getRowCount(), 0); return true; }
 
 		bool newRowGroup();
 

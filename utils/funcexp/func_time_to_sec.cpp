@@ -49,10 +49,9 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 						CalpontSystemCatalog::ColType& op_ct)
 {
 	// assume 256 is enough. assume not allowing incomplete date
-	uint32_t hour = 0, 
-	         min = 0, 
+	uint32_t hour = 0,
+	         min = 0,
 	         sec = 0;
-    bool bIsNegative = false;   // Only set to true if CHAR or VARCHAR with a '-'
 
 	int64_t val = 0;
 	dataconvert::Time tval;
@@ -69,14 +68,8 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 			break;
 		case CalpontSystemCatalog::CHAR:
 		case CalpontSystemCatalog::VARCHAR:
-            {
-                std::string strVal = parm[0]->data()->getStrVal(row, isNull);
-                if (strVal[0] == '-')
-                {
-                    bIsNegative = true;
-                    strVal.replace(0, 1, 1, ' ');
-                }
-                val = dataconvert::DataConvert::stringToTime(strVal);
+			val = dataconvert::DataConvert::stringToTime(parm[0]->data()->getStrVal(row, isNull));
+			tval = *(reinterpret_cast<dataconvert::Time*>(&val));
 			if (val == -1)
 			{
 				isNull = true;
@@ -84,12 +77,10 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 			}
 			else
 			{
-                    tval = *(reinterpret_cast<dataconvert::Time*>(&val));
-                    hour = (uint32_t)(tval.hour);
+				hour = (uint32_t)(tval.hour);
 				min = (uint32_t)(tval.minute);
 				sec = (uint32_t)(tval.second);
-                }
-            }
+			}
 			break;
 		case CalpontSystemCatalog::BIGINT:
 		case CalpontSystemCatalog::MEDINT:
@@ -108,7 +99,7 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 				min = (uint32_t)((val >> 26) & 0x3f);
 				sec = (uint32_t)((val >> 20) & 0x3f);
 			}
-			break;	
+			break;
 		case CalpontSystemCatalog::DECIMAL:
 			if (parm[0]->data()->resultType().scale == 0)
 			{
@@ -130,12 +121,8 @@ int64_t Func_time_to_sec::getIntVal(rowgroup::Row& row,
 			isNull = true;
 			return -1;
 	}
-    int64_t rtn = (int64_t)(hour*60*60)+(min*60)+sec;
-    if (bIsNegative)
-    {
-        rtn *= -1;
-    }
-	return rtn;
+
+	return (hour*60*60)+(min*60)+sec;
 }
 
 

@@ -17,7 +17,7 @@
 
 /***************************************************************************
  *
- *   $Id: filebuffermgr.h 2046 2013-01-31 19:13:16Z pleblanc $
+ *   $Id: filebuffermgr.h 1749 2011-09-29 20:24:41Z pleblanc $
  *
  *                                                                         *
  ***************************************************************************/
@@ -76,7 +76,7 @@ typedef FileBufferIndex HashObject_t;
 class bcHasher
 {
 	public:
-		inline size_t operator()(const HashObject_t& rhs) const
+		size_t operator()(const HashObject_t& rhs) const
 		{
 			return (((rhs.ver & 0xffffULL) << 48) | (rhs.lbid & 0xffffffffffffULL));
 		}
@@ -85,7 +85,7 @@ class bcHasher
 class bcEqual
 {
 	public:
-		inline bool operator()(const HashObject_t& f1, const HashObject_t& f2) const
+		size_t operator()(const HashObject_t& f1, const HashObject_t& f2) const
 		{
 			return ((f1.lbid == f2.lbid) && (f1.ver == f2.ver));
 		}
@@ -158,10 +158,10 @@ public:
 	/**
 	 * @brief  flush all versions
 	 **/
-	void flushManyAllversion(const BRM::LBID_t *laVptr, uint32_t cnt);
+	void flushManyAllversion(const LbidAtVer* laVptr, uint32_t cnt);
 
 	void flushOIDs(const uint32_t *oids, uint32_t count);
-	void flushPartition(const std::vector<BRM::OID_t> &oids, const std::set<BRM::LogicalPartition> &partitions);
+	void flushPartition(const uint32_t *oids, uint32_t count, uint32_t partition);
 
 	/**
 	 * @brief return the disk Block referenced by fb

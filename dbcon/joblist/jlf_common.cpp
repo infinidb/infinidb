@@ -15,13 +15,12 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: jlf_common.cpp 8862 2012-09-07 14:38:08Z xlou $
+//  $Id: jlf_common.cpp 8873 2012-09-07 19:58:19Z xlou $
 
 
 #include "calpontsystemcatalog.h"
 #include "aggregatecolumn.h"
 #include "simplecolumn.h"
-using namespace std;
 using namespace execplan;
 
 #include "messagelog.h"
@@ -44,38 +43,32 @@ namespace
 uint uniqTupleKey(JobInfo& jobInfo,
 					CalpontSystemCatalog::OID& o,
 					CalpontSystemCatalog::OID& t,
-					const string& cn,
-					const string& ca,
-					const string& tn,
-					const string& ta,
-					const string& sn,
-					const string& vw,
-					uint64_t           en,
+					const std::string& cn,
+					const std::string& ca,
+					const std::string& sn,
+					const std::string& tn,
+					const std::string& ta,
+					const std::string& vw,
 					bool correlated=false)
 {
 	uint64_t subId = jobInfo.subId;
 	if (correlated)
 		subId = jobInfo.pSubId;
 	
-	string alias(ta);
+	std::string alias = ta;
 //	if (!ca.empty())
 //		alias += "." + ca;
-	string nm(ta);
-	if (!cn.empty())
-		nm += "." + cn;
-	UniqId id(o, ta, sn, vw, subId);
+	UniqId id(o, alias, vw, subId);
 	TupleKeyMap::iterator iter = jobInfo.keyInfo->tupleKeyMap.find(id);
 	if (iter != jobInfo.keyInfo->tupleKeyMap.end())
 		return iter->second;
 
 	uint newId = jobInfo.keyInfo->nextKey++;
-//cout << "new id: " << newId << " -- " << o << ", " << nm << ", " << vw << ", " << sn << ", " << subId << endl;
 	jobInfo.keyInfo->tupleKeyMap[id] = newId;
 	jobInfo.keyInfo->tupleKeyVec.push_back(id);
-	jobInfo.keyInfo->tupleKeyToTableOid.insert(make_pair(newId, t));
-	jobInfo.keyInfo->crossEngine.push_back((en != 0));
+	jobInfo.keyInfo->tupleKeyToTableOid.insert(std::make_pair(newId, t));
 
-	string ss = vw;
+	std::string ss = vw;
 	if (ss.length() > 0)
 		ss += ".";
 
@@ -84,18 +77,18 @@ uint uniqTupleKey(JobInfo& jobInfo,
 
 	if (o != t)
 	{
-		string name = cn;
+		std::string name = cn;
 		if (!ca.empty()) // has an alias
 			name = ca;
 		else if (ta.compare(0,5,"$sub_") && ta.compare(0,4,"$exp")) // compare != 0
 			name = ss + ta + "." + name;
 
 		jobInfo.keyInfo->tupleKeyToName.push_back(name);
-		jobInfo.keyInfo->keyName.insert(make_pair(newId, cn));
+		jobInfo.keyInfo->keyName.insert(std::make_pair(newId, cn));
 	}
 	else
 	{
-		string name = ta;
+		std::string name = ta;
 		bool useAlias = true;
 		if (name.empty())
 		{
@@ -118,7 +111,7 @@ uint uniqTupleKey(JobInfo& jobInfo,
 		}
 
 		jobInfo.keyInfo->tupleKeyToName.push_back(name);
-		jobInfo.keyInfo->keyName.insert(make_pair(newId, tn));
+		jobInfo.keyInfo->keyName.insert(std::make_pair(newId, tn));
 	}
 
 	return newId;
@@ -153,24 +146,23 @@ uint fudgeWidth(const CalpontSystemCatalog::ColType& ict, CalpontSystemCatalog::
 
 
 // @brief Set some tuple info
-TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
+TupleInfo setTupleInfo_(CalpontSystemCatalog::ColType ct,
 						CalpontSystemCatalog::OID col_oid,
 						JobInfo& jobInfo,
 						CalpontSystemCatalog::OID tbl_oid,
-						const string& col_name,
-						const string& col_alias,
-						const string& sch_name,
-						const string& tbl_name,
-						const string& tbl_alias,
-						const string& vw_name,
-						uint64_t engine = 0,
+						const std::string& col_name,
+						const std::string& col_alias,
+						const std::string& sch_name,
+						const std::string& tbl_name,
+						const std::string& tbl_alias,
+						const std::string& vw_name,
 						bool correlated = false)
 {
 	// get the unique tupleOids for this column
-	uint tbl_key = uniqTupleKey(jobInfo, tbl_oid, tbl_oid, "", "", tbl_name, tbl_alias,
-								sch_name, vw_name, engine, correlated);
-	uint col_key = uniqTupleKey(jobInfo, col_oid, tbl_oid, col_name, col_alias, tbl_name, tbl_alias,
-								sch_name, vw_name, engine, correlated);
+	uint tbl_key = uniqTupleKey(jobInfo, tbl_oid, tbl_oid,
+						"", "", sch_name, tbl_name, tbl_alias, vw_name, correlated);
+	uint col_key = uniqTupleKey(jobInfo, col_oid, tbl_oid,
+						col_name, col_alias, sch_name, tbl_name, tbl_alias, vw_name, correlated);
 	TupleInfo ti = TupleInfo(fudgeWidth(ct, col_oid), col_oid, col_key, tbl_key,
 								ct.scale, ct.precision, ct.colDataType);
 	//If this is the first time we've seen this col, add it to the tim
@@ -186,7 +178,7 @@ TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
 		bool found = false;
 		while (it2 != end2)
 		{
-			if (it2->key == ti.key)
+			if (it2->oid == ti.oid)
 			{
 				found = true;
 				ti = *it2;
@@ -200,7 +192,6 @@ TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
 			v.push_back(ti);
 			i1->second = v;
 			jobInfo.keyInfo->colKeyToTblKey[col_key] = tbl_key;
-			jobInfo.keyInfo->colType[col_key] = ct;
 		}
 	}
 	else
@@ -209,7 +200,6 @@ TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
 		v.push_back(ti);
 		jobInfo.keyInfo->tupleInfoMap[tbl_key] = v;
 		jobInfo.keyInfo->colKeyToTblKey[col_key] = tbl_key;
-		jobInfo.keyInfo->colType[col_key] = ct;
 	}
 
 	return ti;
@@ -218,24 +208,19 @@ TupleInfo setTupleInfo_(const CalpontSystemCatalog::ColType& ct,
 
 uint getTupleKey_(const JobInfo& jobInfo,
 				CalpontSystemCatalog::OID oid,
-				const string& colName,
-				const string& tblAlias,
-				const string& schema,
-				const string& view,
-				uint64_t engine = 0,
+				const std::string& tblAlias,
+				const std::string& view,
+				const std::string& colAlias,
 				bool correlated = false)
 {
 	uint64_t subId = jobInfo.subId;
 	if (correlated)
 		subId = jobInfo.pSubId;
 
-	string alias(tblAlias);
-	string name(tblAlias);
-	if (!colName.empty())
-		name += "." + colName;
+	std::string alias = tblAlias;
 //	if (!colAlias.empty())
 //		alias += "." + colAlias;
-	UniqId id(oid, tblAlias, schema, view, subId);
+	UniqId id(oid, alias, view, subId);
 	TupleKeyMap::const_iterator iter = jobInfo.keyInfo->tupleKeyMap.find(id);
 	if (iter != jobInfo.keyInfo->tupleKeyMap.end())
 		return iter->second;
@@ -243,7 +228,7 @@ uint getTupleKey_(const JobInfo& jobInfo,
 	// dictionaryscan tableOid is 0 in the tuplehashjoin.
 	if (oid != 0)
 	{
-		ostringstream strstm;
+		std::ostringstream strstm;
 		strstm << "(" << oid << ", ";
 		if (!alias.empty())
 			strstm << alias;
@@ -255,10 +240,9 @@ uint getTupleKey_(const JobInfo& jobInfo,
 		args.add(strstm.str());
 		jobInfo.logger->logMessage(LOG_TYPE_DEBUG, LogMakeJobList, args,
 			LoggingID(5, jobInfo.sessionId, jobInfo.txnId, 0));
-		cerr << strstm.str() << endl;
+		std::cerr << strstm.str() << std::endl;
 
-//cout << "not found: " << oid << ", " << name << ", " << view << ", " << schema << ", " << subId << endl;
-		throw logic_error("column is not found in info map.");
+		throw std::logic_error("column is not found in info map.");
 	}
 
 	return static_cast<uint>(-1);
@@ -269,32 +253,10 @@ uint getTupleKey_(const JobInfo& jobInfo,
 namespace joblist
 {
 
-UniqId::UniqId(const execplan::SimpleColumn* sc) :
-	fId(sc->oid()),
-	//fName(extractTableAlias(sc)+"."+sc->columnName()),
-	fTable(extractTableAlias(sc)),
-	fSchema(sc->schemaName()),
-	fView(sc->viewName()),
-	fSubId(-1)
-{
-}
-
-
-UniqId::UniqId(int o, const execplan::SimpleColumn* sc) :
-	fId(o),
-	//fName(extractTableAlias(sc)+"."+sc->columnName()),
-	fTable(extractTableAlias(sc)),
-	fSchema(sc->schemaName()),
-	fView(sc->viewName()),
-	fSubId(-1)
-{
-}
-
-
 //------------------------------------------------------------------------------
 // Returns the table alias for the specified column
 //------------------------------------------------------------------------------
-string extractTableAlias(const SimpleColumn* sc)
+std::string extractTableAlias(const SimpleColumn* sc)
 {
 	return  ba::to_lower_copy(sc->tableAlias());
 }
@@ -302,7 +264,7 @@ string extractTableAlias(const SimpleColumn* sc)
 //------------------------------------------------------------------------------
 // Returns the table alias for the specified column
 //------------------------------------------------------------------------------
-string extractTableAlias(const SSC& sc)
+std::string extractTableAlias(const SSC& sc)
 {
 	return  ba::to_lower_copy(sc->tableAlias());
 }
@@ -345,13 +307,10 @@ bool isCharCol(const CalpontSystemCatalog::ColType& colType)
 //------------------------------------------------------------------------------
 // Returns OID associated with a table
 //------------------------------------------------------------------------------
-CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, boost::shared_ptr<CalpontSystemCatalog> cat)
+CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, CalpontSystemCatalog* cat)
 {
 	if (sc->schemaName().empty())
 		return execplan::CNX_VTABLE_ID;
-
-	if (sc->isInfiniDB() == false)
-		return 0;
 
 	CalpontSystemCatalog::ROPair p = cat->tableRID(make_table(sc->schemaName(),
 		sc->tableName()));
@@ -361,21 +320,28 @@ CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, boost::shared_ptr<Cal
 uint getTupleKey(const JobInfo& jobInfo,
 				const execplan::SimpleColumn* sc)
 {
-	return getTupleKey_(jobInfo, sc->oid(), sc->columnName(), extractTableAlias(sc),
-						sc->schemaName(), sc->viewName(), (sc->isInfiniDB() ? 0 : 1),
+	return getTupleKey_(jobInfo, sc->oid(), extractTableAlias(sc), sc->viewName(), sc->alias(),
 						((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
 }
 
-//uint getTupleKey(const JobInfo& jobInfo, CalpontSystemCatalog::OID oid, const string& colName,
-//				 const string& tblAlias, const string& schema, const string& view)
-//{
-//	return getTupleKey_(jobInfo, oid, colName, tblAlias, schema, view);
-//}
-
-uint getTableKey(const JobInfo& jobInfo, execplan::CalpontSystemCatalog::OID tableOid,
-				 const string& alias, const string& schema, const string& view)
+uint getTupleKey(const JobInfo& jobInfo, CalpontSystemCatalog::OID oid,
+				 const std::string& tblAlias, const std::string& view,
+				 const std::string& colAlias)
 {
-	return getTupleKey_(jobInfo, tableOid, "", alias, schema, view);
+	return getTupleKey_(jobInfo, oid, tblAlias, view, colAlias);
+}
+
+uint getTupleKey(const JobInfo& jobInfo, CalpontSystemCatalog::OID oid,
+				 const std::string& alias, const std::string& view)
+{
+	return getTupleKey_(jobInfo, oid, alias, view, "");
+}
+
+uint getTableKey(const JobInfo& jobInfo, CalpontSystemCatalog::OID oid,
+				 const std::string& alias, const std::string& view)
+{
+	uint colKey = getTupleKey(jobInfo, oid, alias, view, "");
+	return getTableKey(jobInfo, colKey);
 }
 
 uint getTableKey(const JobInfo& jobInfo, uint cid)
@@ -383,29 +349,22 @@ uint getTableKey(const JobInfo& jobInfo, uint cid)
 	return jobInfo.keyInfo->colKeyToTblKey[cid];
 }
 
-uint getTableKey(JobInfo& jobInfo, JobStep* js)
-{
-	CalpontSystemCatalog::OID tableOid = js->tableOid();
-	return getTupleKey_(jobInfo, tableOid, "", js->alias(), js->schema(), js->view());
-}
-
-uint makeTableKey(JobInfo& jobInfo, const execplan::SimpleColumn* sc)
-{
-	CalpontSystemCatalog::OID o = tableOid(sc, jobInfo.csc);
-	return uniqTupleKey(jobInfo, o, o, "", "", "", extractTableAlias(sc),
-						sc->schemaName(), sc->viewName(), (sc->isInfiniDB() ? 0 : 1),
-						((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
-}
-
-uint makeTableKey(JobInfo& jobInfo,
+uint tableKey(JobInfo& jobInfo,
 				CalpontSystemCatalog::OID o,
-				const string& tn,
-				const string& ta,
-				const string& sn,
-				const string& vn,
-				uint64_t      en)
+				const std::string& sn,
+				const std::string& tn,
+				const std::string& ta,
+				const std::string& vn)
 {
-	return uniqTupleKey(jobInfo, o, o, "", "", tn, ta, sn, vn, en);
+	return uniqTupleKey(jobInfo, o, o, "", "", sn, tn, ta, vn);
+}
+
+uint tableKey(JobInfo& jobInfo,
+				CalpontSystemCatalog::OID o,
+				const std::string& ta,
+				const std::string& vn)
+{
+	return uniqTupleKey(jobInfo, o, o, "", "", "", "", ta, vn);
 }
 
 TupleInfo getTupleInfo(uint tableKey, uint columnKey, const JobInfo& jobInfo)
@@ -423,57 +382,56 @@ TupleInfo getTupleInfo(uint tableKey, uint columnKey, const JobInfo& jobInfo)
 
 	if (mtit == mt.end())
 	{
-		ostringstream strstm;
+		std::ostringstream strstm;
 		strstm << "TupleInfo for (" << jobInfo.keyInfo->tupleKeyVec[columnKey].fId << ","
-			<< jobInfo.keyInfo->tupleKeyVec[columnKey].fTable;
+			<< jobInfo.keyInfo->tupleKeyVec[columnKey].fAlias;
 		if (jobInfo.keyInfo->tupleKeyVec[columnKey].fView.length() > 0)
 			strstm << "," << jobInfo.keyInfo->tupleKeyVec[columnKey].fView;
-		strstm << ") could not be found." << endl;
-		cerr << strstm.str();
+		strstm << ") could not be found." << std::endl;
+		std::cerr << strstm;
 
 		Message::Args args;
 		args.add(strstm.str());
 		jobInfo.logger->logMessage(LOG_TYPE_DEBUG, LogMakeJobList, args,
 			LoggingID(5, jobInfo.sessionId, jobInfo.txnId, 0));
 
-		throw runtime_error("column's tuple info could not be found");
+		throw std::runtime_error("column's tuple info could not be found");
 	}
 
 	return *mtit;
 }
 
-TupleInfo setTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct,
+TupleInfo setTupleInfo(execplan::CalpontSystemCatalog::ColType ct,
 	execplan::CalpontSystemCatalog::OID col_oid,
 	JobInfo& jobInfo,
 	execplan::CalpontSystemCatalog::OID tbl_oid,
 	const execplan::SimpleColumn* sc,
-	const string& alias)
+	const std::string& alias)
 {
 	return setTupleInfo_(ct, col_oid, jobInfo, tbl_oid, sc->columnName(), sc->alias(),
 							sc->schemaName(), sc->tableName(), alias, sc->viewName(),
-							(sc->isInfiniDB() ? 0 : 1),
 							((sc->joinInfo() & execplan::JOIN_CORRELATED) != 0));
 }
 
-TupleInfo setExpTupleInfo(const execplan::CalpontSystemCatalog::ColType& ct, uint64_t expressionId,
-	const string& alias, JobInfo& jobInfo)
+TupleInfo setExpTupleInfo(execplan::CalpontSystemCatalog::ColType ct, uint64_t expressionId,
+	const std::string& alias, JobInfo& jobInfo)
 {
 	// pretend all expressions belong to "virtual" table EXPRESSION, (3000, expression)
 	// OID 3000 is not for user table or column, there will be no confilict in queries.
-	stringstream ss;
+	std::stringstream ss;
 	ss << "$exp";
 	if (jobInfo.subLevel > 0)
 		ss << "_" << jobInfo.subId << "_" << jobInfo.subLevel << "_" << jobInfo.subNum; 
-	return setTupleInfo_(ct, expressionId, jobInfo, 3000, "", alias, "", "$exp", ss.str(), "");
+	return setTupleInfo_(ct, expressionId, jobInfo, 3000, alias, alias, "", "$exp", ss.str(), "");
 }
 
 uint getExpTupleKey(const JobInfo& jobInfo, uint64_t eid)
 {
-	stringstream ss;
+	std::stringstream ss;
 	ss << "$exp";
 	if (jobInfo.subLevel > 0)
 		ss << "_" << jobInfo.subId << "_" << jobInfo.subLevel << "_" << jobInfo.subNum; 
-	return getTupleKey_(jobInfo, eid, "", ss.str(), "", "");
+	return getTupleKey(jobInfo, eid, ss.str(), "", "");
 }
 
 TupleInfo getExpTupleInfo(uint expKey, const JobInfo& jobInfo)
@@ -488,7 +446,7 @@ void addAggregateColumn(AggregateColumn* agc, int idx, RetColsVector& vec, JobIn
 	uint eid = agc->expressionId();
 	setExpTupleInfo(agc->resultType(), eid, agc->alias(), jobInfo);
 
-	vector<pair<int, int> >::iterator i;
+	std::vector<std::pair<int, int> >::iterator i;
 	for (i = jobInfo.aggEidIndexList.begin(); i != jobInfo.aggEidIndexList.end(); ++i)
 	{
 		if (i->first == (int) eid)
@@ -498,7 +456,7 @@ void addAggregateColumn(AggregateColumn* agc, int idx, RetColsVector& vec, JobIn
 	if (idx < 0 && i != jobInfo.aggEidIndexList.end())
 	{
 		agc->inputIndex(i->second);
-		jobInfo.cloneAggregateColMap.insert(make_pair(vec[i->second].get(), agc));
+		jobInfo.cloneAggregateColMap.insert(std::make_pair(vec[i->second].get(), agc));
 	}
 	else
 	{
@@ -514,32 +472,25 @@ void addAggregateColumn(AggregateColumn* agc, int idx, RetColsVector& vec, JobIn
 			srcp = vec[idx];
 		}
 
-		jobInfo.aggEidIndexList.push_back(make_pair(eid, idx));
+		jobInfo.aggEidIndexList.push_back(std::make_pair(eid, idx));
 		agc->inputIndex(idx);
-		jobInfo.cloneAggregateColMap.insert(make_pair(srcp.get(), agc));
+		jobInfo.cloneAggregateColMap.insert(std::make_pair(srcp.get(), agc));
 	}
 }
 
 
 bool operator < (const struct UniqId& x, const struct UniqId& y)
 {
-	return (
-		(x.fId < y.fId) ||
-		(x.fId == y.fId && x.fTable < y.fTable) ||
-		(x.fId == y.fId && x.fTable == y.fTable && x.fSchema < y.fSchema) ||
-		(x.fId == y.fId && x.fTable == y.fTable && x.fSchema == y.fSchema && x.fView < y.fView) ||
-		(x.fId == y.fId && x.fTable == y.fTable && x.fSchema == y.fSchema && x.fView == y.fView &&
-		 x.fSubId < y.fSubId));
+	return ((x.fId < y.fId) ||
+			(x.fId == y.fId && x.fAlias < y.fAlias) ||
+			(x.fId == y.fId && x.fAlias == y.fAlias && x.fView < y.fView) ||
+			(x.fId == y.fId && x.fAlias == y.fAlias && x.fView == y.fView && x.fSubId < y.fSubId));
 }
 
 
 bool operator == (const struct UniqId& x, const struct UniqId& y)
 {
-	return (x.fId     == y.fId &&
-			x.fTable  == y.fTable &&
-			x.fSchema == y.fSchema &&
-			x.fView   == y.fView &&
-			x.fSubId  == y.fSubId);
+	return (x.fId == y.fId && x.fAlias == y.fAlias && x.fView == y.fView && x.fSubId == y.fSubId);
 }
 
 
@@ -547,8 +498,8 @@ void updateDerivedColumn(JobInfo& jobInfo, SimpleColumn* sc, CalpontSystemCatalo
 {
 	sc->oid(tableOid(sc, jobInfo.csc) + 1 + sc->colPosition());
 
-	map<UniqId, execplan::CalpontSystemCatalog::ColType>::iterator i =
-		jobInfo.vtableColTypes.find(UniqId(sc));
+	std::map<UniqId, execplan::CalpontSystemCatalog::ColType>::iterator i =
+		jobInfo.vtableColTypes.find(UniqId(sc->oid(), extractTableAlias(sc), sc->viewName()));
 	if (i != jobInfo.vtableColTypes.end())
 		ct = i->second;
 }
@@ -564,12 +515,12 @@ bool filterWithDictionary(execplan::CalpontSystemCatalog::OID dictOid, uint64_t 
 	if (n == ULONG_MAX)
 		return false;
 
-	vector<struct EMEntry> entries;
+	std::vector<struct EMEntry> entries;
 	DBRM dbrm;
 	if (dbrm.getExtents(dictOid, entries) != 0)
 		return false;  // Just do pdictionaryscan and let job step handle this.
 
-	vector<struct EMEntry>::iterator it = entries.begin();
+	std::vector<struct EMEntry>::iterator it = entries.begin();
 	bool ret = false;
 	n--;  // HWM starts at 0
 	while (it != entries.end())

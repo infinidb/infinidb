@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: largehashjoin.cpp 8476 2012-04-25 22:28:15Z xlou $
+// $Id: largehashjoin.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 #include <string>
 #include <sstream>
 #include <cassert>
@@ -178,6 +178,10 @@ void* HashJoinByBucket_thr(void* arg)
 	long set2Size = 0;
 	bool sendAllHashSet = false;
 	bool sendAllSearchSet = false;
+#ifdef PROFILE
+	struct timespec ts1, ts2, diff;
+	clock_gettime(CLOCK_REALTIME, &ts1);
+#endif
 try
 {
 	for (uint idx=0, bucketIdx=params->startBucket;
@@ -386,6 +390,14 @@ try
 	// typename HashJoin<e_t>::hash_t* ht = hjPtr->HashTable(thrIdx);
 	ht->clear();
 
+#ifdef PROFILE
+	clock_gettime(CLOCK_REALTIME, &ts2);
+	timespec_sub(ts1, ts2, diff);
+	std::cout << "Total time to do hash join: "
+		<< diff.tv_sec << "s "
+		<< diff.tv_nsec << "ns"
+		<< std::endl;
+#endif
 	} // for (bucketIdx...
 }  // try
 // We don't have to call JSA.endOfInput() for this exception, because
@@ -496,8 +508,8 @@ void LargeHashJoin::doHashJoin()
 {
 	string val;
 
-	idbassert(fInputJobStepAssociation.outSize() >= 2);
-	idbassert(fOutputJobStepAssociation.outSize() >= 2);
+	assert(fInputJobStepAssociation.outSize() >= 2);
+	assert(fOutputJobStepAssociation.outSize() >= 2);
 	BucketDataList* Ap = 0;
 	BucketDataList* Bp = 0;
 	BucketDataList* tAp = 0;
@@ -506,8 +518,8 @@ void LargeHashJoin::doHashJoin()
 	DataList_t* inDL2 = 0;
 	inDL1 = fInputJobStepAssociation.outAt(0)->dataList();
 	inDL2 = fInputJobStepAssociation.outAt(1)->dataList();
-	idbassert(inDL1);
-	idbassert(inDL2);
+	assert(inDL1);
+	assert(inDL2);
 
 	HashJoin<ElementType>* hj = 0;
 	double createWorkTime     = 0;
@@ -642,7 +654,7 @@ void LargeHashJoin::doHashJoin()
 		time_t finTime = time(0);
 		char finTimeString[50];
 		ctime_r(&finTime, finTimeString);
-		finTimeString[strlen(finTimeString)-1 ] = '\0';
+		finTimeString[ strlen(finTimeString)-1 ] = '\0';
 
 		ostringstream logStr;
 		logStr << "ses:" << fSessionId << " st: " << fStepId <<
@@ -685,7 +697,7 @@ const string LargeHashJoin::toString() const
 	size_t idlsz;
 
 	idlsz = fInputJobStepAssociation.outSize();
-	idbassert(idlsz == 2);
+	assert(idlsz == 2);
 	dl1 = fInputJobStepAssociation.outAt(0)->dataList();
 	if (dl1) oid1 = dl1->OID();
 	dl2 = fInputJobStepAssociation.outAt(1)->dataList();
@@ -698,7 +710,7 @@ const string LargeHashJoin::toString() const
 	oss << " " << fInputJobStepAssociation.outAt(1);
 
 	idlsz = fOutputJobStepAssociation.outSize();
-	idbassert(idlsz == 2);
+	assert(idlsz == 2);
 	dl1 = fOutputJobStepAssociation.outAt(0)->dataList();
 	if (dl1) oid1 = dl1->OID();
 	dl2 = fOutputJobStepAssociation.outAt(1)->dataList();
@@ -740,12 +752,12 @@ void StringHashJoinStep::doStringHashJoin()
 {
 	string val;
 
-	idbassert(fInputJobStepAssociation.outSize() >= 2);
-	idbassert(fOutputJobStepAssociation.outSize() >= 2);
+	assert(fInputJobStepAssociation.outSize() >= 2);
+	assert(fOutputJobStepAssociation.outSize() >= 2);
 	DataList<StringElementType>* inDL1 = fInputJobStepAssociation.outAt(0)->stringDataList();
 	DataList<StringElementType>* inDL2 = fInputJobStepAssociation.outAt(1)->stringDataList();
-	idbassert(inDL1);
-	idbassert(inDL2);
+	assert(inDL1);
+	assert(inDL2);
 
 	BucketDL<StringElementType>* Ap = 0;
 	BucketDL<StringElementType>* Bp = 0;
@@ -1015,7 +1027,7 @@ void StringHashJoinStep::doStringHashJoin()
 		time_t finTime = time(0);
 		char finTimeString[50];
 		ctime_r(&finTime, finTimeString);
-		finTimeString[strlen(finTimeString)-1 ] = '\0';
+		finTimeString[ strlen(finTimeString)-1 ] = '\0';
 
 		ostringstream logStr;
 		logStr << "ses:" << fSessionId << " st: " << fStepId <<
@@ -1059,7 +1071,7 @@ const string StringHashJoinStep::toString() const
 	CalpontSystemCatalog::OID oid2 = 0;
 
 	size_t idlsz = fInputJobStepAssociation.outSize();
-	idbassert(idlsz == 2);
+	assert(idlsz == 2);
 	DataList<StringElementType>* dl1 = fInputJobStepAssociation.outAt(0)->stringDataList();
 	if (dl1) oid1 = dl1->OID();
 	DataList<StringElementType>* dl2 = fInputJobStepAssociation.outAt(1)->stringDataList();
@@ -1073,7 +1085,7 @@ const string StringHashJoinStep::toString() const
 	oss << " " << fInputJobStepAssociation.outAt(1);
 
 	idlsz = fOutputJobStepAssociation.outSize();
-	idbassert(idlsz == 2);
+	assert(idlsz == 2);
 	DataList_t *dl3 = fOutputJobStepAssociation.outAt(0)->dataList();
 	if (dl3) oid1 = dl3->OID();
 	DataList_t *dl4 = fOutputJobStepAssociation.outAt(1)->dataList();

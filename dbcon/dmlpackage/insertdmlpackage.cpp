@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: insertdmlpackage.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: insertdmlpackage.cpp 7517 2011-03-07 22:02:48Z chao $
  *
  *
  ***********************************************************************/
@@ -66,11 +66,8 @@ int InsertDMLPackage::write(messageqcpp::ByteStream& bytestream)
     {
         retval = fTable->write(bytestream);
     }
-	bytestream << fTableOid;
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsInsertSelect);
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsBatchInsert);
-	bytestream << static_cast<const messageqcpp::ByteStream::byte>(fIsAutocommitOn);
-	
+	bytestream << static_cast<const messageqcpp::ByteStream::doublebyte>(fIsInsertSelect);
+
     return retval;
 }
 
@@ -95,10 +92,7 @@ int InsertDMLPackage::read(messageqcpp::ByteStream& bytestream)
 	
     fTable = new DMLTable();
     retval = fTable->read(bytestream);
-	bytestream >> fTableOid;
-    bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsInsertSelect);	
-	bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsBatchInsert);	
-	bytestream >> reinterpret_cast< messageqcpp::ByteStream::byte&>(fIsAutocommitOn);
+    bytestream >> reinterpret_cast< messageqcpp::ByteStream::doublebyte&>(fIsInsertSelect);	
     return retval;
 }
 

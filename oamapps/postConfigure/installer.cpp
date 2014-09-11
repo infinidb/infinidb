@@ -3,6 +3,8 @@
 *
 *
 * List of files that will be updated during system install time on each server
+*		/etc/exports 
+*		/etc/fstab
 *		/etc/rc.local
 *		
 ******************************************************************************************/
@@ -49,11 +51,25 @@ typedef struct Module_struct
 
 typedef std::vector<Module> ModuleList;
 
-bool setOSFiles(string parentOAMModuleName, int serverTypeInstall);
+typedef struct User_Storage_struct
+{
+	std::string     moduleName;
+	std::string     deviceName;
+} UserStorage;
+
+typedef std::vector<UserStorage> UserStorageList;
+
+typedef std::vector<string> PMStorageList;
+
+bool setOSFiles(string parentOAMModuleName, int serverTypeInstall, string sharedNothing, string DBRootStorageType);
+bool setfstab(string moduleName, UserStorageList userstoragelist, PMStorageList pmstoragelist, string parentOAMModuleName,  string parentOAMModuleIPAddr, int serverTypeInstall, string sharedNothing, string moduleIPAddr );
+bool setXMmount(string parentOAMModuleHostName, string parentOAMModuleIPAddr, string moduleName);
+bool makeXMInittab(string moduleName, string systemID, string parentOAMModuleHostName);
 bool makeBASH();
 bool makeModuleFile(string moduleName, string parentOAMModuleName);
 bool updateProcessConfig(int serverTypeInstall);
 bool makeRClocal(string moduleName, int IserverTypeInstall);
+bool setPMdiskexports(string moduleName, string parentOAMModuleIPAddr );
 bool createDbrootDirs(string DBRootStorageType);
 bool uncommentCalpontXml( string entry);
 bool writeConfig(Config* sysConfig);
@@ -61,11 +77,10 @@ bool writeConfig(Config* sysConfig);
 extern string pwprompt;
 extern string mysqlpw;
 
-string installDir;
+string singleServerInstall;
 
 int main(int argc, char *argv[])
 {
-	string cmd;
     Oam oam;
 	string parentOAMModuleIPAddr;
 	string parentOAMModuleHostName;
@@ -74,6 +89,8 @@ int main(int argc, char *argv[])
 	ModuleList usermodulelist;
 	ModuleList performancemodulelist;
 	Module childmodule;
+	UserStorageList userstoragelist;
+	UserStorage userstorage;
 
   	struct sysinfo myinfo; 
 
@@ -86,13 +103,15 @@ int main(int argc, char *argv[])
 	string SystemSection = "SystemConfig";
 	string InstallSection = "Installation";
 	
+	string sharedNothing;
 	string DBRootStorageType;
+	string DBRootStorageLoc;
+	string OAMStorageType;
+	string OAMStorageLoc;
+	string UserStorageType;
+	string UserStorageLoc;
+	PMStorageList pmstoragelist;
 
-	if (argc < 10)
-	{
-		cerr << "installer: ERROR: not enough arguments" << endl;
-		exit(1);
-	}
 	string calpont_rpm = argv[1];
 	string mysql_rpm = argv[2];
 	string mysqld_rpm = argv[3];
@@ -102,22 +121,6 @@ int main(int argc, char *argv[])
 	nodeps = argv[7];
 	mysqlpw = argv[8];
 	installer_debug = argv[9];
-	if (argc >= 11)
-		installDir = argv[10];
-	else
-		installDir = "/usr/local/Calpont";
-
-//	cout << calpont_rpm << endl;
-//	cout << mysql_rpm << endl;
-//	cout << mysqld_rpm << endl;
-//	cout << installType << endl;
-//	cout << password << endl;
-//	cout << reuseConfig << endl;
-//	cout << nodeps << endl;
-//	cout << mysqlpw << endl;
-//	cout << installer_debug << endl;
-//	cout << installDir << endl;
-	sleep(1);
 
 	if ( mysqlpw == "dummymysqlpw" )
 		mysqlpw = " ";
@@ -125,11 +128,12 @@ int main(int argc, char *argv[])
 
 	//copy Calpont.xml.rpmsave if upgrade option is selected
 	if ( installType == "upgrade" ) {
-		cmd = "/bin/cp -f " + installDir + "/etc/Calpont.xml " + installDir + "/etc/Calpont.xml.new 2>&1";
-		system(cmd.c_str());
-		cmd = "/bin/cp -f " + installDir + "/etc/Calpont.xml.rpmsave " + installDir + "/etc/Calpont.xml 2>&1";
-		system(cmd.c_str());
+		system("/bin/cp -f /usr/local/Calpont/etc/Calpont.xml /usr/local/Calpont/etc/Calpont.xml.new 2>&1");
+		system("/bin/cp -f /usr/local/Calpont/etc/Calpont.xml.rpmsave /usr/local/Calpont/etc/Calpont.xml 2>&1");
 	}
+
+	//store syslog config file in Calpont Config file
+	system("/usr/local/Calpont/bin/syslogSetup.sh install  > /dev/null 2>&1");
 
 	string serverTypeInstall;
 	int    IserverTypeInstall;
@@ -138,10 +142,20 @@ int main(int argc, char *argv[])
 	}
 	catch(...)
 	{
-		cout << "ERROR: Problem getting ServerTypeInstall from the Calpont System Configuration file" << endl;
-		exit(1);
+		cout << "ERROR: Problem getting ServerTypeInstall from the InfiniDB System Configuration file" << endl;
+		exit(-1);
 	}
 	IserverTypeInstall = atoi(serverTypeInstall.c_str());
+
+	// get singler-server system install type
+	try {
+		singleServerInstall = sysConfig->getConfig(InstallSection, "SingleServerInstall");
+	}
+	catch(...)
+	{
+		cout << "ERROR: Problem getting SingleServerInstall from the InfiniDB System Configuration file" << endl;
+		exit(-1);
+	}
 
 	if ( installType != "uninstall" ) {
 		//setup ProcessConfig.xml
@@ -164,7 +178,7 @@ int main(int argc, char *argv[])
 			{	
 				if ( !writeConfig(sysConfig) ) {
 					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-					exit(1);
+					exit(-1);
 				}
 	
 				try {
@@ -172,8 +186,8 @@ int main(int argc, char *argv[])
 				}
 				catch(...)
 				{
-					cout << "ERROR: Problem setting RotatingDestination in the Calpont System Configuration file" << endl;
-					exit(1);
+					cout << "ERROR: Problem setting RotatingDestination in the InfiniDB System Configuration file" << endl;
+					exit(-1);
 				}
 
 				// are we using settings from previous config file?
@@ -186,7 +200,7 @@ int main(int argc, char *argv[])
 					catch(...)
 					{
 						cout << "ERROR: Problem setting NumBlocksPct in the InfiniDB System Configuration file" << endl;
-						exit(1);
+						exit(-1);
 					}
 
 					try{
@@ -202,18 +216,23 @@ int main(int argc, char *argv[])
 				
 					if ( total <= 2000 )
 						value = "256M";
-					else if ( total <= 4000 )
-						value = "512M";
-					else if ( total <= 8000 )
-						value = "1G";
-					else if ( total <= 16000 )
-						value = "2G";
-					else if ( total <= 32000 )
-						value = "4G";
-					else if ( total <= 64000 )
-						value = "8G";
 					else
-						value = "16G";
+						if ( total <= 4000 )
+							value = "512M";
+						else
+							if ( total <= 8000 )
+								value = "1G";
+							else
+								if ( total <= 16000 )
+									value = "2G";
+								else
+									if ( total <= 32000 )
+										value = "4G";
+									else
+										if ( total <= 64000 )
+											value = "8G";
+										else
+											value = "16G";
 				
 					cout << "      Setting 'TotalUmMemory' to 25% of total memory. Value set to " << value << endl;
 	
@@ -223,7 +242,7 @@ int main(int argc, char *argv[])
 					catch(...)
 					{
 						cout << "ERROR: Problem setting TotalUmMemory in the InfiniDB System Configuration file" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 				else
@@ -243,7 +262,7 @@ int main(int argc, char *argv[])
 							catch(...)
 							{
 								cout << "ERROR: Problem setting NumBlocksPct in the InfiniDB System Configuration file" << endl;
-								exit(1);
+								exit(-1);
 							}
 						}
 
@@ -254,13 +273,13 @@ int main(int argc, char *argv[])
 					catch(...)
 					{
 						cout << "ERROR: Problem reading NumBlocksPct/TotalUmMemory in the InfiniDB System Configuration file" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 
 				if ( !writeConfig(sysConfig) ) {
 					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-					exit(1);
+					exit(-1);
 				}
 		
 				break;
@@ -270,7 +289,7 @@ int main(int argc, char *argv[])
 			{	
 				// are we using settings from previous config file?
 				if ( reuseConfig == "n" ) {
-					cout << endl << "NOTE: Using the default setting for 'NumBlocksPct' at 70%" << endl;
+					cout << endl << "NOTE: Using the default setting for 'NumBlocksPct' at 86%" << endl;
 	
 					try{
 						sysinfo(&myinfo);
@@ -285,18 +304,23 @@ int main(int argc, char *argv[])
 				
 					if ( total <= 2000 )
 						value = "512M";
-					else if ( total <= 4000 )
-						value = "1G";
-					else if ( total <= 8000 )
-						value = "2G";
-					else if ( total <= 16000 )
-						value = "4G";
-					else if ( total <= 32000 )
-						value = "8G";
-					else if ( total <= 64000 )
-						value = "16G";
 					else
-						value = "32G";
+						if ( total <= 4000 )
+							value = "1G";
+						else
+							if ( total <= 8000 )
+								value = "2G";
+							else
+								if ( total <= 16000 )
+									value = "4G";
+								else
+									if ( total <= 32000 )
+										value = "8G";
+									else
+										if ( total <= 64000 )
+											value = "16G";
+										else
+											value = "32G";
 				
 					cout << endl << "Setting 'TotalUmMemory' to 50% of total memory. Value set to " << value << endl;
 	
@@ -306,7 +330,7 @@ int main(int argc, char *argv[])
 					catch(...)
 					{
 						cout << "ERROR: Problem setting TotalUmMemory in the InfiniDB System Configuration file" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 				else
@@ -316,7 +340,7 @@ int main(int argc, char *argv[])
 						string totalUmMemory = sysConfig->getConfig("HashJoin", "TotalUmMemory");
 
 						if (numBlocksPct.empty() || numBlocksPct == "" )
-							numBlocksPct = "70";
+							numBlocksPct = "86";
 
 						cout << endl << "NOTE: Using previous configuration setting for 'NumBlocksPct' = " << numBlocksPct << "%" << endl;
 						cout << "      Using previous configuration setting for 'TotalUmMemory' = " << totalUmMemory << endl;
@@ -325,13 +349,13 @@ int main(int argc, char *argv[])
 					catch(...)
 					{
 						cout << "ERROR: Problem reading NumBlocksPct/TotalUmMemory in the InfiniDB System Configuration file" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 
 				if ( !writeConfig(sysConfig) ) {
 					cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;
-					exit(1);
+					exit(-1);
 				}
 		
 				break;
@@ -341,12 +365,8 @@ int main(int argc, char *argv[])
 
 	if ( !writeConfig(sysConfig) ) {                
 		cout << "ERROR: Failed trying to update InfiniDB System Configuration file" << endl;                
-		exit(1);        
+		exit(-1);        
 	}
-
-	//store syslog config file in Calpont Config file
-	cmd = installDir + "/bin/syslogSetup.sh install  > /dev/null 2>&1";
-	system(cmd.c_str());
 
 	//get PPackage Type
 	try{
@@ -355,7 +375,7 @@ int main(int argc, char *argv[])
 	catch(...)
 	{
 		cout << "ERROR: Problem getting EEPackageType" << endl;
-		exit(1);
+		exit(-1);
 	}
 
 	//get Parent OAM Module Name and setup of it's Custom OS files
@@ -364,40 +384,88 @@ int main(int argc, char *argv[])
 		parentOAMModuleName = sysConfig->getConfig(SystemSection, "ParentOAMModuleName");
 		if ( parentOAMModuleName == oam::UnassignedName ) {
 			cout << "ERROR: Parent OAM Module Name is unassigned" << endl;
-			exit(1);
+			exit(-1);
 		}
 	}
 	catch(...)
 	{
 		cout << "ERROR: Problem getting Parent OAM Module Name" << endl;
-		exit(1);
+		exit(-1);
 	}
 
 	if ( installType == "initial" ) {
-		//cleanup/create /local/etc directories
-		cmd = "rm -rf " + installDir + "/local/etc > /dev/null 2>&1";
-		system(cmd.c_str());
-		cmd = "mkdir " + installDir + "/local/etc > /dev/null 2>&1";
-		system(cmd.c_str());
+		//cleanup/create /usr/local/Calpont/local/etc directories
+		system("rm -rf /usr/local/Calpont/local/etc > /dev/null 2>&1");
+		system("mkdir /usr/local/Calpont/local/etc > /dev/null 2>&1");
 	
-		//create associated /local/etc directory for parentOAMModuleName
-		cmd = "mkdir " + installDir + "/local/etc/" + parentOAMModuleName + " > /dev/null 2>&1";
+		//create associated /usr/local/Calpont/local/etc directory for parentOAMModuleName
+		string cmd = "mkdir /usr/local/Calpont/local/etc/" + parentOAMModuleName + " > /dev/null 2>&1";
 		system(cmd.c_str());
 
-		if (sysConfig->getConfig("Installation", "EnableSNMP") == "y")
+		//set SNMP Trap config file
+		string NMSIPAddress;
+		try {
+			NMSIPAddress = sysConfig->getConfig(SystemSection, "NMSIPAddress");
+	
+			SNMPManager sm;
+			sm.setNMSAddr(NMSIPAddress);
+		}
+		catch(...)
 		{
-			//set SNMP Trap config file
-			string NMSIPAddress;
+			cout << "ERROR: Problem getting NMSIPAddress from InfiniDB System Configuration file" << endl;
+			exit(-1);
+		}
+	
+		//
+		// setup storage files
+		//
+	
+		int DBRootCount;
+		string deviceName;
+	
+		try {
+			sharedNothing = sysConfig->getConfig(InstallSection, "SharedNothing");
+			DBRootStorageType = sysConfig->getConfig(InstallSection, "DBRootStorageType");
+			DBRootCount = strtol(sysConfig->getConfig(SystemSection, "DBRootCount").c_str(), 0, 0);
+			OAMStorageType = sysConfig->getConfig(InstallSection, "OAMStorageType");
+			OAMStorageLoc = sysConfig->getConfig(InstallSection, "OAMStorageLoc");
+		}
+		catch(...)
+		{
+			cout << "ERROR: Problem getting DB Storage Data from the InfiniDB System Configuration file" << endl;
+			exit(-1);
+		}
+	
+		//if shared-nothing, set up have DBRoot disk local and ProcessManager running Simplex
+		if ( sharedNothing == "y" ) {
+			DBRootStorageType = "local";
+	
 			try {
-				NMSIPAddress = sysConfig->getConfig(SystemSection, "NMSIPAddress");
-		
-				SNMPManager sm;
-				sm.setNMSAddr(NMSIPAddress);
+				oam.setProcessConfig("ProcessManager", "pm1", "RunType", "SIMPLEX");
 			}
 			catch(...)
 			{
-				cout << "ERROR: Problem getting NMSIPAddress from Calpont System Configuration file" << endl;
-				exit(1);
+				cout << "ERROR: Problem setting ProcessManager RunType to Simplex in ProcessConfig.xml" << endl;
+				exit(-1);
+			}
+	
+		}
+
+		if ( DBRootStorageType == "storage" ) {
+			for( int i=1 ; i < DBRootCount+1 ; i++)
+			{
+				string DBRootStorageLocNum = "DBRootStorageLoc" + oam.itoa(i);
+				try {
+					DBRootStorageLoc = sysConfig->getConfig(InstallSection, DBRootStorageLocNum);
+				}
+				catch(...)
+				{
+					cout << "ERROR: Problem getting DB Storage Data from the InfiniDB System Configuration file" << endl;
+					exit(-1);
+				}
+	
+				if ( DBRootStorageLoc != oam::UnassignedName )
+					pmstoragelist.push_back(DBRootStorageLoc);
 			}
 		}
 	}	
@@ -410,8 +478,8 @@ int main(int argc, char *argv[])
 	}
 	catch(...)
 	{
-		cout << "ERROR: Problem reading the Calpont System Configuration file" << endl;
-		exit(1);
+		cout << "ERROR: Problem reading the InfiniDB System Configuration file" << endl;
+		exit(-1);
 	}
 
 	string ModuleSection = "SystemModuleConfig";
@@ -455,7 +523,7 @@ int main(int argc, char *argv[])
 			childmodule.moduleIP = moduleIPAddr;
 			childmodule.hostName = moduleHostName;
 
-			if ( moduleName != parentOAMModuleName) {
+			if ( moduleName != parentOAMModuleName && moduleType != "xm") {
 				childmodulelist.push_back(childmodule);
 			}
 
@@ -466,10 +534,54 @@ int main(int argc, char *argv[])
 			if ( moduleType == "pm")
 				performancemodulelist.push_back(childmodule);
 
+			int moduleID = atoi(moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+
 			if ( installType == "initial" ) {
-				//create associated /local/etc directory for module
-				cmd = "mkdir " + installDir + "/local/etc/" + moduleName + " > /dev/null 2>&1";
+				//create associated /usr/local/Calpont/local/etc directory for module
+				string cmd = "mkdir /usr/local/Calpont/local/etc/" + moduleName + " > /dev/null 2>&1";
 				system(cmd.c_str());
+	
+				string USERSTORAGELOC = "UserStorageLoc" + oam.itoa(moduleID);
+				try {
+					UserStorageType = sysConfig->getConfig(InstallSection, "UserStorageType");
+					UserStorageLoc = sysConfig->getConfig(InstallSection, USERSTORAGELOC);
+				}
+				catch(...)
+				{
+					cout << "ERROR: Problem getting DB Storage Data from the InfiniDB System Configuration file" << endl;
+					exit(-1);
+				}
+	
+				//store User Temp Device name
+				if ( UserStorageType == "storage" && moduleName != oam::UnassignedName) {
+					userstorage.moduleName = moduleName;
+					userstorage.deviceName = UserStorageLoc;
+					userstoragelist.push_back(userstorage);
+				}
+
+				if ( moduleType == "xm" ) {
+					//setup XM mount-file in /usr/local/Calpont/local/etc directory
+					if( !setXMmount(parentOAMModuleHostName, parentOAMModuleIPAddr, moduleName) )
+						cout << "setXMmount error" << endl;
+				}
+	
+				if ( moduleType == "xm" ) {
+					string BRM_UID;
+					try {
+						BRM_UID = sysConfig->getConfig("ExtentMap", "BRM_UID");
+					}
+					catch(...)
+					{
+						cout << "ERROR: Problem getting BRM_UID in the InfiniDB System Configuration file" << endl;
+						exit(-1);
+					}
+
+					string systemID = BRM_UID.substr(2,2);
+
+					//setup XM inittab in /usr/local/Calpont/local/etc directory
+					if( !makeXMInittab(moduleName, systemID, parentOAMModuleHostName) )
+						cout << "setXMInittab error" << endl;
+				}
 			}
 		}
 	} //end of i for loop
@@ -479,17 +591,21 @@ int main(int argc, char *argv[])
 		if( !makeRClocal(parentOAMModuleName, IserverTypeInstall) )
 			cout << "makeRClocal error" << endl;
 	
-		//create associated /local/etc directory for module
-		// generate module
+		//create associated /usr/local/Calpont/local/etc directory for module
+		// generate module, fstabs and export files
 		ModuleList::iterator list1 = directormodulelist.begin();
 		for (; list1 != directormodulelist.end() ; list1++)
 		{
-			cmd = "mkdir " + installDir + "/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
+			string cmd = "mkdir /usr/local/Calpont/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
 			system(cmd.c_str());
 	
-			//make module file in /local/etc/"modulename"
+			//make module file in /usr/local/Calpont/local/etc/"modulename"
 			if( !makeModuleFile((*list1).moduleName, parentOAMModuleName) )
 				cout << "makeModuleFile error" << endl;
+	
+			//setup fstab mounts
+			if( !setfstab((*list1).moduleName, userstoragelist, pmstoragelist, parentOAMModuleName, parentOAMModuleIPAddr, IserverTypeInstall, sharedNothing, (*list1).moduleIP ) ) 
+				cout << "setfstab error" << endl;
 	
 			//setup rc.local file in module tmp dir
 			if( !makeRClocal((*list1).moduleName, IserverTypeInstall) )
@@ -499,12 +615,16 @@ int main(int argc, char *argv[])
 		list1 = usermodulelist.begin();
 		for (; list1 != usermodulelist.end() ; list1++)
 		{
-			cmd = "mkdir " + installDir + "/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
+			string cmd = "mkdir /usr/local/Calpont/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
 			system(cmd.c_str());
 	
-			//make module file in /local/etc/"modulename"
+			//make module file in /usr/local/Calpont/local/etc/"modulename"
 			if( !makeModuleFile((*list1).moduleName, parentOAMModuleName) )
 				cout << "makeModuleFile error" << endl;
+	
+			//setup fstab mounts
+			if( !setfstab((*list1).moduleName, userstoragelist, pmstoragelist, parentOAMModuleName, parentOAMModuleIPAddr, IserverTypeInstall, sharedNothing, (*list1).moduleIP ) ) 
+				cout << "setfstab error" << endl;
 	
 			//setup rc.local file in module tmp dir
 			if( !makeRClocal((*list1).moduleName, IserverTypeInstall) )
@@ -514,16 +634,26 @@ int main(int argc, char *argv[])
 		list1 = performancemodulelist.begin();
 		for (; list1 != performancemodulelist.end() ; list1++)
 		{
-			cmd = "mkdir " + installDir + "/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
+			string cmd = "mkdir /usr/local/Calpont/local/etc/" + (*list1).moduleName + " > /dev/null 2>&1";
 			system(cmd.c_str());
 	
-			//make module file in /local/etc/"modulename"
+			//make module file in /usr/local/Calpont/local/etc/"modulename"
 			if( !makeModuleFile((*list1).moduleName, parentOAMModuleName) )
 				cout << "makeModuleFile error" << endl;
+	
+			//setup fstab mounts
+			if( !setfstab((*list1).moduleName, userstoragelist, pmstoragelist, parentOAMModuleName, parentOAMModuleIPAddr, IserverTypeInstall, sharedNothing, (*list1).moduleIP ) ) 
+				cout << "setfstab error" << endl;
 	
 			//setup rc.local file in module tmp dir
 			if( !makeRClocal((*list1).moduleName, IserverTypeInstall) )
 				cout << "makeRClocal error" << endl;
+
+			//setup pm disk exports file
+			if ( sharedNothing == "y" && (*list1).moduleName != parentOAMModuleName) {
+				if( !setPMdiskexports((*list1).moduleName, parentOAMModuleIPAddr) )
+					cout << "setPMdiskexports error" << endl;
+			}
 		}
 	}
 
@@ -547,22 +677,20 @@ int main(int argc, char *argv[])
 						temppwprompt = "none";
 						
 					cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
-					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
+					string cmd = "/usr/local/Calpont/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
 					if (rtnCode != 0) {
 						cout << endl << "ERROR: returned from user_installer.sh" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 				else
 				{	// do a binary package install
-					cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " +
-						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
-						serverTypeInstall + " " + installer_debug + " " + installDir;
+					string cmd = "/usr/local/Calpont/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + remoteModuleType + + " " + installType + " " + packageType + " " +  serverTypeInstall + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
 					if (rtnCode != 0) {
 						cout << endl << "ERROR: returned from binary_installer.sh" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 			}
@@ -573,29 +701,27 @@ int main(int argc, char *argv[])
 					if ( packageType != "binary" ) {
 						//run remote installer script
 						cout << endl << "----- Performing Uninstall on Module '" + remoteModuleName + "' -----" << endl << endl;
-						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
+						string cmd = "/usr/local/Calpont/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
 						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
-							exit(1);
+							exit(-1);
 						}
 					}
 					else
 					{	// do a binary package install
-						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP +
-							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
-							serverTypeInstall + " " + installer_debug + " " + installDir;
+						string cmd = "/usr/local/Calpont/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + remoteModuleType + + " " + installType + " " + packageType + " " +  serverTypeInstall + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
 						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
-							exit(1);
+							exit(-1);
 						}
 					}
 				}
 			}
 
-			//unmount child module
-			cmd = "umount -fl /mnt/" + remoteModuleName + " > /dev/null 2>&1";
+			//unmount slave module
+			string cmd = "umount -fl /mnt/" + remoteModuleName + " > /dev/null 2>&1";
 			system(cmd.c_str());
 			cmd = "rm -fr /mnt/" + remoteModuleName;
 			system(cmd.c_str());		
@@ -606,19 +732,21 @@ int main(int argc, char *argv[])
 
 	if ( installType == "initial" ) {
 		//setup local OS Files
-		if( !setOSFiles(parentOAMModuleName, IserverTypeInstall) ) {
+		if( !setOSFiles(parentOAMModuleName, IserverTypeInstall, sharedNothing, DBRootStorageType) ) {
 			cout << "ERROR: setOSFiles error" << endl;
-			exit(1);
+			exit(-1);
 		}
 
-		cmd = "chmod 1777 -R " + installDir + "/data1/systemFiles/dbrm > /dev/null 2>&1";
-		system(cmd.c_str());
+		//create directories on dbroot1
+		if( !createDbrootDirs(DBRootStorageType) ) {
+			cout << "ERROR: createDbrootDirs error" << endl;
+			exit(-1);
+		}
 
 		SNMPManager sm;
 		sm.updateSNMPD("parentOAMIPStub", parentOAMModuleIPAddr);
 	}
 
-	string idbstartcmd = installDir + "/bin/infinidb start";
 	if ( IserverTypeInstall != oam::INSTALL_COMBINE_DM_UM_PM || 
 			performancemodulelist.size() > 1 ) {
 		// 
@@ -644,22 +772,20 @@ int main(int argc, char *argv[])
 						temppwprompt = "none";
 						
 					cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
-					cmd = installDir + "/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
+					string cmd = "/usr/local/Calpont/bin/user_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + temppwprompt + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
 					if (rtnCode != 0) {
 						cout << endl << "ERROR returned from user_installer.sh" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 				else
 				{	// do a binary package install
-					cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " +
-						password + " " + calpont_rpm + " " + remoteModuleType + " " + installType + " " +
-						serverTypeInstall + " " + installer_debug + " " + installDir;
+					string cmd = "/usr/local/Calpont/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + remoteModuleType + + " " + installType + " " + packageType + " " +  serverTypeInstall + " " + installer_debug;
 					int rtnCode = system(cmd.c_str());
 					if (rtnCode != 0) {
 						cout << endl << "ERROR returned from binary_installer.sh" << endl;
-						exit(1);
+						exit(-1);
 					}
 				}
 			}
@@ -670,22 +796,20 @@ int main(int argc, char *argv[])
 					//run remote installer script
 					if ( packageType != "binary" ) {
 						cout << endl << "----- Performing Install on Module '" + remoteModuleName + "' -----" << endl << endl;
-						cmd = installDir + "/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
+						string cmd = "/usr/local/Calpont/bin/performance_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + mysql_rpm + " " + mysqld_rpm + " " + installType + " " + packageType + " " + nodeps + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
 						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from performance_installer.sh" << endl;
-							exit(1);
+							exit(-1);
 						}
 					}
 					else
 					{	// do a binary package install
-						cmd = installDir + "/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP +
-							" " + password + " " + calpont_rpm + " " + remoteModuleType + " " + installType +
-							" " + serverTypeInstall + " " + installer_debug + " " + installDir;
+						string cmd = "/usr/local/Calpont/bin/binary_installer.sh " + remoteModuleName + " " + remoteModuleIP + " " + password + " " + calpont_rpm + " " + remoteModuleType + + " " + installType + " " + packageType + " " +  serverTypeInstall + " " + installer_debug;
 						int rtnCode = system(cmd.c_str());
 						if (rtnCode != 0) {
 							cout << endl << "ERROR returned from binary_installer.sh" << endl;
-							exit(1);
+							exit(-1);
 						}
 					}
 				}
@@ -719,14 +843,14 @@ int main(int argc, char *argv[])
 				continue;
 	
 			//run remote command script
-			cmd = installDir + "/bin/remote_command.sh " + remoteModuleIP + " " + password + " '" + idbstartcmd + "' " +  installer_debug;
+			string cmd = "/usr/local/Calpont/bin/remote_command.sh " + remoteModuleIP + " " + password + " '/etc/init.d/infinidb start' " +  installer_debug;
 			int rtnCode = system(cmd.c_str());
 			if (rtnCode != 0)
 				cout << "error with running remote_command.sh" << endl;
 		}
 
 		//start on local module
-		int rtnCode = system(idbstartcmd.c_str());
+		int rtnCode = system("/etc/init.d/infinidb start");
 		if (rtnCode != 0)
 			cout << "Error starting InfiniDB local module" << endl;
 		else
@@ -747,7 +871,7 @@ int main(int argc, char *argv[])
 			sleep(5);
 	
 			//start on local module
-			int rtnCode = system(idbstartcmd.c_str());
+			int rtnCode = system("/etc/init.d/infinidb start");
 			if (rtnCode != 0)
 				cout << "Error starting InfiniDB local module" << endl;
 			else
@@ -768,9 +892,8 @@ int main(int argc, char *argv[])
 
 			//startup mysqld and infinidb processes
 			cout << endl;
-			cmd = installDir + "/bin/clearShm > /dev/null 2>&1";
-			system(cmd.c_str());
-			system(idbstartcmd.c_str());
+			system ("/usr/local/Calpont/bin/clearShm > /dev/null 2>&1");
+			system ("/etc/init.d/infinidb start");
 		}
 	}
 
@@ -782,8 +905,7 @@ int main(int argc, char *argv[])
 	if ( waitForActive() ) {
 		cout << " DONE" << endl;
 
-		cmd = installDir + "/bin/dbbuilder 7 > /tmp/dbbuilder.log";
-		system(cmd.c_str());
+		system("/usr/local/Calpont/bin/dbbuilder 7 > /tmp/dbbuilder.log");
 
 		if (oam.checkLogStatus("/tmp/dbbuilder.log", "System Catalog created") )
 			cout << endl << "System Catalog Successfull Created" << endl;
@@ -817,7 +939,7 @@ int main(int argc, char *argv[])
 
 		cout << "Enter the following command to define InfiniDB Alias Commands" << endl << endl;
 
-		cout << ". " + installDir + "/bin/calpontAlias" << endl << endl;
+		cout << ". /usr/local/Calpont/bin/calpontAlias" << endl << endl;
 
 		cout << "Enter 'idbmysql' to access the InfiniDB MySQL console" << endl;
 		cout << "Enter 'cc' to access the InfiniDB OAM console" << endl << endl;
@@ -836,13 +958,14 @@ int main(int argc, char *argv[])
 
 // /etc OS Files to be updated
 string files[] = {
+	"exports",
+	"fstab",
 	"rc.local",
 	" "
 };
 
-bool setOSFiles(string parentOAMModuleName, int serverTypeInstall)
+bool setOSFiles(string parentOAMModuleName, int serverTypeInstall, string sharedNothing, string DBRootStorageType)
 {
-	string cmd;
 	bool allfound = true;
 
 	//update /etc files
@@ -853,27 +976,48 @@ bool setOSFiles(string parentOAMModuleName, int serverTypeInstall)
 			break;
 
 		//create or update date on file to make sure on exist
+		if ( files[i] == "exports") {
+			string cmd = "touch /usr/local/Calpont/local/etc/" + parentOAMModuleName + "/exports.calpont"; 
+			system(cmd.c_str());
+		}
+
+		//create or update date on file to make sure on exist
 		if ( files[i] == "rc.local") {
-			cmd = "touch " + installDir + "/local/etc/" + parentOAMModuleName + "/rc.local.calpont"; 
+			string cmd = "touch /usr/local/Calpont/local/etc/" + parentOAMModuleName + "/rc.local.calpont"; 
 			system(cmd.c_str());
 		}
 
 		string fileName = "/etc/" + files[i];
 
+		ifstream oldFile (fileName.c_str());
+		if (!oldFile) {
+			if ( files[i] == "exports" ) {
+				string cmd = "touch " + fileName;
+				system(cmd.c_str());
+			}
+		}
+
 		//make a backup copy before changing
-		cmd = "rm -f " + fileName + ".calpontSave";
+		string cmd = "rm -f " + fileName + ".calpontSave";
 		system(cmd.c_str());
 
 		cmd = "cp " + fileName + " " + fileName + ".calpontSave > /dev/null 2>&1";
 		system(cmd.c_str());
 
-		cmd = "cat " + installDir + "/local/etc/" + parentOAMModuleName + "/" + files[i] + ".calpont >> " + fileName;
-		if (geteuid() == 0) system(cmd.c_str());
+		//if fstab, cleanup any calpont entries before added new ones
+		if ( files[i] == "fstab" && DBRootStorageType == "storage") {
+			cleanupFstab();
+		}
 
-		cmd = "rm -f " + installDir + "/local/ " + files[i] + "*.calpont > /dev/null 2>&1";
+		cmd = "cat /usr/local/Calpont/local/etc/" + parentOAMModuleName + "/" + files[i] + ".calpont >> " + fileName; 
+		int rtnCode = system(cmd.c_str());
+		if (rtnCode != 0 && files[i] != "exports")
+			cout << "Error Updating " + files[i] << endl;
+
+		cmd = "rm -f /usr/local/Calpont/local/ " + files[i] + "*.calpont > /dev/null 2>&1";
 		system(cmd.c_str());
 
-		cmd = "cp " + installDir + "/local/etc/" + parentOAMModuleName + "/" + files[i] + ".calpont " + installDir + "/local/. > /dev/null 2>&1"; 
+		cmd = "cp /usr/local/Calpont/local/etc/" + parentOAMModuleName + "/" + files[i] + ".calpont /usr/local/Calpont/local/. > /dev/null 2>&1"; 
 		system(cmd.c_str());
 	}
 
@@ -885,7 +1029,7 @@ bool setOSFiles(string parentOAMModuleName, int serverTypeInstall)
  */
 bool updateSNMPD(string parentOAMModuleIPAddr)
 {
-	string fileName = installDir + "/etc/snmpd.conf";
+	string fileName = "/usr/local/Calpont/etc/snmpd.conf";
 
 	ifstream oldFile (fileName.c_str());
 	if (!oldFile) return false;
@@ -928,21 +1072,140 @@ bool updateSNMPD(string parentOAMModuleIPAddr)
 }
 
 /*
+ * setup Module fstab mount file
+ */
+bool setfstab(string moduleName, UserStorageList userstoragelist, PMStorageList pmstoragelist, string parentOAMModuleName,  string parentOAMModuleIPAddr, int serverTypeInstall, string sharedNothing, string moduleIPAddr )
+{
+	Oam oam;
+	Config* sysConfig = Config::makeConfig();
+	string SystemSection = "SystemConfig";
+
+	string moduleType = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
+
+	vector <string> lines;
+
+	if ( sharedNothing == "n" ) {
+		// do um user temp mount
+		if ( !userstoragelist.empty() ) {
+			if ( ( moduleType == "pm" && serverTypeInstall == oam::INSTALL_COMBINE_DM_UM_PM ) ||
+					moduleType == "um" ) {
+	
+				string TempDiskPath;
+				oam.getSystemConfig("TempDiskPath", TempDiskPath);
+	
+				UserStorageList::iterator list1 = userstoragelist.begin();
+				for (; list1 != userstoragelist.end() ; list1++)
+				{
+					if ( moduleName == (*list1).moduleName ) {
+						string fstab = (*list1).deviceName + " " + TempDiskPath + " ext2 defaults 0 0";
+						lines.push_back(fstab);
+						break;
+					}
+				}
+			}
+		}
+	
+		// do pm dbroot mounts
+		if ( !pmstoragelist.empty() ) {
+			if ( moduleType == "pm" ) {
+				int id=1;
+				PMStorageList::iterator list1 = pmstoragelist.begin();
+				for (; list1 != pmstoragelist.end() ; list1++)
+				{
+					string DBrootDIR;
+					string DBrootID = "DBRoot" + oam.itoa(id);
+					try {
+						DBrootDIR = sysConfig->getConfig(SystemSection, DBrootID);
+					}
+					catch(...)
+					{
+						cout << "ERROR: Problem getting DBRoot in the InfiniDB System Configuration file" << endl;
+						exit(-1);
+					}
+
+					string fstab;
+					if ( singleServerInstall == "y" )
+						fstab = *list1 + " " + DBrootDIR + + " ext2 ro,noatime,nodiratime 0 0";
+					else
+						fstab = *list1 + " " + DBrootDIR + + " ext2 ro,noatime,nodiratime,sync,dirsync 0 0";
+
+					lines.push_back(fstab );
+					id++;
+				}
+			}
+		}
+	
+		string fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/fstab.calpont";
+	
+		unlink (fileName.c_str());
+		ofstream newFile (fileName.c_str());	
+		
+		//create new file
+		int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+		
+		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+		newFile.close();
+		
+		close(fd);
+	}
+	else
+	{
+		// setup shared-nothing nfs mounts
+		if ( moduleType == "pm" && moduleName != parentOAMModuleName) {
+			string moduleID = moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
+			string dbroot = "/usr/local/Calpont/data" + moduleID;
+			string fstab = moduleIPAddr + ":" + dbroot + " " + dbroot + " nfs rw,wsize=8192,rsize=8192,noatime,nodiratime";
+
+			string fileName = "/usr/local/Calpont/local/etc/" + parentOAMModuleName + "/fstab.calpont";
+		
+			ifstream File (fileName.c_str());
+		
+			vector <string> lines;
+			char line[200];
+			string buf;
+		
+			while (File.getline(line, 200))
+			{
+				buf = line;
+		
+				//output to temp file
+				lines.push_back(buf);
+			}
+
+			lines.push_back(fstab);
+
+			File.close();
+			unlink (fileName.c_str());
+			ofstream newFile (fileName.c_str());	
+			
+			//create new file
+			int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+			
+			copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+			newFile.close();
+			
+			close(fd);
+		}
+	}
+
+	return true;
+}
+
+/*
  * Create a module file
  */
 bool makeModuleFile(string moduleName, string parentOAMModuleName)
 {
-	string cmd;
 	string fileName;
 	if ( moduleName == parentOAMModuleName )
-		fileName = installDir + "/local/module";
+		fileName = "/usr/local/Calpont/local/module";
 	else
-		fileName = installDir + "/local/etc/" + moduleName + "/module";
+		fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/module";
 
 	unlink (fileName.c_str());
    	ofstream newFile (fileName.c_str());
 
-	cmd = "echo " + moduleName + " > " + fileName;
+	string cmd = "echo " + moduleName + " > " + fileName;
 	system(cmd.c_str());
 
 	newFile.close();
@@ -958,7 +1221,6 @@ bool updateProcessConfig(int serverTypeInstall)
 {
 	vector <string> oldModule;
 	string newModule;
-	string cmd;
 
 	switch ( serverTypeInstall ) {
 		case (oam::INSTALL_COMBINE_DM_UM_PM):
@@ -982,10 +1244,10 @@ bool updateProcessConfig(int serverTypeInstall)
 		}
 	}
 
-	string fileName = installDir + "/etc/ProcessConfig.xml";
+	string fileName = "/usr/local/Calpont/etc/ProcessConfig.xml";
 
 	//Save a copy of the original version
-	cmd = "/bin/cp -f " + fileName + " " + fileName + ".calpontSave > /dev/null 2>&1";
+	string cmd = "/bin/cp -f " + fileName + " " + fileName + ".calpontSave > /dev/null 2>&1";
 	system(cmd.c_str());
 
 	ifstream oldFile (fileName.c_str());
@@ -1044,14 +1306,91 @@ bool updateProcessConfig(int serverTypeInstall)
 	return true;
 }
 
+/*
+ * setup External Module mount file
+ */
+bool setXMmount(string parentOAMModuleHostName, string parentOAMModuleIPAddr, string moduleName)
+{
+	//
+	// update xm-mount file in /usr/local/Calpont/local/etc
+	//
+	string fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/" + parentOAMModuleHostName + "_mount";
+	string fileName1 = "/usr/local/Calpont/local/etc/" + moduleName + "/" + parentOAMModuleHostName + "_umount";
+
+	vector <string> lines;
+	vector <string> lines1;
+
+	string mount1 = "mount -t nfs -o ro,rsize=8192,wsize=8192,intr,noatime,nodiratime,sync,dirsync " + parentOAMModuleIPAddr + ":/usr/local/Calpont/etc /mnt/" + parentOAMModuleHostName + "_etc";
+	string mount2 = "mount -t nfs -o ro,rsize=8192,wsize=8192,intr,noatime,nodiratime,sync,dirsync " + parentOAMModuleIPAddr + ":/mnt/OAM /mnt/" + parentOAMModuleHostName + "_OAM";
+
+	string umount1 = "umount -lf /mnt/" + parentOAMModuleHostName + "_etc";
+	string umount2 = "umount -lf /mnt/" + parentOAMModuleHostName + "_OAM";
+
+	//add Calpont mount data 
+	lines.push_back(mount2);
+	lines.push_back(mount1);
+
+	lines1.push_back(umount1);
+	lines1.push_back(umount2);
+
+	unlink (fileName.c_str());
+	ofstream newFile (fileName.c_str());	
+	
+	//create new file
+	int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+	
+	copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+	newFile.close();
+	
+	close(fd);
+
+	unlink (fileName1.c_str());
+	ofstream newFile1 (fileName1.c_str());	
+	
+	//create new file
+	int fd1 = open(fileName1.c_str(), O_RDWR|O_CREAT, 0666);
+	
+	copy(lines1.begin(), lines1.end(), ostream_iterator<string>(newFile1, "\n"));
+	newFile1.close();
+	
+	close(fd1);
+
+	return true;
+}
+
+/*
+ * Make inittab to auto-launch ProcMon
+ */
+bool makeXMInittab(string moduleName, string systemID, string parentOAMModuleHostName)
+{
+	string fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/inittab.calpont";
+
+	vector <string> lines;
+
+	string init1 = "1" + systemID + ":2345:respawn:/usr/local/Calpont/bin/ProcMon " + parentOAMModuleHostName;
+	
+	lines.push_back(init1);
+
+	unlink (fileName.c_str());
+   	ofstream newFile (fileName.c_str());	
+	
+	//create new file
+	int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
+	
+	copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
+	newFile.close();
+	
+	close(fd);
+
+	return true;
+}
 
 /*
  * Make makeRClocal to set mount scheduler
  */
 bool makeRClocal(string moduleName, int IserverTypeInstall)
 {
-	string cmd;
-	string fileName = installDir + "/local/etc/" + moduleName + "/rc.local.calpont";
+	string fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/rc.local.calpont";
 
 	string moduleType = moduleName.substr(0,MAX_MODULE_TYPE_SIZE);
 
@@ -1130,7 +1469,7 @@ bool makeRClocal(string moduleName, int IserverTypeInstall)
 	unlink (fileName.c_str());
 
 	if ( lines.begin() == lines.end()) {
-		cmd = "touch " + fileName + " >/dev/null 2>&1";
+		string cmd = "touch " + fileName;
 		system(cmd.c_str());
 		return true;
 	}
@@ -1148,13 +1487,80 @@ bool makeRClocal(string moduleName, int IserverTypeInstall)
 	return true;
 }
 
+/*
+ * setup PM Disk  export file
+ */
+bool setPMdiskexports(string moduleName, string parentOAMModuleIPAddr )
+{
+	string moduleID = moduleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);
+
+	//
+	//update exports in /usr/local/Calpont/local/etc/"moduleName"
+	//
+	string fileName = "/usr/local/Calpont/local/etc/" + moduleName + "/exports.calpont";
+
+	string cmd = "touch " + fileName;
+	system(cmd.c_str());
+
+	cmd = "echo '/usr/local/Calpont/data" + moduleID + " " + parentOAMModuleIPAddr + "(rw,sync)' >> " + fileName;
+	system(cmd.c_str());
+
+	return true;
+
+}
+
+/*
+ * createDbrootDirs 
+ */
+bool createDbrootDirs(string DBRootStorageType)
+{
+	int rtnCode;
+
+	// mount disk and create directories if configured with storage
+	if ( DBRootStorageType == "storage" ) {
+		system("/etc/init.d/nfs stop > /dev/null 2>&1");
+		system("/etc/init.d/syslog stop > /dev/null 2>&1");
+		system("/etc/init.d/syslog-ng stop > /dev/null 2>&1");
+		system("/etc/init.d/rsyslog stop > /dev/null 2>&1");
+		system("mount -al  > /dev/null 2>&1");
+
+		rtnCode = system("mount /usr/local/Calpont/data1 -o rw,remount");
+		if (rtnCode != 0) {
+			cout << endl << "error: failed to mount data1 as read-write" << endl;
+			return false;
+		}
+
+		// create system file directories
+	
+		rtnCode = system("mkdir -p /usr/local/Calpont/data1/systemFiles/dbrm > /dev/null 2>&1");
+		if (rtnCode != 0) {
+			cout << endl << "error: failed to make mount dbrm dir" << endl;
+			return false;
+		}
+	
+		rtnCode = system("mkdir -p /usr/local/Calpont/data1/systemFiles/dataTransaction/archive > /dev/null 2>&1");
+		if (rtnCode != 0) {
+			cout << endl << "error: failed to make mount dataTransaction dir" << endl;
+			return false;
+		}
+
+		system("/etc/init.d/nfs start > /dev/null 2>&1");
+		system("/etc/init.d/syslog start > /dev/null 2>&1");
+		system("/etc/init.d/syslog-ng start > /dev/null 2>&1");
+		system("/etc/init.d/rsyslog start > /dev/null 2>&1");
+	}
+
+	system("chmod 1777 -R /usr/local/Calpont/data1/systemFiles/dbrm > /dev/null 2>&1");
+
+	return true;
+}
 
 /*
  * Uncomment entry in Calpont.xml
  */
 bool uncommentCalpontXml( string entry)
 {
-	string fileName = installDir + "/etc/Calpont.xml";
+	string fileName = "/usr/local/Calpont/etc/Calpont.xml";
 
 	ifstream oldFile (fileName.c_str());
 	if (!oldFile) return true;
@@ -1230,5 +1636,3 @@ bool writeConfig( Config* sysConfig )
 
 	return false;
 }
-// vim:ts=4 sw=4:
-

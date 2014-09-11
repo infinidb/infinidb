@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
  /*********************************************************************
- * $Id: clientrotator.cpp 8908 2012-09-18 18:50:03Z zzhu $
+ * $Id: clientrotator.cpp 8910 2012-09-18 18:52:26Z zzhu $
  *
  *
  ***********************************************************************/
@@ -89,12 +89,11 @@ namespace execplan
   
 	void ClientRotator::resetClient()
 	{
-		try //one more time...
+		try
 		{
 			delete fClient;
 			fClient = 0;
 			connectList(fSessionId % fClients.size());
-			//fClient->write(msg);
 		}
 		catch (std::exception &e)
 		{
@@ -111,7 +110,9 @@ namespace execplan
 	{
 		if (!fClient)
 			connect();
-
+		
+		// @bug4380, 4689. Throw to notify the caller that the connection 
+		// has been reset. Caller will retry the message write if necessary.
 		try
 		{
 			fClient->write(msg);
@@ -141,7 +142,9 @@ namespace execplan
 	
 		if (!fClient)
 			connect();
-	
+		
+		// @bug4380, 4689. Throw to notify the caller that the connection 
+		// has been reset. Caller will retry the message write if necessary.
 		try
 		{
 			bs = fClient->read();
@@ -161,28 +164,8 @@ namespace execplan
 			cout << errmsg << endl;
 			throw runtime_error(errmsg);
 		}
-
-#if 0
-    try //one more time...
-    {
-	delete fClient;
-	fClient = 0;
-	connectList(fSessionId % fClients.size());
-	bs = fClient->read();
-	return bs;
-    }
-    catch (std::exception &e)
-    {
-		/* Can't fail silently */
-		writeToLog(__LINE__, e.what(), true);
-#ifdef LOG_TO_CERR
-		cerr << "ClientRotator::read() failed: " << e.what() << endl;
-#endif
-		throw;
-    }
-#endif
-    return bs;
-  }
+		return bs;
+	}
 
 
   void ClientRotator::connect(double timeout)

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: createindexprocessor.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: createindexprocessor.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -68,7 +68,7 @@ CreateIndexProcessor::DDLResult CreateIndexProcessor::processPackage(ddlpackage:
     tableName.schema = (createIndexStmt.fTableName)->fSchema;
     tableName.table = (createIndexStmt.fTableName)->fName;
     CalpontSystemCatalog::ROPair roPair;
-    boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( createIndexStmt.fSessionID );
+    CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( createIndexStmt.fSessionID );
     try {
     	roPair = systemCatalogPtr->tableRID( tableName );
     }

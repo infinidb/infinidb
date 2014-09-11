@@ -28,27 +28,26 @@ using namespace boost;
 namespace fs=boost::filesystem;
 
 #include "fsutils.h"
-#include "exceptclasses.h"
 
 namespace
 {
 
 const string resolveInDir(const string& dir, const string& name)
 {
-	idbassert(!dir.empty() && !name.empty());
+	assert(!dir.empty() && !name.empty());
 	string ret;
 	fs::path path(dir);
 	if (!fs::exists(path))
 		return ret;
-	idbassert(fs::exists(path));
+	assert(fs::exists(path));
 	path /= name;
 	if (!fs::exists(path))
 		return ret;
-	idbassert(fs::exists(path));
+	assert(fs::exists(path));
 #ifndef _MSC_VER
 	if (!fs::is_symlink(path))
 		return ret;
-	idbassert(fs::is_symlink(path));
+	assert(fs::is_symlink(path));
 	char* realname = (char*)alloca(PATH_MAX+1);
 	ssize_t realnamelen = readlink(path.string().c_str(), realname, PATH_MAX);
 	if (realnamelen <= 0)
@@ -86,19 +85,19 @@ const string symname2devname(const string& sympath)
 	tokenizer tokens(sympath, sep);
 	tokenizer::iterator tok_iter = tokens.begin();
 
-	idbassert(tok_iter != tokens.end());
+	assert(tok_iter != tokens.end());
 	string symtype = *tok_iter;
 	if (symtype != "LABEL" && symtype != "UUID")
 		return ret;
 
-	idbassert(symtype == "LABEL" || symtype == "UUID");
+	assert(symtype == "LABEL" || symtype == "UUID");
 
 	++tok_iter;
-	idbassert(tok_iter != tokens.end());
+	assert(tok_iter != tokens.end());
 	string symname = *tok_iter;
 
 	++tok_iter;
-	idbassert(tok_iter == tokens.end());
+	assert(tok_iter == tokens.end());
 
 	if (symtype == "LABEL")
 		ret = label2dev(symname);

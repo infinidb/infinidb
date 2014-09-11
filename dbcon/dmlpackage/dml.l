@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/* $Id: dml.l 8707 2012-07-13 19:08:12Z rdempsey $ */
+/* $Id: dml.l 7407 2011-02-08 14:05:21Z rdempsey $ */
 %{
 #include <iostream>
 #include <vector>
@@ -26,11 +26,7 @@
 #undef DECIMAL
 #undef DELETE
 #undef IN
-#ifdef _MSC_VER
-#include "dml-gram-win.h"
-#else
 #include "dml-gram.h"
-#endif
 #ifdef _MSC_VER
 #define YY_NO_UNISTD_H
 extern "C" int _isatty(int);

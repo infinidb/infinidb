@@ -17,7 +17,7 @@
 
 
 /******************************************************************************
-* $Id: lbidlist.cpp 8727 2012-07-22 19:04:25Z dcathey $
+* $Id: lbidlist.cpp 9142 2012-12-11 22:18:06Z pleblanc $
 *
 ******************************************************************************/
 #include <iostream>
@@ -214,7 +214,6 @@ LBIDList::~LBIDList()
             mmp->max = numeric_limits<int64_t>::min();
             mmp->min = numeric_limits<int64_t>::max();
             mmp->isValid = retVal;
-            mmp->blksScanned = 0;
             lbidPartitionVector.push_back(mmp);
             bRet = false;
         }
@@ -244,7 +243,6 @@ bool LBIDList::GetMinMax(int64_t *min, int64_t *max, int64_t *seq,
         mmp->max = numeric_limits<int64_t>::min();
         mmp->min = numeric_limits<int64_t>::max();
         mmp->isValid = entry.partition.cprange.isValid;
-        mmp->blksScanned = 0;
         lbidPartitionVector.push_back(mmp);
 		return false;
 	}
@@ -293,7 +291,6 @@ int LBIDList::getMinMaxFromEntries(int64_t& min, int64_t& max, int32_t& seq,
       mmp = lbidPartitionVector.at(i);
       if ( (lbid>=mmp->lbid) && (lbid<mmp->lbidmax) )
       {
-        mmp->blksScanned++;
 
 #ifdef DEBUG
         if (IS_VERBOSE)
@@ -356,8 +353,7 @@ void LBIDList::UpdateAllPartitionInfo()
 
       mmp = lbidPartitionVector.at(i);
 
-      //@bug4543: only update extentmap CP if blks were scanned for this extent
-      if ((mmp->isValid == BRM::CP_INVALID) && (mmp->blksScanned > 0))
+      if (mmp->isValid == BRM::CP_INVALID)
       {
 		cpInfo.firstLbid = mmp->lbid;
 		cpInfo.max = mmp->max;
@@ -378,8 +374,7 @@ void LBIDList::UpdateAllPartitionInfo()
           cout << "LBIDList::UpdateAllPartitionInfo() updated mmp.lbid " << mmp->lbid
             << " mmp->max " << mmp->max
 			<< " mmp->min " << mmp->min
-			<< " seq "      << mmp->seq
-			<< " blksScanned " << mmp->blksScanned
+			<< " seq " << mmp->seq
 			<< endl;
 #endif
 		mmp->isValid = BRM::CP_VALID;

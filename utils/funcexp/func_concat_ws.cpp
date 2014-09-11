@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_concat_ws.cpp 3716 2013-04-18 16:35:52Z bpaul $
+* $Id: func_concat_ws.cpp 2853 2011-09-12 20:32:05Z xlou $
 *
 *
 ****************************************************************************/
@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -55,9 +54,9 @@ string Func_concat_ws::getStrVal(Row& row,
 
 #ifdef STRCOLL_ENH__
 	wstring wstr;
-	size_t strwclen = utf8::idb_mbstowcs(0,delim.c_str(),0) + 1;
+	size_t strwclen = mbstowcs(0,delim.c_str(),0) + 1;
 	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
-	strwclen = utf8::idb_mbstowcs(wcbuf, delim.c_str(), strwclen);
+	strwclen = mbstowcs(wcbuf, delim.c_str(), strwclen);
 	wstring wdelim(wcbuf, strwclen); 
 
 	for ( unsigned int id = 1 ; id < parm.size() ; id++) 
@@ -70,16 +69,16 @@ string Func_concat_ws::getStrVal(Row& row,
 		}
 		if (!wstr.empty())
 			wstr += wdelim;
-		size_t strwclen1 = utf8::idb_mbstowcs(0, tstr.c_str(), 0) + 1;
+		size_t strwclen1 = mbstowcs(0, tstr.c_str(), 0) + 1;
 		wchar_t* wcbuf1 = (wchar_t*)alloca(strwclen1 * sizeof(wchar_t));
-		strwclen1 = utf8::idb_mbstowcs(wcbuf1, tstr.c_str(), strwclen1);
+		strwclen1 = mbstowcs(wcbuf1, tstr.c_str(), strwclen1);
 		wstring str1(wcbuf1, strwclen1);
 		wstr += str1; 
 	}
 
-	size_t strmblen = utf8::idb_wcstombs(0, wstr.c_str(), 0) + 1;
+	size_t strmblen = wcstombs(0, wstr.c_str(), 0) + 1;
 	char* outbuf = (char*)alloca(strmblen * sizeof(char));
-	strmblen = utf8::idb_wcstombs(outbuf, wstr.c_str(), strmblen);
+	strmblen = wcstombs(outbuf, wstr.c_str(), strmblen);
 	if (strmblen == 0)
 		isNull = true;
 	else

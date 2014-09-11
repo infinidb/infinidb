@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: writeengine.h 4374 2012-12-03 22:16:10Z xlou $
+//  $Id: writeengine.h 4376 2012-12-03 23:14:04Z xlou $
 
 
 /** @file */
@@ -30,24 +30,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 // end
+
 #include <boost/lexical_cast.hpp>
-#ifdef _MSC_VER
-#include <unordered_map>
-#else
-#include <tr1/unordered_map>
-#endif
 
 #include "we_brm.h"
 #include "we_colop.h"
 #include "we_dctnry.h"
 #include "we_index.h"
-#include "we_tablemetadata.h"
-#include "we_dbrootextenttracker.h"
-#include "we_rbmetawriter.h"
-#define WRITEENGINECHUNKMGR_DLLEXPORT
-#include "we_chunkmanager.h"
-#undef WRITEENGINECHUNKMGR_DLLEXPORT
-
 #define IO_BUFF_SIZE 81920
 
 #if defined(_MSC_VER) && defined(WRITEENGINEWRAPPER_DLLEXPORT)
@@ -55,6 +44,7 @@
 #else
 #define EXPORT
 #endif
+
 /** Namespace WriteEngine */
 namespace WriteEngine
 {
@@ -67,27 +57,6 @@ const int TOTAL_COMPRESS_OP = 2;
 //...Forward class declarations
 class Log;
 
-// Bug4312. During transactions, we need to mark each extent modified as invalid.
-// In order to prevent thrashing, marking the same extent everytime we get an lbid
-// for an extent, we remember the starting lbid for each extent marked for the
-// transaction. We also add a sequence number so we can age them out of the list
-// for truly long running transactions.
-struct TxnLBIDRec
-{
-    std::tr1::unordered_map<BRM::LBID_t, uint32_t> m_LBIDMap;
-    uint32_t        m_lastSeqnum;
-    uint32_t        m_squashedLbids;
-
-    TxnLBIDRec() : m_lastSeqnum(0), m_squashedLbids(0) {};
-    ~TxnLBIDRec() {}
-    void AddLBID(BRM::LBID_t lbid)
-    {
-        m_LBIDMap[lbid] = ++m_lastSeqnum;
-    }
-};
-
-typedef boost::shared_ptr<TxnLBIDRec>  SP_TxnLBIDRec_t;
-
 /** Class WriteEngineWrapper */
 class WriteEngineWrapper : public WEObj
 {
@@ -97,7 +66,6 @@ public:
     */
    EXPORT WriteEngineWrapper();
 
-   EXPORT WriteEngineWrapper(const WriteEngineWrapper& rhs);
    /**
     * @brief Default Destructor
     */
@@ -129,6 +97,9 @@ public:
                          int maxRow = IDX_DEFAULT_READ_ROW)
    { return -1; }
 
+   int buildIndexRec(const TxnID& txnid, const IdxStructList& idxStructList,
+                            const IdxValueList& idxValueList, const RIDList& ridList) { return -1; }
+
    /**
     * @brief Close a index file
     */
@@ -142,8 +113,7 @@ public:
    /**
     * @brief Commit transaction
     */
-   int commit(const TxnID& txnid)
-   { m_txnLBIDMap.erase(txnid); return BRMWrapper::getInstance()->commit(txnid); }
+   int commit(const TxnID& txnid) { return BRMWrapper::getInstance()->commit(txnid); }
 
    /**
     * @brief Convert interface value list to internal value array
@@ -181,8 +151,8 @@ public:
    EXPORT int fillColumn(const TxnID& txnid, const OID& dataOid, ColDataType dataType,
                          int dataWidth, ColTuple defaultVal,
                          const OID& refColOID, ColDataType refColDataType,
-                         int refColWidth, int refCompressionType, bool isNULL, int compressionType,
-                         const std::string& defaultValStr, const OID& dictOid = 0, bool autoincrement = false);
+                         int refColWidth, int refCompressionType, uint16_t dbRoot, bool isNULL, int compressionType,
+                         const std::string& defaultValStr, long long & nextVal, const OID& dictOid = 0, bool autoincrement = false);
 
    /**
     * @brief Create a index related files, include object ids for index tree and list files
@@ -191,7 +161,7 @@ public:
     * @param listOid index list file object id
     */
    int createIndex(const TxnID& txnid, const OID& treeOid, const OID& listOid)
-   { int rc = -1; return rc;}
+   { int rc = -1; flushVMCache(); return rc;}
 
    /**
     * @brief Create dictionary
@@ -210,8 +180,18 @@ public:
     * @param colOldValueList column old values list (return value)
     * @param rowIdList row id list
     */
-   EXPORT int deleteRow(const TxnID& txnid, std::vector<ColStructList>& colExtentsStruct,
+    EXPORT int deleteRow(const TxnID& txnid, std::vector<ColStructList>& colExtentsStruct,
                          std::vector<void *>& colOldValueList, std::vector<RIDList>& ridLists);
+
+   /**
+    * @brief Delete rid/values from an index
+    * @param idxStructList index structure list
+    * @param idxValueList index value list
+    * @param ridList row id list
+    */
+   int deleteIndexRec(const TxnID& txnid, IdxStructList& idxStructList, IdxValueList& idxValueList,
+                      RIDList& ridList)
+   { return -1; }
 
    /**
     * @brief delete a dictionary signature and its token
@@ -240,9 +220,8 @@ public:
     * @brief Delete files for one partition
     * @param dataOids column and dictionary datafile object id
     */
-   int deletePartitions(const std::vector<OID> & dataOids, 
-                        const std::vector<BRM::PartitionInfo>& partitions)
-   { return m_colOp[0]->dropPartitions(dataOids, partitions); }
+   int deletePartition(const std::vector<int32_t> & dataOids, uint32_t partition)
+   { return m_colOp[0]->dropPartition(dataOids, partition); }
 
    int deleteOIDsFromExtentMap (const TxnID& txnid,  const std::vector<int32_t>& dataOids)
    { return m_colOp[0]->deleteOIDsFromExtentMap(dataOids); }
@@ -271,54 +250,18 @@ public:
    EXPORT void flushVMCache() const;
 
    /**
-    * @brief Insert values into a table
+    * @brief Insert values into a column
     * @param colStructList column structure list
     * @param colValueList column value list
     * @param dicStringListt dictionary values list
-    * @param dbRootExtentTrackers dbrootTrackers
-    * @param bFirstExtentOnThisPM true when there is no extent on this PM
-    * @param insertSelect if insert with select, the hwm block is skipped
-    * @param isAutoCommitOn if autocommit on, only the hwm block is versioned,
-    *        else eveything is versioned
-    * @param tableOid used to get table meta data
-    * @param isFirstBatchPm to track if this batch is first batch for this PM.
     */
-   EXPORT int insertColumnRecs(const TxnID& txnid,
+    EXPORT int insertColumnRec(const TxnID& txnid,
                                ColStructList& colStructList,
                                ColValueList& colValueList,
                                DctnryStructList& dctnryStructList,
                                DictStrList& dictStrList,
-                               std::vector<DBRootExtentTracker*> & dbRootExtentTrackers,
-							   RBMetaWriter* fRBMetaWriter,
-                               bool bFirstExtentOnThisPM,
-                               bool insertSelect = false, 
-                               bool isAutoCommitOn = false,
-                               OID tableOid = 0,
-                               bool isFirstBatchPm = false);
-   
-   /**
-    * @brief Insert values into systables
-    * @param colStructList column structure list
-    * @param colValueList column value list
-    * @param dicStringListt dictionary values list
-    */
-   EXPORT int insertColumnRec_SYS(const TxnID& txnid,
-                               ColStructList& colStructList,
-                               ColValueList& colValueList,
-                               DctnryStructList& dctnryStructList,
-                               DictStrList& dictStrList);
-   
-   /**
-    * @brief Insert a row 
-    * @param colStructList column structure list
-    * @param colValueList column value list
-    * @param dicStringListt dictionary values list
-    */
-   EXPORT int insertColumnRec_Single(const TxnID& txnid,
-                               ColStructList& colStructList,
-                               ColValueList& colValueList,
-                               DctnryStructList& dctnryStructList,
-                               DictStrList& dictStrList);
+                               bool insertSelect = false);
+
    /**
     * @brief Open dictionary
     * @param dctnryOid dictionary signature file object id
@@ -342,62 +285,17 @@ public:
     * @brief Rollback transaction
     */
    EXPORT int rollbackTran(const TxnID& txnid, int sessionId);  
-   
+
    /**
-    * @brief Rollback transaction
+    * @brief Set the root directory for column data files
+    * @param path data directory
     */
-   EXPORT int rollbackBlocks(const TxnID& txnid, int sessionId);  
-   
-   /**
-    * @brief Rollback transaction
-    */
-   EXPORT int rollbackVersion(const TxnID& txnid, int sessionId);  
-
-   /**
-   * @brief Set the IsInsert flag in the ChunkManagers. 
-   * This forces flush at end of block. Used only for bulk insert. 
-   */
-   void setIsInsert(bool bIsInsert)
+   void setChunkManager(ChunkManager * cm)
    { 
-       m_colOp[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
-       m_dctnry[COMPRESSED_OP]->chunkManager()->setIsInsert(bIsInsert); 
+         m_colOp[COMPRESSED_OP]->chunkManager(cm);
+         m_dctnry[COMPRESSED_OP]->chunkManager(cm);
    }
    
-   /**
-   * @brief Get the IsInsert flag as set in the ChunkManagers. 
-   * Since both chunk managers are supposed to be in lockstep as regards the 
-   * isInsert flag, we need only grab one. 
-   *  
-   */
-   bool getIsInsert() 
-   { 
-       return m_colOp[COMPRESSED_OP]->chunkManager()->getIsInsert(); 
-   }
-   
-   /**
-   * @brief Flush the ChunkManagers. 
-   */
-   int flushChunks(int rc, const std::map<FID, FID> & columOids)
-   { 
-       int rtn1 = m_colOp[COMPRESSED_OP]->chunkManager()->flushChunks(rc, columOids); 
-       int rtn2 = m_dctnry[COMPRESSED_OP]->chunkManager()->flushChunks(rc, columOids);
-
-       return (rtn1 != NO_ERROR ? rtn1 : rtn2);
-   }
-   
-   /**
-   * @brief Set the transaction id into all fileops
-   */
-   void setTransId(const TxnID& txnid)
-   { 
-       for (int i = 0; i < TOTAL_COMPRESS_OP; i++) 
-       {
-           m_colOp[i]->setTransId(txnid);
-           m_dctnry[i]->setTransId(txnid);
-       }
-   }
-
-
    /**
     * @brief Tokenize a dictionary signature into a token
     * @param dctnryStruct dictionary structure
@@ -413,7 +311,7 @@ public:
     * @param colOldValueList column old values list (return value)
     * @param ridList row id list
     */
-   EXPORT int updateColumnRec(const TxnID& txnid,
+    EXPORT int updateColumnRec(const TxnID& txnid,
                                std::vector<ColStructList>& colExtentsStruct,
                                ColValueList& colValueList,
                                std::vector<void *>& colOldValueList,
@@ -428,55 +326,62 @@ public:
     * @param ridList row id list
     */
 
-   EXPORT int updateColumnRecs(const TxnID& txnid,
+    EXPORT int updateColumnRecs(const TxnID& txnid,
                                 std::vector<ColStruct>& colStructList,
                                 ColValueList& colValueList,
                                 const RIDList & ridLists);
 
    /**
-    * @brief Release specified table lock.
-    * @param lockID Table lock id to be released.
-    * @param errorMsg Return error message
+    * @brief Update values into an index
+    * @param idxStructList index structure list
+    * @param idxValueList index value list
+    * @param ridList row id list
     */
-   EXPORT int clearTableLockOnly(uint64_t lockID,
-                           std::string& errorMsg);
+   int updateIndexRec(const TxnID& txnid, IdxStructList& idxStructList,
+                      IdxValueList& idxValueList, RIDList& ridList)
+   { return -1; }
+
 
    /**
-    * @brief Rollback the specified table
-    * @param tableOid Table to be rolled back
-    * @param lockID Table lock id of the table to be rolled back.
-    *        Currently used for logging only.
-    * @param tableName Name of table associated with tableOid.
-    *        Currently used for logging only.
-    * @param applName Application that is driving this bulk rollback.
-    *        Currently used for logging only.
-    * @param debugConsole Enable logging to console
-    * @param errorMsg Return error message
+    * @brief Update values into an multicolumn index
+    * @param idxStructList index structure list
+    * @param idxValueList index value list
+    * @param ridList row id list
     */
-   EXPORT int bulkRollback(OID   tableOid,
-                           uint64_t lockID,
+   int updateMultiColIndexRec(const TxnID& txnid, IdxStructList& idxStructList,
+                              IdxValueList& idxValueList, RIDList& ridList)
+   { return -1; }
+
+   int deleteMultiColIndexRec(const TxnID& txnid, IdxStructList& idxStructList,
+                              IdxValueList& idxValueList, RIDList& ridList)
+   { return -1; }
+
+
+   /**
+    * @brief rollback the specified table and clear the table lock
+    * @param tableOid
+    * @param tableName name of table associated with tableOid
+    * @param applName application that is driving this bulk rollback
+    */
+   EXPORT int clearLockOnly(const OID& tableOid);
+   EXPORT int bulkRollback(const OID& tableOid,
                            const std::string& tableName,
-                           const std::string& applName,
+                           const std::string& applName, bool rollbackOnly,
                            bool debugConsole, std::string& errorMsg);
-
-   /**
+						   
+						   
+	/**
     * @brief update SYSCOLUMN next value
     * @param oidValueMap
     */
-   EXPORT int updateNextValue(const OID& columnoid, const long long nextVal,  const uint32_t sessionID);
-
-   /**
+	
+   typedef std::map<OID, long long> AutoIncrementValue_t;
+   EXPORT int updateNextValue(const AutoIncrementValue_t & oidValueMap, const uint32_t sessionID = 0);					   
+	/**
     * @brief write active datafiles to disk
     *
     */
-   EXPORT int flushDataFiles(int rc, const TxnID txnId, std::map<FID,FID> & columnOids);
-
-   /**
-    * @brief Process versioning for batch insert - only version the hwm block.
-    */
-   EXPORT int processBatchVersions(const TxnID& txnid, std::vector<Column> columns, std::vector<BRM::LBIDRange> &  rangeList);
-   
-   EXPORT void writeVBEnd(const TxnID& txnid, std::vector<BRM::LBIDRange> &  rangeList);
+    EXPORT int flushDataFiles(int rc, std::map<FID,FID> & columnOids);
 
    /************************************************************************
     * Future implementations
@@ -503,10 +408,20 @@ private:
     */
    int checkValid(const TxnID& txnid, const ColStructList& colStructList, const ColValueList& colValueList, const RIDList& ridList) const;
 
+   int checkIndexValid(const TxnID& txnid, const IdxStructList& idxStructList, const IdxValueList& idxValueList, const RIDList& ridList) const { return -1; }
+
    /**
     * @brief Convert interface column type to a internal column type
     */
    // void convertColType(void* curStruct, const FuncType curType = FUNC_WRITE_ENGINE) const;
+
+   /**
+    * @brief Convert interface value list to internal value array
+    */
+   void convertIndexValArray(ColType colType, IdxTupleList& curTupleList, void* valArray)
+   { for (IdxTupleList::size_type i = 0; i < curTupleList.size(); i++)
+         (void)0;
+   }
 
    void convertValue(const ColType colType, void* valArray, size_t pos, boost::any& data, bool fromList = true);
 
@@ -525,6 +440,20 @@ private:
    void printInputValue(const ColStructList& colStructList, const ColValueList& colValueList, const RIDList& ridList) const;
 
    /**
+    * @brief Internal process index operations
+    */
+   int processIndexRec(const TxnID& txnid, const IdxStructList& idxStructList,
+                       const IdxValueList& idxValueList, const RIDList& ridList,
+                       bool updateFlag = true) { return -1; }
+
+   /**
+    * @brief Internal process multicolumn index operations
+    */
+   int processMultiColIndexRec(const TxnID& txnid, const IdxStructList& idxStructList,
+                               const IdxValueList& idxValueList, const RIDList& ridList,
+                               bool updateFlag = true) { return -1; }
+
+   /**
     * @brief Process version buffer
     */
    int processVersionBuffer(FILE* pFile, const TxnID& txnid, const ColStruct& colStruct,
@@ -538,6 +467,16 @@ private:
                              int width, int totalRow, const RIDList& ridList,
                              std::vector<BRM::LBIDRange> &  rangeList);
 
+
+   void setTransId(const TxnID& txnid)
+   {
+      for (int i = 0; i < TOTAL_COMPRESS_OP; i++)
+      {
+         m_colOp[i]->setTransId(txnid);
+         m_dctnry[i]->setTransId(txnid);
+      }
+   }
+
    void setDebugLevel(const DebugLevel level)
    {
       WEObj::setDebugLevel(level);
@@ -548,13 +487,16 @@ private:
       }
    }  // todo: cleanup
 
+   int buildIndex(IdxLoadTuple*  colBuf, int& colBufSize, const OID& treeOid, const OID& listOid,
+                  const ColDataType colDataType, int width, int maxRow) { return -1; }
+
    /**
     * @brief Common methods to write values to a column
     */
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,
                        const ColValueList& colValueList, ColValueList& colOldValueList,
                        RID* rowIdArray, const ColStructList& newColStructList,
-                       const ColValueList& newColValueList, bool versioning = true);
+                       const ColValueList& newColValueList);
 
     //@Bug 1886,2870 pass the address of ridList vector
     int writeColumnRec(const TxnID& txnid, const ColStructList& colStructList,
@@ -574,23 +516,8 @@ private:
                            const RID filesPerColumnPartition, const RID  extentsPerSegmentFile,
                            const RID extentRows, uint16_t startDBRoot, unsigned dbrootCnt);
 
-    // Bug 4312: We use a hash set to hold the set of starting LBIDS for a given 
-    // txn so that we don't waste time marking the same extent as invalid. This 
-    // list should be trimmed if it gets too big.
-    int AddLBIDtoList(const TxnID     txnid,
-                      std::vector<BRM::LBID_t>& lbids,
-                      const OID       oid,
-                      const u_int32_t colPartition,
-                      const u_int16_t segment,
-                      const int       fbo);
-
-    int RemoveTxnFromLBIDMap(const TxnID txnid);
-
     int op(int compressionType) { return (compressionType > 0 ? COMPRESSED_OP : UN_COMPRESSED_OP); }
 
-
-    // This is a Map of sets of LBIDS for each transaction. A Transaction's list will be removed upon commit or rollback.
-    std::tr1::unordered_map<TxnID, SP_TxnLBIDRec_t> m_txnLBIDMap;
 
     ColumnOp*      m_colOp[TOTAL_COMPRESS_OP];          // column operations
     Dctnry*        m_dctnry[TOTAL_COMPRESS_OP];         // dictionary operations

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*****************************************************************************
- * $Id: masternode.cpp 1933 2013-07-08 20:16:28Z bpaul $
+ * $Id: masternode.cpp 1512 2012-03-06 16:23:38Z dhill $
  *
  ****************************************************************************/
 
@@ -32,7 +32,6 @@
 #include <string>
 #include <clocale>
 #include "brmtypes.h"
-#include "utils_utf8.h"
 
 #define MAX_RETRIES 10
 
@@ -94,9 +93,19 @@ void reload(int num)
 
 int main(int argc, char **argv)
 {
-    // get and set locale language - BUG 5362
+        // get and set locale language
 	string systemLang = "C";
-	systemLang = funcexp::utf8::idb_setlocale();
+
+	oam::Oam oam;
+	try{
+			oam.getSystemConfig("SystemLang", systemLang);
+	}
+	catch(...)
+	{
+		systemLang = "C";
+	}
+
+	setlocale(LC_ALL, systemLang.c_str());
 
 	BRM::logInit ( BRM::SubSystemLogId_controllerNode );
 
@@ -119,13 +128,32 @@ int main(int argc, char **argv)
 	(void)config::Config::makeConfig();
 
 	/* XXXPAT: we might want to install signal handlers for every signal */
+#ifdef SIGHUP
+	signal(SIGHUP, stop);
+#endif
 	signal(SIGINT, stop);
 	signal(SIGTERM, stop);
-#ifndef _MSC_VER
-	signal(SIGHUP, SIG_IGN);
+#ifdef SIGUSR1
 	signal(SIGUSR1, restart);
+#endif
+#ifdef SIPIPE
 	signal(SIGPIPE, SIG_IGN);
 #endif
+
+	//set BUSY_INIT state
+	try {
+		oam::Oam oam;
+
+		oam.processInitComplete("DBRMControllerNode", oam::BUSY_INIT);
+	}
+	catch (exception &e) {
+		ostringstream os;
+
+		os << "failed to notify OAM: " << e.what();
+		os << " continuing anyway";
+		cerr << os.str() << endl;
+		log(os.str(), logging::LOG_TYPE_WARNING);
+	}
 
 	m = NULL;
 	while (retries < MAX_RETRIES && !die) {
@@ -154,7 +182,7 @@ int main(int argc, char **argv)
 		catch (std::exception &e) {
 			ostringstream os;
 			os << e.what();
-			os << "... attempt #" << retries+1 << "/" << MAX_RETRIES << " to restart the  DBRM controller node";
+			os << "... attempt #" << retries+1 << "/" << MAX_RETRIES << ", retrying...";
 			cerr << os.str() << endl;
 			log(os.str());
 			sleep(5);

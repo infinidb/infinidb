@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: calpontsystemcatalog.h 9056 2012-11-06 20:15:42Z rdempsey $
+ *   $Id: calpontsystemcatalog.h 9054 2012-11-06 20:14:44Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -75,7 +75,7 @@ public:
     /** static calpontsystemcatalog instance map. one instance per session 
      *  TODO: should be one per transaction
      */
-    typedef std::map <uint32_t, boost::shared_ptr<CalpontSystemCatalog> > CatalogMap;
+    typedef std::map <uint32_t, CalpontSystemCatalog*> CatalogMap;
     
     /** Server Identity
      *
@@ -138,7 +138,7 @@ public:
 		NO_AUTOINCRCOL,
 		AUTOINCRCOL
 	};
-	
+
     /** the type of an object number
      *
      * @todo TODO: OIDs aren't really signed. This should be fixed.
@@ -204,13 +204,13 @@ public:
      */
     struct ColType
     {
-        ColType() : colWidth(0), constraintType(NO_CONSTRAINT), colDataType(MEDINT), defaultValue(""), colPosition(-1), scale(0), precision(-1), compressionType(NO_COMPRESSION), columnOID(0),
+        ColType() : colWidth(0), constraintType(NO_CONSTRAINT), colDataType(MEDINT), colPosition(-1), scale(0), precision(-1), compressionType(NO_COMPRESSION), columnOID(0),
 		autoincrement(0), nextvalue(0){ }
         int32_t colWidth;
         ConstraintType constraintType;
         ColDataType colDataType;
         DictOID ddn;
-        std::string defaultValue;
+        boost::any defaultValue;
         int32_t colPosition;    // temporally put here. may need to have ColInfo struct later
         int32_t scale;  //number after decimal points
         int32_t precision; 
@@ -218,23 +218,7 @@ public:
         OID columnOID;
 		bool     autoincrement; //set to true if  SYSCOLUMN autoincrement is �y�
 		int64_t nextvalue; //next autoincrement value 
-		
-        ColType(const ColType& rhs)
-		{
-			colWidth = rhs.colWidth;
-			constraintType = rhs.constraintType;
-			colDataType = rhs.colDataType;
-			ddn = rhs.ddn;
-			defaultValue = rhs.defaultValue;
-			colPosition = rhs.colPosition;
-			scale = rhs.scale;
-			precision = rhs.precision;
-			compressionType = rhs.compressionType;
-			columnOID = rhs.columnOID;
-			autoincrement = rhs.autoincrement;
-			nextvalue = rhs.nextvalue;
-		
-		}
+        
         // for F&E use. only serialize necessary info for now
         void serialize (messageqcpp::ByteStream& b) const
         {
@@ -345,22 +329,17 @@ public:
      */
     struct TableAliasName
     {
-        TableAliasName ():fIsInfiniDB (true) {}
+        TableAliasName () {}
         TableAliasName (std::string sch, std::string tb, std::string al) :
-                    schema (sch), table (tb), alias (al), fIsInfiniDB(true) {}
+                    schema (sch), table (tb), alias (al) {}
         std::string schema;
         std::string table;
         std::string alias;
         std::string view;
-        bool fIsInfiniDB;
         bool operator<(const TableAliasName& rhs) const;
         bool operator>=(const TableAliasName& rhs) const { return !(*this < rhs); }
         bool operator==(const TableAliasName& rhs) const
-            { return (schema == rhs.schema && 
-            	        table == rhs.table && 
-            	        alias == rhs.alias && 
-            	        view == rhs.view && 
-            	        fIsInfiniDB == rhs.fIsInfiniDB); }
+            { return (schema == rhs.schema && table == rhs.table && alias == rhs.alias && view == rhs.view); }
         bool operator!=(const TableAliasName& rhs) const { return !(*this == rhs); }
         void serialize(messageqcpp::ByteStream&) const;
         void unserialize(messageqcpp::ByteStream&);
@@ -475,13 +454,8 @@ public:
      *
      * return the ird of next value of autoincrement for a given table:
      */
-	const ROPair nextAutoIncrRid ( const OID& oid);	
+	const ROPair nextAutoIncrRid ( const OID& oid);
 
-	/** returns the oid of autoincrement column for the table
-     *
-     * return the oid of autoincrement column for a given table:
-     */
-	int32_t autoColumOid(TableName tableName);
     
     /** returns the columns bitmap file object number
      *
@@ -684,7 +658,7 @@ public:
      *  TODO: may need to change to one instance per transaction
      *  @parm sessionID to map the key of catalog map
      */
-    static boost::shared_ptr<CalpontSystemCatalog> makeCalpontSystemCatalog(uint32_t sessionID = 0);
+    static CalpontSystemCatalog* makeCalpontSystemCatalog(uint32_t sessionID = 0);
     
     /** remove and delete the instance map to the sessionid
      *  @param sessionID
@@ -716,7 +690,7 @@ public:
     /** return the table name for a give table oid */
     const TableName tableName (const OID& oid);
     /** return the list of tables for a given schema */
-    const std::vector< std::pair<OID, TableName> > getTables (const std::string schema = "");
+    const std::vector<std::string> getTables (const std::string& schema);
     /** return the number of tables in the whole database */
     const int getTableCount ();
     /** return the constraint info for a given constraint */
@@ -737,14 +711,13 @@ public:
 
 	friend class ::ExecPlanTest;
 
-    /** Destructor */
-    ~CalpontSystemCatalog();
-
 private:
     /** Constuctors */
     explicit CalpontSystemCatalog();
     explicit CalpontSystemCatalog(const CalpontSystemCatalog& rhs);
     
+    /** Destructor */
+    ~CalpontSystemCatalog();
     
     CalpontSystemCatalog& operator=(const CalpontSystemCatalog& rhs);
 
@@ -800,9 +773,9 @@ private:
     DctTokenMap fDctTokenMap;
     boost::mutex fDctTokenMapLock;
 
-		typedef std::map<OID, TableName> TableNameMap;
-		TableNameMap fTableNameMap;
-		boost::mutex fTableNameMapLock;
+	typedef std::map<OID, TableName> TableNameMap;
+	TableNameMap fTableNameMap;
+	boost::mutex fTableNameMapLock;
 
     ClientRotator* fExeMgr;
     uint32_t fSessionID;
@@ -824,9 +797,8 @@ const CalpontSystemCatalog::TableColName make_tcn(const std::string& s, const st
 /** convenience function to make a TableName from 2 strings
  */
 const CalpontSystemCatalog::TableName make_table(const std::string& s, const std::string& t);
-const CalpontSystemCatalog::TableAliasName make_aliastable(const std::string& s, const std::string& t, const std::string& a,
-	                     const bool fIsInfiniDB = true);
-const CalpontSystemCatalog::TableAliasName make_aliasview(const std::string& s, const std::string& t, const std::string& a, const std::string& v, const bool fIsInfiniDB = true);
+const CalpontSystemCatalog::TableAliasName make_aliastable(const std::string& s, const std::string& t, const std::string& a);
+const CalpontSystemCatalog::TableAliasName make_aliasview(const std::string& s, const std::string& t, const std::string& a, const std::string& v);
 
 
 /** constants for system table names

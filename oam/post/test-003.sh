@@ -1,18 +1,8 @@
 #!/bin/bash
 #
-# $Id: test-003.sh 2937 2012-05-30 18:17:09Z rdempsey $
+# $Id: test-003.sh 1538 2009-07-22 18:57:04Z dhill $
 
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	test -f /etc/default/infinidb && . /etc/default/infinidb
-fi
-
-if [ -z "$INFINIDB_INSTALL_DIR" ]; then
-	INFINIDB_INSTALL_DIR=/usr/local/Calpont
-fi
-
-declare -x INFINIDB_INSTALL_DIR=$INFINIDB_INSTALL_DIR
-
-test -f $INFINIDB_INSTALL_DIR/post/functions && . $INFINIDB_INSTALL_DIR/post/functions
+test -f /usr/local/Calpont/post/functions && . /usr/local/Calpont/post/functions
 
 scrname=`basename $0`
 tname="check-oid-bitmap"

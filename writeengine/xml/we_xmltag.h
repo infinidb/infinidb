@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_xmltag.h 3806 2012-05-01 12:23:02Z dcathey $
+* $Id: we_xmltag.h 3403 2011-12-21 16:58:13Z xlou $
 *
 *******************************************************************************/
 /** @file */
@@ -65,7 +65,6 @@ namespace WriteEngine
       TAG_LOAD_NAME,
       TAG_MAX_ERR_ROW,
       TAG_NOT_NULL,
-      TAG_DEFAULT_VALUE,
       TAG_ORIG_NAME, //@bug 3599: deprecated; kept for backwards compatibility
       TAG_PRECISION,
       TAG_SCALE,
@@ -111,7 +110,6 @@ namespace WriteEngine
       "loadName",
       "maxErrRow",
       "notnull",
-      "defaultValue",
       "origName", //@bug 3599: deprecated; kept for backwards compatibility
       "precision",
       "scale",

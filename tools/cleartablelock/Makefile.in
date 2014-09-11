@@ -69,8 +69,7 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_cleartablelock_OBJECTS = cleartablelock-cleartablelock.$(OBJEXT) \
-	cleartablelock-cleartablelockthread.$(OBJEXT)
+am_cleartablelock_OBJECTS = cleartablelock-cleartablelock.$(OBJEXT)
 cleartablelock_OBJECTS = $(am_cleartablelock_OBJECTS)
 cleartablelock_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -216,9 +215,9 @@ AM_CPPFLAGS = $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
-cleartablelock_SOURCES = cleartablelock.cpp cleartablelockthread.cpp
+cleartablelock_SOURCES = cleartablelock.cpp
 cleartablelock_CPPFLAGS = @idb_common_includes@ $(AM_CPPFLAGS)
-cleartablelock_LDFLAGS = @idb_common_ldflags@ @idb_exec_libs@ -lwriteengine -lcacheutils $(AM_LDFLAGS)
+cleartablelock_LDFLAGS = @idb_common_ldflags@ @idb_exec_libs@ -lwriteengine -lcacheutils -ldm $(AM_LDFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -291,7 +290,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cleartablelock-cleartablelock.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cleartablelock-cleartablelockthread.Po@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -327,20 +325,6 @@ cleartablelock-cleartablelock.obj: cleartablelock.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cleartablelock.cpp' object='cleartablelock-cleartablelock.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(cleartablelock_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cleartablelock-cleartablelock.obj `if test -f 'cleartablelock.cpp'; then $(CYGPATH_W) 'cleartablelock.cpp'; else $(CYGPATH_W) '$(srcdir)/cleartablelock.cpp'; fi`
-
-cleartablelock-cleartablelockthread.o: cleartablelockthread.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(cleartablelock_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cleartablelock-cleartablelockthread.o -MD -MP -MF "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo" -c -o cleartablelock-cleartablelockthread.o `test -f 'cleartablelockthread.cpp' || echo '$(srcdir)/'`cleartablelockthread.cpp; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo" "$(DEPDIR)/cleartablelock-cleartablelockthread.Po"; else rm -f "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cleartablelockthread.cpp' object='cleartablelock-cleartablelockthread.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(cleartablelock_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cleartablelock-cleartablelockthread.o `test -f 'cleartablelockthread.cpp' || echo '$(srcdir)/'`cleartablelockthread.cpp
-
-cleartablelock-cleartablelockthread.obj: cleartablelockthread.cpp
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(cleartablelock_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cleartablelock-cleartablelockthread.obj -MD -MP -MF "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo" -c -o cleartablelock-cleartablelockthread.obj `if test -f 'cleartablelockthread.cpp'; then $(CYGPATH_W) 'cleartablelockthread.cpp'; else $(CYGPATH_W) '$(srcdir)/cleartablelockthread.cpp'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo" "$(DEPDIR)/cleartablelock-cleartablelockthread.Po"; else rm -f "$(DEPDIR)/cleartablelock-cleartablelockthread.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='cleartablelockthread.cpp' object='cleartablelock-cleartablelockthread.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(cleartablelock_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cleartablelock-cleartablelockthread.obj `if test -f 'cleartablelockthread.cpp'; then $(CYGPATH_W) 'cleartablelockthread.cpp'; else $(CYGPATH_W) '$(srcdir)/cleartablelockthread.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

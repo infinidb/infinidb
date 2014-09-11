@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: masterdbrmnode.h 1705 2012-09-19 18:48:45Z dhall $
+ * $Id: masterdbrmnode.h 1501 2012-02-23 02:03:15Z pleblanc $
  *
  *****************************************************************************/
 
@@ -36,9 +36,6 @@
 #include "bytestream.h"
 #include "configcpp.h"
 #include "sessionmanagerserver.h"
-#include "oidserver.h"
-#include "tablelockserver.h"
-#include "autoincrementmanager.h"
 
 namespace BRM {
 
@@ -163,8 +160,7 @@ private:
 	void confirm();
 	void sendError(messageqcpp::IOSocket *dest, uint8_t err) const throw();
 	int gatherResponses(uint8_t cmd, uint32_t msgCmdLength,
-		std::vector<messageqcpp::ByteStream *>* responses,
-		bool& readErrFlag) throw();
+		std::vector<messageqcpp::ByteStream *>* responses) throw();
 	int compareResponses(uint8_t cmd, uint32_t msgCmdLength,
 		const std::vector <messageqcpp::ByteStream *>& responses) const;
 	void finalCleanup();
@@ -177,7 +173,6 @@ private:
 	void doGetReadOnly(messageqcpp::IOSocket *sock);
 	
 	/* SessionManager interface */
-	SessionManagerServer sm;
 	void doVerID(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doSysCatVerID(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doNewTxnID(messageqcpp::ByteStream &msg, ThreadParams *p);
@@ -185,43 +180,14 @@ private:
 	void doRolledBack(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doGetTxnID(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doSIDTIDMap(messageqcpp::ByteStream &msg, ThreadParams *p);
+	void doSetTableLock(messageqcpp::ByteStream &msg, ThreadParams *p);
+	void doUpdateTableLock(messageqcpp::ByteStream &msg, ThreadParams *p);
+	void doGetTableLock(messageqcpp::ByteStream &msg, ThreadParams *p);
+	void doGetTableLocks(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doGetShmContents(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doGetUniqueUint32(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetUniqueUint64(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doGetSystemState(messageqcpp::ByteStream &msg, ThreadParams *p);
 	void doSetSystemState(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doClearSystemState(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doSessionManagerReset(messageqcpp::ByteStream &msg, ThreadParams *p);
-
-	/* OID Manager interface */
-	OIDServer oids;
-	boost::mutex oidsMutex;
-	void doAllocOIDs(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doReturnOIDs(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doOidmSize(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doAllocVBOID(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetDBRootOfVBOID(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetVBOIDToDBRootMap(messageqcpp::ByteStream &msg, ThreadParams *p);
-
-	/* Table lock interface */
-	boost::scoped_ptr<TableLockServer> tableLockServer;
-	void doGetTableLock(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doReleaseTableLock(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doChangeTableLockState(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doChangeTableLockOwner(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetAllTableLocks(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doReleaseAllTableLocks(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetTableLockInfo(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doOwnerCheck(messageqcpp::ByteStream &msg, ThreadParams *p);
-
-	/* Autoincrement interface */
-	AutoincrementManager aiManager;
-	void doStartAISequence(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetAIRange(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doResetAISequence(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doGetAILock(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doReleaseAILock(messageqcpp::ByteStream &msg, ThreadParams *p);
-	void doDeleteAISequence(messageqcpp::ByteStream &msg, ThreadParams *p);
 
 	messageqcpp::MessageQueueServer *dbrmServer;
 	std::vector<messageqcpp::MessageQueueClient *> slaves;
@@ -229,6 +195,8 @@ private:
 	std::vector<messageqcpp::IOSocket *> activeSessions;
 
 	LBIDResourceGraph *rg;
+
+	SessionManagerServer sm;
 
 	boost::mutex mutex;
 	boost::mutex mutex2;		// protects params and the hand-off  TODO: simplify

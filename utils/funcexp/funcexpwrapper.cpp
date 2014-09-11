@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: funcexpwrapper.cpp 3048 2012-04-04 15:33:45Z rdempsey $
+// $Id: funcexpwrapper.cpp 2596 2011-05-17 17:18:07Z xlou $
 //
 // C++ Implementation: funcexpwrapper
 //

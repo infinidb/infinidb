@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tuplehavingstep.cpp 8476 2012-04-25 22:28:15Z xlou $
+//  $Id: tuplehavingstep.cpp 7829 2011-06-30 20:09:00Z xlou $
 
 
 //#define NDEBUG
@@ -300,8 +300,8 @@ void TupleHavingStep::execute()
 			fOutputJobStepAssociation.status(tupleHavingStepErr);
 	}
 
-	while (more)
-		more = fInputDL->next(fInputIterator, &rgDataIn);
+	if (!fEndOfResult)
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
 	fEndOfResult = true;
 	fOutputDL->endOfInput();
@@ -372,7 +372,7 @@ void TupleHavingStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl

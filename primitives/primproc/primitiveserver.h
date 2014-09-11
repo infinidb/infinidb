@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: primitiveserver.h 2026 2013-01-04 20:16:36Z pleblanc $
+ *   $Id: primitiveserver.h 2027 2013-01-04 20:18:09Z pleblanc $
  *
  *
  ***********************************************************************/
@@ -35,7 +35,7 @@
 #include <boost/thread.hpp>
 
 #include "threadpool.h"
-#include "prioritythreadpool.h"
+#include "weightedthreadpool.h"
 #include "messagequeue.h"
 #include "blockrequestprocessor.h"
 #include "batchprimitiveprocessor.h"
@@ -50,7 +50,6 @@ namespace primitiveprocessor
 	extern dbbc::BlockRequestProcessor **BRPp;
 	extern BRM::DBRM *brm;
 	extern boost::mutex bppLock;
-	extern uint highPriorityThreads, medPriorityThreads, lowPriorityThreads;
 
 #ifdef PRIMPROC_STOPWATCH
 	extern map<pthread_t, logging::StopWatch*> stopwatchMap;
@@ -102,6 +101,7 @@ namespace primitiveprocessor
              */
             PrimitiveServer(int serverThreads,
 						int serverQueueSize,
+                		int processorThreads, 
 						int processorWeight,
 						int processorQueueSize,
 						bool rotatingDestination,
@@ -128,14 +128,15 @@ namespace primitiveprocessor
 
             /** @brief get a pointer the shared processor thread pool
              */
-            inline boost::shared_ptr<threadpool::PriorityThreadPool> getProcessorThreadPool() const { return fProcessorPool; }
+            inline threadpool::WeightedThreadPool* getProcessorThreadPool() { return &fProcessorpool; }
+            inline const threadpool::WeightedThreadPool* getProcessorThreadPool() const { return &fProcessorpool; }
 
 // 			int fCacheCount;
 			const int ReadAheadBlocks() const {return fReadAheadBlocks;}
 			bool  rotatingDestination() const {return fRotatingDestination;}
 			bool PTTrace() const {return fPTTrace;}
 			double prefetchThreshold() const { return fPrefetchThreshold; }
-			uint ProcessorThreads() const { return highPriorityThreads + medPriorityThreads + lowPriorityThreads; }
+			const int ProcessorThreads() const { return fProcessorThreads;}
         protected:
 
         private:
@@ -147,10 +148,11 @@ namespace primitiveprocessor
             /** @brief the thread pool used to process
              * primitive commands
              */
-            boost::shared_ptr<threadpool::PriorityThreadPool> fProcessorPool;
+            threadpool::WeightedThreadPool fProcessorpool;
 
             int fServerThreads;
             int fServerQueueSize;
+            int fProcessorThreads;
             int fProcessorWeight;
             int fProcessorQueueSize;
 			int fMaxBlocksPerRead;

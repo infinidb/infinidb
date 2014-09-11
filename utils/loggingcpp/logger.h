@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*
- * $Id: logger.h 3048 2012-04-04 15:33:45Z rdempsey $
+ * $Id: logger.h 2386 2011-02-03 17:56:55Z rdempsey $
  */
 
 /** @file */

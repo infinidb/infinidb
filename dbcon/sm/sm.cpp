@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: sm.cpp 9262 2013-02-06 21:07:19Z zzhu $
+ *   $Id: sm.cpp 8910 2012-09-18 18:52:26Z zzhu $
  *
  ***********************************************************************/
 
@@ -43,9 +43,6 @@ using namespace messageqcpp;
 
 #include "errorcodes.h"
 using namespace logging;
-
-#include "querystats.h"
-using namespace querystats;
 
 #include "sm.h"
 
@@ -123,7 +120,7 @@ status_t
 tpl_scan_open (
 		tableid_t				tableid,	/* IN - Table id of the table */
 		tpl_fetch_hint_t fh,			/* IN - Tuple fetch hint */
-		sp_cpsm_tplsch_t& ntplsch,			/* OUT - Tuple scan handle */
+		void **tpl_scanhdl,			/* OUT - Tuple scan handle */
 		void *conn_hdl			/* IN - connection handle */
 ) 
 {	
@@ -131,6 +128,7 @@ tpl_scan_open (
 		DEBUG << "tpl_scan_open: " << hndl << " tableid: " << tableid << endl;
 		
 		// @bug 649. No initialization here. take passed in reference
+		cpsm_tplsch_t* ntplsch = static_cast<cpsm_tplsch_t*> (*tpl_scanhdl);
 		ntplsch->tableid = tableid;
 		char* tmp = (char*)alloca(sizeof(ntplsch->tbName));
 		strcpy(ntplsch->tbName, tblid2name(tmp, ntplsch->tableid, conn_hdl));
@@ -139,12 +137,11 @@ tpl_scan_open (
 		return STATUS_OK;
 }
 
-status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, int* killed)
+status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, cpsm_tplsch_t* ntplsch, int* killed)
 {	 
 		// @bug 649 check keybandmap first
 		map<int, int>::iterator keyBandMapIter = hndl->keyBandMap.find(ntplsch->key);
-		
-		try {
+			
 		if (keyBandMapIter != hndl->keyBandMap.end())
 		{
 				ByteStream bs;
@@ -220,15 +217,11 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 							// @bug 2244. Bypass ClientRotator::read() because if I/O error occurs, it tries
 							//            to reestablish a connection with ExeMgr which ends up causing mysql
 							//            session to hang.
-							bool timeout = true;
-							while (timeout)
-							{
-								timeout = false;
-								ntplsch->bs = hndl->exeMgr->getClient()->read(&t, &timeout);
-								
-								if (killed && *killed)
-									return SQL_KILLED;
-							}
+							// @bug4380. clientrotator throws exception for read/write now, so we can remove 
+							// the timeout work around.
+							ntplsch->bs = hndl->exeMgr->read();
+							if (killed && *killed)
+								return SQL_KILLED;							
 
 							if (ntplsch->bs.length() == 0)
 							{
@@ -249,8 +242,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 					{
 						hndl->curFetchTb = 0;
 						if (ntplsch->saveFlag == NO_SAVE)
-							hndl->tidScanMap[ntplsch->tableid] = ntplsch;
-						ntplsch->errMsg = IDBErrorInfo::instance()->errorMsg(ERR_LOST_CONN_EXEMGR);
+							hndl->tidScanMap[ntplsch->tableid] = *ntplsch;
 						return logging::ERR_LOST_CONN_EXEMGR;
 					}
 				}
@@ -260,25 +252,16 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 				{
 						hndl->curFetchTb = 0;
 						if (ntplsch->saveFlag == NO_SAVE)
-								hndl->tidScanMap[ntplsch->tableid] = ntplsch;
+								hndl->tidScanMap[ntplsch->tableid] = *ntplsch;
 						return SQL_NOT_FOUND;
 				}
-		}
-		} catch (std::exception &e)
-		{
-			hndl->curFetchTb = 0;
-			if (ntplsch->saveFlag == NO_SAVE)
-				hndl->tidScanMap[ntplsch->tableid] = ntplsch;
-			ntplsch->errMsg = e.what();
-			return logging::ERR_LOST_CONN_EXEMGR;
 		}
 		ntplsch->rowsreturned = 0;
 		return STATUS_OK;
 }
-
 status_t 
 tpl_scan_fetch (
-		sp_cpsm_tplsch_t& ntplsch,				/* IN - Tuple scan handle */
+		void* tpl_scanhdl,				/* IN - Tuple scan handle */
 		fldl_val_t* fld_vlist,	/* OUT - Field values fetched */
 		void* tid,							/* OUT - Tuple id of the fetched tuple */
 		void* conn_hdl,						/* IN - connection handle */
@@ -286,11 +269,20 @@ tpl_scan_fetch (
 )
 {
 		cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(conn_hdl);
-
+		cpsm_tplsch_t* ntplsch = static_cast<cpsm_tplsch_t*>(tpl_scanhdl);
+		cpsm_tid_t* tplid = static_cast<cpsm_tid_t*>(tid);
+		
 		// @770. force end of result set when this is not the first table to be fetched.
 		if (ntplsch->traceFlags & CalpontSelectExecutionPlan::TRACE_NO_ROWS2)
 				if (hndl->tidScanMap.size() >= 1)
 						return SQL_NOT_FOUND;
+
+		if (tid)
+		{
+				char b[1024];
+				sprintf(b, "%u", (unsigned)ntplsch->rowsreturned);
+				char_to_tid(strlen(b), b, tplid, hndl);
+		}
 
 		// need another band
 		status_t status = STATUS_OK;
@@ -302,63 +294,37 @@ tpl_scan_fetch (
 
 status_t 
 tpl_scan_close (
-		//void *tpl_scanhdl,			/* IN - Tuple scan handle */
-		sp_cpsm_tplsch_t& ntplsch,
+		void *tpl_scanhdl,			/* IN - Tuple scan handle */
 		void *conn_hdl			/* IN - connection handle */
 ) 
 {
 	cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(conn_hdl);
 
+	cpsm_tplsch_t* ntplsch = static_cast<cpsm_tplsch_t*>(tpl_scanhdl);
+
 	DEBUG << "tpl_scan_close: " << hndl;
-	if (ntplsch) 
-		DEBUG << " tableid: " << ntplsch->tableid << endl;
-	ntplsch.reset();
+	if (ntplsch) DEBUG << " tableid: " << ntplsch->tableid;
+			DEBUG << endl;
+
+	delete ntplsch;
 
 	return STATUS_OK;
-}
-
-void end_query(cpsm_conhdl_t* hndl)
-{
-	// remove system catalog instance for this statement.
-	// @bug 695. turn on system catalog session cache for FE
-	// CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);
-	hndl->queryState = NO_QUERY;
-	// reset at the end of query
-	hndl->curFetchTb = 0;
-	// @bug 626 clear up 
-	hndl->tidMap.clear();
-	hndl->tidScanMap.clear();
-	hndl->keyBandMap.clear();
-	// Tell ExeMgr we are done with this query
-	try {
-		ByteStream bs;
-		ByteStream::quadbyte qb = 0;
-		bs << qb;
-		hndl->write(bs);
-	}
-	catch(...)
-	{
-		throw;
-	}
 }
 
 status_t
 tpl_close (
 		void *tplhdl,			/* IN - Tuple handle */
-		cpsm_conhdl_t **conn_hdl,			/* IN - connection handle */
-		QueryStats& stats   /* IN&OUT - query stats */
+		void *conn_hdl			/* IN - connection handle */
 ) 
 {
-		cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(*conn_hdl);
+		cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(conn_hdl);
 		
 		cpsm_tplh_t* ntplh = static_cast<cpsm_tplh_t*>(tplhdl);
 		
 		DEBUG << "tpl_close: " << hndl;
 		if (ntplh) DEBUG << " tableid: " << ntplh->tableid;
 		DEBUG << endl;
-		
-		delete ntplh;
-		
+
 		// determine end of result set and end of statement execution	
 		if (hndl->queryState == QUERY_IN_PROCESS)
 		{ 
@@ -378,28 +344,28 @@ tpl_close (
 						bs >> hndl->queryStats;
 						bs >> hndl->extendedStats;
 						bs >> hndl->miniStats;
-						stats.unserialize(bs);
-						stats.setEndTime();
-						stats.insert();
 						break;
-					} catch (IDBExcept&)
-					{
-						// @bug4732
-						end_query(hndl);
-						throw;
-					} 
-					catch (...) {
-						// querystats messed up. close connection.
-						// no need to throw for querystats protocol error, like for tablemode.
-						end_query(hndl);
-						sm_cleanup(hndl);
-						*conn_hdl = 0;
-						return STATUS_OK;
-						//throw runtime_error(string("tbl_close catch exception: ") + e.what());
+					} catch (...) {
 					}
 				}
-				end_query(hndl);
+				// Tell ExeMgr we are done with this query
+				bs.reset();
+				qb = 0;
+				bs << qb;
+				//hndl->exeMgr->write(bs);
+				hndl->write(bs);
+				// remove system catalog instance for this statement.
+				// @bug 695. turn on system catalog session cache for FE
+				// CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);
+				hndl->queryState = NO_QUERY;
+				// reset at the end of query
+				hndl->curFetchTb = 0;
+				// @bug 626 clear up 
+				hndl->tidMap.clear();
+				hndl->tidScanMap.clear();
+				hndl->keyBandMap.clear();
 		}
+		delete ntplh;
 		return STATUS_OK;
 }
 
@@ -442,7 +408,8 @@ sm_cleanup (
 #if IDB_SM_DEBUG    
     DEBUG.close();
 #endif
-    delete hndl;
+		if (hndl)
+    	delete hndl;
     return STATUS_OK;
 }
 
@@ -495,7 +462,7 @@ status_t get_tblinfo (
     // TODO: need a dharma version for ODBC solution.
     cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(conn_hdl);
     uint32_t  sessionid = hndl->sessionID;
-    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
     csc->sessionID(sessionid);
     csc->identity(CalpontSystemCatalog::FE);
     
@@ -524,7 +491,7 @@ void sighandler(int sig_num)
 
 	if ((p = fopen("/tmp/f1.dat", "a")) != NULL)
 	{
-		snprintf(buf, 1024, "sighandler() hit with %d\n", sig_num);
+		sprintf(buf, "sighandler() hit with %d\n", sig_num);
 		fwrite(buf, 1, strlen(buf), p);
 		fclose(p);
 	}

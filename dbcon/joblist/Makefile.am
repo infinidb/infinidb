@@ -23,21 +23,28 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = -version-info 1:0:0 $(idb_ldflags)
 lib_LTLIBRARIES = libjoblist.la
-libjoblist_la_CPPFLAGS = -I../../mysql/include -I../../mysql/sql -I../../mysql/regex $(AM_CPPFLAGS)
 libjoblist_la_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 libjoblist_la_SOURCES = \
+        aggregatefilterstep.cpp \
+        aggregator.cpp \
         anydatalist.cpp \
         batchprimitiveprocessor-jl.cpp \
+        batchprimitivestep.cpp \
+        bucketreuse.cpp \
+        bucketreusestep.cpp \
         columncommand-jl.cpp \
         command-jl.cpp \
-        crossenginestep.cpp \
+        deliverystep.cpp \
+        deliverywsdl.cpp \
         dictstep-jl.cpp \
         distributedenginecomm.cpp \
         elementtype.cpp \
         expressionstep.cpp \
         filtercommand-jl.cpp \
+        filteroperation.cpp \
         filterstep.cpp \
         groupconcat.cpp \
+        hashjoin.cpp \
         jl_logger.cpp \
         jlf_common.cpp \
         jlf_execplantojoblist.cpp \
@@ -48,6 +55,7 @@ libjoblist_la_SOURCES = \
         joblistfactory.cpp \
         jobstep.cpp \
         jobstepassociation.cpp \
+        largehashjoin.cpp \
         lbidlist.cpp \
         limitedorderby.cpp \
         passthrucommand-jl.cpp \
@@ -57,12 +65,15 @@ libjoblist_la_SOURCES = \
         pdictionary.cpp \
         pdictionaryscan.cpp \
         primitivemsg.cpp \
+        profiling.cpp \
+        reducestep.cpp  \
         resourcedistributor.cpp \
         resourcemanager.cpp \
         rowestimator.cpp \
         rtscommand-jl.cpp \
         subquerystep.cpp \
         subquerytransformer.cpp \
+        tableband.cpp \
         tablecolumn.cpp \
         timestamp.cpp \
         tuple-bps.cpp \
@@ -72,17 +83,25 @@ libjoblist_la_SOURCES = \
         tuplehashjoin.cpp \
         tuplehavingstep.cpp \
         tupleunion.cpp \
+        tuplewsdl.cpp \
+        unionstep.cpp \
         unique32generator.cpp \
         virtualtable.cpp
 
 include_HEADERS = \
+        aggregator.h \
+        batchprimitiveprocessor-jl.h \
+        bdlwrapper.h \
         bpp-jl.h \
-        datalist.h \
-        datalistimpl.h \
+        bucketreuse.h \
+        columncommand-jl.h \
+        command-jl.h \
+        deliverywsdl.h \
+        dictstep-jl.h \
         distributedenginecomm.h \
-        elementcompression.h \
         elementtype.h \
-        fifo.h \
+        filtercommand-jl.h \
+        filteroperation.h \
         groupconcat.h \
         jl_logger.h \
         joblist.h \
@@ -91,14 +110,30 @@ include_HEADERS = \
         jobstep.h \
         lbidlist.h \
         limitedorderby.h \
+        passthrucommand-jl.h \
         primitivemsg.h \
+        profiling.h \
         resourcedistributor.h \
         resourcemanager.h \
+        rowestimator.h \
         rtscommand-jl.h \
+        tableband.h \
         tablecolumn.h \
         threadsafequeue.h \
         timeset.h \
         timestamp.h \
+        bandeddl.h \
+        bucketdl.h \
+        constantdatalist.h \
+        datalist.h \
+        datalistimpl.h \
+        elementcompression.h \
+        fifo.h \
+        largedatalist.h \
+        swsdl.h \
+        tuplewsdl.h \
+        wsdl.h \
+        zdl.h \
         unique32generator.h
 
 test:

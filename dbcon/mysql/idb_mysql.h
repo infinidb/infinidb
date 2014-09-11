@@ -1,19 +1,3 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1301, USA. */
 //One include file to deal with all the MySQL pollution of the
 //  global namespace
 //
@@ -57,13 +41,6 @@
 #undef pthread_mutex_trylock
 #undef sleep
 #undef getpid
-#undef SIZEOF_LONG
-#undef PACKAGE_VERSION
-#undef PACKAGE_TARNAME
-#undef PACKAGE_STRING
-#undef PACKAGE_NAME
-#undef PACKAGE_BUGREPORT
-#undef DEBUG
 
 #endif
 // vim:ts=4 sw=4:

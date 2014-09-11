@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: columncommand-jl.h 8757 2012-07-27 19:00:31Z pleblanc $
+// $Id: columncommand-jl.h 8765 2012-07-30 17:29:49Z pleblanc $
 // C++ Interface: columncommand
 //
 // Description: 
@@ -32,7 +32,7 @@
 #ifndef COLUMNCOMMANDJL_H_
 #define COLUMNCOMMANDJL_H_
 
-#include "primitivestep.h"
+#include "jobstep.h"
 #include "command-jl.h"
 
 namespace joblist
@@ -41,14 +41,14 @@ namespace joblist
 class ColumnCommandJL : public CommandJL
 {
 public:
-	ColumnCommandJL(const pColScanStep &, std::vector<BRM::LBID_t> lastLBID);
+	ColumnCommandJL(const pColScanStep &, BRM::LBID_t lastLBID);
 	ColumnCommandJL(const pColScanStep &);
 	ColumnCommandJL(const pColStep &);
 	virtual ~ColumnCommandJL();
 
 	void createCommand(messageqcpp::ByteStream &bs) const;
 	void runCommand(messageqcpp::ByteStream &bs) const;
-	void setLBID(uint64_t rid, uint dbroot);
+	void setLBID(uint64_t rid);
 	uint8_t getTableColumnType();
 	std::string toString();
 	uint16_t getWidth();
@@ -57,7 +57,7 @@ public:
 	const uint8_t getBOP() const { return BOP; }
 	const messageqcpp::ByteStream& getFilterString() { return filterString; }
 	const uint16_t getFilterCount() const { return filterCount; }
-	const std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
+	std::vector<struct BRM::EMEntry>& getExtents() { return extents; }
 	const execplan::CalpontSystemCatalog::ColType& getColType() const { return colType; }
 	bool isCharType() const;
 	bool isDict() const { return fIsDict; }
@@ -83,7 +83,7 @@ private:
 	messageqcpp::ByteStream filterString;
 	uint16_t filterCount;
 	uint8_t fFcnOrd;
-	std::vector<BRM::LBID_t> fLastLbid;
+	BRM::LBID_t fLastLbid;
 
 	// care about colDataType, colWidth and scale fields.  On the PM the rest is uninitialized
 	execplan::CalpontSystemCatalog::ColType colType;
@@ -94,8 +94,6 @@ private:
 	uint64_t fFilesPerColumnPartition;
 	uint64_t fExtentsPerSegmentFile;
 	uint64_t fExtentRows;
-
-	uint numDBRoots;
 	static const unsigned DEFAULT_FILES_PER_COLUMN_PARTITION = 32;
 	static const unsigned DEFAULT_EXTENTS_PER_SEGMENT_FILE   =  4;
 };

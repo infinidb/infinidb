@@ -24512,7 +24512,7 @@ else
 	echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
-idb_ldflags='-Wl,--rpath -Wl,/usr/local/Calpont/lib -Wl,--no-as-needed -Wl,--add-needed'
+idb_ldflags='-Wl,--rpath -Wl,/usr/local/Calpont/lib'
 
 
 echo "$as_me:$LINENO: checking for CPU architecture" >&5
@@ -24560,22 +24560,22 @@ mibdir='${prefix}/Calpont/share/snmp/mibs'
 netsnmp_libs=' '
 
 
-idb_common_libs='-lmessageqcpp -lloggingcpp -lconfigcpp -lidbboot -lboost_idb -lxml2 -lpthread -lrt'
+idb_common_libs='-lmessageqcpp -lloggingcpp -lconfigcpp -lboost_idb -lxml2 -lpthread -lrt'
 
 idb_oam_libs='-loamcpp -lsnmpmanager ${netsnmp_libs}'
 
-idb_brm_libs='-lbrm -lrwlock -lcacheutils ${idb_oam_libs} ${idb_common_libs}'
+idb_brm_libs='-lbrm -lrwlock ${idb_common_libs}'
 
-idb_exec_libs='-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon -lmysqlcl_idb -lquerystats ${idb_brm_libs}'
+idb_exec_libs='-ljoblist -lexecplan -ljoiner -lrowgroup -lmulticast -lfuncexp -ldataconvert -lcommon ${idb_brm_libs} ${idb_oam_libs}'
 
-idb_write_libs='-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -lwriteengineclient -lcacheutils ${idb_exec_libs}'
+idb_write_libs='-lddlpackageproc -lddlpackage -ldmlpackageproc -ldmlpackage -lwriteengine -ldm -lcacheutils ${idb_exec_libs}'
 
 idb_common_includes='-I${prefix}/Calpont/include -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/include/libxml2'
 
 idb_common_ldflags='-L${prefix}/Calpont/lib -L/usr/local/lib'
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ac_config_files="$ac_config_files Makefile utils/Makefile utils/boost_idb/Makefile utils/startup/Makefile utils/common/Makefile utils/configcpp/Makefile utils/loggingcpp/Makefile utils/messageqcpp/Makefile utils/threadpool/Makefile utils/rwlock/Makefile utils/dataconvert/Makefile utils/joiner/Makefile utils/rowgroup/Makefile utils/cacheutils/Makefile utils/multicast/Makefile utils/funcexp/Makefile utils/compress/Makefile utils/ddlcleanup/Makefile utils/batchloader/Makefile utils/mysqlcl_idb/Makefile utils/querystats/Makefile exemgr/Makefile ddlproc/Makefile dbcon/Makefile dbcon/ddlpackage/Makefile dbcon/ddlpackageproc/Makefile dbcon/dmlpackage/Makefile dbcon/dmlpackageproc/Makefile dbcon/execplan/Makefile dbcon/joblist/Makefile dbcon/mysql/Makefile dbcon/sm/Makefile dmlproc/Makefile oam/Makefile oam/etc/Makefile oam/install_scripts/Makefile oam/oamcpp/Makefile oam/post/Makefile oam/replaytxnlog/Makefile oamapps/Makefile oamapps/replayTransactionLog/Makefile primitives/Makefile primitives/blockcache/Makefile primitives/linux-port/Makefile primitives/primproc/Makefile decomsvr/Makefile snmpd/Makefile snmpd/etc/Makefile snmpd/snmpmanager/Makefile tools/Makefile tools/editem/Makefile tools/cplogger/Makefile tools/clearShm/Makefile tools/setConfig/Makefile tools/getConfig/Makefile tools/dbbuilder/Makefile tools/dbloadxml/Makefile tools/viewtablelock/Makefile tools/cleartablelock/Makefile tools/ddlcleanup/Makefile tools/idbmeminfo/Makefile versioning/Makefile versioning/BRM/Makefile writeengine/Makefile writeengine/shared/Makefile writeengine/index/Makefile writeengine/dictionary/Makefile writeengine/wrapper/Makefile writeengine/xml/Makefile writeengine/bulk/Makefile writeengine/client/Makefile writeengine/splitter/Makefile writeengine/server/Makefile writeengine/cpimport/Makefile writeengine/redistribute/Makefile"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ac_config_files="$ac_config_files Makefile utils/Makefile utils/boost_idb/Makefile utils/common/Makefile utils/configcpp/Makefile utils/loggingcpp/Makefile utils/messageqcpp/Makefile utils/threadpool/Makefile utils/rwlock/Makefile utils/dataconvert/Makefile utils/joiner/Makefile utils/rowgroup/Makefile utils/cacheutils/Makefile utils/multicast/Makefile utils/funcexp/Makefile utils/compress/Makefile exemgr/Makefile ddlproc/Makefile dbcon/Makefile dbcon/ddlpackage/Makefile dbcon/ddlpackageproc/Makefile dbcon/dmlpackage/Makefile dbcon/dmlpackageproc/Makefile dbcon/execplan/Makefile dbcon/joblist/Makefile dbcon/mysql/Makefile dbcon/sm/Makefile dmlib/Makefile dmlproc/Makefile oam/Makefile oam/etc/Makefile oam/install_scripts/Makefile oam/oamcpp/Makefile oam/post/Makefile oam/replaytxnlog/Makefile oamapps/Makefile oamapps/replayTransactionLog/Makefile primitives/Makefile primitives/blockcache/Makefile primitives/linux-port/Makefile primitives/primproc/Makefile decomsvr/Makefile snmpd/Makefile snmpd/etc/Makefile snmpd/snmpmanager/Makefile tools/Makefile tools/editem/Makefile tools/cplogger/Makefile tools/clearShm/Makefile tools/setConfig/Makefile tools/getConfig/Makefile tools/dbbuilder/Makefile tools/dbloadxml/Makefile tools/viewtablelock/Makefile tools/cleartablelock/Makefile tools/ddlcleanup/Makefile tools/idbmeminfo/Makefile versioning/Makefile versioning/BRM/Makefile writeengine/Makefile writeengine/shared/Makefile writeengine/index/Makefile writeengine/dictionary/Makefile writeengine/wrapper/Makefile writeengine/xml/Makefile writeengine/bulk/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -25139,7 +25139,6 @@ do
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
   "utils/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/Makefile" ;;
   "utils/boost_idb/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/boost_idb/Makefile" ;;
-  "utils/startup/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/startup/Makefile" ;;
   "utils/common/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/common/Makefile" ;;
   "utils/configcpp/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/configcpp/Makefile" ;;
   "utils/loggingcpp/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/loggingcpp/Makefile" ;;
@@ -25153,10 +25152,6 @@ do
   "utils/multicast/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/multicast/Makefile" ;;
   "utils/funcexp/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/funcexp/Makefile" ;;
   "utils/compress/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/compress/Makefile" ;;
-  "utils/ddlcleanup/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/ddlcleanup/Makefile" ;;
-  "utils/batchloader/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/batchloader/Makefile" ;;
-  "utils/mysqlcl_idb/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/mysqlcl_idb/Makefile" ;;
-  "utils/querystats/Makefile" ) CONFIG_FILES="$CONFIG_FILES utils/querystats/Makefile" ;;
   "exemgr/Makefile" ) CONFIG_FILES="$CONFIG_FILES exemgr/Makefile" ;;
   "ddlproc/Makefile" ) CONFIG_FILES="$CONFIG_FILES ddlproc/Makefile" ;;
   "dbcon/Makefile" ) CONFIG_FILES="$CONFIG_FILES dbcon/Makefile" ;;
@@ -25168,6 +25163,7 @@ do
   "dbcon/joblist/Makefile" ) CONFIG_FILES="$CONFIG_FILES dbcon/joblist/Makefile" ;;
   "dbcon/mysql/Makefile" ) CONFIG_FILES="$CONFIG_FILES dbcon/mysql/Makefile" ;;
   "dbcon/sm/Makefile" ) CONFIG_FILES="$CONFIG_FILES dbcon/sm/Makefile" ;;
+  "dmlib/Makefile" ) CONFIG_FILES="$CONFIG_FILES dmlib/Makefile" ;;
   "dmlproc/Makefile" ) CONFIG_FILES="$CONFIG_FILES dmlproc/Makefile" ;;
   "oam/Makefile" ) CONFIG_FILES="$CONFIG_FILES oam/Makefile" ;;
   "oam/etc/Makefile" ) CONFIG_FILES="$CONFIG_FILES oam/etc/Makefile" ;;
@@ -25206,11 +25202,6 @@ do
   "writeengine/wrapper/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/wrapper/Makefile" ;;
   "writeengine/xml/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/xml/Makefile" ;;
   "writeengine/bulk/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/bulk/Makefile" ;;
-  "writeengine/client/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/client/Makefile" ;;
-  "writeengine/splitter/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/splitter/Makefile" ;;
-  "writeengine/server/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/server/Makefile" ;;
-  "writeengine/cpimport/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/cpimport/Makefile" ;;
-  "writeengine/redistribute/Makefile" ) CONFIG_FILES="$CONFIG_FILES writeengine/redistribute/Makefile" ;;
   "$ac_config_libobj_dir/fnmatch.h" ) CONFIG_LINKS="$CONFIG_LINKS $ac_config_libobj_dir/fnmatch.h:$ac_config_libobj_dir/fnmatch_.h" ;;
   "depfiles" ) CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;

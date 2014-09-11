@@ -23,7 +23,7 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = dbbuilder
-dbbuilder_SOURCES = dbbuilder.cpp systemcatalog.cpp
+dbbuilder_SOURCES = dbbuilder.cpp systemcatalog.cpp tpchschema.cpp tpchpopulate.cpp
 dbbuilder_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) $(AM_LDFLAGS)
 
 test:

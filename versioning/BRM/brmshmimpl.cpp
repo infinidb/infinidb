@@ -91,7 +91,7 @@ again:
 		perms.set_unrestricted();
 		bi::shared_memory_object shm(bi::create_only, keyName.c_str(), bi::read_write, perms);
 #endif
-		idbassert(fSize > 0);
+		assert(fSize > 0);
 		shm.truncate(fSize);
 		fShmobj.swap(shm);
 	}
@@ -106,8 +106,8 @@ again:
 #else
 		shm.get_size(curSize);
 #endif
-		idbassert(curSize > 0);
-		idbassert(curSize >= fSize);
+		assert(curSize > 0);
+		assert(curSize >= fSize);
 		fShmobj.swap(shm);
 		fSize = curSize;
 	}
@@ -130,8 +130,8 @@ again:
 
 int BRMShmImpl::grow(unsigned newKey, off_t newSize)
 {
-	idbassert(newKey != fKey);
-	idbassert(newSize >= fSize);
+	assert(newKey != fKey);
+	assert(newSize >= fSize);
 
 	string oldName = fShmobj.get_name();
 
@@ -178,7 +178,7 @@ int BRMShmImpl::grow(unsigned newKey, off_t newSize)
 
 int BRMShmImpl::clear(unsigned newKey, off_t newSize)
 {
-	idbassert(newKey != fKey);
+	assert(newKey != fKey);
 
 	string oldName = fShmobj.get_name();
 

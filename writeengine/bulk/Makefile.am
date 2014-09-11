@@ -23,34 +23,16 @@ AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 noinst_LIBRARIES = libwe_bulk.a
-libwe_bulk_a_SOURCES = \
-	we_brmreporter.cpp \
-	we_bulkload.cpp \
-	we_bulkloadbuffer.cpp \
-	we_bulkstatus.cpp \
-	we_colopbulk.cpp \
-	we_colbuf.cpp \
-	we_colbufcompressed.cpp \
-	we_colbufmgr.cpp \
-	we_colbufmgrdctnry.cpp \
-	we_colbufsec.cpp \
-	we_colextinf.cpp \
-	we_columninfo.cpp \
-	we_columninfocompressed.cpp \
-	we_columnautoinc.cpp \
-	we_extentstripealloc.cpp \
-	we_tableinfo.cpp \
-	we_tempxmlgendata.cpp \
-	we_workers.cpp
+libwe_bulk_a_SOURCES = we_bulkload.cpp we_workers.cpp we_colopbulk.cpp we_tableinfo.cpp we_bulkloadbuffer.cpp we_colbuf.cpp we_colbufcompressed.cpp we_colbufmgr.cpp we_colbufmgrdctnry.cpp we_colbufsec.cpp we_columninfo.cpp we_columninfocompressed.cpp we_rbmetawriter.cpp we_bulkstatus.cpp we_colextinf.cpp we_tempxmlgendata.cpp we_brmreporter.cpp
 libwe_bulk_a_CPPFLAGS = $(march_flags) -D_FILE_OFFSET_BITS=64 $(AM_CPPFLAGS)
 
-bin_PROGRAMS = cpimport.bin
-cpimport_bin_SOURCES = cpimport.cpp
-cpimport_bin_LDFLAGS = $(idb_common_ldflags) -lwriteengine -lwriteengineclient -lcacheutils $(idb_exec_libs) $(AM_LDFLAGS)
-cpimport_bin_LDADD = libwe_bulk.a ../xml/libwe_xml.a
-cpimport_bin_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
+bin_PROGRAMS = cpimport
+cpimport_SOURCES = cpimport.cpp
+cpimport_LDFLAGS = $(idb_common_ldflags) -lwriteengine -lcacheutils -ldm $(idb_exec_libs) $(AM_LDFLAGS)
+cpimport_LDADD = libwe_bulk.a ../xml/libwe_xml.a
+cpimport_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
 
-install_bulk: install
+cpinstall: install
 
 test:
 

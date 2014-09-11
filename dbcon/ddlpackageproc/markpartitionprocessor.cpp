@@ -26,248 +26,208 @@
 
 #include "messagelog.h"
 #include "sqllogger.h"
-#include "oamcache.h"
 
 using namespace std;
 using namespace execplan;
 using namespace logging;
 using namespace WriteEngine;
-using namespace oam;
 
 namespace ddlpackageprocessor
 {
 
-MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpackage::MarkPartitionStatement& markPartitionStmt)
-{
-	SUMMARY_INFO("RestorePartitionProcessor::processPackage");
+    MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpackage::MarkPartitionStatement& markPartitionStmt)
+    {
+        SUMMARY_INFO("RestorePartitionProcessor::processPackage");
 
-	DDLResult result;
-	result.result = NO_ERROR;   
-	std::string err;
-	VERBOSE_INFO(markPartitionStmt);
+        DDLResult result;
+        result.result = NO_ERROR;   
+        std::string err;
+        VERBOSE_INFO(markPartitionStmt);
 
-	BRM::TxnID txnID;
-	txnID.id= fTxnid.id;
-	txnID.valid= fTxnid.valid;
-	
-	int rc = 0;
-	rc = fDbrm.isReadWrite();
-	if (rc != 0 )
-	{
-		logging::Message::Args args;
-		logging::Message message(9);
-		args.add("Unable to execute the statement due to DBRM is read only");
-		message.format(args);
-		result.result = DROP_ERROR;	
-		result.message = message;
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	std::vector <CalpontSystemCatalog::OID> oidList;
-	CalpontSystemCatalog::RIDList tableColRidList;
-	CalpontSystemCatalog::DictOIDList dictOIDList;
-	std::string  processName("DDLProc");
-	SQLLogger logger(markPartitionStmt.fSql, fDDLLoggingId, markPartitionStmt.fSessionID, txnID.id);
-	
-	uint32_t processID = 0;
-	uint64_t uniqueID = 0;
-	uint32_t sessionID = markPartitionStmt.fSessionID;
-	execplan::CalpontSystemCatalog::ROPair roPair;
-
-	try 
-	{
-		//check table lock
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
-		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
-		systemCatalogPtr->sessionID(markPartitionStmt.fSessionID);
-		CalpontSystemCatalog::TableName tableName;
-		tableName.schema = markPartitionStmt.fTableName->fSchema;
-		tableName.table = markPartitionStmt.fTableName->fName;
-		roPair = systemCatalogPtr->tableRID( tableName );
-		//@Bug 3054 check for system catalog
-		if ( roPair.objnum < 3000 )
+		BRM::TxnID txnID;
+		txnID.id= fTxnid.id;
+		txnID.valid= fTxnid.valid;
+		
+		int rc = 0;
+		rc = fDbrm.isReadWrite();
+		if (rc != 0 )
 		{
-			throw std::runtime_error("Drop partition cannot be operated on Calpont system catalog.");
-		}
-		int i = 0;
-		processID = ::getpid();
-		oam::OamCache * oamcache = OamCache::makeOamCache();
-		std::vector<int> pmList = oamcache->getModuleIds();
-		std::vector<uint> pms;
-		for (unsigned i=0; i < pmList.size(); i++)
-		{
-			pms.push_back((uint)pmList[i]);
-		}
-			
-		try {
-			uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
-		}
-		catch (std::exception&)
-		{
-			result.result = DROP_ERROR;
-			result.message = IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE);
+			logging::Message::Args args;
+			logging::Message message(9);
+			args.add("Unable to execute the statement due to DBRM is read only");
+			message.format(args);
+			result.result = DROP_ERROR;	
+			result.message = message;
 			fSessionManager.rolledback(txnID);
 			return result;
 		}
-		
-		if ( uniqueID  == 0 )
-		{
-			int waitPeriod = 10;
-			int sleepTime = 100; // sleep 100 milliseconds between checks
-			int numTries = 10;  // try 10 times per second
-			waitPeriod = Config::getWaitPeriod();
-			numTries = 	waitPeriod * 10;
-			struct timespec rm_ts;
-
-			rm_ts.tv_sec = sleepTime/1000;
-			rm_ts.tv_nsec = sleepTime%1000 *1000000;
-
-			for (; i < numTries; i++)
+		std::vector <CalpontSystemCatalog::OID> oidList;
+		CalpontSystemCatalog::RIDList tableColRidList;
+		CalpontSystemCatalog::DictOIDList dictOIDList;
+		u_int32_t  processID = 0;
+        std::string  processName("DDLProc");
+        try 
+        {
+        	
+			//check table lock
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
+			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
+			systemCatalogPtr->sessionID(markPartitionStmt.fSessionID);
+			CalpontSystemCatalog::TableName tableName;
+			tableName.schema = markPartitionStmt.fTableName->fSchema;
+			tableName.table = markPartitionStmt.fTableName->fName;
+			uint32_t partition = markPartitionStmt.fPartition;
+			execplan::CalpontSystemCatalog::ROPair roPair;
+			roPair = systemCatalogPtr->tableRID( tableName );
+			
+			//@Bug 3054 check for system catalog
+			if ( roPair.objnum < 3000 )
 			{
-#ifdef _MSC_VER
-				Sleep(rm_ts.tv_sec * 1000);
-#else
-				struct timespec abs_ts;
-				do
+				throw std::runtime_error("Disable partition cannot be operated on Calpont system catalog.");
+			}
+			
+			int i = 0; 
+			rc = fSessionManager.setTableLock( roPair.objnum, markPartitionStmt.fSessionID, processID, processName, true );
+					
+			if ( rc == BRM::ERR_TABLE_LOCKED_ALREADY )
+			{	
+				int waitPeriod = 10 * 1000;
+				waitPeriod = Config::getWaitPeriod() * 1000;				
+				//retry until time out (microsecond)
+            			
+				for ( ; i < waitPeriod; i+=100 )
 				{
-					abs_ts.tv_sec = rm_ts.tv_sec;
-					abs_ts.tv_nsec = rm_ts.tv_nsec;
+					usleep(100);
+						
+					rc = fSessionManager.setTableLock( roPair.objnum, markPartitionStmt.fSessionID, processID, processName, true );
+						
+					if ( rc == 0 )
+						break;
 				}
-				while(nanosleep(&abs_ts,&rm_ts) < 0);
-#endif
-				// reset
-				sessionID = markPartitionStmt.fSessionID;
-				txnID.id= fTxnid.id;
-				txnID.valid= fTxnid.valid;
-				processID = ::getpid();
-				processName = "DDLProc";
-
-				try {
-					uniqueID = fDbrm.getTableLock(pms, roPair.objnum, &processName, &processID, (int32_t*)&sessionID, (int32_t*)&txnID.id, BRM::LOADING );
-				}
-				catch (std::exception&)
+    
+				if ( i >= waitPeriod ) //error out
 				{
-					result.result = DROP_ERROR;
-					result.message = IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE);
+					bool  lockStatus;
+					ostringstream oss;
+					u_int32_t sid;
+					rc = fSessionManager.getTableLockInfo( roPair.objnum, processID, processName, lockStatus, sid);	
+					if ( lockStatus )
+					{
+						oss << " table " << markPartitionStmt.fTableName->fSchema << "." << markPartitionStmt.fTableName->fName << " is still locked by " << processName << " with ProcessID " << processID;
+						if ((processName == "DMLProc") && (processID > 0))
+						{
+							oss << " due to active bulkrollback.";
+						}
+						oss << endl;
+					}
+		
+					logging::Message::Args args;
+					logging::Message message(9);
+					args.add(oss.str());
+					message.format(args);
+					result.result = DROP_ERROR;	
+					result.message = message;
 					fSessionManager.rolledback(txnID);
 					return result;
-				}
-
-				if (uniqueID > 0)
-					break;
+				}					
+					
 			}
-
-			if (i >= numTries) //error out
+			else if ( rc  == BRM::ERR_FAILURE)
 			{
-				result.result = DROP_ERROR;
 				logging::Message::Args args;
-				args.add(processName);
-				args.add((uint64_t)processID);
-				args.add((uint64_t)sessionID);
-				result.message = Message(IDBErrorInfo::instance()->errorMsg(ERR_TABLE_LOCKED,args));
+				logging::Message message(1);
+				args.add("Disable partition Failed due to BRM failure");
+				result.result = DROP_ERROR;
+				result.message = message;
 				fSessionManager.rolledback(txnID);
 				return result;
 			}
-		}
-
-		// 1. Get the OIDs for the columns
-		// 2. Get the OIDs for the dictionaries
-		// 3. Save the OIDs to a log file
-		// 4. Remove the extents from extentmap
-		// 5. Flush PrimProc Cache        	
-		// 6. Remove the column and dictionary  files for the partition
-
-		CalpontSystemCatalog::TableName userTableName;
-		userTableName.schema = markPartitionStmt.fTableName->fSchema;
-		userTableName.table = markPartitionStmt.fTableName->fName;
-
-		tableColRidList = systemCatalogPtr->columnRIDs( userTableName );
-
-		dictOIDList = systemCatalogPtr->dictOIDs( userTableName );
-
-		//Save qualified tablename, all column, dictionary OIDs, and transaction ID into a file in ASCII format
-		for ( unsigned i=0; i < tableColRidList.size(); i++ )
-		{
-			if ( tableColRidList[i].objnum > 3000 )
-				oidList.push_back( tableColRidList[i].objnum );
-		}
-		for ( unsigned i=0; i < dictOIDList.size(); i++ )
-		{
-			if (  dictOIDList[i].dictOID > 3000 )
-				oidList.push_back( dictOIDList[i].dictOID );
-		}
-
-		//Remove the partition from extent map
-		string emsg;
-		rc = fDbrm.markPartitionForDeletion( oidList, markPartitionStmt.fPartitions, emsg);
-		if ( rc != 0 )
-		{
-			throw std::runtime_error(emsg);
-		}
-	}
-	catch (exception& ex)
-	{
-		logging::Message::Args args;
-		logging::Message message(ex.what());
-
-		if (rc == BRM::ERR_TABLE_NOT_LOCKED)
-			result.result = USER_ERROR;
-		else if (rc == BRM::ERR_PARTITION_DISABLED || rc == BRM::ERR_INVALID_OP_LAST_PARTITION ||
-			       rc == BRM::ERR_NOT_EXIST_PARTITION)
-			result.result = PARTITION_WARNING;
-		else if (rc == BRM::ERR_NO_PARTITION_PERFORMED)
-			result.result = WARN_NO_PARTITION;
-		else
-			result.result = DROP_ERROR;
 			
-		result.message = message;
-		try {
-			fDbrm.releaseTableLock(uniqueID);
-		} catch (std::exception&)
-		{
-			result.result = DROP_ERROR;
-			result.message = IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE);
-		}
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	catch (...)
-	{
-		//cerr << "MarkPartitionProcessor::processPackage: caught unknown exception!" << endl;
+			SQLLogger logger(markPartitionStmt.fSql, fDDLLoggingId, markPartitionStmt.fSessionID, txnID.id);
 
-		logging::Message::Args args;
-		logging::Message message(1);
-		args.add("Disable partition failed: ");
-		args.add( "encountered unkown exception" );
-		args.add("");
-		args.add("");
-		message.format( args );
+        	// 1. Get the OIDs for the columns
+        	// 2. Get the OIDs for the dictionaries
+        	// 3. Save the OIDs to a log file
+        	// 4. Remove the extents from extentmap
+        	// 5. Flush PrimProc Cache        	
+        	// 6. Remove the column and dictionary  files for the partition
 
-		result.result = DROP_ERROR;
-		result.message = message;
-		try {
-			fDbrm.releaseTableLock(uniqueID);
-		} catch (std::exception&)
-		{
-			result.result = DROP_ERROR;
-			result.message = IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE);
+        	CalpontSystemCatalog::TableName userTableName;
+        	userTableName.schema = markPartitionStmt.fTableName->fSchema;
+        	userTableName.table = markPartitionStmt.fTableName->fName;
+
+        	tableColRidList = systemCatalogPtr->columnRIDs( userTableName );
+
+        	dictOIDList = systemCatalogPtr->dictOIDs( userTableName );
+
+			//Save qualified tablename, all column, dictionary OIDs, and transaction ID into a file in ASCII format
+			for ( unsigned i=0; i < tableColRidList.size(); i++ )
+			{
+				if ( tableColRidList[i].objnum > 3000 )
+					oidList.push_back( tableColRidList[i].objnum );
+			}
+			for ( unsigned i=0; i < dictOIDList.size(); i++ )
+			{
+				if (  dictOIDList[i].dictOID > 3000 )
+					oidList.push_back( dictOIDList[i].dictOID );
+			}
+			
+		
+			//Remove the partition from extent map
+			rc = fDbrm.markPartitionForDeletion( oidList, partition);
+			if ( rc != 0 )
+			{
+				string errorMsg;
+				BRM::errString( rc, errorMsg );
+				ostringstream oss;
+				oss << errorMsg;
+				throw std::runtime_error(oss.str());
+			}
 		}
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	// Log the DDL statement
-	logging::logDDL(markPartitionStmt.fSessionID, 0, markPartitionStmt.fSql, markPartitionStmt.fOwner);
-	try {
-			fDbrm.releaseTableLock(uniqueID);
-	} catch (std::exception&)
-	{
-		result.result = DROP_ERROR;
-		result.message = IDBErrorInfo::instance()->errorMsg(ERR_HARD_FAILURE);
-		fSessionManager.rolledback(txnID);
-		return result;
-	}
-	fSessionManager.committed(txnID);
-	return result;
-}
+		catch (exception& ex)
+		{
+			//cerr << "MarkPartitionProcessor::processPackage: " << ex.what() << endl;
+
+        	logging::Message::Args args;
+        	logging::Message message(1);
+        	args.add("Disable partition failed: ");
+        	args.add( ex.what() );
+        	args.add("");
+        	args.add("");
+       	 	message.format( args );
+
+        	if (( rc == BRM::ERR_NOT_EXIST_PARTITION) || (rc == BRM::ERR_INVALID_OP_LAST_PARTITION) || 
+				(rc == BRM::ERR_PARTITION_DISABLED) || (rc == BRM::ERR_PARTITION_ENABLED) || (rc == BRM::ERR_TABLE_NOT_LOCKED))
+				result.result = USER_ERROR;
+			else
+				result.result = DROP_ERROR;
+				
+        	result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		catch (...)
+		{
+			//cerr << "MarkPartitionProcessor::processPackage: caught unknown exception!" << endl;
+
+        	logging::Message::Args args;
+        	logging::Message message(1);
+        	args.add("Disable partition failed: ");
+        	args.add( "encountered unkown exception" );
+        	args.add("");
+        	args.add("");
+       	 	message.format( args );
+
+        	result.result = DROP_ERROR;
+        	result.message = message;
+			fSessionManager.rolledback(txnID);
+			return result;
+		}
+		// Log the DDL statement
+		logging::logDDL(markPartitionStmt.fSessionID, 0, markPartitionStmt.fSql, markPartitionStmt.fOwner);		
+		fSessionManager.committed(txnID);
+        return result;
+
+    }
 
 }

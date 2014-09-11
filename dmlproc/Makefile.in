@@ -70,7 +70,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
 am_DMLProc_OBJECTS = dmlproc.$(OBJEXT) dmlprocessor.$(OBJEXT) \
-	dmlresultbuffer.$(OBJEXT) batchinsertprocessor.$(OBJEXT)
+	dmlresultbuffer.$(OBJEXT)
 DMLProc_OBJECTS = $(am_DMLProc_OBJECTS)
 DMLProc_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -216,8 +216,8 @@ AM_CPPFLAGS = $(idb_common_includes) $(idb_cppflags)
 AM_CFLAGS = $(idb_cflags)
 AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
-DMLProc_SOURCES = dmlproc.cpp dmlprocessor.cpp dmlresultbuffer.cpp batchinsertprocessor.cpp
-DMLProc_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) -lthreadpool -lddlcleanuputil -lbatchloader $(AM_LDFLAGS)
+DMLProc_SOURCES = dmlproc.cpp dmlprocessor.cpp dmlresultbuffer.cpp
+DMLProc_LDFLAGS = $(idb_common_ldflags) $(idb_write_libs) -lthreadpool $(AM_LDFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -289,7 +289,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/batchinsertprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlproc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dmlresultbuffer.Po@am__quote@

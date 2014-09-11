@@ -40,7 +40,6 @@ using namespace logging;
 
 #include "jobstep.h"
 #include "jlf_common.h"
-#include "distributedenginecomm.h"
 #include "expressionstep.h"
 #include "tuplehashjoin.h"
 #include "subquerystep.h"
@@ -51,13 +50,13 @@ namespace joblist
 {
 
 SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& status) :
-	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fStatus(status)
+	fJobInfo(jobInfo), fStatus(status)
 {
 }
 
 
-SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err, const string& alias) :
-	fOutJobInfo(jobInfo), fSubJobInfo(NULL), fStatus(err)
+SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& status, const string& alias) :
+	fJobInfo(jobInfo), fStatus(status)
 {
 	fVtable.alias(algorithm::to_lower_copy(alias)); 
 }
@@ -65,9 +64,6 @@ SubQueryTransformer::SubQueryTransformer(JobInfo* jobInfo, SErrorInfo& err, cons
 
 SubQueryTransformer::~SubQueryTransformer()
 {
-	// OK to delete NULL ptr
-	delete fSubJobInfo;
-	fSubJobInfo = NULL;
 }
 
 
@@ -75,39 +71,35 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
                                               bool subInFromClause)
 {
 	// Setup job info, job list and error status relation.
-	fSubJobInfo = new JobInfo(fOutJobInfo->rm);
-	fSubJobInfo->sessionId = fOutJobInfo->sessionId;
-	fSubJobInfo->txnId = fOutJobInfo->txnId;
-	fSubJobInfo->verId = fOutJobInfo->verId;
-	fSubJobInfo->statementId = fOutJobInfo->statementId;
-	fSubJobInfo->csc = fOutJobInfo->csc;
-	fSubJobInfo->trace = fOutJobInfo->trace;
-	fSubJobInfo->traceFlags = fOutJobInfo->traceFlags;
-	fSubJobInfo->isExeMgr = fOutJobInfo->isExeMgr;
-	fSubJobInfo->subLevel = fOutJobInfo->subLevel + 1;
-	fSubJobInfo->keyInfo = fOutJobInfo->keyInfo;
-	fSubJobInfo->stringScanThreshold = fOutJobInfo->stringScanThreshold;
-	fSubJobInfo->tryTuples = true;
-	fSubJobInfo->status = fStatus;
-	fOutJobInfo->subNum++;
-	fSubJobInfo->subCount = fOutJobInfo->subCount;
-	fSubJobInfo->subId = ++(*(fSubJobInfo->subCount));
-	fSubJobInfo->pSubId = fOutJobInfo->subId;
+	JobInfo jobInfo(fJobInfo->rm);
+	jobInfo.sessionId = fJobInfo->sessionId;
+	jobInfo.txnId = fJobInfo->txnId;
+	jobInfo.verId = fJobInfo->verId;
+	jobInfo.statementId = fJobInfo->statementId;
+	jobInfo.csc = fJobInfo->csc;
+	jobInfo.trace = fJobInfo->trace;
+	jobInfo.traceFlags = fJobInfo->traceFlags;
+	jobInfo.isExeMgr = fJobInfo->isExeMgr;
+	jobInfo.subLevel = fJobInfo->subLevel + 1;
+	jobInfo.keyInfo = fJobInfo->keyInfo;
+	jobInfo.stringScanThreshold = fJobInfo->stringScanThreshold;
+	jobInfo.tryTuples = true;
+	jobInfo.status = fStatus;
+	fJobInfo->subNum++;
+	jobInfo.subCount = fJobInfo->subCount;
+	jobInfo.subId = ++(*(jobInfo.subCount));
+	jobInfo.pSubId = fJobInfo->subId;
 	fSubJobList.reset(new TupleJobList(true));
-	fSubJobList->priority(csep->priority());
-	fSubJobInfo->projectingTableOID = fSubJobList->projectingTableOIDPtr();
-	fSubJobInfo->jobListPtr = fSubJobList.get();
-	fOutJobInfo->jobListPtr->addSubqueryJobList(fSubJobList);
+	jobInfo.projectingTableOID = fSubJobList->projectingTableOIDPtr();
+	jobInfo.jobListPtr = fSubJobList.get();
+	fJobInfo->jobListPtr->addSubqueryJobList(fSubJobList);
 
 	// Update v-table's alias.
 	fVtable.name("$sub");
 	if (fVtable.alias().empty())
 	{
 		ostringstream oss;
-		oss << "$sub_"
-			<< fSubJobInfo->subId
-			<< "_" << fSubJobInfo->subLevel
-			<< "_" << fOutJobInfo->subNum;
+		oss << "$sub_" << jobInfo.subId << "_" << jobInfo.subLevel << "_" << fJobInfo->subNum;
 		fVtable.alias(oss.str()); 
 	}
 
@@ -116,17 +108,17 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	JobStepVector projectSteps;
 	DeliveredTableMap deliverySteps;
 	if (csep->unionVec().size() == 0)
-		makeJobSteps(csep, *fSubJobInfo, querySteps, projectSteps, deliverySteps);
+		makeJobSteps(csep, jobInfo, querySteps, projectSteps, deliverySteps);
 	else if (subInFromClause)
-		makeUnionJobSteps(csep, *fSubJobInfo, querySteps, projectSteps, deliverySteps);
+		makeUnionJobSteps(csep, jobInfo, querySteps, projectSteps, deliverySteps);
 	else
 		throw IDBExcept(ERR_UNION_IN_SUBQUERY);
 
-    if (fSubJobInfo->trace)
+    if (jobInfo.trace)
 	{
 		ostringstream oss;
 		oss << boldStart
-			<< "\nsubquery " << fSubJobInfo->subLevel << "." << fOutJobInfo->subNum << " steps:"
+			<< "\nsubquery " << jobInfo.subLevel << "." << fJobInfo->subNum << " steps:"
 			<< boldStop << endl;
 		ostream_iterator<JobStepVector::value_type> oIter(oss, "\n");
 		copy(querySteps.begin(), querySteps.end(), oIter);
@@ -136,24 +128,23 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	// Add steps to the joblist.
 	fSubJobList->addQuery(querySteps);
 	fSubJobList->addDelivery(deliverySteps);
-	fSubJobList->putEngineComm(DistributedEngineComm::instance(fOutJobInfo->rm));
+	fSubJobList->putEngineComm(DistributedEngineComm::instance(fJobInfo->rm));
 
 	// Get the correlated steps
-	fCorrelatedSteps = fSubJobInfo->correlateSteps;
-	fSubReturnedCols = fSubJobInfo->deliveredCols;
+	fCorrelatedSteps = jobInfo.correlateSteps;
+	fSubReturnedCols = jobInfo.deliveredCols;
 
 	// Convert subquery to step.
-	SubQueryStep* sqs =
-		new SubQueryStep(fSubJobInfo->sessionId, fSubJobInfo->txnId, fSubJobInfo->statementId);
+	SubQueryStep* sqs = new SubQueryStep(jobInfo.sessionId, jobInfo.txnId, jobInfo.statementId);
 	sqs->tableOid(fVtable.tableOid());
 	sqs->alias(fVtable.alias());
 	sqs->subJoblist(fSubJobList);
 	sqs->setOutputRowGroup(fSubJobList->getOutputRowGroup());
 	AnyDataListSPtr spdl(new AnyDataList());
-	RowGroupDL* dl = new RowGroupDL(1, fSubJobInfo->fifoSize);
+	RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
 	spdl->rowGroupDL(dl);
 	dl->OID(fVtable.tableOid());
-	JobStepAssociation jsa(fSubJobInfo->status);
+	JobStepAssociation jsa(jobInfo.status);
 	jsa.outAdd(spdl);
 	(querySteps.back())->outputAssociation(jsa);
 	sqs->outputAssociation(jsa);
@@ -176,7 +167,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 	rg.initRow(&row);
 	for (uint64_t i = 0; i < fSubReturnedCols.size(); i++)
 	{
-		fVtable.addColumn(fSubReturnedCols[i], fOutJobInfo->subView);
+		fVtable.addColumn(fSubReturnedCols[i], fJobInfo->subView);
 
 		// make sure the column type is the same as rowgroup
 		CalpontSystemCatalog::ColType ct = fVtable.columnType(i);
@@ -209,7 +200,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 		}
 
 		// build tuple info to export to outer query
-		TupleInfo ti(setTupleInfo(fVtable.columnType(i), fVtable.columnOid(i), *fOutJobInfo,
+		TupleInfo ti(setTupleInfo(fVtable.columnType(i), fVtable.columnOid(i), *fJobInfo,
 									tblOid, fVtable.columns()[i].get(), alias));
 		pos.push_back(pos.back() + ti.width);
 		oids.push_back(ti.oid);
@@ -218,7 +209,7 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 		scale.push_back(ti.scale);
 		precision.push_back(ti.precision);
 
-		fOutJobInfo->vtableColTypes[UniqId(fVtable.columnOid(i), fVtable.alias(), "", "")] =
+		fJobInfo->vtableColTypes[UniqId(fVtable.columnOid(i), fVtable.alias(), "")] =
 				fVtable.columnType(i);
 	}
 	RowGroup rg1(oids.size(), pos, oids, keys, types, scale, precision);
@@ -228,45 +219,20 @@ SJSTEP& SubQueryTransformer::makeSubQueryStep(execplan::CalpontSelectExecutionPl
 }
 
 
-void SubQueryTransformer::checkCorrelateInfo(TupleHashJoinStep* thjs, const JobInfo& jobInfo)
-{
-	int pos = (thjs->correlatedSide() == 1) ? thjs->sequence2() : thjs->sequence1();
-
-	if (pos == -1 || (size_t) pos >= fVtable.columns().size())
-	{
-		
-		uint64_t id = (thjs->correlatedSide() == 1) ? thjs->tupleId2() : thjs->tupleId1();
-		string alias = jobInfo.keyInfo->tupleKeyVec[id].fTable;
-		string name = jobInfo.keyInfo->keyName[id];
-		if (!name.empty() && alias.length() > 0)
-			name = alias + "." + name;
-	
-		Message::Args args;
-		args.add(name);
-		string errMsg(IDBErrorInfo::instance()->errorMsg(ERR_CORRELATE_COL_MISSING, args));
-		cerr << errMsg << ": " << pos << endl;
-		throw IDBExcept(errMsg, ERR_CORRELATE_COL_MISSING);
-	}
-}
-
-
 void SubQueryTransformer::updateCorrelateInfo()
 {
 	// put vtable into the table list to resolve correlated filters 
+//	fJobInfo->tableList.push_back(tableKey(*fJobInfo, fVtable.tableOid(),
+//											"", fVtable.name(), fVtable.alias(), ""));
 	// Temp fix for @bug3932 until outer join has no dependency on table order.
 	// Insert at [1], not to mess with OUTER join and hint(INFINIDB_ORDERED -- bug2317).
-	fOutJobInfo->tableList.insert(fOutJobInfo->tableList.begin()+1, makeTableKey(
-		*fOutJobInfo, fVtable.tableOid(), fVtable.name(), fVtable.alias(), "", ""));
+	fJobInfo->tableList.insert(fJobInfo->tableList.begin()+1, tableKey(
+		*fJobInfo, fVtable.tableOid(), "", fVtable.name(), fVtable.alias(), ""));
 
 	// tables in outer level
-	set<uint32_t> outTables;
-	for (uint64_t i = 0; i < fOutJobInfo->tableList.size(); i++)
-		outTables.insert(fOutJobInfo->tableList[i]);
-
-	// tables in subquery level
-	set<uint32_t> subTables;
-	for (uint64_t i = 0; i < fSubJobInfo->tableList.size(); i++)
-		subTables.insert(fSubJobInfo->tableList[i]);
+	set<uint32_t> oTables;
+	for (uint64_t i = 0; i < fJobInfo->tableList.size(); i++)
+		oTables.insert(fJobInfo->tableList[i]);
 
 	// Update correlated steps
 	const map<UniqId, uint>& subMap = fVtable.columnMap();
@@ -278,7 +244,6 @@ void SubQueryTransformer::updateCorrelateInfo()
 		{
 			if (thjs->getJoinType() & CORRELATED)
 			{
-				checkCorrelateInfo(thjs, *fSubJobInfo);
 				thjs->setJoinType(thjs->getJoinType() ^ CORRELATED);
 				if (thjs->correlatedSide() == 1)
 				{
@@ -287,13 +252,12 @@ void SubQueryTransformer::updateCorrelateInfo()
 					thjs->oid2(fVtable.columnOid(pos));
 					thjs->alias2(fVtable.alias());
 					thjs->view2(fVtable.columns()[pos]->viewName());
-					thjs->schema2(fVtable.columns()[pos]->schemaName());
 					thjs->dictOid2(0);
 					thjs->sequence2(-1);
-					thjs->joinId(fOutJobInfo->joinNum++);
+					thjs->joinId(fJobInfo->joinNum++);
 
 					CalpontSystemCatalog::ColType ct2 = fVtable.columnType(pos);
-					TupleInfo ti(setTupleInfo(ct2, thjs->oid2(), *fOutJobInfo, thjs->tableOid2(),
+					TupleInfo ti(setTupleInfo(ct2, thjs->oid2(), *fJobInfo, thjs->tableOid2(),
 						fVtable.columns()[pos].get(), thjs->alias2()));
 					thjs->tupleId2(ti.key);
 					
@@ -305,13 +269,12 @@ void SubQueryTransformer::updateCorrelateInfo()
 					thjs->oid1(fVtable.columnOid(pos));
 					thjs->alias1(fVtable.alias());
 					thjs->view1(fVtable.columns()[pos]->viewName());
-					thjs->schema1(fVtable.columns()[pos]->schemaName());
 					thjs->dictOid1(0);
 					thjs->sequence1(-1);
-					thjs->joinId(fOutJobInfo->joinNum++);
+					thjs->joinId(fJobInfo->joinNum++);
 
 					CalpontSystemCatalog::ColType ct1 = fVtable.columnType(pos);
-					TupleInfo ti(setTupleInfo(ct1, thjs->oid1(), *fOutJobInfo, thjs->tableOid1(),
+					TupleInfo ti(setTupleInfo(ct1, thjs->oid1(), *fJobInfo, thjs->tableOid1(),
 						fVtable.columns()[pos].get(), thjs->alias1()));
 					thjs->tupleId1(ti.key);
 				}
@@ -330,22 +293,25 @@ void SubQueryTransformer::updateCorrelateInfo()
 		else if (es)
 		{
 			vector<ReturnedColumn*>& scList = es->columns();
-			vector<CalpontSystemCatalog::OID>& tableOids = es->tableOids();
-			vector<CalpontSystemCatalog::OID>& oids = es->oids();
-			vector<string>& aliases = es->aliases();
-			vector<string>& views = es->views();
-			vector<string>& schemas = es->schemas();
-			vector<uint>& tableKeys = es->tableKeys();
-			vector<uint>& columnKeys = es->columnKeys();
-			for (uint64_t j = 0; j < scList.size(); j++)
+			for (vector<ReturnedColumn*>::iterator j = scList.begin(); j != scList.end(); j++)
 			{
-				SimpleColumn* sc = dynamic_cast<SimpleColumn*>(scList[j]);
+				SimpleColumn* sc = dynamic_cast<SimpleColumn*>(*j);
 				if (sc != NULL)
 				{
-					if (subTables.find(tableKeys[j]) != subTables.end())
+					CalpontSystemCatalog::OID tblOid = tableOid(sc, fJobInfo->csc);
+					string alias(extractTableAlias(sc));
+					string view(sc->viewName());
+            		uint32_t tid = tableKey(*fJobInfo, tblOid, alias, view);
+					if (oTables.find(tid) != oTables.end())
+					{
+						CalpontSystemCatalog::ColType ct = fJobInfo->csc->colType(sc->oid());
+						sc->joinInfo(0);
+						setTupleInfo(ct, sc->oid(), *fJobInfo, tblOid, sc, alias);
+					}
+					else
 					{
 						const map<UniqId, uint>::const_iterator k =
-							subMap.find(UniqId(oids[j], aliases[j], schemas[j], views[j]));
+							subMap.find(UniqId(sc->oid(), alias, view));
 						if (k == subMap.end())
 							//throw CorrelateFailExcept();
 							throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);
@@ -355,55 +321,27 @@ void SubQueryTransformer::updateCorrelateInfo()
 						sc->tableAlias(fVtable.alias());
 						sc->oid(fVtable.columnOid(k->second));
 						sc->columnName(fVtable.columns()[k->second]->columnName());
-						const CalpontSystemCatalog::ColType& ct = fVtable.columnType(k->second);
-						TupleInfo ti = setTupleInfo(
-							ct, sc->oid(), *fOutJobInfo, fVtable.tableOid(), sc, fVtable.alias());
-
-						tableOids[j] = execplan::CNX_VTABLE_ID;
-						oids[j] = sc->oid();
-						aliases[j] = sc->tableAlias();
-						views[j] = sc->viewName();
-						schemas[j] = sc->schemaName();
-						columnKeys[j] = ti.key;
-						tableKeys[j] = getTableKey(*fOutJobInfo, ti.key);
-					}
-					else
-					{
-						if ((sc->joinInfo() & JOIN_CORRELATED) != 0)
-						{
-							sc->joinInfo(0);
-						}
-
-						const CalpontSystemCatalog::ColType& 
-							ct = fOutJobInfo->keyInfo->colType[columnKeys[j]];
-						sc->joinInfo(0);
-						TupleInfo ti = setTupleInfo(
-							ct, sc->oid(), *fOutJobInfo, tableOids[j], sc, aliases[j]);
-
-						columnKeys[j] = ti.key;
-						tableKeys[j] = getTableKey(*fOutJobInfo, ti.key);
+						CalpontSystemCatalog::ColType ct = fVtable.columnType(k->second);
+						setTupleInfo(ct, sc->oid(), *fJobInfo, fVtable.tableOid(), sc, sc->alias());
 					}
 				}
 			}
 
-			es->updateColumnOidAlias(*fOutJobInfo);
+			es->updateColumnOidAlias(*fJobInfo);
 		}
 		else
 		{
-			JobStep* j = i->get();
             uint32_t tid = -1;
-            uint64_t cid = j->tupleId();
+            uint64_t cid = (*i)->tupleId();
             if (cid != (uint64_t) -1)
-                tid = getTableKey(*fOutJobInfo, cid);
+                tid = getTableKey(*fJobInfo, cid);
             else
-                tid = getTableKey(*fOutJobInfo, j);
+                tid = getTupleKey(*fJobInfo, (*i)->tableOid(), (*i)->alias(), (*i)->view());
 
-			if (outTables.find(tid) == outTables.end())
+			if (oTables.find(tid) == oTables.end())
 			{
-				if (subMap.find(
-						UniqId(j->oid(), j->alias(), j->schema(), j->view(), 0)) != subMap.end())
-					//throw CorrelateFailExcept();
-					throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);
+				if (subMap.find(UniqId((*i)->oid(), (*i)->alias(), (*i)->view())) != subMap.end())
+                                       throw IDBExcept(logging::ERR_NON_SUPPORT_SUB_QUERY_TYPE);		
 			}
 		}
 	}
@@ -428,14 +366,12 @@ SimpleScalarTransformer::SimpleScalarTransformer(JobInfo* jobInfo, SErrorInfo& s
 
 
 SimpleScalarTransformer::SimpleScalarTransformer(const SubQueryTransformer& rhs) :
-	SubQueryTransformer(rhs.outJobInfo(), rhs.status()),
+	SubQueryTransformer(rhs),
 	fInputDl(NULL),
 	fDlIterator(-1),
 	fEmptyResultSet(true),
 	fExistFilter(false)
 {
-	fSubJobList = rhs.subJobList();
-	fSubQueryStep = rhs.subQueryStep();
 }
 
 
@@ -468,11 +404,10 @@ void SimpleScalarTransformer::getScalarResult()
 {
 	shared_array<uint8_t> rgData;
 	bool more = fInputDl->next(fDlIterator, &rgData);
+	fRowGroup.setData(rgData.get());
 
-	while (more)
+	if (more)
 	{
-		fRowGroup.setData(rgData.get());
-
 		// Only need one row for scalar filter
 		if (fEmptyResultSet && fRowGroup.getRowCount() == 1)
 		{
@@ -498,10 +433,10 @@ void SimpleScalarTransformer::getScalarResult()
 		}
 
 		// For scalar filter, have to check all blocks to ensure only one row.
-		if (fStatus->errCode != 0)
-			 while (more) more = fInputDl->next(fDlIterator, &rgData);
+		if (fStatus->errCode == 0)
+			getScalarResult();
 		else
-	    	more = fInputDl->next(fDlIterator, &rgData);
+			while (fInputDl->next(fDlIterator, &rgData));
 	}
 }
 

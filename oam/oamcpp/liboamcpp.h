@@ -28,7 +28,6 @@
 #include <boost/tuple/tuple.hpp>
 #include <string>
 #include <vector>
-#include "bytestream.h"
 #include "alarm.h"
 #include "snmpmanager.h"
 #include "messagequeue.h"
@@ -52,7 +51,6 @@
 #include "configcpp.h"
 #include "boost/tuple/tuple.hpp"
 #include "snmpmanager.h"
-#include "dbrm.h"
 #ifndef SKIP_SNMP
 #include "license.h"
 #endif
@@ -60,7 +58,7 @@
 #include "messagequeue.h"
 #endif
 
-#if defined(_MSC_VER) && defined(xxxLIBOAM_DLLEXPORT)
+#if defined(_MSC_VER) && defined(LIBOAM_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -75,16 +73,7 @@ namespace oam
 
     /** @brief Maximum Number of Modules within the Calpont System
      */
-    const int MAX_MODULE = 1024;
-
-    /** @brief Maximum Number of DBRoots within the Calpont System
-     */
-    const int MAX_DBROOT = 10240;
-    const int MAX_DBROOT_AMAZON = 190;	//DUE TO DEVICE NAME LIMIT
-
-   /** @brief Maximum Number of Modules Types within the Calpont System
-     */
-    const int MAX_MODULE_TYPE = 3;
+    const int MAX_MODULE = 100;
 
     /** @brief Maximum Number of External Devices within the Calpont System
      */
@@ -100,8 +89,7 @@ namespace oam
 
     /** @brief Maximum Number of processes within the Calpont System
      */
-    const int MAX_PROCESS_PER_MODULE = 15;
-    const int MAX_PROCESS = MAX_MODULE*MAX_PROCESS_PER_MODULE;
+    const int MAX_PROCESS = 500;
 
     /** @brief Maximum Number of Parameters per process
      */
@@ -136,22 +124,8 @@ namespace oam
 											"OIDManager",
 											"PrimitiveServers",
 											"Installation",
-											"ExtentMap",
 											""
 	};
-
-    /** @brief gluster control commands
-     */
-    enum GLUSTER_COMMANDS
-    {
-        GLUSTER_STATUS,
-        GLUSTER_SETDDC,
-        GLUSTER_ASSIGN,
-        GLUSTER_WHOHAS,
-        GLUSTER_UNASSIGN,
-        GLUSTER_ADD
-	};
-
 
     /** @brief mysql-Calpont Action
      */
@@ -234,10 +208,8 @@ namespace oam
 		API_FAILURE_DB_ERROR,
 		API_INVALID_STATE,
 		API_READONLY_PARAMETER,
-		API_TRANSACTIONS_COMPLETE,
+		API_CPIMPORT_ACTIVE,
 		API_CONN_REFUSED,
-        API_CANCELLED,
-        API_STILL_WORKING,
         API_MAX
     };
 
@@ -283,7 +255,7 @@ namespace oam
         ENABLED,                                  // 16 = Enabled mode
         INITIAL,                                  // 17 = Initial mode
 		STANDBY_INIT,							  // 18 = Standby init
-		BUSY_INIT 							  	  // 19 = Busy init
+		BUSY_INIT							  		// 19 = Busy init
     };
 
     /** @brief Process and Hardware String States
@@ -412,8 +384,6 @@ namespace oam
         DBRM_READ_ONLY,                           // 31 = The DBRM is read-only
         EE_LICENSE_EXPIRED,                       // 32 = Enterprise License has expired
         MODULE_SWITCH_ACTIVE,                     // 33 = PM Failover / Switchover
-        ROLLBACK_FAILURE,                     	  // 34 = DB Rollback Failure
-        GLUSTER_DISK_FAILURE,                     // 35 = Gluster Disk Copy Failure
         MAX_ALARM_ID
     };
 
@@ -483,10 +453,6 @@ namespace oam
         REINITPROCESSTYPE,
 		DISTRIBUTECONFIG,
 		SWITCHOAMPARENT,
-		UNMOUNT,
-		MOUNT,
-        SUSPENDWRITES,
-		FSTABUPDATE
     };
 
     /** @brief Process Management - Mgr to Mon request options
@@ -537,10 +503,7 @@ namespace oam
 		UPDATESNMPD,
 		GETALARMDATA,
 		GETACTIVEALARMDATA,
-		RUNUPGRADE,
-		PROCUNMOUNT,
-		PROCMOUNT,
-		PROCFSTABUPDATE
+		RUNUPGRADE
     };
 
 
@@ -554,8 +517,7 @@ namespace oam
 		INSTALL,
 		REMOVE,
 		GRACEFUL_STANDBY,
-		STATUS_UPDATE,
-        GRACEFUL_WAIT            // Wait for all table locks and transactions to finish.
+		STATUS_UPDATE
     };
 
     /** @brief Acknowledgment indication flag
@@ -565,19 +527,6 @@ namespace oam
     {
         ACK_NO,
         ACK_YES
-    };
-
-    /** @brief Responses to cancel/wait/rollback/force question
-     *  
-     *  When a suspend, stop, restart or shutdown of system is
-     *  requested, the user is asked this question.
-      */
-    enum CC_SUSPEND_ANSWER
-    {
-        CANCEL,
-        WAIT,
-        ROLLBACK,
-        FORCE
     };
 
     /** @brief Process Management Status Request types
@@ -600,9 +549,9 @@ namespace oam
 		SET_PM_IPS,
 		ADD_EXT_DEVICE,
 		REMOVE_EXT_DEVICE,
-		GET_SHARED_MEM,
-		SET_DBROOT_STATUS
+		GET_SHARED_MEM
     };
+
 
     /** @brief System Software Package Structure
      *
@@ -644,9 +593,9 @@ namespace oam
         uint32_t DBRootCount;                  		//!< Database Root directory Count
 		std::vector<std::string> DBRoot;			//!< Database Root directories
         std::string DBRMRoot;                     //!< DBRM Root directory
-        uint32_t ExternalCriticalThreshold;     	  //!< External Disk Critical Threahold %
-        uint32_t ExternalMajorThreshold;        	  //!< External Disk Major Threahold %
-        uint32_t ExternalMinorThreshold;        	  //!< External Disk Minor Threahold %
+        uint32_t RAIDCriticalThreshold;     	  //!< RAID Disk Critical Threahold %
+        uint32_t RAIDMajorThreshold;        	  //!< RAID Disk Major Threahold %
+        uint32_t RAIDMinorThreshold;        	  //!< RAID Disk Minor Threahold %
         uint32_t MaxConcurrentTransactions;       //!< Session Mgr Max Current Trans
         std::string SharedMemoryTmpFile;          //!< Session Mgr Shared Mem Temp file
         uint32_t NumVersionBufferFiles;       		//!< Version Buffer number of files
@@ -688,7 +637,6 @@ namespace oam
         std::string DisableState;               //!< Disabled State
 		HostConfigList hostConfigList;	        //!< IP Address and Hostname List
     };
-
     typedef struct DeviceNetworkConfig_s DeviceNetworkConfig;
 
     /** @brief Device Network Config List
@@ -703,41 +651,11 @@ namespace oam
 
 	typedef std::vector<std::string> DiskMonitorFileSystems;
 
-    /** @brief DBRoot Config List
-     *
-     */
-
-	typedef std::vector<uint16_t> DBRootConfigList;
-
-    /** @brief Device DBRoot Config Structure
-     *
-     */
-
-    struct DeviceDBRootConfig_s
-    {
-        uint16_t DeviceID;                 		//!< Device ID
-		DBRootConfigList dbrootConfigList;	    //!< DBRoot List
-    };
-
-    typedef struct DeviceDBRootConfig_s DeviceDBRootConfig;
-
-    /** @brief Device DBRoot Config List
-     *
-     */
-
-	typedef std::vector<DeviceDBRootConfig> DeviceDBRootList;
-
     /** @brief Module Type Configuration Structure
      *
      *   Structure that is returned by the getSystemConfigFile API for the
      *   Module Type Configuration data stored in the System Configuration file
      */
-
-    struct PmDBRootCount_s
-    {
-        uint16_t pmID;                 		//!< PM ID
-		uint16_t count;	    				//!< DBRoot Count
-    };
 
     struct ModuleTypeConfig_s
     {
@@ -760,7 +678,6 @@ namespace oam
         uint16_t ModuleSwapMinorThreshold;        //!< Swap Minor Threahold %
 		DeviceNetworkList ModuleNetworkList;	  //!< Module IP Address and Hostname List
         DiskMonitorFileSystems FileSystems; 	  //!< Module Disk File System list
-		DeviceDBRootList ModuleDBRootList;		  //!< Module DBRoot 
     };
     typedef struct ModuleTypeConfig_s ModuleTypeConfig;
 
@@ -790,7 +707,6 @@ namespace oam
         std::string ModuleDesc;                   //!< Module Description
         std::string DisableState;                 //!< Disabled State
 		HostConfigList hostConfigList;	          //!< IP Address and Hostname List
-		DBRootConfigList dbrootConfigList;	      //!< DBRoot ID list
     };
     typedef struct ModuleConfig_s ModuleConfig;
 
@@ -876,32 +792,6 @@ namespace oam
     typedef struct SystemExtDeviceStatus_s SystemExtDeviceStatus;
 
 
-    /** @brief DBRoot Status Structure
-     *
-     *   Structure that is returned by the getSystemStatus API for the
-     *   System Status data stored in the System Status file
-     */
-
-    struct DbrootStatus_s
-    {
-        std::string Name;                   		//!< Dbroot Name
-        uint16_t OpState;                			//!< Operational State
-        std::string StateChangeDate;              	//!< Last time/date state change
-    };
-    typedef struct DbrootStatus_s DbrootStatus;
-
-    /** @brief Dbroot Status Structure
-     *
-     *   Structure that is returned by the getSystemStatus API for the
-     *   System System Ext Status data stored in the System Status file
-     */
-
-    struct SystemDbrootStatus_s
-    {
-        std::vector<DbrootStatus> dbrootstatus;   //!< Dbroot Status Structure
-    };
-    typedef struct SystemDbrootStatus_s SystemDbrootStatus;
-
     /** @brief NIC Status Structure
      *
      *   Structure that is returned by the getSystemStatus API for the
@@ -941,7 +831,6 @@ namespace oam
         SystemModuleStatus systemmodulestatus;    		//!< System Module status
         SystemExtDeviceStatus systemextdevicestatus;    //!< System Ext Device status
         SystemNICStatus systemnicstatus;    			//!< System NIC status
-        SystemDbrootStatus systemdbrootstatus;    		//!< System DBroot status
     };
     typedef struct SystemStatus_s SystemStatus;
 
@@ -988,7 +877,7 @@ namespace oam
     {
         std::string ProcessName;                  //!< Process Name
         std::string Module;                   //!< Module Name that process is running on
-        pid_t    	ProcessID;                    //!< Process ID number
+        uint16_t    ProcessID;                    //!< Process ID number
         std::string StateChangeDate;              //!< Last time/date state change
         uint16_t 	ProcessOpState;               //!< Process Operational State
     };	
@@ -1237,28 +1126,18 @@ namespace oam
      *
      */
 
-    struct ActiveSqlStatement
+    struct ActiveSqlStatements_s
     {
-        std::string sqlstatement;
-        unsigned    starttime;
-        uint64_t    sessionid;
+        std::vector<std::string> sqlstatements;   	//!< List of Active SQL Stamements
+        std::vector<std::string> starttime;   		//!< Start Time of SQL Statement
+        std::vector<std::string> sessionid;   		//!< Session ID of SQL Statement
     };	
-    typedef std::vector<ActiveSqlStatement> ActiveSqlStatements;
+    typedef struct ActiveSqlStatements_s ActiveSqlStatements;
 
-
-    // username / password for smbclient use
+	// username / password for smbclient use
 	const std::string USERNAME = "oamuser";
 	const std::string PASSWORD = "Calpont1"; 
 
-    /** @brief System Storage Configuration Structure
-     *
-     *   Structure that is returned by the getStorageConfig API
-	 *   Returns: Storage Type, System DBRoot count, PM dbroot info, 
-     */
-
-    typedef boost::tuple<std::string, uint16_t, DeviceDBRootList, std::string > systemStorageInfo_t;
-
-	typedef std::vector<std::string> dbrootList;
 
     /** @brief OAM API I/F class
      *
@@ -1480,22 +1359,6 @@ namespace oam
              */
             EXPORT void setExtDeviceStatus(const std::string name, const int state);
 
-            /** @brief get Dbroot Status information
-             *
-             * get DBroot Status information in the system status file.
-             * @param name DBroot Name
-             * @param state System  Operational State
-             */
-            EXPORT void getDbrootStatus(const std::string name, int& state);
-
-            /** @brief set Dbroot Status information
-             *
-             * set DBroot Status information in the system status file.
-             * @param name DBroot Name
-             * @param state System  Operational State
-             */
-            EXPORT void setDbrootStatus(const std::string name, const int state);
-
             /** @brief get NIC Status information
              *
              * get NIC Status information.
@@ -1595,7 +1458,7 @@ namespace oam
              * @param PID the Process ID
              */
 
-            EXPORT void setProcessStatus(const std::string process, const std::string module, const int state, pid_t PID);
+            EXPORT void setProcessStatus(const std::string process, const std::string module, const int state, const int PID);
 
             /** @brief Process Init Complete
              *
@@ -1619,7 +1482,7 @@ namespace oam
              * @return myProcessStatus_t structure, which contains the local process OAM
              *         Status Data
              */
-            EXPORT myProcessStatus_t getMyProcessStatus(pid_t processID = 0);
+            EXPORT myProcessStatus_t getMyProcessStatus(const int processID = 0);
 
             /** @brief get Local Module Configuration Data
              *
@@ -1850,15 +1713,6 @@ namespace oam
              */
             EXPORT void shutdownSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag);
 
-            /** @brief Suspend Database Writes
-             *
-             * Suspends writing to the database. This should be done before backup 
-             * activities occur. 
-             * @param gracefulflag Graceful/Forceful flag
-             * @param ackflag Acknowledgment flag
-             */
-            EXPORT void SuspendWrites(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag);
-
             /** @brief Start System
              *
              * Start's the stopped Calpont Database Appliance System
@@ -1872,11 +1726,23 @@ namespace oam
              * @param gracefulflag Graceful/Forceful flag
              * @param ackflag Acknowledgment flag
              */
-            EXPORT int restartSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag);
+            EXPORT void restartSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag);
 
-            /** @brief Display a list of locked tables
+            /** @brief stop accepting incoming DML packages
              */
-            void DisplayLockedTables(std::vector<BRM::TableLockInfo>& tableLocks, BRM::DBRM* pDBRM = NULL);
+            EXPORT int stopDMLProcessing();
+
+            /** @brief stop accepting incoming DDL packages
+             */
+            EXPORT int stopDDLProcessing();
+
+            /** @brief resume accepting DML packages
+             */
+            EXPORT int resumeDMLProcessing();
+
+            /** @brief resume accepting DDL packages
+             */
+            EXPORT int resumeDDLProcessing();
 
             /** @brief Get Active Alarms
              *
@@ -2021,11 +1887,8 @@ namespace oam
 			EXPORT void buildSystemTables();
 
             /** @brief local exception control function
-             * @param function Function throwing the exception
-             * @param returnStatus 
-             * @param msg A message to be included 
              */
-            EXPORT void exceptionControl(std::string function, int returnStatus, const char* extraMsg = NULL);
+            EXPORT void exceptionControl(std::string function, int returnStatus);
 
             /** @brief get IP Address from Hostname
              */
@@ -2148,98 +2011,13 @@ namespace oam
 			EXPORT void distributeConfigFile(std::string name = "system", std::string file = "Calpont.xml");
 
 			/**
-			*@brief Switch Parent OAM Module 
-			*  Return true if we need to wait for systme restart 
+			*@brief Switch Parent OAM Module
 			*/
-			EXPORT bool switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag);
+			EXPORT void switchParentOAMModule(std::string moduleName = "");
 
-			/**
-			*@brief Get Storage Config Data
-			*/
-			EXPORT systemStorageInfo_t getStorageConfig();
-
-			/**
-			*@brief Get PM - DBRoot Config data
-			*/
-			EXPORT void getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
-
-			/**
-			*@brief Get DBRoot - PM Config data
-			*/
-			EXPORT void getDbrootPmConfig(const int dbrootid, int& pmid);
-
-			EXPORT void getDbrootPmConfig(const int dbrootid, std::string& pmid);
-
-			/**
-			*@brief Get System DBRoot Config data
-			*/
-			EXPORT void getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist);
-
-			/**
-			*@brief Set PM - DBRoot Config data
-			*/
-			EXPORT void setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist);
-
-			/**
-			*@brief Manual Move PM - DBRoot data
-			*/
-			EXPORT void manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM);
-
-			/**
-			*@brief Auto Move PM - DBRoot data
-			*/
-			EXPORT bool autoMovePmDbroot(std::string residePM);
-
-			/**
-			*@brief Auto Un-Move PM - DBRoot data
-			*/
-			EXPORT bool autoUnMovePmDbroot(std::string toPM);
-
-			/**
-			*@brief add DBRoot
-			*/
-			EXPORT void addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist);
-
-			/**
-			*@brief distribute Fstab Updates
-			*/
-			EXPORT void distributeFstabUpdates(std::string entry, std::string toPM = "system" );
-
-			/**
-			*@brief assign DBRoot
-			*/
-			EXPORT void assignDbroot(std::string toPM, DBRootConfigList& dbrootlist);
-
-			/**
-			*@brief unassign DBRoot
-			*/
-			EXPORT void unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist);
-
-			/**
-			*@brief get unassigned DBRoot list
-			*/
-			EXPORT void getUnassignedDbroot(DBRootConfigList& dbrootlist);
-
-			/**
-			*@brief remove DBRoot
-			*/
-			EXPORT void removeDbroot(DBRootConfigList& dbrootlist);
-
-			/**
-			*@brief get AWS Device Name for DBRoot ID
-			*/
-			EXPORT std::string getAWSdeviceName( const int dbrootid);
-
-			/**
-			*@brief set System DBRoot Count
-			*/
-			EXPORT void setSystemDBrootCount();
-
-			/**
-			*@brief set FilesPerColumnPartition based on value of old
-			* FilePerColumnPartition and old DbRootCount that is given
-			*/
-			EXPORT void setFilesPerColumnPartition( int oldDbRootCount );
+            /** @brief validate Module name
+             */
+            EXPORT int validateModule(const std::string name);
 
             /** @brief send Device Notification Msg
              */
@@ -2247,75 +2025,11 @@ namespace oam
 
             /** @brief run DBHealth Check
              */
- 			EXPORT void checkDBFunctional(bool action = true);
+ 			EXPORT void checkDBHealth(bool action = true);
 
             /** @brief mysql-Calpont service command
              */
  			EXPORT void actionMysqlCalpont(MYSQLCALPONT_ACTION action);
-
-            /** @brief validate Module name
-             */
-            EXPORT int validateModule(const std::string name);
-
-            /** @brief getEC2LocalInstance
-             */
-            EXPORT std::string getEC2LocalInstance(std::string name = "dummy");
-
-            /** @brief getEC2LocalInstanceType
-             */
-            EXPORT std::string getEC2LocalInstanceType(std::string name = "dummy");
-
-            /** @brief launchEC2Instance
-             */
-            EXPORT std::string launchEC2Instance(const std::string name = "dummy", const std::string type = oam::UnassignedName, const std::string group = oam::UnassignedName);
-
-            /** @brief getEC2InstanceIpAddress
-             */
-            EXPORT std::string getEC2InstanceIpAddress(std::string instanceName);
-
-            /** @brief terminateEC2Instance
-             */
-            EXPORT void terminateEC2Instance(std::string instanceName);
-
-            /** @brief stopEC2Instance
-             */
-            EXPORT void stopEC2Instance(std::string instanceName);
-
-            /** @brief startEC2Instance
-             */
-            EXPORT bool startEC2Instance(std::string instanceName);
-
-            /** @brief assignElasticIP
-             */
-            EXPORT bool assignElasticIP(std::string instanceName, std::string IpAddress);
-
-            /** @brief deassignElasticIP
-             */
-            EXPORT bool deassignElasticIP(std::string IpAddress);
-
-            /** @brief createEC2Volume
-             */
-            EXPORT std::string createEC2Volume(std::string size, std::string name = "dummy");
-
-            /** @brief getEC2VolumeStatus
-             */
-            EXPORT std::string getEC2VolumeStatus(std::string volumeName);
-
-            /** @brief attachEC2Volume
-             */
-            EXPORT bool attachEC2Volume(std::string volumeName, std::string deviceName,std::string instanceName);
-
-            /** @brief detachEC2Volume
-             */
-            EXPORT bool detachEC2Volume(std::string volumeName);
-
-            /** @brief deleteEC2Volume
-             */
-            EXPORT bool deleteEC2Volume(std::string volumeName);
-
-            /** @brief createEC2tag
-             */
-            EXPORT bool createEC2tag(std::string resourceName, std::string tagName, std::string tagValue);
 
 			/**
 			*@brief  take action on Syslog process
@@ -2327,29 +2041,7 @@ namespace oam
 			*/
 			EXPORT void dbrmctl(std::string command);
 
-            /** @brief Wait for system to close transactions
-             *  
-             *  When a Shutdown, stop, restart or suspend operation is
-             *  requested but there are active transactions of some sort,
-             *  We wait for all transactions to close before performing
-             *  the action.
-             */
-            EXPORT bool waitForSystem(PROC_MGT_MSG_REQUEST request, messageqcpp::IOSocket& ios, messageqcpp::ByteStream& stillWorkingMsg);
-
-    		void amazonReattach(std::string toPM, dbrootList dbrootConfigList, bool attach = false);
-            void mountDBRoot(dbrootList dbrootConfigList, bool mount = true);
-
-			/**
-			*@brief  gluster control
-			*/
-			EXPORT int glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg);
-
-
         private:
-
-            /** @brief check Gluster Log after a Gluster control call
-             */
-            int checkGlusterLog(std::string logFile, std::string& errmsg);
 
             /** @brief copy database files from src to dst
              */
@@ -2368,13 +2060,6 @@ namespace oam
     		int sendMsgToProcMgr2(messageqcpp::ByteStream::byte requestType, DeviceNetworkList devicenetworklist,
         		GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag, const std::string password = " ");
 
-            /** @brief build and send request message to Process Manager
-             *  Check for status messages
-             */
-            int sendMsgToProcMgrWithStatus(messageqcpp::ByteStream::byte requestType, const std::string name = "",
-                GRACEFUL_FLAG gracefulflag = GRACEFUL, ACK_FLAG ackflag = ACK_YES,
-                const std::string argument1 = "", const std::string argument2 = "", int timeout = 600);
-
             // check for Ack message from Process Manager
             //	int checkMsgFromProcMgr(messageqcpp::ByteStream::byte requestType, const std::string name);
 
@@ -2382,19 +2067,22 @@ namespace oam
              */
     		int validateProcess(const std::string moduleName, std::string processName);
 
+            /** @brief send a message to the dml processor
+             */
+            int sendMsgToDMLProcessor(messageqcpp::ByteStream::byte requestType);
+
+            /** @brief send a message to the ddl processor
+             */
+            int sendMsgToDDLProcessor(messageqcpp::ByteStream::quadbyte requestType);
+
             /** @brief send status updates to process monitor
              */
     		void sendStatusUpdate(messageqcpp::ByteStream obs, messageqcpp::ByteStream::byte returnRequestType);
 
-			/**
-			* @brief Write the message to the log
-			*/
-			void writeLog(const std::string logContent, const logging::LOG_TYPE logType = logging::LOG_TYPE_INFO);
 
 			std::string CalpontConfigFile;
 			std::string AlarmConfigFile;
 			std::string ProcessConfigFile;
-			std::string InstallDir;
 
     };	// end of class
 
@@ -2435,5 +2123,3 @@ namespace procheartbeat
 #undef EXPORT
 
 #endif
-// vim:ts=4 sw=4:
-

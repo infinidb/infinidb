@@ -39,7 +39,6 @@
 #include <netdb.h>
 #endif
 #include <stdexcept>
-#include <csignal>
 
 #include "ddlpkg.h"
 #include "dmlpkg.h"
@@ -50,9 +49,6 @@
 #ifdef _MSC_VER
 #include "idbregistry.h"
 #endif
-#include "installdir.h"
-#include "dbrm.h"
-#include "sessionmanager.h"
 
 #if defined(__GNUC__)
 #include <string>
@@ -70,51 +66,36 @@ using namespace config;
 using namespace std;
 using namespace messageqcpp;
 using namespace oam;
-using namespace logging;
-using namespace BRM;
 
-namespace
-{
-const string CalpontFile = "Calpont.xml";
-const string AlarmFile = "AlarmConfig.xml";
-const string ProcessFile = "ProcessConfig.xml";
-}
+//default directory
+#ifdef _MSC_VER
+const std::string CalpontFileDir = "C:\\Calpont\\etc";
+#else
+const std::string CalpontFileDir = "/usr/local/Calpont/etc";
+#endif
+
+const std::string CalpontFile = "Calpont.xml";
+const std::string AlarmFile = "AlarmConfig.xml";
+const std::string ProcessFile = "ProcessConfig.xml";
 
 namespace oam
 {
-	// flag to tell us ctrl-c was hit
-	uint32_t    ctrlc = 0;
-
-	//------------------------------------------------------------------------------
-	// Signal handler to catch Control-C signal to terminate the process
-	// while waiting for a shutdown or suspend action
-	//------------------------------------------------------------------------------
-	void handleControlC(int i)
-	{
-		std::cout << "Received Control-C to terminate the command..." << std::endl;
-		ctrlc = 1;
-	}
-
     Oam::Oam()
     {
 		// Assigned pointers to Config files
 		string calpontfiledir;
-		const char* cf=0;
 
-		InstallDir = startup::StartUp::installDir();
-		calpontfiledir = InstallDir + "/etc";
-
-		//FIXME: we should not use this anymore. Everything should be based off the install dir
-		//If CALPONT_HOME is set, use it for etc directory
+		const char* cf;
 #ifdef _MSC_VER
-		cf = 0;
 		string cfStr = IDBreadRegistry("CalpontHome");
 		if (!cfStr.empty())
 			cf = cfStr.c_str();
 #else        
 		cf = getenv("CALPONT_HOME");
 #endif
-		if (cf != 0 && *cf != 0)
+		if (cf == 0 || *cf == 0)
+			calpontfiledir = CalpontFileDir;
+		else
 			calpontfiledir = cf;
 
 		CalpontConfigFile = calpontfiledir + "/" + CalpontFile;
@@ -138,8 +119,11 @@ namespace oam
     {
         // parse releasenum file
 
-        string rn = InstallDir + "/releasenum";
-		ifstream File(rn.c_str());
+#ifdef _MSC_VER
+		ifstream File ("C:\\Calpont\\releasenum");
+#else
+        ifstream File ("/usr/local/Calpont/releasenum");
+#endif
         if (!File)
             // Open File error
             return;
@@ -217,15 +201,15 @@ namespace oam
         systemconfig.ModuleHeartbeatPeriod = strtol(sysConfig->getConfig(Section, "ModuleHeartbeatPeriod").c_str(), 0, 0);
         systemconfig.ModuleHeartbeatCount = strtol(sysConfig->getConfig(Section, "ModuleHeartbeatCount").c_str(), 0, 0);
 //        systemconfig.ProcessHeartbeatPeriod = strtol(sysConfig->getConfig(Section, "ProcessHeartbeatPeriod").c_str(), 0, 0);
-        systemconfig.ExternalCriticalThreshold = strtol(sysConfig->getConfig(Section, "ExternalCriticalThreshold").c_str(), 0, 0);
-        systemconfig.ExternalMajorThreshold = strtol(sysConfig->getConfig(Section, "ExternalMajorThreshold").c_str(), 0, 0);
-        systemconfig.ExternalMinorThreshold = strtol(sysConfig->getConfig(Section, "ExternalMinorThreshold").c_str(), 0, 0);
+        systemconfig.RAIDCriticalThreshold = strtol(sysConfig->getConfig(Section, "RAIDCriticalThreshold").c_str(), 0, 0);
+        systemconfig.RAIDMajorThreshold = strtol(sysConfig->getConfig(Section, "RAIDMajorThreshold").c_str(), 0, 0);
+        systemconfig.RAIDMinorThreshold = strtol(sysConfig->getConfig(Section, "RAIDMinorThreshold").c_str(), 0, 0);
         systemconfig.TransactionArchivePeriod = strtol(sysConfig->getConfig(Section, "TransactionArchivePeriod").c_str(), 0, 0);
 
         // get string variables
-		for ( unsigned int dbrootID = 1 ; dbrootID < systemconfig.DBRootCount + 1 ; dbrootID++)
+		for ( unsigned int i = 1 ; i < systemconfig.DBRootCount + 1 ; i++)
 		{
-			systemconfig.DBRoot.push_back(sysConfig->getConfig(Section, "DBRoot" + itoa(dbrootID)));
+			systemconfig.DBRoot.push_back(sysConfig->getConfig(Section, "DBRoot" + itoa(i)));
 		}
 
         systemconfig.SystemName = sysConfig->getConfig(Section, "SystemName");
@@ -273,7 +257,7 @@ namespace oam
         const string MODULE_TYPE = "ModuleType";
         systemmoduletypeconfig.moduletypeconfig.clear();
 
-        for (int moduleTypeID = 1; moduleTypeID < MAX_MODULE_TYPE+1; moduleTypeID++)
+        for (int j = 0; j < MAX_MODULE; j++)
         {
         	ModuleTypeConfig moduletypeconfig;
 	
@@ -281,7 +265,7 @@ namespace oam
 
             // get Module info
 
-            string moduleType = MODULE_TYPE + itoa(moduleTypeID);
+            string moduleType = MODULE_TYPE + itoa(j+1);
 
             Oam::getSystemConfig(sysConfig->getConfig(Section, moduleType), moduletypeconfig );
 
@@ -323,37 +307,35 @@ namespace oam
         const string MODULE_IP_ADDR = "ModuleIPAddr";
         const string MODULE_SERVER_NAME = "ModuleHostName";
         const string MODULE_DISK_MONITOR_FS = "ModuleDiskMonitorFileSystem";
-        const string MODULE_DBROOT_COUNT = "ModuleDBRootCount";
-        const string MODULE_DBROOT_ID = "ModuleDBRootID";
 
-        for (int moduleTypeID = 1; moduleTypeID < MAX_MODULE_TYPE+1; moduleTypeID++)
+        for (int j = 0; j < MAX_MODULE; j++)
         {
-            string moduleType = MODULE_TYPE + itoa(moduleTypeID);
+            string moduleType = MODULE_TYPE + itoa(j+1);
 
             if( sysConfig->getConfig(Section, moduleType) ==  moduletype)
             {
-                string ModuleCount = MODULE_COUNT + itoa(moduleTypeID);
-                string ModuleType = MODULE_TYPE + itoa(moduleTypeID);
-                string ModuleDesc = MODULE_DESC + itoa(moduleTypeID);
-                string ModuleRunType = MODULE_RUN_TYPE + itoa(moduleTypeID);
-                string ModuleCPUCriticalThreshold = MODULE_CPU_CRITICAL + itoa(moduleTypeID);
-                string ModuleCPUMajorThreshold = MODULE_CPU_MAJOR + itoa(moduleTypeID);
-                string ModuleCPUMinorThreshold = MODULE_CPU_MINOR + itoa(moduleTypeID);
-                string ModuleCPUMinorClearThreshold = MODULE_CPU_MINOR_CLEAR + itoa(moduleTypeID);
-                string ModuleDiskCriticalThreshold = MODULE_DISK_CRITICAL + itoa(moduleTypeID);
-                string ModuleDiskMajorThreshold = MODULE_DISK_MAJOR + itoa(moduleTypeID);
-                string ModuleDiskMinorThreshold = MODULE_DISK_MINOR + itoa(moduleTypeID);
-                string ModuleMemCriticalThreshold = MODULE_MEM_CRITICAL + itoa(moduleTypeID);
-                string ModuleMemMajorThreshold = MODULE_MEM_MAJOR + itoa(moduleTypeID);
-                string ModuleMemMinorThreshold = MODULE_MEM_MINOR + itoa(moduleTypeID);
-                string ModuleSwapCriticalThreshold = MODULE_SWAP_CRITICAL + itoa(moduleTypeID);
-                string ModuleSwapMajorThreshold = MODULE_SWAP_MAJOR + itoa(moduleTypeID);
-                string ModuleSwapMinorThreshold = MODULE_SWAP_MINOR + itoa(moduleTypeID);
+                string ModuleType = MODULE_TYPE + itoa(j+1);
+                string ModuleDesc = MODULE_DESC + itoa(j+1);
+                string ModuleRunType = MODULE_RUN_TYPE + itoa(j+1);
+                string ModuleCount = MODULE_COUNT + itoa(j+1);
+                string ModuleCPUCriticalThreshold = MODULE_CPU_CRITICAL + itoa(j+1);
+                string ModuleCPUMajorThreshold = MODULE_CPU_MAJOR + itoa(j+1);
+                string ModuleCPUMinorThreshold = MODULE_CPU_MINOR + itoa(j+1);
+                string ModuleCPUMinorClearThreshold = MODULE_CPU_MINOR_CLEAR + itoa(j+1);
+                string ModuleDiskCriticalThreshold = MODULE_DISK_CRITICAL + itoa(j+1);
+                string ModuleDiskMajorThreshold = MODULE_DISK_MAJOR + itoa(j+1);
+                string ModuleDiskMinorThreshold = MODULE_DISK_MINOR + itoa(j+1);
+                string ModuleMemCriticalThreshold = MODULE_MEM_CRITICAL + itoa(j+1);
+                string ModuleMemMajorThreshold = MODULE_MEM_MAJOR + itoa(j+1);
+                string ModuleMemMinorThreshold = MODULE_MEM_MINOR + itoa(j+1);
+                string ModuleSwapCriticalThreshold = MODULE_SWAP_CRITICAL + itoa(j+1);
+                string ModuleSwapMajorThreshold = MODULE_SWAP_MAJOR + itoa(j+1);
+                string ModuleSwapMinorThreshold = MODULE_SWAP_MINOR + itoa(j+1);
 
-                moduletypeconfig.ModuleCount = strtol(sysConfig->getConfig(Section, ModuleCount).c_str(), 0, 0);
                 moduletypeconfig.ModuleType = sysConfig->getConfig(Section, ModuleType);
                 moduletypeconfig.ModuleDesc = sysConfig->getConfig(Section, ModuleDesc);
                 moduletypeconfig.RunType = sysConfig->getConfig(Section, ModuleRunType);
+                moduletypeconfig.ModuleCount = strtol(sysConfig->getConfig(Section, ModuleCount).c_str(), 0, 0);
                 moduletypeconfig.ModuleCPUCriticalThreshold = strtol(sysConfig->getConfig(Section, ModuleCPUCriticalThreshold).c_str(), 0, 0);
                 moduletypeconfig.ModuleCPUMajorThreshold = strtol(sysConfig->getConfig(Section, ModuleCPUMajorThreshold).c_str(), 0, 0);
                 moduletypeconfig.ModuleCPUMinorThreshold = strtol(sysConfig->getConfig(Section, ModuleCPUMinorThreshold).c_str(), 0, 0);
@@ -368,50 +350,45 @@ namespace oam
                 moduletypeconfig.ModuleSwapMajorThreshold = strtol(sysConfig->getConfig(Section, ModuleSwapMajorThreshold).c_str(), 0, 0);
                 moduletypeconfig.ModuleSwapMinorThreshold = strtol(sysConfig->getConfig(Section, ModuleSwapMinorThreshold).c_str(), 0, 0);
 
-				int moduleFound = 0;
-				//get NIC IP address/hostnames
-				for (int moduleID = 1; moduleID < MAX_MODULE ; moduleID++)
+				for (int i = 1; i < MAX_MODULE ; i++)
 				{
+
 					DeviceNetworkConfig devicenetworkconfig;
 					HostConfig hostconfig;
 
-					for (int nicID= 1; nicID < MAX_NIC+1 ; nicID++)
+					//get NIC IP address/hostnames
+					for (int k = 1; k < MAX_NIC+1 ; k++)
 					{
-						string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
+						string ModuleIpAddr = MODULE_IP_ADDR + itoa(i) + "-" + itoa(k) + "-" + itoa(j+1);
 	
 						string ipAddr = sysConfig->getConfig(Section, ModuleIpAddr);
 						if (ipAddr.empty() || ipAddr == UnassignedIpAddr )
 							continue;
 	
-						string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
+						string ModuleHostName = MODULE_SERVER_NAME + itoa(i) + "-" + itoa(k) + "-" + itoa(j+1);
 						string serverName = sysConfig->getConfig(Section, ModuleHostName);
 	
 						hostconfig.IPAddr = ipAddr;
 						hostconfig.HostName = serverName;
-						hostconfig.NicID = nicID;
+						hostconfig.NicID = k;
 
 						devicenetworkconfig.hostConfigList.push_back(hostconfig);
 					}
 
 					if ( !devicenetworkconfig.hostConfigList.empty() ) {
-		                string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(moduleTypeID);
+		                string ModuleDisableState = MODULE_DISABLE_STATE + itoa(i) + "-" + itoa(j+1);
 						devicenetworkconfig.DisableState = sysConfig->getConfig(Section, ModuleDisableState);
 
-						devicenetworkconfig.DeviceName = moduletypeconfig.ModuleType + itoa(moduleID);
+						devicenetworkconfig.DeviceName = moduletypeconfig.ModuleType + itoa(i);
 						moduletypeconfig.ModuleNetworkList.push_back(devicenetworkconfig);
 						devicenetworkconfig.hostConfigList.clear();
-
-						moduleFound++;
-						if ( moduleFound >= moduletypeconfig.ModuleCount )
-							break;
 					}
 				}
 
-				// get filesystems
 				DiskMonitorFileSystems fs;
-				for (int fsID = 1;; fsID++)
+				for (int i = 1;; i++)
 				{
-	            	string ModuleDiskMonitorFS = MODULE_DISK_MONITOR_FS + itoa(fsID) + "-" + itoa(moduleTypeID);
+	            	string ModuleDiskMonitorFS = MODULE_DISK_MONITOR_FS + itoa(i) + "-" + itoa(j+1);
 
                 	string fsName = sysConfig->getConfig(Section, ModuleDiskMonitorFS);
 					if (fsName.empty())
@@ -420,54 +397,6 @@ namespace oam
 					fs.push_back(fsName);
 				}
 				moduletypeconfig.FileSystems = fs;
-
-				// get dbroot IDs
-				moduleFound = 0;
-				for (int moduleID = 1; moduleID < MAX_MODULE+1 ; moduleID++)
-				{
-					string ModuleDBRootCount = MODULE_DBROOT_COUNT + itoa(moduleID) + "-" + itoa(moduleTypeID);
-					string temp = sysConfig->getConfig(Section, ModuleDBRootCount).c_str();
-					if ( temp.empty() || temp == oam::UnassignedName)
-						continue;
-
-					int moduledbrootcount = strtol(temp.c_str(), 0, 0);
-	
-					DeviceDBRootConfig devicedbrootconfig;
-					DBRootConfigList dbrootconfiglist;
-
-					if ( moduledbrootcount < 1 ) {
-						dbrootconfiglist.clear();
-					}
-					else
-					{
-	
-						int foundIDs = 0;
-						for (int dbrootID = 1; dbrootID < moduledbrootcount+1 ; dbrootID++)
-						{
-							string DBRootID = MODULE_DBROOT_ID + itoa(moduleID) + "-" + itoa(dbrootID) + "-" + itoa(moduleTypeID);
-		
-							string dbrootid = sysConfig->getConfig(Section, DBRootID);
-							if (dbrootid.empty() || dbrootid == oam::UnassignedName
-								|| dbrootid == "0")
-								continue;
-	
-							dbrootconfiglist.push_back(atoi(dbrootid.c_str()));
-							foundIDs++;
-							if ( moduledbrootcount == foundIDs)
-								break;
-						}
-					}
-
-					sort ( dbrootconfiglist.begin(), dbrootconfiglist.end() );
-					devicedbrootconfig.DeviceID = moduleID;
-					devicedbrootconfig.dbrootConfigList = dbrootconfiglist;
-					moduletypeconfig.ModuleDBRootList.push_back(devicedbrootconfig);
-					devicedbrootconfig.dbrootConfigList.clear();
-
-					moduleFound++;
-					if ( moduleFound >= moduletypeconfig.ModuleCount )
-						break;
-				}
 
                 return;
             }
@@ -493,8 +422,6 @@ namespace oam
         const string MODULE_IP_ADDR = "ModuleIPAddr";
         const string MODULE_SERVER_NAME = "ModuleHostName";
         const string MODULE_DISABLE_STATE = "ModuleDisableState";
-        const string MODULE_DBROOT_COUNT = "ModuleDBRootCount";
-        const string MODULE_DBROOT_ID = "ModuleDBRootID";
 
 		string moduletype = module.substr(0,MAX_MODULE_TYPE_SIZE);
 		int moduleID = atoi(module.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
@@ -502,66 +429,42 @@ namespace oam
 			//invalid ID
         	exceptionControl("getSystemConfig", API_INVALID_PARAMETER);
 
-        for (int moduleTypeID = 1; moduleTypeID < MAX_MODULE_TYPE+1; moduleTypeID++)
+        for (int j = 0; j < MAX_MODULE; j++)
         {
-            string moduleType = MODULE_TYPE + itoa(moduleTypeID);
-            string ModuleCount = MODULE_COUNT + itoa(moduleTypeID);
+            string moduleType = MODULE_TYPE + itoa(j+1);
+            string ModuleCount = MODULE_COUNT + itoa(j+1);
 
             if( sysConfig->getConfig(Section, moduleType) ==  moduletype  )
             {
-                string ModuleType = MODULE_TYPE + itoa(moduleTypeID);
-                string ModuleDesc = MODULE_DESC + itoa(moduleTypeID);
-	            string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(moduleTypeID);
+                string ModuleType = MODULE_TYPE + itoa(j+1);
+                string ModuleDesc = MODULE_DESC + itoa(j+1);
+	            string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(j+1);
 
                 moduleconfig.ModuleName = module;
                 moduleconfig.ModuleType = sysConfig->getConfig(Section, ModuleType);
                 moduleconfig.ModuleDesc = sysConfig->getConfig(Section, ModuleDesc) + " #" + itoa(moduleID);
                 moduleconfig.DisableState = sysConfig->getConfig(Section, ModuleDisableState);
 
-				string ModuleDBRootCount = MODULE_DBROOT_COUNT + itoa(moduleID) + "-" + itoa(moduleTypeID);
-				string temp = sysConfig->getConfig(Section, ModuleDBRootCount).c_str();
-
-				int moduledbrootcount = 0;
-				if ( temp.empty() || temp != oam::UnassignedName)
-					moduledbrootcount = strtol(temp.c_str(), 0, 0);
-
 				HostConfig hostconfig;
 
 				//get NIC IP address/hostnames
-				moduleconfig.hostConfigList.clear();
-				for (int nicID = 1; nicID < MAX_NIC+1 ; nicID++)
+				for (int k = 1; k < MAX_NIC+1 ; k++)
 				{
-					string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
+					string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa(k) + "-" + itoa(j+1);
 
 					string ipAddr = sysConfig->getConfig(Section, ModuleIpAddr);
 					if (ipAddr.empty() || ipAddr == UnassignedIpAddr )
 						continue;
 
-					string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
+					string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa(k) + "-" + itoa(j+1);
 					string serverName = sysConfig->getConfig(Section, ModuleHostName);
 
 					hostconfig.IPAddr = ipAddr;
 					hostconfig.HostName = serverName;
-					hostconfig.NicID = nicID;
+					hostconfig.NicID = k;
 
 					moduleconfig.hostConfigList.push_back(hostconfig);
 				}
-
-				//get DBroot IDs
-				moduleconfig.dbrootConfigList.clear();
-				for (int dbrootID = 1; dbrootID < moduledbrootcount+1 ; dbrootID++)
-				{
-					string ModuleDBRootID = MODULE_DBROOT_ID + itoa(moduleID) + "-" + itoa(dbrootID) + "-" + itoa(moduleTypeID);
-
-					string moduleDBRootID = sysConfig->getConfig(Section, ModuleDBRootID);
-					if (moduleDBRootID.empty() || moduleDBRootID == oam::UnassignedName
-						|| moduleDBRootID == "0")
-						continue;
-
-					moduleconfig.dbrootConfigList.push_back(atoi(moduleDBRootID.c_str()));
-				}
-
-				sort ( moduleconfig.dbrootConfigList.begin(), moduleconfig.dbrootConfigList.end() );
 
                 return;
             }
@@ -627,11 +530,11 @@ namespace oam
         systemextdeviceconfig.Count = strtol(sysConfig->getConfig(Section, "Count").c_str(), 0, 0);
 
 		int configCount = 0;
-        for (int extDeviceID = 1; extDeviceID < MAX_EXT_DEVICE+1; extDeviceID++)
+        for (int j = 1; j < MAX_EXT_DEVICE+1; j++)
         {
 	        ExtDeviceConfig Extdeviceconfig;
 
-			string name = NAME + itoa(extDeviceID);
+			string name = NAME + itoa(j);
 
 			try {
 				Extdeviceconfig.Name = sysConfig->getConfig(Section, name);
@@ -645,8 +548,8 @@ namespace oam
 				Extdeviceconfig.Name.empty())
                 continue;
 
-			string ipaddr = IPADDR + itoa(extDeviceID);
-			string disablestate = DISABLE_STATE + itoa(extDeviceID);
+			string ipaddr = IPADDR + itoa(j);
+			string disablestate = DISABLE_STATE + itoa(j);
 
 			Extdeviceconfig.IPAddr = sysConfig->getConfig(Section, ipaddr);
 			Extdeviceconfig.DisableState = sysConfig->getConfig(Section, disablestate);
@@ -685,17 +588,17 @@ namespace oam
         const string IPADDR = "IPAddr";
         const string DISABLE_STATE = "DisableState";
 
-        for (int extDeviceID = 1; extDeviceID < MAX_EXT_DEVICE+1; extDeviceID++)
+        for (int j = 1; j < MAX_EXT_DEVICE+1; j++)
         {
-			string name = NAME + itoa(extDeviceID);
+			string name = NAME + itoa(j);
 
 			extdeviceconfig.Name = sysConfig->getConfig(Section, name);
 
             if (extdeviceconfig.Name != extDevicename)
                 continue;
 
-			string ipaddr = IPADDR + itoa(extDeviceID);
-			string disablestate = DISABLE_STATE + itoa(extDeviceID);
+			string ipaddr = IPADDR + itoa(j);
+			string disablestate = DISABLE_STATE + itoa(j);
 
 			extdeviceconfig.IPAddr = sysConfig->getConfig(Section, ipaddr);
 			extdeviceconfig.DisableState = sysConfig->getConfig(Section, disablestate);
@@ -727,22 +630,22 @@ namespace oam
         int count = strtol(sysConfig->getConfig(Section, "Count").c_str(), 0, 0);
 
 		int entry = 0;
-		int extDeviceID = 1;
-        for (; extDeviceID < MAX_EXT_DEVICE+1; extDeviceID++)
+		int j = 1;
+        for (; j < MAX_EXT_DEVICE+1; j++)
         {
-			string name = NAME + itoa(extDeviceID);
+			string name = NAME + itoa(j);
 
             if (sysConfig->getConfig(Section, name) == oam::UnassignedName)
-				entry = extDeviceID;
+				entry = j;
 
             if ((sysConfig->getConfig(Section, name)).empty() && entry == 0)
-				entry = extDeviceID;
+				entry = j;
 
             if (sysConfig->getConfig(Section, name) != deviceName)
                 continue;
 
-			string ipaddr = IPADDR + itoa(extDeviceID);
-			string disablestate = DISABLE_STATE + itoa(extDeviceID);
+			string ipaddr = IPADDR + itoa(j);
+			string disablestate = DISABLE_STATE + itoa(j);
 
 			sysConfig->setConfig(Section, name, extdeviceconfig.Name);
 			sysConfig->setConfig(Section, ipaddr, extdeviceconfig.IPAddr);
@@ -787,7 +690,7 @@ namespace oam
 		}
 
 		if ( entry == 0 )
-			entry = extDeviceID;
+			entry = j;
 
         // Ext Device Not found, add it
 
@@ -1074,29 +977,29 @@ namespace oam
         const string MODULE_DISK_MONITOR_FS = "ModuleDiskMonitorFileSystem";
         const string MODULE_DISABLE_STATE = "ModuleDisableState";
 
-        for (int moduleTypeID = 1; moduleTypeID < MAX_MODULE_TYPE+1; moduleTypeID++)
+        for (int j = 0; j < MAX_MODULE; j++)
         {
-            string moduleType = MODULE_TYPE + itoa(moduleTypeID);
+            string moduleType = MODULE_TYPE + itoa(j+1);
 
             if( sysConfig->getConfig(Section, moduleType) ==  moduletype)
             {
-                string ModuleType = MODULE_TYPE + itoa(moduleTypeID);
-                string ModuleDesc = MODULE_DESC + itoa(moduleTypeID);
-                string ModuleRunType = MODULE_RUN_TYPE + itoa(moduleTypeID);
-                string ModuleCount = MODULE_COUNT + itoa(moduleTypeID);
-                string ModuleCPUCriticalThreshold = MODULE_CPU_CRITICAL + itoa(moduleTypeID);
-                string ModuleCPUMajorThreshold = MODULE_CPU_MAJOR + itoa(moduleTypeID);
-                string ModuleCPUMinorThreshold = MODULE_CPU_MINOR + itoa(moduleTypeID);
-                string ModuleCPUMinorClearThreshold = MODULE_CPU_MINOR_CLEAR + itoa(moduleTypeID);
-                string ModuleDiskCriticalThreshold = MODULE_DISK_CRITICAL + itoa(moduleTypeID);
-                string ModuleDiskMajorThreshold = MODULE_DISK_MAJOR + itoa(moduleTypeID);
-                string ModuleDiskMinorThreshold = MODULE_DISK_MINOR + itoa(moduleTypeID);
-                string ModuleMemCriticalThreshold = MODULE_MEM_CRITICAL + itoa(moduleTypeID);
-                string ModuleMemMajorThreshold = MODULE_MEM_MAJOR + itoa(moduleTypeID);
-                string ModuleMemMinorThreshold = MODULE_MEM_MINOR + itoa(moduleTypeID);
-                string ModuleSwapCriticalThreshold = MODULE_SWAP_CRITICAL + itoa(moduleTypeID);
-                string ModuleSwapMajorThreshold = MODULE_SWAP_MAJOR + itoa(moduleTypeID);
-                string ModuleSwapMinorThreshold = MODULE_SWAP_MINOR + itoa(moduleTypeID);
+                string ModuleType = MODULE_TYPE + itoa(j+1);
+                string ModuleDesc = MODULE_DESC + itoa(j+1);
+                string ModuleRunType = MODULE_RUN_TYPE + itoa(j+1);
+                string ModuleCount = MODULE_COUNT + itoa(j+1);
+                string ModuleCPUCriticalThreshold = MODULE_CPU_CRITICAL + itoa(j+1);
+                string ModuleCPUMajorThreshold = MODULE_CPU_MAJOR + itoa(j+1);
+                string ModuleCPUMinorThreshold = MODULE_CPU_MINOR + itoa(j+1);
+                string ModuleCPUMinorClearThreshold = MODULE_CPU_MINOR_CLEAR + itoa(j+1);
+                string ModuleDiskCriticalThreshold = MODULE_DISK_CRITICAL + itoa(j+1);
+                string ModuleDiskMajorThreshold = MODULE_DISK_MAJOR + itoa(j+1);
+                string ModuleDiskMinorThreshold = MODULE_DISK_MINOR + itoa(j+1);
+                string ModuleMemCriticalThreshold = MODULE_MEM_CRITICAL + itoa(j+1);
+                string ModuleMemMajorThreshold = MODULE_MEM_MAJOR + itoa(j+1);
+                string ModuleMemMinorThreshold = MODULE_MEM_MINOR + itoa(j+1);
+                string ModuleSwapCriticalThreshold = MODULE_SWAP_CRITICAL + itoa(j+1);
+                string ModuleSwapMajorThreshold = MODULE_SWAP_MAJOR + itoa(j+1);
+                string ModuleSwapMinorThreshold = MODULE_SWAP_MINOR + itoa(j+1);
 
                 int oldModuleCount = atoi(sysConfig->getConfig(Section, ModuleCount).c_str());
 
@@ -1120,19 +1023,19 @@ namespace oam
 
 				// clear out hostConfig info before adding in new contents
 				if ( oldModuleCount > 0) {
-					for (int moduleID = 1; moduleID < MAX_MODULE ; moduleID++)
+					for (int i = 1; i < MAX_MODULE ; i++)
 					{
 						//get NIC IP address/hostnames
-						for (int nicID = 1; nicID < MAX_NIC+1 ; nicID++)
+						for (int k = 1; k < MAX_NIC+1 ; k++)
 						{
-							string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
+							string ModuleIpAddr = MODULE_IP_ADDR + itoa(i) + "-" + itoa(k) + "-" + itoa(j+1);
 		
 							string ipAddr = sysConfig->getConfig(Section, ModuleIpAddr);
 							if (ipAddr.empty())
 								continue;
 		
-							string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa(nicID) + "-" + itoa(moduleTypeID);
-							string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(moduleTypeID);
+							string ModuleHostName = MODULE_SERVER_NAME + itoa(i) + "-" + itoa(k) + "-" + itoa(j+1);
+							string ModuleDisableState = MODULE_DISABLE_STATE + itoa(i) + "-" + itoa(j+1);
 
 							sysConfig->setConfig(Section, ModuleIpAddr, UnassignedIpAddr);
 							sysConfig->setConfig(Section, ModuleHostName, UnassignedName);
@@ -1148,17 +1051,14 @@ namespace oam
 					{
 						int ModuleID = atoi((*pt).DeviceName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
 
-						string ModuleDisableState = MODULE_DISABLE_STATE + itoa(ModuleID) + "-" + itoa(moduleTypeID);
-						sysConfig->setConfig(Section, ModuleDisableState, (*pt).DisableState);
-
 						HostConfigList::iterator pt1 = (*pt).hostConfigList.begin();
 						for( ; pt1 != (*pt).hostConfigList.end() ; pt1++)
 						{
 							int nidID = (*pt1).NicID;
-							string ModuleIpAddr = MODULE_IP_ADDR + itoa(ModuleID) + "-" + itoa(nidID) + "-" + itoa(moduleTypeID);
+							string ModuleIpAddr = MODULE_IP_ADDR + itoa(ModuleID) + "-" + itoa(nidID) + "-" + itoa(j+1);
 							sysConfig->setConfig(Section, ModuleIpAddr, (*pt1).IPAddr);
 	
-							string ModuleHostName = MODULE_SERVER_NAME + itoa(ModuleID) + "-" + itoa(nidID) + "-" + itoa(moduleTypeID);
+							string ModuleHostName = MODULE_SERVER_NAME + itoa(ModuleID) + "-" + itoa(nidID) + "-" + itoa(j+1);
 							sysConfig->setConfig(Section, ModuleHostName, (*pt1).HostName);
 						}
 					}
@@ -1168,7 +1068,7 @@ namespace oam
 				int id=1;
 				for( ; pt != moduletypeconfig.FileSystems.end() ; pt++)
 				{
-	            	string ModuleDiskMonitorFS = MODULE_DISK_MONITOR_FS + itoa(id) + "-" + itoa(moduleTypeID);
+	            	string ModuleDiskMonitorFS = MODULE_DISK_MONITOR_FS + itoa(id) + "-" + itoa(j+1);
                 	sysConfig->setConfig(Section, ModuleDiskMonitorFS, *pt);
 					++id;
 				}
@@ -1205,8 +1105,6 @@ namespace oam
         const string MODULE_IP_ADDR = "ModuleIPAddr";
         const string MODULE_SERVER_NAME = "ModuleHostName";
         const string MODULE_DISABLE_STATE = "ModuleDisableState";
-        const string MODULE_DBROOTID = "ModuleDBRootID";
-        const string MODULE_DBROOT_COUNT = "ModuleDBRootCount";
 
 		string moduletype = module.substr(0,MAX_MODULE_TYPE_SIZE);
 		int moduleID = atoi(module.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
@@ -1214,55 +1112,25 @@ namespace oam
 			//invalid ID
         	exceptionControl("setSystemConfig", API_INVALID_PARAMETER);
 
-        for (int moduleTypeID = 1; moduleTypeID < MAX_MODULE_TYPE+1; moduleTypeID++)
+        for (int j = 0; j < MAX_MODULE; j++)
         {
-            string moduleType = MODULE_TYPE + itoa(moduleTypeID);
-            string ModuleCount = MODULE_COUNT + itoa(moduleTypeID);
+            string moduleType = MODULE_TYPE + itoa(j+1);
+            string ModuleCount = MODULE_COUNT + itoa(j+1);
 
             if( sysConfig100->getConfig(Section, moduleType) ==  moduletype )
             {
-	            string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(moduleTypeID);
+	            string ModuleDisableState = MODULE_DISABLE_STATE + itoa(moduleID) + "-" + itoa(j+1);
 				sysConfig100->setConfig(Section, ModuleDisableState, moduleconfig.DisableState);
 
 				HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
 				for( ; pt1 != moduleconfig.hostConfigList.end() ; pt1++)
 				{
-					string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa((*pt1).NicID) + "-" + itoa(moduleTypeID);
+					string ModuleIpAddr = MODULE_IP_ADDR + itoa(moduleID) + "-" + itoa((*pt1).NicID) + "-" + itoa(j+1);
 					sysConfig100->setConfig(Section, ModuleIpAddr, (*pt1).IPAddr);
 	
-					string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa((*pt1).NicID) + "-" + itoa(moduleTypeID);
+					string ModuleHostName = MODULE_SERVER_NAME + itoa(moduleID) + "-" + itoa((*pt1).NicID) + "-" + itoa(j+1);
 					sysConfig100->setConfig(Section, ModuleHostName, (*pt1).HostName);
 				}
-
-				int id = 1;
-				if ( moduleconfig.dbrootConfigList.size() == 0 )
-				{
-					string ModuleDBrootID = MODULE_DBROOTID + itoa(moduleID) + "-" + itoa((id)) + "-" + itoa(moduleTypeID);
-					sysConfig100->setConfig(Section, ModuleDBrootID, oam::UnassignedName);
-				}
-				else
-				{
-					DBRootConfigList::iterator pt2 = moduleconfig.dbrootConfigList.begin();
-					for( ; pt2 != moduleconfig.dbrootConfigList.end() ; pt2++, id++)
-					{
-						string ModuleDBrootID = MODULE_DBROOTID + itoa(moduleID) + "-" + itoa((id)) + "-" + itoa(moduleTypeID);
-						sysConfig100->setConfig(Section, ModuleDBrootID, itoa((*pt2)));
-					}
-				}
-
-				//set entries no longer configured to unsassigned
-				for ( int extraid = id ; id < MAX_DBROOT ; extraid++ )
-				{
-					string ModuleDBrootID = MODULE_DBROOTID + itoa(moduleID) + "-" + itoa((extraid)) + "-" + itoa(moduleTypeID);
-					if ( sysConfig100->getConfig(Section, ModuleDBrootID).empty() || 
-							sysConfig100->getConfig(Section, ModuleDBrootID) == oam::UnassignedName )
-						break;
-					sysConfig100->setConfig(Section, ModuleDBrootID, oam::UnassignedName);
-				}
-
-				string ModuleDBRootCount = MODULE_DBROOT_COUNT + itoa(moduleID) + "-" + itoa(moduleTypeID);
-				sysConfig100->setConfig(Section, ModuleDBRootCount, itoa(moduleconfig.dbrootConfigList.size()));
-
 				try
 				{
 					sysConfig100->write();
@@ -1357,8 +1225,6 @@ namespace oam
         systemstatus.systemextdevicestatus.extdevicestatus.clear();
         NICStatus nicstatus;
         systemstatus.systemnicstatus.nicstatus.clear();
-        DbrootStatus dbrootstatus;
-        systemstatus.systemdbrootstatus.dbrootstatus.clear();
 
         try
         {
@@ -1366,7 +1232,6 @@ namespace oam
 			processor.syncProto(false);
             ByteStream::byte ModuleNumber;
             ByteStream::byte ExtDeviceNumber;
-            ByteStream::byte dbrootNumber;
             ByteStream::byte NICNumber;
 			ByteStream::byte state;
 			std::string name;
@@ -1375,17 +1240,10 @@ namespace oam
 
             obs << (ByteStream::byte) GET_SYSTEM_STATUS;
 
-			try {
-				struct timespec ts = { 10, 0 };
-				processor.write(obs, &ts);
-			}
-			catch(...)
-			{
-				exceptionControl("getSystemStatus", API_TIMEOUT);
-			}
+            processor.write(obs);
 
 			// wait 10 seconds for ACK from Process Monitor
-			struct timespec ts = { 20, 0 };
+			struct timespec ts = { 10, 0 };
 
 			ibs = processor.read(&ts);
 
@@ -1435,19 +1293,6 @@ namespace oam
 					nicstatus.NICOpState = state;
 					nicstatus.StateChangeDate = date;
 					systemstatus.systemnicstatus.nicstatus.push_back(nicstatus);
-				}
-
-				ibs >> dbrootNumber;
-
-				for( int i=0 ; i < dbrootNumber ; ++i)
-				{
-					ibs >> name;
-					ibs >> state;
-					ibs >> date;
-					dbrootstatus.Name = name;
-					dbrootstatus.OpState = state;
-					dbrootstatus.StateChangeDate = date;
-					systemstatus.systemdbrootstatus.dbrootstatus.push_back(dbrootstatus);
 				}
 
 				processor.shutdown();
@@ -1643,66 +1488,6 @@ namespace oam
 
     /********************************************************************
      *
-     * get DBroot Status information
-     *
-     ********************************************************************/
-
-    void Oam::getDbrootStatus(const std::string name, int& state)
-    {
-		SystemStatus systemstatus;
-
-		try
-		{
-			getSystemStatus(systemstatus);
-
-			for( unsigned int i = 0 ; i < systemstatus.systemdbrootstatus.dbrootstatus.size(); i++)
-			{
-				if( systemstatus.systemdbrootstatus.dbrootstatus[i].Name == name ) {
-					state = systemstatus.systemdbrootstatus.dbrootstatus[i].OpState;
-					return;
-				}
-			}
-		}
-		catch (exception&)
-		{
-	        exceptionControl("getDbrootStatus", API_FAILURE);
-		}
-
-        // no match found
-        exceptionControl("getDbrootStatus", API_INVALID_PARAMETER);
-    }
-
-    /********************************************************************
-     *
-     * set DBroot Status information
-     *
-     ********************************************************************/
-
-    void Oam::setDbrootStatus(const std::string name, const int state)
-    {
-		//send and wait for ack and resend if not received
-		//retry 3 time max
-		for ( int i=0; i < 3 ; i++)
-		{
-			try
-			{
-				ByteStream obs;
-	
-				obs << (ByteStream::byte) SET_DBROOT_STATUS;
-				obs << name;
-				obs << (ByteStream::byte) state;
-	
-	    		sendStatusUpdate(obs, SET_DBROOT_STATUS);
-				return;
-			}
-			catch(...)
-			{}
-		}
-        exceptionControl("setDbrootStatus", API_FAILURE);
-    }
-
-    /********************************************************************
-     *
      * get NIC Status information
      *
      ********************************************************************/
@@ -1780,9 +1565,9 @@ namespace oam
         string depMdlName;
 		string moduleType = module.substr(0,MAX_MODULE_TYPE_SIZE);
 
-        for (int processID = 1; processID < MAX_PROCESS+1; processID++)
+        for (int j = 0; j < MAX_PROCESS; j++)
         {
-            string sectionName = SECTION_NAME + itoa(processID);
+            string sectionName = SECTION_NAME + itoa(j+1);
 
             if( proConfig->getConfig(sectionName, "ProcessName") == process )
 			{
@@ -1805,23 +1590,23 @@ namespace oam
 					processconfig.LaunchID = strtol(proConfig->getConfig(sectionName, "LaunchID").c_str(), 0, 0);;
 	
 					// get Auguments
-					for (int argID = 0; argID < MAX_ARGUMENTS; argID++)
+					for (int k = 0; k < MAX_ARGUMENTS; k++)
 					{
-						argName = ARG_NAME + itoa(argID+1);
-						processconfig.ProcessArgs[argID] = proConfig->getConfig(sectionName, argName);
+						argName = ARG_NAME + itoa(k+1);
+						processconfig.ProcessArgs[k] = proConfig->getConfig(sectionName, argName);
 					}
 	
 					// get process dependencies
-					for (int depID = 0; depID < MAX_DEPENDANCY; depID++)
+					for (int k = 0; k < MAX_DEPENDANCY; k++)
 					{
-						depName = DEP_NAME + itoa(depID+1);
-						processconfig.DepProcessName[depID] = proConfig->getConfig(sectionName, depName);
+						depName = DEP_NAME + itoa(k+1);
+						processconfig.DepProcessName[k] = proConfig->getConfig(sectionName, depName);
 					}
 					// get dependent process Module name
-					for (int moduleID = 0; moduleID < MAX_DEPENDANCY; moduleID++)
+					for (int k = 0; k < MAX_DEPENDANCY; k++)
 					{
-						depMdlName = DEP_MDLNAME + itoa(moduleID+1);
-						processconfig.DepModuleName[moduleID] = proConfig->getConfig(sectionName, depMdlName);
+						depMdlName = DEP_MDLNAME + itoa(k+1);
+						processconfig.DepModuleName[k] = proConfig->getConfig(sectionName, depMdlName);
 					}
 	
 					// get optional group id and type
@@ -1854,7 +1639,7 @@ namespace oam
         const string SECTION_NAME = "PROCESSCONFIG";
         systemprocessconfig.processconfig.clear();
 
-        for (int processID = 1; processID < MAX_PROCESS+1; processID++)
+        for (int j = 0; j < MAX_PROCESS; j++)
         {
 	        ProcessConfig processconfig;
 
@@ -1862,7 +1647,7 @@ namespace oam
 
             // get process info
 
-            string sectionName = SECTION_NAME + itoa(processID);
+            string sectionName = SECTION_NAME + itoa(j+1);
 
             Oam::getProcessConfig(proConfig->getConfig(sectionName, "ProcessName"),
                 proConfig->getConfig(sectionName, "ModuleType"),
@@ -1889,9 +1674,9 @@ namespace oam
         const string SECTION_NAME = "PROCESSCONFIG";
 		string moduleType = module.substr(0,MAX_MODULE_TYPE_SIZE);
 
-        for (int processID = 1; processID < MAX_PROCESS+1; processID++)
+        for (int j = 0; j < MAX_PROCESS; j++)
         {
-            string sectionName = SECTION_NAME + itoa(processID);
+            string sectionName = SECTION_NAME + itoa(j+1);
 
             if( proConfig->getConfig(sectionName, "ProcessName") == process )
 			{
@@ -1951,9 +1736,9 @@ namespace oam
         string returnValue;
 		string moduleType = module.substr(0,MAX_MODULE_TYPE_SIZE);
 
-        for (int processID = 1; processID < MAX_PROCESS+1; processID++)
+        for (int j = 0; j < MAX_PROCESS; j++)
         {
-            string sectionName = SECTION_NAME + itoa(processID);
+            string sectionName = SECTION_NAME + itoa(j+1);
 
             if( proConfig->getConfig(sectionName, "ProcessName") == process )
 			{
@@ -2037,17 +1822,10 @@ namespace oam
 
             obs << (ByteStream::byte) GET_ALL_PROC_STATUS;
 
-			try {
-				struct timespec ts = { 3, 0 };
-				processor.write(obs, &ts);
-			}
-			catch(...)
-			{
-				exceptionControl("getProcessStatus", API_TIMEOUT);
-			}
+            processor.write(obs);
 
 			// wait 10 seconds for ACK from Process Monitor
-			struct timespec ts = { 15, 0 };
+			struct timespec ts = { 10, 0 };
 
 			ibs = processor.read(&ts);
 
@@ -2106,17 +1884,10 @@ namespace oam
             obs << module;
             obs << process;
 
-			try {
-				struct timespec ts = { 3, 0 };
-				processor.write(obs, &ts);
-			}
-			catch(...)
-			{
-				exceptionControl("getProcessStatus", API_TIMEOUT);
-			}
+            processor.write(obs);
 
 			// wait 10 seconds for ACK from Process Monitor
-			struct timespec ts = { 15, 0 };
+			struct timespec ts = { 10, 0 };
 
 			ibs = processor.read(&ts);
 
@@ -2163,7 +1934,7 @@ namespace oam
      *
      ********************************************************************/
 
-    void Oam::setProcessStatus(const std::string process, const std::string module, const int state, pid_t PID)
+    void Oam::setProcessStatus(const std::string process, const std::string module, const int state, const int PID)
     {
 		//send and wait for ack and resend if not received
 		//retry 5 time max
@@ -2184,18 +1955,14 @@ namespace oam
 			}
 			catch(...)
 			{}
-#ifdef _MSC_VER
-			Sleep(1 * 1000);
-#else
 			sleep(1);
-#endif
 		}
         exceptionControl("setProcessStatus", API_TIMEOUT);
     }
 
     /********************************************************************
      *
-     * Process Initization Successful Completed, Mark Process ACTIVE
+     * Process Initization Sucessfull Completed, Mark Process ACTIVE
      *
      ********************************************************************/
 
@@ -2516,32 +2283,11 @@ namespace oam
     {
         AlarmList activeAlarm;
 
-		// check if on Active OAM Parent
-		bool OAMParentModuleFlag;
-		oamModuleInfo_t st;
-		try {
-			st = getModuleInfo();
-			OAMParentModuleFlag = boost::get<4>(st);
+        // get list of active alarms
+        SNMPManager sm;
+        sm.getActiveAlarm(activeAlarm);
 
-			if ( OAMParentModuleFlag ) {
-				//call getAlarm API directly
-				SNMPManager sm;
-				sm.getActiveAlarm(activeAlarm);
-			}
-			else
-			{
-				// build and send msg
-				int returnStatus = sendMsgToProcMgr3(GETACTIVEALARMDATA, activeAlarm, "");
-		
-				if (returnStatus != API_SUCCESS)
-					return false;
-			}
-		}
-		catch (...) {
-			return false;
-		}
-
-       AlarmList::iterator i;
+        AlarmList::iterator i;
         for (i = activeAlarm.begin(); i != activeAlarm.end(); ++i)
         {
             // check if matching ID
@@ -2577,7 +2323,12 @@ namespace oam
         int localModuleID;
 
 		// Get Module Name from module-file
-		string fileName = InstallDir + "/local/module";
+
+#ifdef _MSC_VER
+		string fileName = "C:\\Calpont\\local\\module";
+#else
+		string fileName = "/usr/local/Calpont/local/module";
+#endif
 	
 		ifstream oldFile (fileName.c_str());
 		
@@ -2633,7 +2384,7 @@ namespace oam
      *
      ********************************************************************/
 
-    myProcessStatus_t Oam::getMyProcessStatus(pid_t processID)
+    myProcessStatus_t Oam::getMyProcessStatus(const int processID)
     {
         string returnValue;
 		ByteStream::quadbyte pid;
@@ -2670,8 +2421,7 @@ namespace oam
 
 			try
 			{
-				struct timespec ts1 = { 3, 0 };
-				processor.write(obs, &ts1);
+				processor.write(obs);
 	
 				// wait 10 seconds for ACK from Process Monitor
 				struct timespec ts = { 10, 0 };
@@ -2698,7 +2448,7 @@ namespace oam
 						// shutdown connection
 						processor.shutdown();
 		
-						return boost::make_tuple((pid_t) pid, processName, state);
+						return boost::make_tuple((int) pid, processName, state);
 					}
 				}
 				catch(...)
@@ -2881,23 +2631,10 @@ namespace oam
     void Oam::stopSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag)
     {
         // build and send msg
-		int returnStatus = sendMsgToProcMgrWithStatus(STOPSYSTEM, "stopped", gracefulflag, ackflag);
+        int returnStatus = sendMsgToProcMgr(STOPSYSTEM, "", gracefulflag, ackflag);
 
-		//Wait for everything to settle down
-		sleep(10);
-
-		switch (returnStatus)
-		{ 
-			case API_SUCCESS:
-				cout << endl << "   Successful stop of System " << endl << endl;
-				break;
-			case API_CANCELLED:
-				cout << endl << "   stop of System canceled" << endl << endl;
-				break;
-			default:
-				exceptionControl("stopSystem", returnStatus);
-				break;
-		}
+        if (returnStatus != API_SUCCESS)
+            exceptionControl("stopSystem", returnStatus);
     }
 
     /********************************************************************
@@ -2908,55 +2645,12 @@ namespace oam
 
     void Oam::shutdownSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag)
     {
-		int returnStatus = sendMsgToProcMgrWithStatus(SHUTDOWNSYSTEM, "shutdown", gracefulflag, ackflag);
+        // build and send msg
+        int returnStatus = sendMsgToProcMgr(SHUTDOWNSYSTEM, "", gracefulflag, ackflag);
 
-		//Wait for everything to settle down
-		sleep(10);
-
-		switch (returnStatus)
-		{ 
-			case API_SUCCESS:
-				cout << endl << "   Successful shutdown of System " << endl << endl;
-				break;
-			case API_CANCELLED:
-				cout << endl << "   Shutdown of System canceled" << endl << endl;
-				break;
-			default:
-				exceptionControl("shutdownSystem", returnStatus);
-				break;
-		}
+        if (returnStatus != API_SUCCESS)
+            exceptionControl("shutdownSystem", returnStatus);
     }
-
-	/********************************************************************
-	 *
-	 * Suspend Database Writes - build and send message to Process Manager
-	 *
-	 ********************************************************************/
-
-	void Oam::SuspendWrites(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag)
-	{
-		SystemProcessStatus systemprocessstatus;
-
-		// Send the message to suspend and wait for it to finish
-		int returnStatus = sendMsgToProcMgrWithStatus(SUSPENDWRITES, "write suspended", gracefulflag, ackflag);
-
-		// An error throws here.
-		switch (returnStatus)
-		{ 
-			case API_SUCCESS:
-				cout << endl << "Suspend Calpont Database Writes Request successfully completed" << endl;
-				break;
-			case API_FAILURE_DB_ERROR:
-				cout << endl << "**** stopDatabaseWrites Failed: save_brm Failed" << endl;
-				break;
-			case API_CANCELLED:
-				cout << endl << "   Suspension of database writes canceled" << endl << endl;
-				break;
-			default:
-				exceptionControl("suspendWrites", returnStatus);
-				break;
-		}
-	}
 
     /********************************************************************
      *
@@ -2979,16 +2673,13 @@ namespace oam
      *
      ********************************************************************/
 
-    int Oam::restartSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag)
+    void Oam::restartSystem(GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag)
     {
-		// Send the restart message (waits for completion)
-		int returnStatus = sendMsgToProcMgrWithStatus(RESTARTSYSTEM, "restarted", gracefulflag, ackflag);
+        // build and send msg
+        int returnStatus = sendMsgToProcMgr(RESTARTSYSTEM, "", gracefulflag, ackflag);
 
-        if (returnStatus != API_SUCCESS && returnStatus != API_CANCELLED)
-        {
+        if (returnStatus != API_SUCCESS)
             exceptionControl("restartSystem", returnStatus);
-        }
-        return returnStatus;
     }
 
     /********************************************************************
@@ -3036,10 +2727,10 @@ namespace oam
             exceptionControl("startProcess", returnStatus);
 
 		// validate Process Name, don't allow COLD-STANDBY process
-//		ProcessStatus procstat;
-//		getProcessStatus(processName, moduleName, procstat);
-//		if ( procstat.ProcessOpState == oam::COLD_STANDBY )
-//			exceptionControl("startProcess", API_INVALID_STATE);
+		ProcessStatus procstat;
+		getProcessStatus(processName, moduleName, procstat);
+		if ( procstat.ProcessOpState == oam::COLD_STANDBY )
+			exceptionControl("startProcess", API_INVALID_STATE);
 
         // build and send msg
         returnStatus = sendMsgToProcMgr(STARTPROCESS, processName, gracefulflag, ackflag, moduleName);
@@ -3268,9 +2959,7 @@ namespace oam
 		//make 1 log file made up of archive and current *.log
 		(void)system("touch /tmp/logs");
 	
-		string logdir("/var/log/Calpont");
-		if (access(logdir.c_str(), W_OK) != 0) logdir = "/tmp";
-		string cmd = "ls " + path + logdir + "/archive | grep '" + logFileName + "' > /tmp/logfiles";
+		string cmd = "ls " + path + "/var/log/Calpont/archive | grep '" + logFileName + "' > /tmp/logfiles";
 		(void)system(cmd.c_str());
 	
 		string fileName = "/tmp/logfiles";
@@ -3282,7 +2971,7 @@ namespace oam
 			while (oldFile.getline(line, 400))
 			{
 				buf = line;
-				cmd = "cat " + path + logdir + "/archive/" + buf + " >> /tmp/logs";
+				string cmd = "cat " + path + "/var/log/Calpont/archive/" + buf + " >> /tmp/logs";
 				(void)system(cmd.c_str());
 			}
 		
@@ -3453,187 +3142,141 @@ namespace oam
     }
 
     /******************************************************************************************
-     * @brief	DisplayLockedTables
+     * @brief	stopDMLProcessing
      *
-     * purpose:	Show the details of all the locks in tableLocks
-     *          Used when attempting to suspend or stop the
-     *          database, but there are table locks.
+     * purpose:	tell the DML Processor to stop accepting incoming DML packages
      *
      ******************************************************************************************/
-    void Oam::DisplayLockedTables(std::vector<BRM::TableLockInfo>& tableLocks, BRM::DBRM* pDBRM)
+    int Oam::stopDMLProcessing()
     {
-        cout << "The following tables are locked:" << endl;
+        int retval = sendMsgToDMLProcessor(dmlpackage::DML_STOP);
 
-        // Initial widths of columns to display. We pass thru the table
-        // and see if we need to grow any of these.
-        unsigned int lockIDColumnWidth    = 6;  // "LockID"
-        unsigned int tableNameColumnWidth = 12; // "Name"
-        unsigned int ownerColumnWidth     = 7;  // "Process"
-        unsigned int pidColumnWidth       = 3;  // "PID"
-        unsigned int sessionIDColumnWidth = 7;  // "Session"
-		unsigned int createTimeColumnWidth= 12; // "CreationTime"
-		unsigned int dbrootColumnWidth        = 7;  // "DBRoots"
-		unsigned int stateColumnWidth     = 9;  // "State"
+		if ( retval != API_SUCCESS )
+        	exceptionControl("stopDMLProcessing", retval);
 
-        // Initialize System Catalog object used to get table name
-        boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
-            execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0);
+        return retval;
+    }
 
-        std::string fullTblName;
-		const char* tableState;
+    /******************************************************************************************
+     * @brief	stopDDLProcessing
+     *
+     * purpose:	tell the DDL Processor to stop accepting incoming DDL packages
+     *
+     ******************************************************************************************/
+    int Oam::stopDDLProcessing()
+    {
+        int retval = sendMsgToDDLProcessor(ddlpackage::DDL_STOP);
 
-        // Make preliminary pass through the table locks in order to determine our
-        // output column widths based on the data.  Min column widths are based on
-        // the width of the column heading (except for the 'state' column).
-        uint64_t maxLockID                = 0;
-        uint32_t maxPID                   = 0;
-        int32_t  maxSessionID             = 0;
-        int32_t  minSessionID             = 0;
-		std::vector<std::string> createTimes;
-		std::vector<std::string> pms;
-		char cTimeBuffer[64];
+		if ( retval != API_SUCCESS )
+        	exceptionControl("stopDDLProcessing", retval);
 
-        execplan::CalpontSystemCatalog::TableName tblName;
+        return retval;
+    }
 
-        for (unsigned idx=0; idx<tableLocks.size(); idx++)
+    /******************************************************************************************
+     * @brief	resumeDMLProcessing
+     *
+     * purpose:	tell the DML Processor to resume accepting DML packages
+     *
+     ******************************************************************************************/
+    int Oam::resumeDMLProcessing()
+    {
+        int retval = sendMsgToDMLProcessor(dmlpackage::DML_RESUME);
+
+		if ( retval != API_SUCCESS )
+        	exceptionControl("resumeDMLProcessing", retval);
+
+        return retval;
+    }
+
+    /******************************************************************************************
+     * @brief	resumeDDLProcessing
+     *
+     * purpose:	tell the DDL Processor to resume accepting DDL packages
+     *
+     ******************************************************************************************/
+    int Oam::resumeDDLProcessing()
+    {
+        int retval = sendMsgToDDLProcessor(ddlpackage::DDL_RESUME);
+
+		if ( retval != API_SUCCESS )
+        	exceptionControl("resumeDDLProcessing", retval);
+
+        return retval;
+    }
+
+    /******************************************************************************************
+     * @brief	sendMsgToDDLProcessor
+     *
+     * purpose:	send a message to the DDL processor
+     *
+     ******************************************************************************************/
+    int Oam::sendMsgToDDLProcessor(messageqcpp::ByteStream::quadbyte requestType)
+    {
+        int retval = -1;
+
+        try
         {
-            if (tableLocks[idx].id > maxLockID)
+
+            MessageQueueClient processor("DDLProc");
+            ByteStream::byte status;
+            ByteStream obs, ibs;
+			//Serialize DDL,DML
+			u_int32_t sessionID = 0;
+			obs << sessionID;
+            obs << requestType;
+
+            processor.write(obs);
+
+            ibs = processor.read();
+
+            if (ibs.length() > 0)
             {
-                maxLockID = tableLocks[idx].id;
+                ibs >> status;
+                retval = (int)status;
             }
-            try
-            {
-                tblName = systemCatalogPtr->tableName(tableLocks[idx].tableOID);
-            }
-            catch (...)
-            {
-                tblName.schema.clear();
-                tblName.table.clear();
-            }
-            fullTblName = tblName.toString();
-            if (fullTblName.size() > tableNameColumnWidth)
-            {
-                tableNameColumnWidth = fullTblName.size();
-            }
-            if (tableLocks[idx].ownerName.length() > ownerColumnWidth)
-            {
-                ownerColumnWidth = tableLocks[idx].ownerName.length();
-            }
-            if (tableLocks[idx].ownerPID > maxPID)
-            {
-                maxPID = tableLocks[idx].ownerPID;
-            }
-            if (tableLocks[idx].ownerSessionID > maxSessionID)
-            {
-                maxSessionID = tableLocks[idx].ownerSessionID;
-            }
-            if (tableLocks[idx].ownerSessionID < minSessionID)
-            {
-                minSessionID = tableLocks[idx].ownerSessionID;
-            }
-			// Creation Time.
-			// While we're at it, we save the time string off into a vector
-			// so we can display it later without recalcing it.
-			struct tm timeTM;
-			localtime_r(&tableLocks[idx].creationTime,&timeTM);
-			ctime_r(&tableLocks[idx].creationTime, cTimeBuffer);
-			strftime(cTimeBuffer, 64, "%F %r:", &timeTM);
-			cTimeBuffer[strlen(cTimeBuffer)-1] = '\0'; // strip trailing '\n'
-			std::string cTimeStr( cTimeBuffer );
-			if (cTimeStr.length() > createTimeColumnWidth)
-			{
-				createTimeColumnWidth = cTimeStr.length();
-			}
-			createTimes.push_back(cTimeStr);
         }
-        tableNameColumnWidth  += 1;
-        ownerColumnWidth      += 1;
-		createTimeColumnWidth += 1;
+        catch(...)
+            {}
 
-        std::ostringstream idString;
-        idString << maxLockID;
-        if (idString.str().length() > lockIDColumnWidth)
-            lockIDColumnWidth = idString.str().length();
-        lockIDColumnWidth += 1;
+        return retval;
+    }
 
-        std::ostringstream pidString;
-        pidString << maxPID;
-        if (pidString.str().length() > pidColumnWidth)
-            pidColumnWidth = pidString.str().length();
-        pidColumnWidth += 1;
+    /******************************************************************************************
+     * @brief	sendMsgToDMLProcessor
+     *
+     * purpose:	send a message to the DML processor
+     *
+     ******************************************************************************************/
+    int Oam::sendMsgToDMLProcessor(messageqcpp::ByteStream::byte requestType)
+    {
+        int retval = -1;
 
-        const std::string sessionNoneStr("BulkLoad");
-        std::ostringstream sessionString;
-        sessionString << maxSessionID;
-        if (sessionString.str().length() > sessionIDColumnWidth)
-            sessionIDColumnWidth = sessionString.str().length();
-        if ((minSessionID < 0) &&
-            (sessionNoneStr.length() > sessionIDColumnWidth))
-            sessionIDColumnWidth = sessionNoneStr.length();
-        sessionIDColumnWidth += 1;
-
-        // write the column headers before the first entry
-        cout.setf(ios::left, ios::adjustfield);
-        cout << setw(lockIDColumnWidth)     << "LockID"       <<
-                setw(tableNameColumnWidth)  << "Name"         <<
-                setw(ownerColumnWidth)      << "Process"      <<
-                setw(pidColumnWidth)        << "PID"          <<
-                setw(sessionIDColumnWidth)  << "Session"      <<
-				setw(createTimeColumnWidth) << "CreationTime" <<
-                setw(stateColumnWidth)      << "State"        <<
-				setw(dbrootColumnWidth)     << "DBRoots"      << endl;
-
-        for (unsigned idx=0; idx<tableLocks.size(); idx++)
+        try
         {
-            try
+
+            MessageQueueClient processor("DMLProc");
+            ByteStream::byte status;
+            ByteStream obs, ibs;
+			//Serialize DDL,DML
+			u_int32_t sessionID = 0;
+			obs << sessionID;
+            obs << requestType;
+
+            processor.write(obs);
+
+            ibs = processor.read();
+
+            if (ibs.length() > 0)
             {
-
-                tblName = systemCatalogPtr->tableName(tableLocks[idx].tableOID);
+                ibs >> status;
+                retval = (int)status;
             }
-            catch(...)
-            {
-                tblName.schema.clear();
-                tblName.table.clear();
-            }
-            fullTblName = tblName.toString();
-            cout << 
-                setw(lockIDColumnWidth)    << tableLocks[idx].id         <<
-                setw(tableNameColumnWidth) << fullTblName                <<
-                setw(ownerColumnWidth)     << tableLocks[idx].ownerName  <<
-                setw(pidColumnWidth)       << tableLocks[idx].ownerPID;
+        }
+        catch(...)
+            {}
 
-			// Log session ID, or "BulkLoad" if session is -1
-			if (tableLocks[idx].ownerSessionID < 0)
-				cout << setw(sessionIDColumnWidth) << sessionNoneStr;
-			else
-				cout << setw(sessionIDColumnWidth) <<
-					tableLocks[idx].ownerSessionID;
-
-			// Creation Time
-			cout << setw(createTimeColumnWidth) << createTimes[idx];
-
-			// Processor State
-			if (pDBRM && !pDBRM->checkOwner(tableLocks[idx].id))
-			{
-				tableState = "Abandoned";
-			}
-			else
-			{
-				tableState = ((tableLocks[idx].state==BRM::LOADING) ?
-					"LOADING" : "CLEANUP");
-			}
-			cout << setw(stateColumnWidth) << tableState;
-
-			// PM List
-			cout << setw(dbrootColumnWidth);
-			for (unsigned k=0; k<tableLocks[idx].dbrootList.size(); k++)
-			{
-				if (k > 0)
-					cout << ',';
-				cout << tableLocks[idx].dbrootList[k];
-			}
-			cout << endl;
-        } // end of loop through table locks
+        return retval;
     }
 
     /******************************************************************************************
@@ -3668,13 +3311,13 @@ namespace oam
 
         Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
 
-		int numWorker = atoi(sysConfig->getConfig("DBRM_Controller", "NumWorkers").c_str());
-        for (int workerID = 1; workerID < numWorker+1; workerID++)
+		int numWorker = atoi(sysConfig->getConfig("DBRM_Controller", "NumWorkers", true).c_str());
+        for (int i = 1; i < numWorker+1; i++)
         {
-            string section = SECTION + itoa(workerID);
+            string section = SECTION + itoa(i);
 
             if( sysConfig->getConfig(section, "Module") == moduleName )
-				return workerID;
+				return i;
         }
 		// not found
         exceptionControl("getLocalDBRMID", API_INVALID_PARAMETER);
@@ -3830,7 +3473,7 @@ namespace oam
             MessageQueueClient servermonitor(module + "_ServerMonitor");
             servermonitor.write(msg);
 
-			// wait 10 seconds for ACK from Server Monitor
+			// wait 30 seconds for ACK from Server Monitor
 			struct timespec ts = { 30, 0 };
 
 			receivedMSG = servermonitor.read(&ts);
@@ -4326,97 +3969,227 @@ namespace oam
      * purpose:	get Active SQL Statements
      *
      ******************************************************************************************/
-    void Oam::getActiveSQLStatements(ActiveSqlStatements& activesqlstatements)
-    {
+	void Oam::getActiveSQLStatements(ActiveSqlStatements& activesqlstatements)
+	{
         SystemModuleTypeConfig systemmoduletypeconfig;
-        ByteStream msg;
+		ByteStream msg;
         ByteStream receivedMSG;
-        ByteStream::byte entries;
+		ByteStream::byte entries;
+		string SqlStatement;
+		string startTime;
+		string sessionID;
+
         try
         {
             Oam::getSystemConfig(systemmoduletypeconfig);
-
-            // get Server Type Install ID
-            int serverTypeInstall = oam::INSTALL_NORMAL;
-            oamModuleInfo_t st;
-            st = getModuleInfo();
-            serverTypeInstall = boost::get<5>(st);
-
-            string sendModule;
-            switch (serverTypeInstall)
-            {
-                case oam::INSTALL_NORMAL:
-                case oam::INSTALL_COMBINE_DM_UM:
-                    sendModule = "um";
-                    break;
-                case oam::INSTALL_COMBINE_PM_UM:
-                case oam::INSTALL_COMBINE_DM_UM_PM:
-                    sendModule = "pm";
-                    break;
-            }
-
-            //send request to modules
-            for ( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-            {
-                if ( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
-                    //end of file
-                    break;
-
-                if ( systemmoduletypeconfig.moduletypeconfig[i].ModuleType == sendModule )
-                {
-                    if ( systemmoduletypeconfig.moduletypeconfig[i].ModuleCount == 0 )
-                        break;
-
-                    DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
-                    for ( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-                    {
-                        string module = (*pt).DeviceName;
-
-                        // setup message
-                        msg << (ByteStream::byte) GET_ACTIVE_SQL_QUERY;
-
-                        //send the msg to Server Monitor
-                        MessageQueueClient servermonitor(module + "_ServerMonitor");
-                        servermonitor.write(msg);
-
-                        // wait 30 seconds for ACK from Server Monitor
-                        struct timespec ts = { 30, 0 };
-
-                        receivedMSG = servermonitor.read(&ts);
-                        if (receivedMSG.length() > 0)
-                        {
-                            receivedMSG >> entries;
-                            ActiveSqlStatement activeSqlStatement;
-                            for (int i = 0; i < entries; i++)
-                            {
-                                receivedMSG >> activeSqlStatement.sqlstatement;
-                                receivedMSG >> activeSqlStatement.starttime;
-                                receivedMSG >> activeSqlStatement.sessionid;
-                                activesqlstatements.push_back(activeSqlStatement);
-                            }
-                        }
-                        else
-                        {
-                            // timeout
-                            exceptionControl("getActiveSQLStatements", API_TIMEOUT);
-                        }
-
-                        // shutdown connection
-                        servermonitor.shutdown();
-                    }
-                    break;
-                }
-            }
         }
-        catch (std::exception& ex)
-        {
-            exceptionControl("getActiveSQLStatements", API_FAILURE, ex.what());
-        }
-        catch (...)
+        catch(...)
         {
             exceptionControl("getActiveSQLStatements", API_FAILURE);
         }
-    }
+
+		// get Server Type Install ID
+		int serverTypeInstall = oam::INSTALL_NORMAL;
+		oamModuleInfo_t st;
+		try {
+			st = getModuleInfo();
+			serverTypeInstall = boost::get<5>(st);
+		}
+		catch (...) {
+       		exceptionControl("getMyProcessStatus", API_FAILURE);
+		}
+
+		string sendModule;
+		switch ( serverTypeInstall ) {
+			case (oam::INSTALL_NORMAL):
+			case (oam::INSTALL_COMBINE_DM_UM):
+			{
+				sendModule = "um";
+				break;
+			}
+			case (oam::INSTALL_COMBINE_PM_UM):
+			case (oam::INSTALL_COMBINE_DM_UM_PM):
+			{
+				sendModule = "pm";
+				break;
+			}
+		}
+
+		//send request to modules
+        for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
+        {
+            if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
+                //end of file
+                break;
+
+            if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType == sendModule )
+			{
+				if ( systemmoduletypeconfig.moduletypeconfig[i].ModuleCount == 0 )
+					break;
+	
+				DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
+				for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
+				{
+					string module = (*pt).DeviceName;
+
+					// setup message
+					msg << (ByteStream::byte) GET_ACTIVE_SQL_QUERY;
+			
+					try
+					{
+						//send the msg to Server Monitor
+						MessageQueueClient servermonitor(module + "_ServerMonitor");
+						servermonitor.write(msg);
+			
+						// wait 30 seconds for ACK from Server Monitor
+						struct timespec ts = { 30, 0 };
+			
+						receivedMSG = servermonitor.read(&ts);
+						if (receivedMSG.length() > 0)
+						{
+							receivedMSG >> entries;
+			
+							for ( int i=0 ; i < entries ; i++)
+							{
+								receivedMSG >> SqlStatement;
+								receivedMSG >> startTime;
+								receivedMSG >> sessionID;
+								//skip dummy info
+								if ( SqlStatement != "-1" ) {
+									activesqlstatements.sqlstatements.push_back(SqlStatement);
+									activesqlstatements.starttime.push_back(startTime);
+									activesqlstatements.sessionid.push_back(sessionID);
+								}
+							}
+						}
+						else	// timeout
+							exceptionControl("getActiveSQLStatements", API_TIMEOUT);
+			
+						// shutdown connection
+						servermonitor.shutdown();
+					}
+					catch(...)
+					{
+						exceptionControl("getActiveSQLStatements", API_FAILURE);
+					}
+				}
+
+				break;
+			}
+        }
+	}
+
+    /******************************************************************************************
+     * @brief	run DBHealth Check
+     *
+     * purpose:	test the health of the DB
+     *
+     ******************************************************************************************/
+	void Oam::checkDBHealth(bool action)
+	{
+		ByteStream msg;
+        ByteStream receivedMSG;
+
+		// only make call if system is active
+		SystemStatus systemstatus;
+		try {
+			getSystemStatus(systemstatus);
+		}
+		catch (exception& ex)
+		{}
+		
+		if (systemstatus.SystemOpState != oam::ACTIVE )
+            exceptionControl("checkDBHealth", API_INVALID_STATE);
+
+        SystemModuleTypeConfig systemmoduletypeconfig;
+
+        try
+        {
+            Oam::getSystemConfig(systemmoduletypeconfig);
+        }
+        catch(...)
+        {
+            exceptionControl("checkDBHealth", API_FAILURE);
+        }
+
+		// get Server Type Install ID
+		int serverTypeInstall = oam::INSTALL_NORMAL;
+		string OAMParentModuleName;
+		oamModuleInfo_t st;
+		try {
+			st = getModuleInfo();
+			OAMParentModuleName = boost::get<3>(st);
+			serverTypeInstall = boost::get<5>(st);
+		}
+		catch (...) {
+       		exceptionControl("getMyProcessStatus", API_FAILURE);
+		}
+
+		string module;
+		switch ( serverTypeInstall ) {
+			case (oam::INSTALL_NORMAL):
+			case (oam::INSTALL_COMBINE_DM_UM):
+			{
+				module = "um1";
+				break;
+			}
+			case (oam::INSTALL_COMBINE_PM_UM):
+			case (oam::INSTALL_COMBINE_DM_UM_PM):
+			{
+				module = OAMParentModuleName;
+				break;
+			}
+		}
+
+	// setup message
+	msg << (ByteStream::byte) RUN_DBHEALTH_CHECK;
+	msg << (ByteStream::byte) action;
+
+	try
+	{
+		//send the msg to Server Monitor
+		MessageQueueClient servermonitor(module + "_ServerMonitor");
+		servermonitor.write(msg);
+
+		// wait 30 seconds for ACK from Server Monitor
+		struct timespec ts = { 60, 0 };
+
+		receivedMSG = servermonitor.read(&ts);
+		if (receivedMSG.length() > 0)
+		{
+			ByteStream::byte returnType;
+			receivedMSG >> returnType;
+
+			if ( returnType == RUN_DBHEALTH_CHECK ) {
+				ByteStream::byte returnStatus;
+				receivedMSG >> returnStatus;
+				if ( returnStatus == oam::API_SUCCESS ) {
+					// succesfull
+					servermonitor.shutdown();
+					return;
+				}
+			}
+			// shutdown connection
+			servermonitor.shutdown();
+	
+			exceptionControl("checkDBHealth", API_FAILURE);
+		}
+		else
+		{ // timeout
+			// shutdown connection
+			servermonitor.shutdown();
+	
+			exceptionControl("checkDBHealth", API_TIMEOUT);
+		}
+	}
+	catch(...)
+	{
+		exceptionControl("checkDBHealth", API_FAILURE);
+		return;
+	}
+
+	return;
+	}
 
     /********************************************************************
      *
@@ -4503,7 +4276,11 @@ namespace oam
      ********************************************************************/
 	string Oam::getHotStandbyPM()
 	{
-		string fileName = InstallDir + "/local/hotStandbyPM";
+#ifdef _MSC_VER
+		string fileName = "C:\\Calpont\\local\\hotStandbyPM";
+#else
+		string fileName = "/usr/local/Calpont/local/hotStandbyPM";
+#endif
 		string module;
 
 		ifstream oldFile (fileName.c_str());
@@ -4529,7 +4306,11 @@ namespace oam
      ********************************************************************/
 	void Oam::setHotStandbyPM(std::string moduleName)
 	{
-		string fileName = InstallDir + "/local/hotStandbyPM";
+#ifdef _MSC_VER
+		string fileName = "C:\\Calpont\\loca\\hotStandbyPM";
+#else
+		string fileName = "/usr/local/Calpont/local/hotStandbyPM";
+#endif
 	
 		unlink (fileName.c_str());
 
@@ -4571,10 +4352,36 @@ namespace oam
      * Switch Parent OAM Module
      *
      ********************************************************************/
-	bool Oam::switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulflag)
+	void Oam::switchParentOAMModule(std::string moduleName)
 	{
-		int returnStatus;
-		// We assume that moduleName is a valid pm
+		ModuleTypeConfig moduletypeconfig;
+		getSystemConfig("pm", moduletypeconfig);
+		if ( moduletypeconfig.ModuleCount < 2 )
+			exceptionControl("switchParentOAMModule", API_INVALID_PARAMETER);
+
+		if ( moduleName.empty() || moduleName == " ") {
+			getSystemConfig("StandbyOAMModuleName", moduleName);
+			if ( moduleName.empty() || moduleName == oam::UnassignedName )
+			exceptionControl("switchParentOAMModule", API_INVALID_PARAMETER);
+		}
+
+		// Get Parent OAM module Name and error on match
+		string parentOAMModule;
+		try{
+			getSystemConfig("ParentOAMModuleName", parentOAMModule);
+		}
+		catch(...)
+		{
+			exceptionControl("switchParentOAMModule", API_INVALID_PARAMETER);
+		}
+
+		if (parentOAMModule == moduleName )
+			exceptionControl("switchParentOAMModule", API_INVALID_PARAMETER);
+
+		// validate Module name
+		int returnStatus = validateModule(moduleName);
+		if (returnStatus != API_SUCCESS)
+			exceptionControl("switchParentOAMModule", returnStatus);
 
 		// check if current Active Parent Process-Manager is down and running on Standby Module
 		// if so, send signal to Standby Process-Manager to start failover
@@ -4603,7 +4410,7 @@ namespace oam
 				exceptionControl("switchParentOAMModule", API_FAILURE);
 			}
 
-			return false;
+			return;
 		}
 
 		// only make call if system is ACTIVE and module switching to is ACTIVE
@@ -4615,1977 +4422,91 @@ namespace oam
 		catch (exception& ex)
 		{}
 
-		if (systemstatus.SystemOpState == oam::MAN_INIT ||
-			systemstatus.SystemOpState == oam::AUTO_INIT ||
-			systemstatus.SystemOpState == oam::UP ||
-			systemstatus.SystemOpState == oam::BUSY_INIT ||
-			systemstatus.SystemOpState == oam::UP )
+		if (systemstatus.SystemOpState != oam::ACTIVE )
 			exceptionControl("switchParentOAMModule", API_INVALID_STATE);
 
-		if (systemstatus.SystemOpState == oam::ACTIVE ||
-			systemstatus.SystemOpState == oam::FAILED )
-		{
-			// build and send msg to stop system
-			returnStatus = sendMsgToProcMgrWithStatus(STOPSYSTEM, "OAM Module switched", gracefulflag, ACK_YES);
-	
-			if ( returnStatus != API_SUCCESS )
-				exceptionControl("stopSystem", returnStatus);
+		int opState;
+		bool degraded;
+		try {
+			getModuleStatus(moduleName, opState, degraded);
 		}
-	
+		catch(...)
+		{}
+
+		if (opState != oam::ACTIVE)
+			exceptionControl("switchParentOAMModule", API_INVALID_STATE);
+
+        // build and send msg to stop system
+        returnStatus = sendMsgToProcMgr(STOPSYSTEM, "", FORCEFUL, ACK_YES);
+
+		if ( returnStatus != API_SUCCESS )
+			exceptionControl("stopSystem", returnStatus);
+
         // build and send msg to switch configuration
-		cout << endl << "   Switch Active Parent OAM to Module '" << moduleName << "', please wait...";
         returnStatus = sendMsgToProcMgr(SWITCHOAMPARENT, moduleName, FORCEFUL, ACK_YES);
 
         if (returnStatus != API_SUCCESS)
             exceptionControl("switchParentOAMModule", returnStatus);
 
-		if (systemstatus.SystemOpState == oam::ACTIVE ||
-			systemstatus.SystemOpState == oam::FAILED )
-		{
-			//give  time for ProcMon/ProcMgr to get fully active on new pm
-			sleep(10);
-	
-			// build and send msg to restart system
-			returnStatus = sendMsgToProcMgr(STARTSYSTEM, "", FORCEFUL, ACK_YES);
-	
-			if (returnStatus != API_SUCCESS)
-				exceptionControl("startSystem", returnStatus);
-			return true; // Caller should wait for system to come up.
-		}
-
-		return false; // Caller should not wait for system to come up.
-	}
-
-    /********************************************************************
-     *
-     * Get Storage Config Data
-     *
-     ********************************************************************/
-	systemStorageInfo_t Oam::getStorageConfig()
-	{
-		DeviceDBRootList deviceDBRootList;
-		std::string storageType = "";
-		std::string UMstorageType = "";
-		int SystemDBRootCount = 0;
-
-		try {
-			getSystemConfig("DBRootStorageType", storageType);
-		}
-		catch(...)
-		{
-			exceptionControl("getStorageConfig", oam::API_FAILURE);
-		}
-
-		try {
-			getSystemConfig("UMStorageType", UMstorageType);
-		}
-		catch(...)
-		{
-			exceptionControl("getStorageConfig", oam::API_FAILURE);
-		}
-
-		try {
-			getSystemConfig("DBRootCount", SystemDBRootCount);
-		}
-		catch(...)
-		{
-			exceptionControl("getStorageConfig", oam::API_FAILURE);
-		}
-
-		try
-		{
-			SystemModuleTypeConfig systemmoduletypeconfig;
-			getSystemConfig(systemmoduletypeconfig);
-
-			for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-			{
-				if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
-					// end of list
-					break;
-
-				int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
-
-				string moduletype = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
-
-				if ( moduleCount > 0 && moduletype == "pm") {
-					deviceDBRootList = systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList;
-					return boost::make_tuple(storageType, SystemDBRootCount, deviceDBRootList, UMstorageType);
-				}
-			}
-		}
-		catch(...)
-		{
-			exceptionControl("getStorageConfig", oam::API_FAILURE);
-		}
-
-		return boost::make_tuple(storageType, SystemDBRootCount, deviceDBRootList, UMstorageType);
-	}
-
-    /********************************************************************
-     *
-     * Get PM - DBRoot Config data
-     *
-     ********************************************************************/
-	void Oam::getPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist)
-	{
-		string module = "pm" + itoa(pmid);
-		// validate Module name
-		int returnStatus = validateModule(module);
-		if (returnStatus != API_SUCCESS)
-			exceptionControl("getPmDbrootConfig", returnStatus);
-
-		try
-		{
-			ModuleConfig moduleconfig;
-			getSystemConfig(module, moduleconfig);
-
-			DBRootConfigList::iterator pt1 = moduleconfig.dbrootConfigList.begin();
-			for( ; pt1 != moduleconfig.dbrootConfigList.end() ; pt1++)
-			{
-				dbrootconfiglist.push_back((*pt1));
-			}	
-		}
-		catch (...)
-		{
-			// dbrootid not found, return with error
-			exceptionControl("getPmDbrootConfig", API_INVALID_PARAMETER);
-		}
-	}
-
-    /********************************************************************
-     *
-     * Get DBRoot - PM Config data
-     *
-     ********************************************************************/
-	void Oam::getDbrootPmConfig(const int dbrootid, int& pmid)
-	{
-		SystemModuleTypeConfig systemmoduletypeconfig;
-		ModuleTypeConfig moduletypeconfig;
-		ModuleConfig moduleconfig;
-
-		try
-		{
-			getSystemConfig(systemmoduletypeconfig);
-
-			for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-			{
-				if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
-					// end of list
-					break;
-
-				int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
-
-				string moduletype = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
-
-				if ( moduleCount > 0 && moduletype == "pm")
-				{
-					DeviceDBRootList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList.begin();
-					for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList.end() ; pt++)
-					{
-						DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-						for( ; pt1 != (*pt).dbrootConfigList.end() ; pt1++)
-						{
-							if (*pt1 == dbrootid) {
-								pmid = (*pt).DeviceID;
-								return;
-							}
-						}
-					}
-				}
-			}
-			// dbrootid not found, return with error
-			exceptionControl("getDbrootPmConfig", API_INVALID_PARAMETER);
-		}
-		catch (exception& e)
-		{}
-		
-		// dbrootid not found, return with error
-		exceptionControl("getDbrootPmConfig", API_INVALID_PARAMETER);
-	}
-
-    /********************************************************************
-     *
-     * Get DBRoot - PM Config data
-     *
-     ********************************************************************/
-	void Oam::getDbrootPmConfig(const int dbrootid, std::string& pmid)
-	{
-		try {
-			int PMid;
-			getDbrootPmConfig(dbrootid, PMid);
-			pmid = itoa(PMid);
-			return;
-		}
-		catch (exception& e)
-		{}
-		
-		// dbrootid not found, return with error
-		exceptionControl("getDbrootPmConfig", API_INVALID_PARAMETER);
-	}
-
-    /********************************************************************
-     *
-     * Get System DBRoot Config data
-     *
-     ********************************************************************/
-	void Oam::getSystemDbrootConfig(DBRootConfigList& dbrootconfiglist)
-	{
-		SystemModuleTypeConfig systemmoduletypeconfig;
-		ModuleTypeConfig moduletypeconfig;
-		ModuleConfig moduleconfig;
-
-		try
-		{
-			getSystemConfig(systemmoduletypeconfig);
-
-			for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-			{
-				if( systemmoduletypeconfig.moduletypeconfig[i].ModuleType.empty() )
-					// end of list
-					break;
-
-				int moduleCount = systemmoduletypeconfig.moduletypeconfig[i].ModuleCount;
-
-				string moduletype = systemmoduletypeconfig.moduletypeconfig[i].ModuleType;
-
-				if ( moduleCount > 0 && moduletype == "pm")
-				{
-					DeviceDBRootList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList.begin();
-					for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList.end() ; pt++)
-					{
-						DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-						for( ; pt1 != (*pt).dbrootConfigList.end() ; pt1++)
-						{
-							dbrootconfiglist.push_back(*pt1);
-						}
-					}
-				}
-			}
-
-			sort ( dbrootconfiglist.begin(), dbrootconfiglist.end() );
-		}
-		catch (...)
-		{		// dbrootid not found, return with error
-			exceptionControl("getSystemDbrootConfig", API_INVALID_PARAMETER);
-		}
-		return;
-	}
-
-    /********************************************************************
-     *
-     * Set PM - DBRoot Config data
-     *
-     ********************************************************************/
-	void Oam::setPmDbrootConfig(const int pmid, DBRootConfigList& dbrootconfiglist)
-	{
-		ModuleConfig moduleconfig;
-
-		string module = "pm" + itoa(pmid);
-		try
-		{
-			getSystemConfig(module, moduleconfig);
-
-			moduleconfig.dbrootConfigList = dbrootconfiglist;
-
-			try
-			{
-				setSystemConfig(module, moduleconfig);
-				return;
-			}
-			catch(...)
-			{
-				writeLog("ERROR: setSystemConfig api failure for " + module  , LOG_TYPE_ERROR );
-				cout << endl << "ERROR: setSystemConfig api failure for " + module << endl;
-				exceptionControl("getSystemDbrootConfig", API_INVALID_PARAMETER);
-			}
-		}
-		catch(...)
-		{
-			writeLog("ERROR: getSystemConfig api failure for " + module  , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getSystemConfig api failure for " + module << endl;
-			exceptionControl("getSystemDbrootConfig", API_INVALID_PARAMETER);
-		}
-
-		//set System DBRoot Count
-		try
-		{
-			setSystemDBrootCount();
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setSystemDBrootCount Failed" << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-	}
-
-    /********************************************************************
-     *
-     * Manual Move PM - DBRoot data
-     *
-     ********************************************************************/
-	void Oam::manualMovePmDbroot(std::string residePM, std::string dbrootIDs, std::string toPM)
-	{
-		typedef std::vector<string> dbrootList;
-		dbrootList dbrootlist;
-		dbrootList tempdbrootlist;
-
-		string GlusterConfig = "n";
-		try {
-			getSystemConfig( "GlusterConfig", GlusterConfig);
-		}
-		catch(...)
-		{
-			GlusterConfig = "n";
-		}
-
-		boost::char_separator<char> sep(", ");
-		boost::tokenizer< boost::char_separator<char> > tokens(dbrootIDs, sep);
-		for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-				it != tokens.end();
-				++it)
-		{
-			dbrootlist.push_back(*it);
-			tempdbrootlist.push_back(*it);
-		}
-
-		string residePMID = residePM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-		string toPMID = toPM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-
-		//get dbroots ids for reside PM
-		DBRootConfigList residedbrootConfigList;
-		try
-		{
-			getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-
-			DBRootConfigList::iterator pt = residedbrootConfigList.begin();
-			for( ; pt != residedbrootConfigList.end() ; pt++)
-			{
-				//check if entered dbroot id is in residing pm
-				dbrootList::iterator pt1 = tempdbrootlist.begin();
-				for( ; pt1 != tempdbrootlist.end() ; pt1++)
-				{
-					if ( itoa(*pt) == *pt1 ) {
-						tempdbrootlist.erase(pt1);
-						break;
-					}
-				}
-			}
-
-			if ( !tempdbrootlist.empty() ) {
-				// there is a entered dbroot id not in the residing pm
-				writeLog("ERROR: dbroot IDs not assigned to " + residePM , LOG_TYPE_ERROR );
-				cout << endl << "ERROR: these dbroot IDs not assigned to '" << residePM << "' : ";
-				dbrootList::iterator pt1 = tempdbrootlist.begin();
-				for( ; pt1 != tempdbrootlist.end() ;)
-				{
-					cout << *pt1;
-					pt1++;
-					if (pt1 != tempdbrootlist.end())
-						cout << ", ";
-				}
-				cout << endl << endl;
-				exceptionControl("manualMovePmDbroot", API_FAILURE);
-			}
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: getPmDbrootConfig api failure for pm" + residePMID , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getPmDbrootConfig api failure for pm" + residePMID << endl;
-			exceptionControl("manualMovePmDbroot", API_FAILURE);
-		}
-
-		//get dbroots ids for reside PM
-		DBRootConfigList todbrootConfigList;
-		try
-		{
-			getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: getPmDbrootConfig api failure for pm" + toPMID , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getPmDbrootConfig api failure for pm" + toPMID << endl;
-			exceptionControl("manualMovePmDbroot", API_FAILURE);
-		}
-
-		//remove entered dbroot IDs from reside PM list
-		dbrootList::iterator pt1 = dbrootlist.begin();
-		for( ; pt1 != dbrootlist.end() ; pt1++)
-		{
-			DBRootConfigList::iterator pt2 = residedbrootConfigList.begin();
-			for( ; pt2 != residedbrootConfigList.end() ; pt2++)
-			{
-				if ( itoa(*pt2) == *pt1 ) {
-
-					dbrootList dbroot1;
-					dbroot1.push_back(*pt1);
-
-					//send msg to unmount dbroot if module is not offline
-					int opState;
-					bool degraded;
-					try {
-						getModuleStatus(residePM, opState, degraded);
-					}
-					catch(...)
-					{}
-		
-					if (opState != oam::AUTO_OFFLINE || opState != oam::AUTO_DISABLED) {
-//						bool unmountPass = true;
-						try
-						{
-							mountDBRoot(dbroot1, false);
-						}
-						catch (exception& e)
-						{
-							writeLog("ERROR: dbroot failed to unmount", LOG_TYPE_ERROR );
-							cout << endl << "ERROR: umountDBRoot api failure" << endl;
-							exceptionControl("manualMovePmDbroot", API_FAILURE);
-//							unmountPass = false;
-						}
-	
-//						if ( !unmountPass) {
-//							dbrootlist.erase(pt1);
-//							break;
-//						}
-					}
-
-					//check for amazon moving required
-					try
-					{
-						amazonReattach(toPM, dbroot1);
-					}
-					catch (exception& e)
-					{
-						writeLog("ERROR: amazonReattach api failure", LOG_TYPE_ERROR );
-						cout << endl << "ERROR: amazonReattach api failure" << endl;
-						exceptionControl("manualMovePmDbroot", API_FAILURE);
-					}
-
-					//if Gluster, do the assign command
-					if ( GlusterConfig == "y")
-					{
-						try {
-							string errmsg;
-							int ret = glusterctl(oam::GLUSTER_ASSIGN, *pt1, toPMID, errmsg);
-							if ( ret != 0 )
-							{
-								cerr << "FAILURE: Error assigning gluster dbroot# " + *pt1 + " to pm" + toPMID + ", error: " + errmsg << endl;
-								exceptionControl("manualMovePmDbroot", API_FAILURE);
-							}
-						}
-						catch (exception& e)
-						{
-							cout << endl << "**** glusterctl API exception:  " << e.what() << endl;
-							cerr << "FAILURE: Error assigning gluster dbroot# " + *pt1 + " to pm" + toPMID << endl;
-							exceptionControl("manualMovePmDbroot", API_FAILURE);
-						}
-						catch (...)
-						{
-							cout << endl << "**** glusterctl API exception: UNKNOWN"  << endl;
-							cerr << "FAILURE: Error assigning gluster dbroot# " + *pt1 + " to pm" + toPMID << endl;
-							exceptionControl("manualMovePmDbroot", API_FAILURE);
-						}
-					}
-
-					todbrootConfigList.push_back(*pt2);
-
-					residedbrootConfigList.erase(pt2);
-
-					break;
-				}
-			}
-		}
-
-		//set the 2 pms dbroot config
-		try
-		{
-			setPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: setPmDbrootConfig api failure for pm" + residePMID , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: setPmDbrootConfig api failure for pm" + residePMID << endl;
-			exceptionControl("manualMovePmDbroot", API_FAILURE);
-		}
-
-		try
-		{
-			setPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: setPmDbrootConfig api failure for pm" + toPMID , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: setPmDbrootConfig api failure for pm" + toPMID << endl;
-			exceptionControl("manualMovePmDbroot", API_FAILURE);
-		}
-
-		//send msg to mount dbroot
-		try
-		{
-    		mountDBRoot(dbrootlist);
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
-			cout << endl << "ERROR: mountDBRoot api failure" << endl;
-		}
-
-		//get updated Calpont.xml distributed
-		distributeConfigFile("system");
-
-		return;
-
-	}
-
-
-	bool comparex(const PmDBRootCount_s& x, const PmDBRootCount_s& y)
-	{
-		return x.count < y.count;
-	}
-
-    /********************************************************************
-     *
-     * Auto Move PM - DBRoot data
-     *
-     ********************************************************************/
-	bool Oam::autoMovePmDbroot(std::string residePM)
-	{
-		string DBRootStorageType;
-		try {
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-
-		string GlusterConfig = "n";
-		try {
-			getSystemConfig( "GlusterConfig", GlusterConfig);
-		}
-		catch(...)
-		{
-			GlusterConfig = "n";
-		}
-
-		if (DBRootStorageType != "external" && GlusterConfig == "n")
-			return 1;
-
-		// get current Module name
-		string localModuleName;
-		oamModuleInfo_t st;
-		try {
-			st = getModuleInfo();
-			localModuleName = boost::get<0>(st);
-		}
-		catch (...) 
-		{}
-
-		int localPMID = atoi(localModuleName.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-
-		int residePMID = atoi(residePM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-
-		//get dbroot ids for reside PM
-		DBRootConfigList residedbrootConfigList;
-		try
-		{
-			getPmDbrootConfig(residePMID, residedbrootConfigList);
-			if ( residedbrootConfigList.empty() ) {
-				writeLog("ERROR: residedbrootConfigList empty", LOG_TYPE_ERROR );
-				exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-			}
-		}
-		catch (...)
-		{
-			writeLog("ERROR: getPmDbrootConfig failure", LOG_TYPE_ERROR );
-			exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-		}
-
-		//get dbroot id for other PMs
-		systemStorageInfo_t t;
-		DeviceDBRootList moduledbrootlist;
-		try
-		{
-			t = getStorageConfig();
-			moduledbrootlist = boost::get<2>(t);
-		}
-		catch (exception& e)
-		{
-			writeLog("ERROR: getStorageConfig failure", LOG_TYPE_ERROR );
-			exceptionControl("autoMovePmDbroot", API_FAILURE);
-		}
-
-		// get list of dbroot count for each pm
-        typedef std::vector<PmDBRootCount_s> PMdbrootList;
-		PMdbrootList pmdbrootList;
-		PmDBRootCount_s pmdbroot;
-
-		DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-		for( ; pt != moduledbrootlist.end() ; pt++)
-		{
-			// only put pms with dbroots assigned, if 0 then that pm is disabled
-			if ( (*pt).dbrootConfigList.size() > 0 )
-			{
-				pmdbroot.pmID = (*pt).DeviceID;
-				pmdbroot.count = (*pt).dbrootConfigList.size();
-				pmdbrootList.push_back(pmdbroot);
-			}
-		}
-
-		sort ( pmdbrootList.begin(), pmdbrootList.end(), comparex );
-
-		//clear reside IDs
-		DBRootConfigList clearresidedbrootConfigList;
-		try
-		{
-			setPmDbrootConfig(residePMID, clearresidedbrootConfigList);
-		}
-		catch (...)
-		{
-			writeLog("ERROR: setPmDbrootConfig failure - clear reside ID", LOG_TYPE_ERROR );
-			exceptionControl("autoMovePmDbroot", API_FAILURE);
-		}
-
-		//distribute dbroot IDs to other PMs starting with lowest count
-		bool exceptionFailure = false;
-		bool dbroot1 = false;
-		DBRootConfigList::iterator pt2 = residedbrootConfigList.begin();
-		for( ; pt2 != residedbrootConfigList.end() ; )
-		{
-			int dbrootID = *pt2;
-
-			//dbroot #1 always get moved to local module
-			if ( dbrootID == 1 )
-			{
-				dbroot1 = true;
-				//get dbroot ids for PM
-				DBRootConfigList todbrootConfigList;
-				try
-				{
-					getPmDbrootConfig(localPMID, todbrootConfigList);
-				}
-				catch (...)
-				{
-					writeLog("ERROR: getPmDbrootConfig failure", LOG_TYPE_ERROR );
-					exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-				}
-
-				//get the first dbroot assigned to this pm, so it can be auto unmoved later instead of dbroot1
-				DBRootConfigList::iterator pt = todbrootConfigList.begin();
-				int subDBRootID = *pt;
-
-				todbrootConfigList.push_back(dbrootID);
-
-				try
-				{
-					setPmDbrootConfig(localPMID, todbrootConfigList);
-					writeLog("autoMovePmDbroot/setPmDbrootConfig : " + localModuleName + ":" + itoa(dbrootID), LOG_TYPE_DEBUG);
-					sleep(5);
-
-					//send msg to toPM to mount dbroot
-					try
-					{
-						typedef std::vector<string> dbrootList;
-						dbrootList dbrootlist;
-						dbrootlist.push_back(itoa(dbrootID));
-						mountDBRoot(dbrootlist);
-					}
-					catch (exception& e)
-					{
-						writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
-						cout << endl << "ERROR: mountDBRoot api failure" << endl;
-					}
-				}
-				catch (...)
-				{
-					writeLog("ERROR: setPmDbrootConfig failure", LOG_TYPE_ERROR );
-					exceptionControl("autoMovePmDbroot", API_FAILURE);
-				}
-		
-				if ( GlusterConfig == "y")
-				{
-					try {
-						string lPMid = itoa(localPMID);
-						string errmsg;
-						int ret = glusterctl(oam::GLUSTER_ASSIGN, itoa(dbrootID), lPMid, errmsg);
-						if ( ret != 0 )
-						{
-							cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + itoa(localPMID) + ", error: " + errmsg << endl;
-							exceptionControl("assignPmDbrootConfig", API_FAILURE);
-						}
-					}
-					catch (exception& e)
-					{
-						cout << endl << "**** glusterctl API exception:  " << e.what() << endl;
-						cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + itoa(localPMID) << endl;
-						exceptionControl("assignPmDbrootConfig", API_FAILURE);
-					}
-					catch (...)
-					{
-						cout << endl << "**** glusterctl API exception: UNKNOWN"  << endl;
-						cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + itoa(localPMID) << endl;
-						exceptionControl("assignPmDbrootConfig", API_FAILURE);
-					}
-				}
-
-				//store in move dbroot transaction file
-				string fileName = InstallDir + "/local/moveDbrootTransactionLog";
-			
-				string cmd = "echo '" + residePM + "|" + localModuleName + "|" + itoa(subDBRootID) + "' >> " + fileName;
-				system(cmd.c_str());
-			
-				//check for amazon moving required
-				try
-				{
-					typedef std::vector<string> dbrootList;
-					dbrootList dbrootlist;
-					dbrootlist.push_back(itoa(dbrootID));
-
-					amazonReattach(localModuleName, dbrootlist, true);
-				}
-				catch (exception& e)
-				{
-					writeLog("ERROR: amazonReattach failure", LOG_TYPE_ERROR );
-					exceptionControl("autoMovePmDbroot", API_FAILURE);
-				}
-
-				pt2++;
-				if ( pt2 == residedbrootConfigList.end() )
-					break;
-			}
-			else
-			{
-				//if Gluster, get it's list for DBroot and move to one of those
-				string toPmID;
-				if ( GlusterConfig == "y")
-				{
-					string pmList = "";
-					try {
-						string errmsg;
-						int ret = glusterctl(oam::GLUSTER_WHOHAS, itoa(dbrootID), pmList, errmsg);
-						if ( ret != 0 )
-						{
-							writeLog("ERROR: glusterctl failure getting pm list for dbroot " + itoa(dbrootID) + " , error: " + errmsg, LOG_TYPE_ERROR );
-							exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-						}
-					}
-					catch (exception& e)
-					{
-						writeLog("ERROR: glusterctl failure getting pm list for dbroot " + itoa(dbrootID), LOG_TYPE_ERROR );
-						exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-					}
-					catch (...)
-					{
-						writeLog("ERROR: glusterctl failure getting pm list for dbroot " + itoa(dbrootID), LOG_TYPE_ERROR );
-						exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-					}
-
-					bool found = false;
-					boost::char_separator<char> sep(" ");
-					boost::tokenizer< boost::char_separator<char> > tokens(pmList, sep);
-					for ( boost::tokenizer< boost::char_separator<char> >::iterator it = tokens.begin();
-							it != tokens.end();
-							++it)
-					{
-						if ( atoi((*it).c_str()) != residePMID ) {
-							found = true;
-							toPmID = *it;
-
-							string toPM = "pm" + toPmID;
-
-							try {
-								string errmsg;
-								int ret = glusterctl(oam::GLUSTER_ASSIGN, itoa(dbrootID), toPmID, errmsg);
-								if ( ret != 0 )
-								{
-									cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + toPmID + ", error: " + errmsg << endl;
-									exceptionControl("manualMovePmDbroot", API_FAILURE);
-								}
-							}
-							catch (exception& e)
-							{
-								cout << endl << "**** glusterctl API exception:  " << e.what() << endl;
-								cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + toPmID << endl;
-								exceptionControl("manualMovePmDbroot", API_FAILURE);
-							}
-							catch (...)
-							{
-								cout << endl << "**** glusterctl API exception: UNKNOWN"  << endl;
-								cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(dbrootID) + " to pm" + toPmID << endl;
-								exceptionControl("manualMovePmDbroot", API_FAILURE);
-							}
-
-							DBRootConfigList todbrootConfigList;
-							try
-							{
-								getPmDbrootConfig(atoi(toPmID.c_str()), todbrootConfigList);
-							}
-							catch (...)
-							{
-								writeLog("ERROR: getPmDbrootConfig failure", LOG_TYPE_ERROR );
-								exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-							}
-
-							todbrootConfigList.push_back(dbrootID);
-			
-							try
-							{
-								setPmDbrootConfig(atoi(toPmID.c_str()), todbrootConfigList);
-								writeLog("autoMovePmDbroot/setPmDbrootConfig : " + toPM + ":" + itoa(dbrootID), LOG_TYPE_DEBUG);
-								sleep(5);
-		
-								//send msg to toPM to mount dbroot
-								try
-								{
-									typedef std::vector<string> dbrootList;
-									dbrootList dbrootlist;
-									dbrootlist.push_back(itoa(dbrootID));
-		
-									mountDBRoot(dbrootlist);
-								}
-								catch (exception& e)
-								{
-									writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
-									cout << endl << "ERROR: mountDBRoot api failure" << endl;
-								}
-							}
-							catch (...)
-							{
-								writeLog("ERROR: setPmDbrootConfig failure", LOG_TYPE_ERROR );
-								exceptionFailure = true;
-							}
-					
-							//store in move dbroot transaction file
-							string fileName = InstallDir + "/local/moveDbrootTransactionLog";
-						
-							string cmd = "echo '" + residePM + "|" + toPM + "|" + itoa(dbrootID) + "' >> " + fileName;
-							system(cmd.c_str());
-
-							pt2++;
-							if ( pt2 == residedbrootConfigList.end() )
-								break;
-							dbrootID = *pt2;
-						}
-					}
-
-					if (!found) {
-						writeLog("ERROR: no available pm found for DBRoot " + itoa(dbrootID), LOG_TYPE_ERROR );
-						exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-					}
-				}
-				else
-				{  // not gluster, pmdbrootList = available pms for assigning
-					PMdbrootList::iterator pt1 = pmdbrootList.begin();
-					for( ; pt1 != pmdbrootList.end() ; pt1++)
-					{
-						//if dbroot1 was moved, skip local module the first time through
-						if ( dbroot1 )
-						{
-							if ( (*pt1).pmID == localPMID ) {
-								dbroot1 = false;
-								continue;
-							}
-						}
-
-						if ( (*pt1).pmID != residePMID ) {
-			
-							string toPM = "pm" + itoa((*pt1).pmID);
-					
-							//get dbroot ids for PM
-							DBRootConfigList todbrootConfigList;
-							try
-							{
-								getPmDbrootConfig((*pt1).pmID, todbrootConfigList);
-							}
-							catch (...)
-							{
-								writeLog("ERROR: getPmDbrootConfig failure", LOG_TYPE_ERROR );
-								exceptionControl("autoMovePmDbroot", API_INVALID_PARAMETER);
-							}
-					
-							todbrootConfigList.push_back(dbrootID);
-			
-							try
-							{
-								setPmDbrootConfig((*pt1).pmID, todbrootConfigList);
-								writeLog("autoMovePmDbroot/setPmDbrootConfig : " + toPM + ":" + itoa(dbrootID), LOG_TYPE_DEBUG);
-								sleep(5);
-		
-								//send msg to toPM to mount dbroot
-								try
-								{
-									typedef std::vector<string> dbrootList;
-									dbrootList dbrootlist;
-									dbrootlist.push_back(itoa(dbrootID));
-	
-									mountDBRoot(dbrootlist);
-								}
-								catch (exception& e)
-								{
-									writeLog("ERROR: mountDBRoot api failure", LOG_TYPE_DEBUG );
-									cout << endl << "ERROR: mountDBRoot api failure" << endl;
-								}
-							}
-							catch (...)
-							{
-								writeLog("ERROR: setPmDbrootConfig failure", LOG_TYPE_ERROR );
-								exceptionFailure = true;
-							}
-					
-							//store in move dbroot transaction file
-							string fileName = InstallDir + "/local/moveDbrootTransactionLog";
-						
-							string cmd = "echo '" + residePM + "|" + toPM + "|" + itoa(dbrootID) + "' >> " + fileName;
-							system(cmd.c_str());
-				
-							//check for amazon moving required
-							try
-							{
-								typedef std::vector<string> dbrootList;
-								dbrootList dbrootlist;
-								dbrootlist.push_back(itoa(dbrootID));
-		
-								amazonReattach(toPM, dbrootlist, true);
-							}
-							catch (exception& e)
-							{
-								writeLog("ERROR: amazonReattach failure", LOG_TYPE_ERROR );
-								exceptionFailure = true;
-							}
-		
-							pt2++;
-							if ( pt2 == residedbrootConfigList.end() )
-								break;
-							dbrootID = *pt2;
-						}
-					}
-				}
-			}
-		}
-
-		if (exceptionFailure)
-			exceptionControl("autoMovePmDbroot", API_FAILURE);
-
-		return 0;
-
-	}
-
-    /********************************************************************
-     *
-     * Auto Move PM - DBRoot data
-     *
-     ********************************************************************/
-	bool Oam::autoUnMovePmDbroot(std::string toPM)
-	{
-		string residePM;
-		string fromPM;
-		string dbrootIDs;
-
-		string DBRootStorageType;
-		try {
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-
-		string GlusterConfig = "n";
-		try {
-			getSystemConfig( "GlusterConfig", GlusterConfig);
-		}
-		catch(...)
-		{
-			GlusterConfig = "n";
-		}
-
-		if (DBRootStorageType == "internal" && GlusterConfig == "n")
-			return 1;
-
-		//store in move dbroot transaction file
-		string fileName = InstallDir + "/local/moveDbrootTransactionLog";
-	
-		ifstream oldFile (fileName.c_str());
-		if (!oldFile) {
-			ofstream newFile (fileName.c_str());	
-			int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
-			newFile.close();
-			close(fd);
-		}
-
-		vector <string> lines;
-		char line[200];
-		string buf;
-		string newLine;
-		bool found = false;
-		while (oldFile.getline(line, 200))
-		{
-			buf = line;
-			string::size_type pos = buf.find("|",0);
-			if (pos != string::npos)
-			{
-				residePM = buf.substr(0,pos);
-				if ( residePM == toPM ) {
-					string::size_type pos1 = buf.find("|",pos+1);
-					if (pos1 != string::npos)
-					{
-						fromPM = buf.substr(pos+1,pos1-pos-1);
-						dbrootIDs = buf.substr(pos1+1,80);
-						found = true;
-
-						try {
-							manualMovePmDbroot(fromPM, dbrootIDs, toPM);
-							writeLog("autoUnMovePmDbroot/manualMovePmDbroot : " + fromPM + ":" + dbrootIDs + ":" + toPM, LOG_TYPE_DEBUG);
-						}
-						catch (...)
-						{
-							writeLog("ERROR: manualMovePmDbroot failure: " + fromPM + ":" + dbrootIDs + ":" + toPM, LOG_TYPE_ERROR );
-							cout << "ERROR: manualMovePmDbroot failure" << endl;
-						}
-					}
-				}
-				else
-					lines.push_back(buf);
-			}
-		}
-
-		if (!found) {
-			writeLog("ERROR: no dbroots found in ../Calpont/local/moveDbrootTransactionLog", LOG_TYPE_ERROR );
-			cout << "ERROR: no dbroots found in " << fileName << endl;
-			exceptionControl("autoUnMovePmDbroot", API_FAILURE);
-		}
-
-		oldFile.close();
-		unlink (fileName.c_str());
-		ofstream newFile (fileName.c_str());	
-		
-		//create new file
-		int fd = open(fileName.c_str(), O_RDWR|O_CREAT, 0666);
-		
-		copy(lines.begin(), lines.end(), ostream_iterator<string>(newFile, "\n"));
-		newFile.close();
-		
-		close(fd);
-
-		return 0;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  addDbroot
-     *
-     * Purpose:   add DBRoot
-     *
-     ****************************************************************************/
-
-    void Oam::addDbroot(const int dbrootNumber, DBRootConfigList& dbrootlist)
-	{
-		int SystemDBRootCount = 0;
-		string cloud;
-		string DBRootStorageType;
-		string volumeSize;
-		Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
-        string Section = "SystemConfig";
-
-		try {
-			getSystemConfig("DBRootCount", SystemDBRootCount);
-			getSystemConfig("Cloud", cloud);
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-			getSystemConfig("PMVolumeSize", volumeSize);
-		}
-		catch(...) {}
-
-		int newSystemDBRootCount = SystemDBRootCount + dbrootNumber;
-		if ( newSystemDBRootCount > MAX_DBROOT )
-		{
-			cout << "ERROR: Failed add, total Number of DBRoots would be over maximum of " << MAX_DBROOT << endl;
-			exceptionControl("addDbroot", API_INVALID_PARAMETER);
-		}
-
-		if (cloud == "amazon" && DBRootStorageType == "external" )
-		{
-			if ( newSystemDBRootCount > MAX_DBROOT_AMAZON )
-			{
-				cout << "ERROR: Failed add, total Number of DBRoots would be over maximum of " << MAX_DBROOT_AMAZON << endl;
-				exceptionControl("addDbroot", API_INVALID_PARAMETER);
-			}
-		}
-
-		//get assigned DBRoots IDs
-		DBRootConfigList dbrootConfigList;
-		try {
-			getSystemDbrootConfig(dbrootConfigList);
-		}
-		catch(...) {}
-
-		//get unassigned DBRoots IDs
-		DBRootConfigList undbrootlist;
-		try {
-			getUnassignedDbroot(undbrootlist);
-		}
-		catch(...) {}
-
-		//combined list
-		DBRootConfigList::iterator pt1 = undbrootlist.begin();
-		for( ; pt1 != undbrootlist.end() ; pt1++)
-		{
-			dbrootConfigList.push_back(*pt1);
-		}
-
-		int newID = 1;
-		for ( int count = 0 ; count < dbrootNumber ; count++ )
-		{
-			//check for match
-			while (true)
-			{
-				bool found = false;
-				DBRootConfigList::iterator pt = dbrootConfigList.begin();
-				for( ; pt != dbrootConfigList.end() ; pt++)
-				{
-					if ( newID == *pt ) {
-						newID++;
-						found = true;
-						break;
-					}
-				}
-
-				if (!found)
-				{
-					dbrootlist.push_back(newID);
-					newID++;
-					break;
-				}
-			}
-		}
-
-		if ( dbrootlist.size() == 0 )
-		{
-			cout << "ERROR: Failed add, No DBRoot IDs available" << endl;
-			exceptionControl("addDbroot", API_INVALID_PARAMETER);
-		}
-
-		//if amazon cloud with external volumes, create AWS volumes
-		if (cloud == "amazon" && DBRootStorageType == "external" )
-		{
-			//get local instance name (pm1)
-			string localInstance = getEC2LocalInstance();
-			if ( localInstance == "failed" || localInstance.empty() || localInstance == "") 
-			{
-				cout << endl << "ERROR: Failed to get Instance ID" << endl;
-				exceptionControl("addDbroot", API_INVALID_PARAMETER);
-			}
-
-			string Section = "Installation";
-	
-			DBRootConfigList::iterator pt1 = dbrootlist.begin();
-			for( ; pt1 != dbrootlist.end() ; pt1++)
-			{
-				cout << "  Create AWS Volume for DBRoot #" << itoa(*pt1) << endl;
-				//create volume
-				string volumeName;
-				int retry = 0;
-				for ( ; retry < 5 ; retry++ )
-				{
-					volumeName = createEC2Volume(volumeSize);
-				
-					if ( volumeName == "failed" || volumeName.empty() )
-						retry = retry;
-					else
-						break;
-				}
-			
-				if ( retry >= 5 )
-				{
-					cout << " *** ERROR: Failed to create a Volume for dbroot " << *pt1 << endl;
-					exceptionControl("addDbroot", API_FAILURE);
-				}
-
-				string autoTagging;
-				string systemName;
-		
-				try {
-					getSystemConfig("AmazonAutoTagging", autoTagging);
-					getSystemConfig("SystemName", systemName);
-				}
-				catch(...) {}
-
-				if ( autoTagging == "y" ) {
-					string tagValue = systemName + "-dbroot" + itoa(*pt1);
-					createEC2tag( volumeName, "Name", tagValue );
-				}
-
-				//get device name based on dbroot ID
-				string deviceName = getAWSdeviceName( *pt1 );
-
-				//attach volumes to local instance
-				retry = 0;
-				for ( ; retry < 5 ; retry++ )
-				{
-					if (!attachEC2Volume(volumeName, deviceName, localInstance)) {
-						detachEC2Volume(volumeName);
-					}
-					else
-						break;
-				}
-
-				if ( retry >= 5 )
-				{
-					cout << " *** ERROR: Volume " << volumeName << " failed to attach to local instance" << endl;
-					exceptionControl("addDbroot", API_FAILURE);
-				}
-			
-				//format attached volume
-				cout << "  Formatting DBRoot #" << itoa(*pt1) << ", please wait..." << endl;
-				string cmd = "mkfs.ext2 -F " + deviceName + " > /dev/null 2>&1";
-				system(cmd.c_str());
-
-				//detach
-				detachEC2Volume(volumeName);
-
-				string volumeNameID = "PMVolumeName" + itoa(*pt1);
-				string deviceNameID = "PMVolumeDeviceName" + itoa(*pt1);
-	
-				//write volume and device name
-				try {
-					sysConfig->setConfig(Section, volumeNameID, volumeName);
-					sysConfig->setConfig(Section, deviceNameID, deviceName);
-				}
-				catch(...)
-				{}
-	
-				//update /etc/fstab with mount
-				string entry = deviceName + " " + InstallDir + "/data" + itoa(*pt1) + " ext2 noatime,nodiratime,noauto 0 0";
-	
-				//use from addmodule later
-				cmd = "echo " + entry + " >> " + InstallDir + "/local/etc/pm1/fstab";
-				system(cmd.c_str());
-
-				//send update pms
-				distributeFstabUpdates(entry);
-			}
-		}
-	
-		//update Calpont.xml entries
-		DBRootConfigList::iterator pt2 = dbrootlist.begin();
-		for( ; pt2 != dbrootlist.end() ; pt2++)
-		{
-			string DBrootID = "DBRoot" + itoa(*pt2);
-			string pathID = InstallDir + "/data" + itoa(*pt2);
-	
-			try {
-				sysConfig->setConfig(Section, DBrootID, pathID);
-			}
-			catch(...)
-			{
-				cout << "ERROR: Problem setting DBRoot in the InfiniDB System Configuration file" << endl;
-				exceptionControl("setConfig", API_FAILURE);
-			}
-		}
-
-		try
-		{
-			sysConfig->write();
-		}
-		catch(...)
-		{
-			exceptionControl("sysConfig->write", API_FAILURE);
-		}
-
-		//get updated Calpont.xml distributed
-		distributeConfigFile("system");
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  distributeFstabUpdates
-     *
-     * Purpose:   distribute Fstab Updates
-     *
-     ****************************************************************************/
-
-    void Oam::distributeFstabUpdates(std::string entry, std::string toPM)
-	{
-		ACK_FLAG ackflag = oam::ACK_YES;
-        // build and send msg
-        int returnStatus = sendMsgToProcMgr(FSTABUPDATE, toPM, FORCEFUL, ackflag, entry);
+		//give  time for ProcMon/ProcMgr to get fully active on new pm
+		sleep(10);
+
+		// build and send msg to restart system
+        returnStatus = sendMsgToProcMgr(STARTSYSTEM, "", FORCEFUL, ACK_YES);
 
         if (returnStatus != API_SUCCESS)
-            exceptionControl("distributeFstabUpdates", returnStatus);
-	}
-
-    /***************************************************************************
-     *
-     * Function:  assignDbroot
-     *
-     * Purpose:   assign DBRoot
-     *
-     ****************************************************************************/
-
-    void Oam::assignDbroot(std::string toPM, DBRootConfigList& dbrootlist)
-	{
-		//make sure this new DBroot IDs aren't being used already
-		try
-		{
-			systemStorageInfo_t t;
-			t = getStorageConfig();
-
-			DeviceDBRootList moduledbrootlist = boost::get<2>(t);
-
-			DBRootConfigList::iterator pt3 = dbrootlist.begin();
-			for( ; pt3 != dbrootlist.end() ; pt3++)
-			{
-				DeviceDBRootList::iterator pt = moduledbrootlist.begin();
-				for( ; pt != moduledbrootlist.end() ; pt++)
-				{
-					string moduleID = itoa((*pt).DeviceID);
-					DBRootConfigList::iterator pt1 = (*pt).dbrootConfigList.begin();
-					for( ; pt1 != (*pt).dbrootConfigList.end() ; pt1++)
-					{
-						if ( *pt3 == *pt1) {
-							cout << endl << "**** assignPmDbrootConfig Failed : DBRoot ID " + itoa(*pt3) + " already assigned to 'pm" + moduleID << "'" << endl;
-							exceptionControl("assignPmDbrootConfig", API_INVALID_PARAMETER);
-						}
-					}
-				}
-			}
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getStorageConfig Failed :  " << e.what() << endl;
-		}
-
-		//make sure it's exist and unassigned
-		DBRootConfigList undbrootlist;
-		try {
-			getUnassignedDbroot(undbrootlist);
-		}
-		catch(...) {}
-
-		if ( undbrootlist.empty() )
-		{
-			cout << endl << "**** assignPmDbrootConfig Failed : no available dbroots are unassigned" << endl;
-			exceptionControl("assignPmDbrootConfig", API_INVALID_PARAMETER);
-		}
-
-		DBRootConfigList::iterator pt1 = dbrootlist.begin();
-		for( ; pt1 != dbrootlist.end() ; pt1++)
-		{
-			bool found = false;
-			DBRootConfigList::iterator pt2 = undbrootlist.begin();
-			for( ; pt2 != undbrootlist.end() ; pt2++)
-			{
-				if ( *pt1 == * pt2 ) {
-					found = true;
-					break;
-				}
-			}
-
-			if (!found)
-			{
-				cout << endl << "**** assignPmDbrootConfig Failed : dbroot "  << *pt1 << " doesn't exist" << endl;
-				exceptionControl("assignPmDbrootConfig", API_INVALID_PARAMETER);
-			}
-		}
-
-		string toPMID = toPM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-
-		//get dbroots ids for to PM
-		DBRootConfigList todbrootConfigList;
-		try
-		{
-			getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-
-			cout << "DBRoot IDs assigned to '" + toPM + "' = ";
-
-			DBRootConfigList::iterator pt = todbrootConfigList.begin();
-			for( ; pt != todbrootConfigList.end() ;)
-			{
-				cout << itoa(*pt);
-				pt++;
-				if (pt != todbrootConfigList.end())
-					cout << ", ";
-			}
-			cout << endl;
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		cout << endl << "Changes being applied" << endl << endl;
-
-		//added entered dbroot IDs to to-PM list and do Gluster assign if needed
-		string GlusterConfig = "n";
-		try {
-			getSystemConfig( "GlusterConfig", GlusterConfig);
-		}
-		catch(...)
-		{
-			GlusterConfig = "n";
-		}
-
-		DBRootConfigList::iterator pt3 = dbrootlist.begin();
-		for( ; pt3 != dbrootlist.end() ; pt3++)
-		{
-			todbrootConfigList.push_back(*pt3);
-
-			if ( GlusterConfig == "y")
-			{
-				try {
-					string errmsg;
-					int ret = glusterctl(oam::GLUSTER_ASSIGN, itoa(*pt3), toPMID, errmsg);
-					if ( ret != 0 )
-					{
-						cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(*pt3) + " to pm" + toPMID + ", error: " + errmsg << endl;
-						exceptionControl("assignPmDbrootConfig", API_FAILURE);
-					}
-				}
-				catch (exception& e)
-				{
-					cout << endl << "**** glusterctl API exception:  " << e.what() << endl;
-					cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(*pt3) + " to pm" + toPMID << endl;
-					exceptionControl("assignPmDbrootConfig", API_FAILURE);
-				}
-				catch (...)
-				{
-					cout << endl << "**** glusterctl API exception: UNKNOWN"  << endl;
-					cerr << "FAILURE: Error assigning gluster dbroot# " + itoa(*pt3) + " to pm" + toPMID << endl;
-					exceptionControl("assignPmDbrootConfig", API_FAILURE);
-				}
-			}
-		}
-
-		try
-		{
-			setPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		//get dbroots ids for to-PM
-		try
-		{
-			todbrootConfigList.clear();
-			getPmDbrootConfig(atoi(toPMID.c_str()), todbrootConfigList);
-
-			cout << "DBRoot IDs assigned to '" + toPM + "' = ";
-
-			DBRootConfigList::iterator pt = todbrootConfigList.begin();
-			for( ; pt != todbrootConfigList.end() ;)
-			{
-				cout << itoa(*pt);
-				pt++;
-				if (pt != todbrootConfigList.end())
-					cout << ", ";
-			}
-			cout << endl;
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getPmDbrootConfig Failed for '" << toPM << "' : " << e.what() << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		//get old System DBRoot Count
-		int oldSystemDbRootCount = 0;
-		try
-		{
-			getSystemConfig("DBRootCount", oldSystemDbRootCount);
-			if (oldSystemDbRootCount < 1)
-				throw runtime_error("SystemDbRootCount not > 0");
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getSystemConfig for DBRootCount failed; " <<
-				e.what() << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		//set new System DBRoot Count
-		try
-		{
-			setSystemDBrootCount();
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setSystemDBrootCount Failed" << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		//set FilesPerColumnPartition
-		try
-		{
-			setFilesPerColumnPartition( oldSystemDbRootCount );
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setFilesPerColumnPartition Failed" << endl;
-			exceptionControl("assignPmDbrootConfig", API_FAILURE);
-		}
-
-		//get updated Calpont.xml distributed
-		distributeConfigFile("system");
+            exceptionControl("startSystem", returnStatus);
 
 		return;
 	}
 
     /***************************************************************************
      *
-     * Function:  unassignDbroot
+     * Function:  validateModule
      *
-     * Purpose:   unassign DBRoot
+     * Purpose:   Validate Module Name
      *
      ****************************************************************************/
 
-    void Oam::unassignDbroot(std::string residePM, DBRootConfigList& dbrootlist)
-	{
-		string residePMID = residePM.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE);;
-
-		//get dbroots ids for reside PM
-		DBRootConfigList residedbrootConfigList;
-		try
-		{
-			getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-
-			cout << "DBRoot IDs assigned to '" + residePM + "' = ";
-
-			DBRootConfigList::iterator pt = residedbrootConfigList.begin();
-			for( ; pt != residedbrootConfigList.end() ;)
-			{
-				cout << itoa(*pt);
-				pt++;
-				if (pt != residedbrootConfigList.end())
-					cout << ", ";
-			}
-			cout << endl;
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getPmDbrootConfig Failed for '" << residePM << "' : " << e.what() << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		cout << endl << "Changes being applied" << endl << endl;
-
-		//remove entered dbroot IDs from reside PM list
-		DBRootConfigList::iterator pt1 = dbrootlist.begin();
-		for( ; pt1 != dbrootlist.end() ; pt1++)
-		{
-			DBRootConfigList::iterator pt2 = residedbrootConfigList.begin();
-			for( ; pt2 != residedbrootConfigList.end() ; pt2++)
-			{
-				if ( *pt2 == *pt1 ) {
-
-					dbrootList dbroot1;
-					dbroot1.push_back(itoa(*pt1));
-
-					//send msg to unmount dbroot if module is not offline
-					int opState;
-					bool degraded;
-					try {
-						getModuleStatus(residePM, opState, degraded);
-					}
-					catch(...)
-					{}
+    int Oam::validateModule(const std::string name)
+    {
+		if ( name.size() < 3 )
+			// invalid ID
+            return API_INVALID_PARAMETER;
 		
-					if (opState != oam::AUTO_OFFLINE || opState != oam::AUTO_DISABLED) {
-						try
-						{
-							mountDBRoot(dbroot1, false);
-						}
-						catch (exception& e)
-						{
-							writeLog("ERROR: dbroot failed to unmount", LOG_TYPE_ERROR );
-							cout << endl << "ERROR: umountDBRoot api failure" << endl;
-							exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-						}
-					}
+		string moduletype = name.substr(0,MAX_MODULE_TYPE_SIZE);
+		int moduleID = atoi(name.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
+		if ( moduleID < 1 )
+			// invalid ID
+            return API_INVALID_PARAMETER;
 
-					//get volume name and detach it
+        SystemModuleTypeConfig systemmoduletypeconfig;
 
-					string volumeNameID = "PMVolumeName" + itoa(*pt1);
-					string volumeName = oam::UnassignedName;
-					try {
-						getSystemConfig( volumeNameID, volumeName);
-					}
-					catch(...)
-					{}
-	
-					if ( volumeName != oam::UnassignedName )
-						detachEC2Volume(volumeName);
+        try
+        {
+            getSystemConfig(systemmoduletypeconfig);
+        }
+        catch(...)
+        {
+            return API_INVALID_PARAMETER;
+        }
 
-					residedbrootConfigList.erase(pt2);
+        for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
+        {
+            if (systemmoduletypeconfig.moduletypeconfig[i].ModuleType == moduletype ) {
+				if (systemmoduletypeconfig.moduletypeconfig[i].ModuleCount == 0 )
+					return API_INVALID_PARAMETER;
 
-					break;
-				}
-			}
-		}
-
-		try
-		{
-			setPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setPmDbrootConfig Failed for '" << residePM << "' : " << e.what() << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		//get dbroots ids for reside-PM
-		try
-		{
-			residedbrootConfigList.clear();
-			getPmDbrootConfig(atoi(residePMID.c_str()), residedbrootConfigList);
-
-			cout << "DBRoot IDs assigned to '" + residePM + "' = ";
-
-			DBRootConfigList::iterator pt = residedbrootConfigList.begin();
-			for( ; pt != residedbrootConfigList.end() ;)
-			{
-				cout << itoa(*pt);
-				pt++;
-				if (pt != residedbrootConfigList.end())
-					cout << ", ";
-			}
-			cout << endl;
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getPmDbrootConfig Failed for '" << residePM << "' : " << e.what() << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		//get old System DBRoot Count
-		int oldSystemDbRootCount = 0;
-		try
-		{
-			getSystemConfig("DBRootCount", oldSystemDbRootCount);
-			if (oldSystemDbRootCount < 1)
-				throw runtime_error("SystemDbRootCount not > 0");
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** getSystemConfig for DBRootCount failed; " <<
-				e.what() << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		//set new System DBRoot Count
-		try
-		{
-			setSystemDBrootCount();
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setSystemDBrootCount Failed" << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		//set FilesPerColumnPartition
-		try
-		{
-			setFilesPerColumnPartition( oldSystemDbRootCount );
-		}
-		catch (exception& e)
-		{
-			cout << endl << "**** setFilesPerColumnPartition Failed" << endl;
-			exceptionControl("unassignPmDbrootConfig", API_FAILURE);
-		}
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  getUnassignedDbroot
-     *
-     * Purpose:   get unassigned DBRoot list
-     *
-     ****************************************************************************/
-
-    void Oam::getUnassignedDbroot(DBRootConfigList& dbrootlist)
-	{
-
-		//get assigned dbroots IDs
-		DBRootConfigList dbrootConfigList;
-		try
-		{
-			getSystemDbrootConfig(dbrootConfigList);
-
-		}
-		catch(...) {}
-
-        // get string variables
-		Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
-        string Section = "SystemConfig";
-		for ( int dbrootID = 1 ; dbrootID < MAX_DBROOT ; dbrootID++)
-		{
-			string dbrootPath;
-			try
-			{
-				dbrootPath = sysConfig->getConfig(Section, "DBRoot" + itoa(dbrootID));
-			}
-			catch(...) {}
-
-			if (dbrootPath.empty() || dbrootPath == oam::UnassignedName)
-				continue;
-
-			bool found = false;
-			DBRootConfigList::iterator pt = dbrootConfigList.begin();
-			for( ; pt != dbrootConfigList.end() ; pt++)
-			{
-				if ( dbrootID == *pt ) {
-					found = true;
-					break;
-				}
-			}
-
-			if (!found)
-				dbrootlist.push_back(dbrootID);
-		}
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  removeDbroot
-     *
-     * Purpose:   remove DBRoot
-     *
-     ****************************************************************************/
-
-    void Oam::removeDbroot(DBRootConfigList& dbrootlist)
-	{
-		int SystemDBRootCount = 0;
-		string cloud;
-		string DBRootStorageType;
-		try {
-			getSystemConfig("DBRootCount", SystemDBRootCount);
-			getSystemConfig("Cloud", cloud);
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-
-		int dbrootNumber = dbrootlist.size();
-
-		if ( dbrootNumber < 1 )
-		{
-			cout << "ERROR: Failed remove, total Number of DBRoots to remove is less than 1 " << endl;
-			exceptionControl("removeDbroot", API_INVALID_PARAMETER);
-		}
-
-		Config* sysConfig = Config::makeConfig(CalpontConfigFile.c_str());
-        string Section = "SystemConfig";
-
-		//check if dbroot requested to be removed is empty and dboot #1 is requested to be removed
-		DBRootConfigList::iterator pt = dbrootlist.begin();
-		for( ; pt != dbrootlist.end() ; pt++)
-		{
-			int dbrootID = *pt;
-
-			//see if dbroot exist
-			string DBrootpath = "DBRoot" + itoa(dbrootID);
-			string dbrootdir;
-			try {
-				dbrootdir = sysConfig->getConfig(Section, DBrootpath);
-			}
-			catch(...)
-			{}
-
-			if ( dbrootdir.empty() || dbrootdir == oam::UnassignedName )
-			{
-				cout << "ERROR: DBRoot doesn't exist: " << itoa(dbrootID) << endl;
-				exceptionControl("removeDbroot", API_FAILURE);
-			}
-
-			if ( dbrootID == 1 )
-			{
-				cout << "ERROR: Failed remove, can't remove dbroot #1" << endl;
-				exceptionControl("removeDbroot", API_INVALID_PARAMETER);
-			}
-
-			//check if dbroot is empty
-			bool isEmpty = false;
-			string errMsg;
-			try {
-				BRM::DBRM dbrm;
-				if ( dbrm.isDBRootEmpty(dbrootID, isEmpty, errMsg) != 0) {
-					cout << "ERROR: isDBRootEmpty API error, dbroot #" << itoa(dbrootID) << " :" << errMsg << endl;
-					exceptionControl("removeDbroot", API_FAILURE);
-				}
-			}
-			catch (exception& e)
-			{}
-
-			if (!isEmpty)
-			{
-				cout << "ERROR: Failed remove, dbroot #" << itoa(dbrootID) << " is not empty" << endl;
-				exceptionControl("removeDbroot", API_FAILURE);
-			}
-
-			//check if dbroot is assigned to a pm and if so, unassign it
-			int pmid = 0;
-			try {
-				getDbrootPmConfig(dbrootID, pmid);
-			}
-			catch (exception& e)
-			{}
-
-			if ( pmid > 0 )
-			{
-				//unassign dbroot from pm
-				DBRootConfigList pmdbrootlist;
-				pmdbrootlist.push_back(dbrootID);
-
-				try {
-					unassignDbroot("pm" + itoa(pmid), pmdbrootlist);
-				}
-				catch (exception& e)
+				DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
+				for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
 				{
-					cout << endl << "**** unassignDbroot Failed" << endl;
-					exceptionControl("removeDbroot", API_FAILURE);
+					if ( name == (*pt).DeviceName )
+						return API_SUCCESS;
 				}
 			}
-
-			try {
-				sysConfig->delConfig(Section, DBrootpath);
-			}
-			catch(...)
-			{
-				cout << "ERROR: Problem deleting DBRoot in the InfiniDB System Configuration file" << endl;
-				exceptionControl("deleteConfig", API_FAILURE);
-			}
-		}
-
-		try
-		{
-			sysConfig->write();
-		}
-		catch(...)
-		{
-			exceptionControl("sysConfig->write", API_FAILURE);
-		}
-
-		//get updated Calpont.xml distributed
-		distributeConfigFile("system");
-
-		return;
-	}
-
-	//current amazon max dbroot id support = 190;
-	string PMdeviceName = "/dev/sd";
-	string deviceLetter[] = {"g","h","i","j","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","end"};
-
-    /***************************************************************************
-     *
-     * Function:  getAWSdeviceName
-     *
-     * Purpose:   get AWS Device Name for DBRoot ID
-     *
-     ****************************************************************************/
-
-	std::string Oam::getAWSdeviceName( const int dbrootid)
-	{
-		//calulate id numbers from DBRoot ID
-		int lid = (dbrootid-1) / 10;
-		int did = dbrootid - (dbrootid * lid);
-
-		return PMdeviceName + deviceLetter[lid] + itoa(did);
-	}
-
-    /***************************************************************************
-     *
-     * Function:  setSystemDBrootCount
-     *
-     * Purpose:   set System DBRoot Count
-     *
-     ****************************************************************************/
-
-    void Oam::setSystemDBrootCount()
-	{
-		//set the system dbroot number
-		try
-		{
-			DBRootConfigList dbrootConfigList;
-			getSystemDbrootConfig(dbrootConfigList);
-
-			try {
-				setSystemConfig("DBRootCount", dbrootConfigList.size());
-			}
-			catch(...)
-			{
-				writeLog("ERROR: setSystemConfig DBRootCount " + dbrootConfigList.size() , LOG_TYPE_ERROR );
-				cout << endl << "ERROR: setSystemConfig DBRootCount " + dbrootConfigList.size() << endl;
-				exceptionControl("setSystemConfig", API_FAILURE);
-			}
-		}
-		catch(...)
-		{
-			writeLog("ERROR: getSystemDbrootConfig ", LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getSystemDbrootConfig "  << endl;
-			exceptionControl("getSystemDbrootConfig", API_INVALID_PARAMETER);
-		}
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  setFilesPerColumnPartition
-     *
-     * Purpose:   set FilesPerColumnPartition
-	 *            This function takes the old DBRootCount as an input arg
-	 *            and expects that the new DBRootCount has been set in the
-	 *            Calpont.xml file.  Function assumes oldSystemDBRootCount
-	 *            has already been validated to be > 0 (else we could get a
-	 *            divide by 0 error).
-     *
-     ****************************************************************************/
-
-    void Oam::setFilesPerColumnPartition( int oldSystemDBRootCount )
-	{
-		int newSystemDBRootCount = 0;
-		int oldFilesPerColumnPartition = 4;
-
-		try {
-			getSystemConfig("DBRootCount", newSystemDBRootCount);
-		}
-		catch(...)
-		{
-			writeLog("ERROR: getSystemConfig DBRootCount ", LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getSystemConfig DBRootCount"  << endl;
-			exceptionControl("setFilesPerColumnPartition", API_INVALID_PARAMETER);
-		}
-
-		try {
-			getSystemConfig("FilesPerColumnPartition", oldFilesPerColumnPartition);
-		}
-		catch(...)
-		{
-			writeLog("ERROR: getSystemConfig FilesPerColumnPartition ", LOG_TYPE_ERROR );
-			cout << endl << "ERROR: getSystemConfig FilesPerColumnPartition"  << endl;
-			exceptionControl("setFilesPerColumnPartition", API_INVALID_PARAMETER);
-		}
-
-		if ( oldFilesPerColumnPartition != oldSystemDBRootCount *
-			(oldFilesPerColumnPartition/oldSystemDBRootCount) ) {
-			writeLog("ERROR: old FilesPerColumnPartition not a multiple of DBRootCount", LOG_TYPE_ERROR );
-			cout << endl << "ERROR: old FilesPerColumnPartition not a multiple of DBRootCount " << endl;
-			exceptionControl("setFilesPerColumnPartition", API_INVALID_PARAMETER);
-		}
-
-		int newFilesPerColumnPartition = (oldFilesPerColumnPartition/oldSystemDBRootCount) * newSystemDBRootCount;
-
-		try {
-			setSystemConfig("FilesPerColumnPartition", newFilesPerColumnPartition);
-		}
-		catch(...)
-		{
-			writeLog("ERROR: setSystemConfig FilesPerColumnPartition " + newFilesPerColumnPartition , LOG_TYPE_ERROR );
-			cout << endl << "ERROR: setSystemConfig FilesPerColumnPartition " + newFilesPerColumnPartition << endl;
-			exceptionControl("setFilesPerColumnPartition", API_FAILURE);
-		}
-	}
+        }
+        return API_INVALID_PARAMETER;
+    }
 
 #pragma pack(push,1)
 	struct NotifyMsgStruct
@@ -6690,8 +4611,8 @@ namespace oam
     void Oam::actionMysqlCalpont(MYSQLCALPONT_ACTION action)
 	{
 		// check if mysql-Capont is installed
-		string mysqlscript = InstallDir + "/mysql/mysql-Calpont";
-        if (access(mysqlscript.c_str(), X_OK) != 0)
+        ifstream File ("/etc/init.d/mysql-Calpont");
+        if (!File)
             exceptionControl("actionMysqlCalpont", API_FILE_OPEN_ERROR);
 
 		string command;
@@ -6754,15 +4675,14 @@ namespace oam
 			}
 		}
 
-		string cmd = mysqlscript + " " + command;
+		string cmd = "/etc/init.d/mysql-Calpont " + command;
 		int status = system(cmd.c_str());
 		if (status != 0 && action != MYSQL_STATUS)
 			exceptionControl("actionMysqlCalpont", API_FAILURE);
 
 		if (action == MYSQL_START || action == MYSQL_RESTART) {
 			//get pid
-			cmd = "cat " + InstallDir + "/mysql/db/*.pid > /tmp/mysql.pid";
-			system(cmd.c_str());
+			system("cat /usr/local/Calpont/mysql/db/*.pid > /tmp/mysql.pid");
 			ifstream oldFile ("/tmp/mysql.pid");
 			char line[400];
 			string pid;
@@ -6786,14 +4706,12 @@ namespace oam
 			ProcessStatus procstat;
 			getProcessStatus("mysqld", moduleName, procstat);
 			int state = procstat.ProcessOpState;
-			pid_t pidStatus = procstat.ProcessID;
 
 			if (checkLogStatus("/tmp/mysql.status", "MySQL running")) {
 				if ( state != ACTIVE )
 				{
 					//get pid
-					cmd = "cat " + InstallDir + "/mysql/db/*.pid > /tmp/mysql.pid";
-					system(cmd.c_str());
+					system("cat /usr/local/Calpont/mysql/db/*.pid > /tmp/mysql.pid");
 					ifstream oldFile ("/tmp/mysql.pid");
 					char line[400];
 					string pid;
@@ -6811,33 +4729,7 @@ namespace oam
 					}
 					catch(...)
 					{}
-
 					return;
-				}
-				else
-				{	//check if pid has changed
-					cmd = "cat " + InstallDir + "/mysql/db/*.pid > /tmp/mysql.pid";
-					system(cmd.c_str());
-					ifstream oldFile ("/tmp/mysql.pid");
-					char line[400];
-					string pid;
-					while (oldFile.getline(line, 400))
-					{
-						pid = line;
-						break;
-					}
-					oldFile.close();
-
-					if ( pidStatus != atoi(pid.c_str()) )
-					{
-						//set process status
-						try
-						{
-							setProcessStatus("mysqld", moduleName, ACTIVE, atoi(pid.c_str()));
-						}
-						catch(...)
-						{}
-					}
 				}
 
 				//check module status, if DEGRADED set to ACTIVE
@@ -6900,557 +4792,6 @@ namespace oam
 		return;
 	}
 
-    /******************************************************************************************
-     * @brief	run DBHealth Check
-     *
-     * purpose:	test the health of the DB
-     *
-     ******************************************************************************************/
-	void Oam::checkDBFunctional(bool action)
-	{
-		ByteStream msg;
-        ByteStream receivedMSG;
-
-		// only make call if system is active
-		SystemStatus systemstatus;
-		try {
-			getSystemStatus(systemstatus);
-		}
-		catch (exception& ex)
-		{}
-		
-		if (systemstatus.SystemOpState != oam::ACTIVE )
-            exceptionControl("checkDBHealth", API_INVALID_STATE);
-
-        SystemModuleTypeConfig systemmoduletypeconfig;
-
-        try
-        {
-            Oam::getSystemConfig(systemmoduletypeconfig);
-        }
-        catch(...)
-        {
-            exceptionControl("checkDBHealth", API_FAILURE);
-        }
-
-		// get Server Type Install ID
-		int serverTypeInstall = oam::INSTALL_NORMAL;
-		string OAMParentModuleName;
-		oamModuleInfo_t st;
-		try {
-			st = getModuleInfo();
-			OAMParentModuleName = boost::get<3>(st);
-			serverTypeInstall = boost::get<5>(st);
-		}
-		catch (...) {
-       		exceptionControl("getMyProcessStatus", API_FAILURE);
-		}
-
-		string module;
-		switch ( serverTypeInstall ) {
-			case (oam::INSTALL_NORMAL):
-			case (oam::INSTALL_COMBINE_DM_UM):
-			{
-				module = "um1";
-				break;
-			}
-			case (oam::INSTALL_COMBINE_PM_UM):
-			case (oam::INSTALL_COMBINE_DM_UM_PM):
-			{
-				module = OAMParentModuleName;
-				break;
-			}
-		}
-
-	// setup message
-	msg << (ByteStream::byte) RUN_DBHEALTH_CHECK;
-	msg << (ByteStream::byte) action;
-
-	try
-	{
-		//send the msg to Server Monitor
-		MessageQueueClient servermonitor(module + "_ServerMonitor");
-		servermonitor.write(msg);
-
-		// wait 30 seconds for ACK from Server Monitor
-		struct timespec ts = { 30, 0 };
-
-		receivedMSG = servermonitor.read(&ts);
-		if (receivedMSG.length() > 0)
-		{
-			ByteStream::byte returnType;
-			receivedMSG >> returnType;
-
-			if ( returnType == RUN_DBHEALTH_CHECK ) {
-				ByteStream::byte returnStatus;
-				receivedMSG >> returnStatus;
-				if ( returnStatus == oam::API_SUCCESS ) {
-					// succesfull
-					servermonitor.shutdown();
-					return;
-				}
-			}
-			// shutdown connection
-			servermonitor.shutdown();
-	
-			exceptionControl("checkDBHealth", API_FAILURE);
-		}
-		else
-		{ // timeout
-			// shutdown connection
-			servermonitor.shutdown();
-	
-			exceptionControl("checkDBHealth", API_TIMEOUT);
-		}
-	}
-	catch(...)
-	{
-		exceptionControl("checkDBHealth", API_FAILURE);
-		return;
-	}
-
-	return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  validateModule
-     *
-     * Purpose:   Validate Module Name
-     *
-     ****************************************************************************/
-
-    int Oam::validateModule(const std::string name)
-    {
-		if ( name.size() < 3 )
-			// invalid ID
-            return API_INVALID_PARAMETER;
-		
-		string moduletype = name.substr(0,MAX_MODULE_TYPE_SIZE);
-		int moduleID = atoi(name.substr(MAX_MODULE_TYPE_SIZE,MAX_MODULE_ID_SIZE).c_str());
-		if ( moduleID < 1 )
-			// invalid ID
-            return API_INVALID_PARAMETER;
-
-        SystemModuleTypeConfig systemmoduletypeconfig;
-
-        try
-        {
-            getSystemConfig(systemmoduletypeconfig);
-        }
-        catch(...)
-        {
-            return API_INVALID_PARAMETER;
-        }
-
-        for( unsigned int i = 0 ; i < systemmoduletypeconfig.moduletypeconfig.size(); i++)
-        {
-            if (systemmoduletypeconfig.moduletypeconfig[i].ModuleType == moduletype ) {
-				if (systemmoduletypeconfig.moduletypeconfig[i].ModuleCount == 0 )
-					return API_INVALID_PARAMETER;
-
-				DeviceNetworkList::iterator pt = systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.begin();
-				for( ; pt != systemmoduletypeconfig.moduletypeconfig[i].ModuleNetworkList.end() ; pt++)
-				{
-					if ( name == (*pt).DeviceName )
-						return API_SUCCESS;
-				}
-			}
-        }
-        return API_INVALID_PARAMETER;
-    }
-
-    /***************************************************************************
-     *
-     * Function:  getEC2InstanceIpAddress
-     *
-     * Purpose:   Check Amazon EC2 is running and returns Private IP address
-     *
-     ****************************************************************************/
-
-    std::string Oam::getEC2InstanceIpAddress(std::string instanceName)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh getPrivateIP " + instanceName + " > /tmp/getCloudIP_" + instanceName;
-		system(cmd.c_str());
-
-		if (checkLogStatus("/tmp/getCloudIP_" + instanceName, "stopped") )
-			return "stopped";
-
-		if (checkLogStatus("/tmp/getCloudIP_" + instanceName, "terminated") )
-			return "terminated";
-
-		// get IP Address
-		string IPAddr;
-		string file = "/tmp/getCloudIP_" + instanceName;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			IPAddr = line;
-		}
-		oldFile.close();
-
-		if (isValidIP(IPAddr))
-			return IPAddr;
-
-		return "terminated";
-	}
-
-    /***************************************************************************
-     *
-     * Function:  getEC2LocalInstance
-     *
-     * Purpose:   Get Amazon EC2 local Instance Name
-     *
-     ****************************************************************************/
-
-    std::string Oam::getEC2LocalInstance(std::string name)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh getInstance  > /tmp/getInstanceInfo_" + name;
-		int status = system(cmd.c_str());
-		if (status != 0 )
-			return "failed";
-
-		// get Instance Name
-		string instanceName;
-		string file = "/tmp/getInstanceInfo_" + name;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			instanceName = line;
-		}
-		oldFile.close();
-
-		return instanceName;
-
-	}
-
-    /***************************************************************************
-     *
-     * Function:  getEC2LocalInstanceType
-     *
-     * Purpose:   Get Amazon EC2 local Instance Type
-     *
-     ****************************************************************************/
-
-    std::string Oam::getEC2LocalInstanceType(std::string name)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh getType  > /tmp/getInstanceType_" + name;
-		int status = system(cmd.c_str());
-		if (status != 0 )
-			return "failed";
-
-		// get Instance Name
-		string instanceType;
-		string file = "/tmp/getInstanceType_" + name;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			instanceType = line;
-		}
-		oldFile.close();
-
-		return instanceType;
-
-	}
-
-    /***************************************************************************
-     *
-     * Function:  launchEC2Instance
-     *
-     * Purpose:   Launch Amazon EC2 Instance
-     *
-     ****************************************************************************/
-
-    std::string Oam::launchEC2Instance( const std::string name, const std::string type, const std::string group)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh launchInstance " + type + " " + group + " > /tmp/getInstance_" + name;
-		int status = system(cmd.c_str());
-		if (status != 0 )
-			return "failed";
-
-		if (checkLogStatus("/tmp/getInstance", "Required") )
-			return "failed";
-
-		// get Instance ID
-		string instance;
-		string file = "/tmp/getInstance_" + name;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			instance = line;
-		}
-		oldFile.close();
-
-		if (instance.empty())
-			return "failed";
-
-		if (instance == "unknown")
-			return "failed";
-
-		if (instance.find("i-") == string::npos)
-			return "failed";
-
-		return instance;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  terminateEC2Instance
-     *
-     * Purpose:   Terminate Amazon EC2 Instance
-     *
-     ****************************************************************************/
-
-    void Oam::terminateEC2Instance(std::string instanceName)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh terminateInstance " + instanceName + " > /tmp/terminateEC2Instance_" + instanceName;
-		system(cmd.c_str());
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  stopEC2Instance
-     *
-     * Purpose:   Terminate Amazon EC2 Instance
-     *
-     ****************************************************************************/
-
-    void Oam::stopEC2Instance(std::string instanceName)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh stopInstance " + instanceName + " > /tmp/stopEC2Instance_" + instanceName;
-		system(cmd.c_str());
-
-		return;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  startEC2Instance
-     *
-     * Purpose:   Start Amazon EC2 Instance
-     *
-     ****************************************************************************/
-
-    bool Oam::startEC2Instance(std::string instanceName)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh startInstance " + instanceName + " > /tmp/startEC2Instance_" + instanceName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return false;
-
-		return true;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  assignElasticIP
-     *
-     * Purpose:   assign Elastic IP Address on Amazon
-     *
-     ****************************************************************************/
-
-    bool Oam::assignElasticIP(std::string instanceName, std::string IpAddress)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh assignElasticIP " + instanceName + " " + IpAddress + " > /tmp/assignElasticIP_" + instanceName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-            exceptionControl("assignElasticIP", oam::API_FAILURE);
-
-		return true;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  deassignElasticIP
-     *
-     * Purpose:   deassign Elastic IP Address on Amazon
-     *
-     ****************************************************************************/
-
-    bool Oam::deassignElasticIP(std::string IpAddress)
-	{
-		// run script to get Instance status and IP Address
-		string cmd = InstallDir + "/bin/IDBInstanceCmds.sh deassignElasticIP " + IpAddress + " > /tmp/deassignElasticIP_" + IpAddress;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-            exceptionControl("deassignElasticIP", oam::API_FAILURE);
-
-		return true;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  getEC2VolumeStatus
-     *
-     * Purpose:   get Volume Status
-     *
-     ****************************************************************************/
-
-	std::string Oam::getEC2VolumeStatus(std::string volumeName)
-	{
-		// run script to get Volume Status
-		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh describe " + volumeName + " > /tmp/getVolumeStatus_" + volumeName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return "failed";
-
-		// get status
-		string status;
-		string file = "/tmp/getVolumeStatus_" + volumeName;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			status = line;
-			break;
-		}
-		oldFile.close();
-
-		return status;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  createEC2Volume
-     *
-     * Purpose:   create a EC2 Volume
-     *
-     ****************************************************************************/
-
-	std::string Oam::createEC2Volume(std::string size, std::string name)
-	{
-		// run script to get Volume Status
-		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh create " + size + " > /tmp/createVolumeStatus_" + name;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return "failed";
-
-		// get status
-		string volumeName;
-		string file = "/tmp/createVolumeStatus_" + name;
-		ifstream oldFile (file.c_str());
-		char line[400];
-		while (oldFile.getline(line, 400))
-		{
-			volumeName = line;
-		}
-		oldFile.close();
-
-		if ( volumeName == "unknown" )
-			return "failed";
-
-		if ( volumeName == "unknown" )
-			return "failed";
-
-		if (volumeName.find("vol-") == string::npos)
-			return "failed";
-
-		return volumeName;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  attachEC2Volume
-     *
-     * Purpose:   attach EC2 Volume
-     *
-     ****************************************************************************/
-
-	bool Oam::attachEC2Volume(std::string volumeName, std::string deviceName, std::string instanceName)
-	{
-		// add 1 retry if it fails by dettaching then attaching
-		int ret = 0;
-		string status;
-		for ( int retry = 0 ; retry < 2 ; retry++ )
-		{
-			// run script to attach Volume
-			string cmd = InstallDir + "/bin/IDBVolumeCmds.sh attach " + volumeName + " " + instanceName + " " + deviceName + " > /tmp/attachVolumeStatus_" + volumeName;
-			ret = system(cmd.c_str());
-
-			if (ret == 0 )
-				return true;
-			
-			//failing to attach, dettach and retry
-			detachEC2Volume(volumeName);
-		}
-
-		if (ret == 0 )
-			return true;
-		else
-			return false;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  detachEC2Volume
-     *
-     * Purpose:   detach EC2 Volume
-     *
-     ****************************************************************************/
-
-	bool Oam::detachEC2Volume(std::string volumeName)
-	{
-		// run script to attach Volume
-		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh detach " + volumeName + " > /tmp/detachVolumeStatus_" + volumeName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return false;
-
-		return true;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  deleteEC2Volume
-     *
-     * Purpose:   detach EC2 Volume
-     *
-     ****************************************************************************/
-
-	bool Oam::deleteEC2Volume(std::string volumeName)
-	{
-		// run script to delete Volume
-		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh delete " + volumeName + " > /tmp/deleteVolumeStatus_" + volumeName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return false;
-
-		return true;
-	}
-
-    /***************************************************************************
-     *
-     * Function:  createEC2tag
-     *
-     * Purpose:   create EC2 tag
-     *
-     ****************************************************************************/
-
-	bool Oam::createEC2tag(std::string resourceName, std::string tagName, std::string tagValue)
-	{
-		// run script to create a tag
-		string cmd = InstallDir + "/bin/IDBVolumeCmds.sh createTag " + resourceName + " " + tagName + " " + tagValue + " > /tmp/createTagStatus_" + resourceName;
-		int ret = system(cmd.c_str());
-		if (ret != 0 )
-			return false;
-
-		return true;
-	}
-
 	/******************************************************************************************
 	* @brief	syslogAction
 	*
@@ -7459,9 +4800,6 @@ namespace oam
 	******************************************************************************************/
     void Oam::syslogAction( std::string action)
 	{
-#ifndef _MSC_VER
-		writeLog("syslogAction: " + action, LOG_TYPE_DEBUG );
-
 		string systemlog = "syslog";
 	
 		string fileName;
@@ -7487,21 +4825,15 @@ namespace oam
 			cmd = "pkill -hup " + systemlog + " > /dev/null 2>&1";
 		}
 		else
-		{
-			int user;
-			user = getuid();
-			if (user == 0)
-				cmd = "/etc/init.d/" + systemlog + " " + action + " > /dev/null 2>&1";
-			else
-				cmd = "sudo /etc/init.d/" + systemlog + " " + action + " > /dev/null 2>&1";
-		}
-		// take action on syslog service
-		writeLog("syslogAction cmd: " + cmd, LOG_TYPE_DEBUG );
+			cmd = "/etc/init.d/" + systemlog + " " + action + " > /dev/null 2>&1";
+	
+		// take action on syslog service to make sure it running
 		system(cmd.c_str());
 	
-		// delay to give time for syslog to get up and going
-		sleep(2);
-#endif
+		// if start/restart, delay to give time for syslog to get up and going
+		pos = action.find("start",0);
+		if (pos != string::npos)
+			sleep(2);
 	}
 
 	/******************************************************************************************
@@ -7513,292 +4845,16 @@ namespace oam
 	void Oam::dbrmctl(std::string command)
 	{
 		//reload DBRM with new configuration
-		string cmd = InstallDir + "/bin/dbrmctl " + command + " > /dev/null 2>&1";
+		string cmd = "/usr/local/Calpont/bin/dbrmctl " + command + " > /dev/null 2>&1";
 		system(cmd.c_str());
 	
 		return;
 	}
 
 
-	/******************************************************************************************
-	* @brief	glusterctl
-	*
-	* purpose:	gluster control and glusteradd
-	*
-	* commands:	status - Used to check status of kuster and disk good/bad 
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*			setddc	- Set Number of gluster disk copies
-	*					 argument = #
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*			assign - Used to assign a dbroot to a primary pm
-	*					 argument1 = dbroot#
-	*					 argument2 = pm#
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*			unassign - Used to assign a dbroot to a primary pm
-	*					 argument1 = dbroot#
-	*					 argument2 = pm#
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*			whohas - Used to get secondary pm for a dbroot for moving
-	*					  argument1 = dbroot#
-	*					return argument #2 - pm#
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*			add - Used to add new gluster pm and dbroot
-	*					  argument1 = firstnewpm#
-	*					  argument2 = firstnewdbroot#
-	*					 returns
-	*						NOTINSTALLED
-	*						OK
-	*						FAILED! erorrmsg
-	*
- 	******************************************************************************************/
-	int Oam::glusterctl(GLUSTER_COMMANDS command, std::string argument1, std::string& argument2, std::string& errmsg)
-	{
-#ifndef _MSC_VER
-		int user;
-		user = getuid();
-		string glustercmd = InstallDir + "/bin/glusterctl";
-
-		if (access(glustercmd.c_str(), X_OK) != 0 )
-			exceptionControl("glusterctl", API_DISABLED);
-
-		errmsg = "";
-
-		switch ( command ) {
-			case (oam::GLUSTER_STATUS):
-			{
-				glustercmd = glustercmd + " status > /tmp/gluster_status.log 2>&1";
-
-				int ret;
-				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
-					return 0;
-
-            	ret = checkGlusterLog("/tmp/gluster_status.log", errmsg);
-				return ret;
-			}
-
-			case (oam::GLUSTER_SETDDC):
-			{
-				string copies = argument1;
-
-				writeLog("glusterctl: GLUSTER_SETDDC: " + copies, LOG_TYPE_DEBUG );
-				glustercmd = glustercmd + " setddc " + copies + " > /tmp/gluster_setddc.log 2>&1";
-				int ret;
-				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
-					return 0;
-
-            	ret = checkGlusterLog("/tmp/gluster_setddc.log", errmsg);
-				return ret;
-			}
-
-			case (oam::GLUSTER_ASSIGN):
-			{
-
-				string dbrootID = argument1;
-				string pmID = argument2;
-
-				writeLog("glusterctl call: GLUSTER_ASSIGN: dbroot = " + dbrootID + " pm = " + pmID, LOG_TYPE_DEBUG );
-				glustercmd = glustercmd + " assign " + dbrootID + " " + pmID + " > /tmp/gluster_assign.log 2>&1";
-				int ret;
-				ret = system(glustercmd.c_str());
-				writeLog("glusterctl return: GLUSTER_ASSIGN: dbroot = " + dbrootID + " pm = " + pmID, LOG_TYPE_DEBUG );
-				if ( ret == 0 )
-					return 0;
-
-            	ret = checkGlusterLog("/tmp/gluster_assign.log", errmsg);
-				return ret;
-
-				break;
-			}
-
-			case (oam::GLUSTER_WHOHAS):
-			{
-
-				string dbrootID = argument1;
-				string msg;
-
-				for ( int retry = 0 ; retry < 5 ; retry++ )
-				{
-					writeLog("glusterctl: GLUSTER_WHOHAS for dbroot : " + dbrootID, LOG_TYPE_DEBUG );
-					glustercmd = glustercmd + " whohas " + dbrootID + " > /tmp/gluster_howhas.log 2>&1";
-					system(glustercmd.c_str());
-	
-					int ret;
-					ret = checkGlusterLog("/tmp/gluster_howhas.log", msg);
-	
-					if ( ret == 0 )
-					{ // OK return, get pm list
-						if ( msg.empty() )
-						{
-							writeLog("glusterctl: GLUSTER_WHOHAS: empty pm list", LOG_TYPE_ERROR );
-							exceptionControl("glusterctl", API_FAILURE);
-						}
-						else
-						{
-							writeLog("glusterctl: GLUSTER_WHOHAS: pm list = " + msg, LOG_TYPE_DEBUG );
-							argument2 = msg;
-							return 0;
-						}
-					}
-
-					// retry failure
-					writeLog("glusterctl: GLUSTER_WHOHAS: failure, retrying (restarting gluster) " + msg, LOG_TYPE_ERROR );
-
-					string cmd = "/etc/init.d/glusterd restart > /dev/null 2>&1";
-					int user;
-					user = getuid();
-					if (user != 0)
-						cmd = "sudo " + cmd;
-
-					system(cmd.c_str());
-
-					sleep(1);
-				}
-
-				break;
-			}
-
-			case (oam::GLUSTER_UNASSIGN):
-			{
-
-				string dbrootID = argument1;
-				string pmID = argument2;
-
-				writeLog("glusterctl: GLUSTER_UNASSIGN: dbroot = " + dbrootID + " pm = " + pmID, LOG_TYPE_DEBUG );
-				glustercmd = glustercmd + " unassign " + dbrootID + " " + pmID + " > /tmp/gluster_unassign.log 2>&1";
-				int ret;
-				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
-					return 0;
-
-            	ret = checkGlusterLog("/tmp/gluster_unassign.log", errmsg);
-				return ret;
-
-				break;
-			}
-
-			case (oam::GLUSTER_ADD):
-			{
-				string pmID = argument1;
-				string dbrootID = argument2;
-
-				string glustercmd = InstallDir + "/bin/glusteradd";
-				writeLog("glusterctl: GLUSTER_ADD: dbroot = " + dbrootID + " pm = " + pmID, LOG_TYPE_DEBUG );
-				glustercmd = glustercmd + " " + pmID  + " " + dbrootID + " > /tmp/gluster_add.log 2>&1";
-				int ret;
-				//writeLog("glusterctl: cmd = " + glustercmd, LOG_TYPE_DEBUG );
-				ret = system(glustercmd.c_str());
-				if ( ret == 0 )
-					return 0;
-
-            	ret = checkGlusterLog("/tmp/gluster_add.log", errmsg);
-				return ret;
-
-				break;
-			}
-			default:
-				break;
-		}
-#endif
-		return 0;
-	}
-
-
     /***************************************************************************
      * PRIVATE FUNCTIONS
      ***************************************************************************/
-
-
-    /***************************************************************************
-     *
-     * Function:  checkGlusterLog
-     *
-     * Purpose:   check Gluster Log after a Gluster control call
-     *
-     ****************************************************************************/
-    int Oam::checkGlusterLog(std::string logFile, std::string& msg)
-    {
-		if (checkLogStatus(logFile, "OK")) 
-		{
-			if ( logFile == "/tmp/gluster_howhas.log" )
-			{
-				ifstream File(logFile.c_str());
-	
-				char line[100];
-				string buf;
-				while (File.getline(line, 100))
-				{
-					buf = line;
-					string::size_type pos = buf.find("OK",0);
-					if (pos != string::npos)
-					{
-						msg = buf.substr(3,100);
-						return 0;
-					}
-				}
-	
-				msg = "";
-				return 1;
-			}
-
-			msg = "";
-			return 0;
-		}
-
-		if (checkLogStatus(logFile, "NOTINSTALLED")) {
-			writeLog("checkGlusterLog: NOTINSTALLED", LOG_TYPE_DEBUG );
-			exceptionControl("glusterctl", API_DISABLED);
-		}
-
-		if (checkLogStatus(logFile, "FAILED"))
-		{
-			ifstream File(logFile.c_str());
-
-			char line[100];
-			string buf;
-			while (File.getline(line, 100))
-			{
-				buf = line;
-				string::size_type pos = buf.find("FAILED",0);
-				if (pos != string::npos)
-				{
-					msg = buf.substr(7,100);
-					writeLog("checkGlusterLog: " + buf, LOG_TYPE_ERROR);
-					return 1;
-				}
-			}
-
-			writeLog("checkGlusterLog: FAILURE", LOG_TYPE_ERROR);
-
-			if ( logFile == "/tmp/gluster_howhas.log" )
-				return 2;
-			else
-				exceptionControl("glusterctl", API_FAILURE);
-		}
-
-		writeLog("checkGlusterLog: FAILURE - no log file match", LOG_TYPE_ERROR);
-		exceptionControl("glusterctl", API_FAILURE);
-
-		return 1;
-	}
-
-
     /***************************************************************************
      *
      * Function:  copyDatabaseFiles
@@ -7819,11 +4875,7 @@ namespace oam
             fs::path source = *iter;
             if (!fs::is_directory(source) )
             {
-#if BOOST_VERSION >= 105200
-                file_name = source.filename().generic_string();
-#else
                 file_name = iter->leaf();
-#endif
                 if (file_name.find(".dat", file_name.length() - 4) != string::npos)
                 {
                     dbFileNames.push_back(file_name);
@@ -7874,94 +4926,93 @@ namespace oam
      *
      ****************************************************************************/
 
-    void Oam::exceptionControl(std::string function, int returnStatus, const char* extraMsg)
+    void Oam::exceptionControl(std::string function, int returnStatus)
     {
-		std::string msg;
         switch(returnStatus)
         {
             case API_INVALID_PARAMETER:
             {
-                msg = "Invalid Parameter passed in ";
+                string msg = "Invalid Parameter passed in ";
                 msg.append(function);
                 msg.append(" API");
+                throw runtime_error(msg);
             }
             break;
             case API_FILE_OPEN_ERROR:
             {
-                msg = "File Open error from ";
+                string msg = "File Open error from ";
                 msg.append(function);
                 msg.append(" API");
+                throw runtime_error(msg);
             }
             break;
             case API_TIMEOUT:
             {
-                msg = "Timeout error from ";
+                string msg = "Timeout error from ";
                 msg.append(function);
                 msg.append(" API");
+                throw runtime_error(msg);
             }
             break;
             case API_DISABLED:
             {
-                msg = "API Disabled: ";
+                string msg = "API Disabled: ";
                 msg.append(function);
+                throw runtime_error(msg);
             }
             break;
             case API_FILE_ALREADY_EXIST:
             {
-                msg = "File Already Exist";
+                string msg = "File Already Exist";
+                throw runtime_error(msg);
             }
             break;
             case API_ALREADY_IN_PROGRESS:
             {
-                msg = "Already In Process";
+                string msg = "Already In Process";
+                throw runtime_error(msg);
             }
             break;
             case API_FAILURE_DB_ERROR:
             {
-                msg = "Database Test Error";
+                string msg = "Database Test Error";
+                throw runtime_error(msg);
             }
             break;
             case API_INVALID_STATE:
             {
-                msg = "Target in an invalid state";
+                string msg = "Target in an invalid state";
+                throw runtime_error(msg);
             }
             break;
             case API_READONLY_PARAMETER:
             {
-                msg = "Parameter is Read-Only, can't update";
+                string msg = "Parameter is Read-Only, can't update";
+                throw runtime_error(msg);
             }
             break;
-            case API_TRANSACTIONS_COMPLETE:
+            case API_CPIMPORT_ACTIVE:
             {
-                msg = "Finished waiting for transactions";
+                string msg = "A Bulk Load Process 'cpimport' is Active";
+                throw runtime_error(msg);
             }
             break;
             case API_CONN_REFUSED:
             {
-                msg = "Connection refused";
+                string msg = "Connection refused";
+                throw runtime_error(msg);
             }
             break;
-			case API_CANCELLED:
-			{
-				msg = "Operation Cancelled";
-			}
-			break;
 
             default:
             {
-                msg = "API Failure return in ";
+                string msg = "API Failure return in ";
                 msg.append(function);
                 msg.append(" API");
+                throw runtime_error(msg);
             }
 			break;
         } // end of switch
-
-		if (extraMsg)
-		{
-			msg.append(":\n    ");
-			msg.append(extraMsg);
-		}
-        throw runtime_error(msg);
     }
 
     /***************************************************************************
@@ -8064,7 +5115,7 @@ namespace oam
             // check for Ack msg if needed
             if ( ackflag == ACK_YES )
             {
-				// wait for ACK from Process Manager
+                // wait for ACK from Process Manager
 				struct timespec ts = { timeout, 0 };
 
 				receivedMSG = procmgr.read(&ts);
@@ -8082,7 +5133,7 @@ namespace oam
 					}
 				}
 				else	// timeout
-					returnStatus = API_TIMEOUT;
+            		returnStatus = API_TIMEOUT;
             }
             else
                 // No ACK, assume write success
@@ -8260,40 +5311,31 @@ namespace oam
 				if ( msgType == oam::ACK &&  actionType == requestType && status == API_SUCCESS )
 				{
 					ByteStream::byte numAlarms;
+					//number of alarms
+					receivedMSG >> numAlarms;
 
-					while(true)
+					for ( int i = 0 ; i < numAlarms ; i++ )
 					{
-						//number of alarms
-						receivedMSG >> numAlarms;
+						Alarm alarm;
+						ByteStream::doublebyte value;
+						string svalue;
 
-						//check for end-of-list
-						if ( numAlarms == 0)
-							break;
+						receivedMSG >> value;
+						alarm.setAlarmID(value);
+						receivedMSG >> svalue;
+						alarm.setDesc(svalue);
+						receivedMSG >> value;
+						alarm.setSeverity(value);
+						receivedMSG >> svalue;
+						alarm.setTimestamp(svalue);
+						receivedMSG >> svalue;
+						alarm.setSname(svalue);
+						receivedMSG >> svalue;
+						alarm.setPname(svalue);
+						receivedMSG >> svalue;
+						alarm.setComponentID(svalue);
 
-						for ( int i = 0 ; i < numAlarms ; i++ )
-						{
-							Alarm alarm;
-							ByteStream::doublebyte value;
-							string svalue;
-	
-							receivedMSG >> value;
-							alarm.setAlarmID(value);
-							receivedMSG >> svalue;
-							alarm.setDesc(svalue);
-							receivedMSG >> value;
-							alarm.setSeverity(value);
-							receivedMSG >> svalue;
-							alarm.setTimestamp(svalue);
-							receivedMSG >> svalue;
-							alarm.setSname(svalue);
-							receivedMSG >> svalue;
-							alarm.setPname(svalue);
-							receivedMSG >> svalue;
-							alarm.setComponentID(svalue);
-	
-							alarmlist.insert (AlarmList::value_type(alarm.getTimestampSeconds(), alarm));
-						}
-						break;
+						alarmlist.insert (AlarmList::value_type(INVALID_ALARM_ID, alarm));
 					}
 				}
 				else
@@ -8313,163 +5355,7 @@ namespace oam
         return returnStatus;
     }
 
-	/***************************************************************************
-	 *
-	 * Function:  sendMsgToProcMgrWithStatus
-	 *
-	 * Purpose:   Build and send a request message to Process Manager
-	 * Check for status messages and display on stdout.
-	 * 
-	 * This is used only in manual mode.
-	 *
-	 ****************************************************************************/
-
-	int Oam::sendMsgToProcMgrWithStatus(messageqcpp::ByteStream::byte requestType, const std::string name,
-		GRACEFUL_FLAG gracefulflag, ACK_FLAG ackflag,
-        const std::string argument1, const std::string argument2, int timeout)
-	{
-		int returnStatus = API_STILL_WORKING;
-		ByteStream msg;
-		ByteStream receivedMSG;
-		ByteStream::byte msgType;
-		ByteStream::byte actionType;
-		string target;
-		ByteStream::byte status;
-		struct timespec ts = {timeout, 0};
-		bool requestManual = true;
-		std::stringstream buffer; 
-		BRM::DBRM dbrm;
-#ifndef _MSC_VER
-		struct sigaction ctrlcHandler;
-		struct sigaction oldCtrlcHandler;
-		memset(&ctrlcHandler, 0, sizeof(ctrlcHandler));
-#endif
-		// setup message
-		msg << (ByteStream::byte) REQUEST;
-		msg << requestType;
-		msg << name;
-		msg << (ByteStream::byte) gracefulflag;
-		msg << (ByteStream::byte) ackflag;
-		msg << (ByteStream::byte) requestManual;
-
-		if (!argument1.empty())
-			msg << argument1;
-		if (!argument2.empty())
-			msg << argument2;
-
-		if (gracefulflag == GRACEFUL_WAIT)
-		{
-			// Control-C signal to terminate the shutdown command
-			ctrlc = 0;
-#ifdef _MSC_VER
-			//FIXME:
-#else
-			ctrlcHandler.sa_handler = handleControlC;
-			sigaction(SIGINT, &ctrlcHandler, &oldCtrlcHandler);
-#endif
-		}
-		try
-		{
-			//send the msg to Process Manager
-			MessageQueueClient procmgr("ProcMgr");
-			procmgr.write(msg);
-
-			// check for Ack msg if needed
-			if (ackflag == ACK_YES)
-			{
-				while (returnStatus == API_STILL_WORKING)
-				{
-					// wait for ACK from Process Manager
-					receivedMSG = procmgr.read(&ts);
-
-					// If user hit ctrl-c, we've been cancelled
-					if (ctrlc == 1)
-					{
-						writeLog("Clearing System Shutdown pending", LOG_TYPE_INFO );
-						dbrm.setSystemShutdownPending(false);
-						dbrm.setSystemSuspendPending(false);
-						returnStatus = API_CANCELLED;
-						break;
-					}
-
-					if (receivedMSG.length() > 0)
-					{
-						receivedMSG >> msgType;
-						receivedMSG >> actionType;
-						receivedMSG >> target;
-						receivedMSG >> status;
-
-						if ( msgType == oam::ACK &&  actionType == requestType && target == name)
-						{
-							if (status == API_TRANSACTIONS_COMPLETE)
-							{
-								cout << endl << "   System being " << name << ", please wait..." << flush;
-								// More work to wait on....
-								// At this point, the requirement is to have ctrl-c drop us out of calpont console
-								// so we'll restore the handler to default.
-								if (gracefulflag == GRACEFUL_WAIT)
-								{
-#ifdef _MSC_VER
-									//FIXME:
-#else
-									sigaction(SIGINT, &oldCtrlcHandler, NULL);
-#endif
-								}
-							}
-							else
-							{
-								returnStatus = status;
-							}
-						}
-
-						if (returnStatus == API_STILL_WORKING)
-						{
-							cout << "." << flush;
-						}
-					}
-					else	// timeout
-					{
-						returnStatus = API_TIMEOUT;
-					}
-				}
-			}
-			else
-			{
-				// No ACK, assume write success
-				returnStatus = API_SUCCESS;
-			}
-
-			// shutdown connection
-			procmgr.shutdown();
-		}
-		catch (std::runtime_error&)
-		{
-			//There's other reasons, but this is the most likely...
-			returnStatus = API_CONN_REFUSED;
-		}
-		catch (std::exception&)
-		{
-			returnStatus = API_FAILURE;
-		}
-		catch (...)
-		{
-			returnStatus = API_FAILURE;
-		}
-
-		if (gracefulflag == GRACEFUL_WAIT)
-		{
-			// Just in case we errored out and bypassed the normal restore, 
-			// restore ctrl-c to previous handler.
-#ifdef _MSC_VER
-			//FIXME:
-#else
-			sigaction(SIGINT, &oldCtrlcHandler, NULL);
-#endif
-		}
-		return returnStatus;
-	}
-
-	/***************************************************************************
+    /***************************************************************************
      *
      * Function:  validateProcess
      *
@@ -8518,7 +5404,7 @@ namespace oam
 			ByteStream ibs;
 
 			try {
-				struct timespec ts = { 3, 0 };
+				struct timespec ts = { 1, 0 };
 				processor.write(obs, &ts);
 			}
 			catch(...)
@@ -8529,7 +5415,7 @@ namespace oam
 			
 
 			try {
-				struct timespec ts1 = { 15, 0 };
+				struct timespec ts1 = { 5, 0 };
 				ibs = processor.read(&ts1);
 			}
 			catch(...)
@@ -8562,276 +5448,7 @@ namespace oam
 		return;
 	}
 
-    /***************************************************************************
-     *
-     * Function:  amazonReattach
-     *
-     * Purpose:   Amazon EC2 volume reattach needed
-     *
-     ****************************************************************************/
-
-    void Oam::amazonReattach(std::string toPM, dbrootList dbrootConfigList, bool attach)
-    {
-		//if amazon cloud with external volumes, do the detach/attach moves
-		string cloud;
-		string DBRootStorageType;
-		try {
-			getSystemConfig("Cloud", cloud);
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-
-		if (cloud == "amazon" && DBRootStorageType == "external" )
-		{
-			//get Instance Name for to-pm
-			string toInstanceName = oam::UnassignedName;
-			try
-			{
-				ModuleConfig moduleconfig;
-				getSystemConfig(toPM, moduleconfig);
-				HostConfigList::iterator pt1 = moduleconfig.hostConfigList.begin();
-				toInstanceName = (*pt1).HostName;
-			}
-			catch(...)
-			{}
-
-			if ( toInstanceName == oam::UnassignedName || toInstanceName.empty() )
-			{
-				cout << "   ERROR: amazonReattach, invalid Instance Name for " << toPM << endl;
-				writeLog("ERROR: amazonReattach, invalid Instance Name " + toPM, LOG_TYPE_ERROR );
-				exceptionControl("amazonReattach", API_INVALID_PARAMETER);
-			}
-
-			dbrootList::iterator pt3 = dbrootConfigList.begin();
-			for( ; pt3 != dbrootConfigList.end() ; pt3++)
-			{
-				string dbrootid = *pt3;
-				string volumeNameID = "PMVolumeName" + dbrootid;
-				string volumeName = oam::UnassignedName;
-				string deviceNameID = "PMVolumeDeviceName" + dbrootid;
-				string deviceName = oam::UnassignedName;
-				try {
-					getSystemConfig( volumeNameID, volumeName);
-					getSystemConfig( deviceNameID, deviceName);
-				}
-				catch(...)
-				{}
-
-				if ( volumeName == oam::UnassignedName || deviceName == oam::UnassignedName )
-				{
-					cout << "   ERROR: amazonReattach, invalid configure " + volumeName + ":" + deviceName << endl;
-					writeLog("ERROR: amazonReattach, invalid configure " + volumeName + ":" + deviceName, LOG_TYPE_ERROR );
-					exceptionControl("amazonReattach", API_INVALID_PARAMETER);
-				}
-
-				if (!attach)
-				{
-					//send msg to to-pm to umount volume
-					int returnStatus = sendMsgToProcMgr(UNMOUNT, dbrootid, FORCEFUL, ACK_YES);
-					if (returnStatus != API_SUCCESS) {
-						writeLog("ERROR: amazonReattach, umount failed on " + dbrootid, LOG_TYPE_ERROR );
-					}
-				}
-
-				if (!detachEC2Volume(volumeName)) {
-					cout << "   ERROR: amazonReattach, detachEC2Volume failed on " + volumeName << endl;
-					writeLog("ERROR: amazonReattach, detachEC2Volume failed on " + volumeName , LOG_TYPE_ERROR );
-					exceptionControl("amazonReattach", API_FAILURE);
-				}
-
-				writeLog("amazonReattach, detachEC2Volume passed on " + volumeName , LOG_TYPE_DEBUG );
-
-				if (!attachEC2Volume(volumeName, deviceName, toInstanceName)) {
-					cout << "   ERROR: amazonReattach, attachEC2Volume failed on " + volumeName + ":" + deviceName + ":" + toInstanceName << endl;
-					writeLog("ERROR: amazonReattach, attachEC2Volume failed on " + volumeName + ":" + deviceName + ":" + toInstanceName, LOG_TYPE_ERROR );
-					exceptionControl("amazonReattach", API_FAILURE);
-				}
-
-				writeLog("amazonReattach, attachEC2Volume passed on " + volumeName + ":" + toPM, LOG_TYPE_DEBUG );
-			}
-		}
-	}
-
-    /***************************************************************************
-     *
-     * Function:  mountDBRoot
-     *
-     * Purpose:   Send msg to ProcMon to mount/unmount a external DBRoot
-     *
-     ****************************************************************************/
-
-    void Oam::mountDBRoot(dbrootList dbrootConfigList, bool mount)
-    {
-		//if external volumes, mount to device
-		string DBRootStorageType;
-		try {
-			getSystemConfig("DBRootStorageType", DBRootStorageType);
-		}
-		catch(...) {}
-
-		string GlusterConfig = "n";
-		try {
-			getSystemConfig( "GlusterConfig", GlusterConfig);
-		}
-		catch(...)
-		{
-			GlusterConfig = "n";
-		}
-
-		if ( (DBRootStorageType == "external" && GlusterConfig == "n") 
-			||
-			(DBRootStorageType == "internal" && GlusterConfig == "y" && !mount) )
-		{
-			dbrootList::iterator pt3 = dbrootConfigList.begin();
-			for( ; pt3 != dbrootConfigList.end() ; pt3++)
-			{
-				string dbrootid = *pt3;
-
-				int mountCmd = oam::MOUNT;
-				if (!mount) {
-					mountCmd = oam::UNMOUNT;
-					writeLog("mountDBRoot api, umount dbroot" + dbrootid, LOG_TYPE_DEBUG);
-				}
-				else
-					writeLog("mountDBRoot api, mount dbroot" + dbrootid, LOG_TYPE_DEBUG);
-
-				//send msg to to-pm to umount volume
-				int returnStatus = sendMsgToProcMgr(mountCmd, dbrootid, FORCEFUL, ACK_YES);
-		
-				if (returnStatus != API_SUCCESS) {
-					if ( mountCmd == oam::MOUNT ) {
-						writeLog("ERROR: mount failed on dbroot" + dbrootid, LOG_TYPE_ERROR );
-						cout << "   ERROR: mount failed on dbroot" + dbrootid << endl;
-					}
-					else
-					{
-						writeLog("ERROR: unmount failed on dbroot" + dbrootid, LOG_TYPE_ERROR );
-						cout << "   ERROR: unmount failed on dbroot" + dbrootid << endl;
-						exceptionControl("mountDBRoot", API_FAILURE);
-					}
-				}
-			}
-		}
-
-		return;
-	}
-
-	/******************************************************************************************
-	* @brief	writeLog
-	*
-	* purpose:	Write the message to the log
-	*
-	******************************************************************************************/
-	void Oam::writeLog(const string logContent, const LOG_TYPE logType)
-	{
-		LoggingID lid(17);
-		MessageLog ml(lid);
-		Message msg;
-		Message::Args args;
-		args.add(logContent);
-		msg.format(args);
-	
-		switch(logType) {
-			case LOG_TYPE_DEBUG:
-				ml.logDebugMessage(msg);
-				break;
-			case LOG_TYPE_INFO:
-				ml.logInfoMessage(msg);
-				break;
-			case LOG_TYPE_WARNING:
-				ml.logWarningMessage(msg);
-				break;
-			case LOG_TYPE_ERROR:
-				ml.logErrorMessage(msg);
-				break;
-			case LOG_TYPE_CRITICAL:
-				ml.logCriticalMessage(msg);
-				break;
-		}
-		return;
-	}
-
-	/***************************************************************************
-	 *
-	 * Function:  waitForSystem
-	 *
-	 * Purpose:   When a Shutdown, stop, restart or suspend
-	 *  		  operation is requested but there are active
-	 *  		  transactions of some sort, We wait for all
-	 *  		  transactions to close before performing the
-	 *  		  action.
-	 ****************************************************************************/
-	bool Oam::waitForSystem(PROC_MGT_MSG_REQUEST request, messageqcpp::IOSocket& ios, messageqcpp::ByteStream& stillWorkingMsg)
-	{
-		// Use ios to send back periodic still working messages
-		BRM::DBRM dbrm;
-		execplan::SessionManager sessionManager; 
-		bool bIsDbrmUp;
-		BRM::SIDTIDEntry blockingsid;
-		std::vector<BRM::TableLockInfo> tableLocks;
-		bool bActiveTransactions = true;
-		bool bRollback;
-		bool bForce;
-		bool ret = false;
-		size_t idx;
-
-		try
-		{
-			while (bActiveTransactions)
-			{
-				sleep(3);
-				ios.write(stillWorkingMsg);
-
-				bActiveTransactions = false;
-				// Any table locks still set?
-				tableLocks = dbrm.getAllTableLocks();
-				for (idx = 0; idx < tableLocks.size(); ++idx)
-				{
-					if (dbrm.checkOwner(tableLocks[idx].id))
-					{
-						bActiveTransactions = true;
-						break;
-					}
-				}
-				// Any active transactions?
-				if (sessionManager.checkActiveTransaction(0, bIsDbrmUp, blockingsid))
-				{
-					bActiveTransactions = true;
-				}
-
-				// check to see if the user canceled the request.
-				if (request == SUSPENDWRITES)
-				{
-					if (dbrm.getSystemSuspendPending(bRollback) == 0)	// Means we no longer are going to suspend
-					{
-						writeLog("System Suspend Canceled in wait", LOG_TYPE_INFO );
-						break;
-					}
-				}
-				else
-				{
-					if (dbrm.getSystemShutdownPending(bRollback, bForce) == 0)	// Means we no longer are going to shutdown
-					{
-						writeLog("System Shutdown Canceled in wait", LOG_TYPE_INFO );
-						break;
-					}
-				}
-
-				if (!bActiveTransactions)
-				{
-					ret =  true;
-				}
-			}
-		}
-		catch (...)
-		{
-			writeLog("Communication with calpont console failed while waiting for transactions", LOG_TYPE_ERROR);
-		}
-//		writeLog("Returning from wait with value " + itoa(ret), LOG_TYPE_INFO );
-		return ret;
-	}
 } //namespace oam
-
 
 namespace procheartbeat
 {
@@ -8855,22 +5472,22 @@ namespace procheartbeat
 		string Module;
 		oamModuleInfo_t st;
 		try {
-			st = getModuleInfo();
+			st = oam.getModuleInfo();
 			Module = boost::get<0>(st);
 		}
 		catch (...) {
-	        exceptionControl("registerHeartbeat", API_FAILURE);
+	        oam.exceptionControl("registerHeartbeat", API_FAILURE);
 		}
 
 		// get current process Name
 		string processName;
 		myProcessStatus_t t;
 		try {
-			t = getMyProcessStatus();
+			t = oam.getMyProcessStatus();
 			processName = boost::get<1>(t);
 		}
 		catch (...) {
-	        exceptionControl("registerHeartbeat", API_FAILURE);
+	        oam.exceptionControl("registerHeartbeat", API_FAILURE);
 		}
 
         ByteStream msg;
@@ -8890,7 +5507,7 @@ namespace procheartbeat
         }
         catch(...)
         {
-	        exceptionControl("registerHeartbeat", API_FAILURE);
+	        oam.exceptionControl("registerHeartbeat", API_FAILURE);
         }
 
 	}
@@ -8908,22 +5525,22 @@ namespace procheartbeat
 		string Module;
 		oamModuleInfo_t st;
 		try {
-			st = getModuleInfo();
+			st = oam.getModuleInfo();
 			Module = boost::get<0>(st);
 		}
 		catch (...) {
-	        exceptionControl("deregisterHeartbeat", API_FAILURE);
+	        oam.exceptionControl("deregisterHeartbeat", API_FAILURE);
 		}
 
 		// get current process Name
 		string processName;
 		myProcessStatus_t t;
 		try {
-			t = getMyProcessStatus();
+			t = oam.getMyProcessStatus();
 			processName = boost::get<1>(t);
 		}
 		catch (...) {
-	        exceptionControl("deregisterHeartbeat", API_FAILURE);
+	        oam.exceptionControl("deregisterHeartbeat", API_FAILURE);
 		}
 
         ByteStream msg;
@@ -8943,7 +5560,7 @@ namespace procheartbeat
         }
         catch(...)
         {
-	        exceptionControl("deregisterHeartbeat", API_FAILURE);
+	        oam.exceptionControl("deregisterHeartbeat", API_FAILURE);
         }
 
 	}
@@ -8962,7 +5579,7 @@ namespace procheartbeat
 		int processHeartbeatPeriod = 60;	//default
 	
 		try {
-			getSystemConfig("ProcessHeartbeatPeriod", processHeartbeatPeriod);
+			oam.getSystemConfig("ProcessHeartbeatPeriod", processHeartbeatPeriod);
 		}
 		catch(...)
 		{
@@ -8970,28 +5587,28 @@ namespace procheartbeat
 
 		//skip sending if Heartbeat is disable
 		if( processHeartbeatPeriod == -1 )
-	        exceptionControl("sendHeartbeat", API_DISABLED);
+	        oam.exceptionControl("sendHeartbeat", API_DISABLED);
 
 		// get current Module name
 		string Module;
 		oamModuleInfo_t st;
 		try {
-			st = getModuleInfo();
+			st = oam.getModuleInfo();
 			Module = boost::get<0>(st);
 		}
 		catch (...) {
-	        exceptionControl("sendHeartbeat", API_FAILURE);
+	        oam.exceptionControl("sendHeartbeat", API_FAILURE);
 		}
 
 		// get current process Name
 		string processName;
 		myProcessStatus_t t;
 		try {
-			t = getMyProcessStatus();
+			t = oam.getMyProcessStatus();
 			processName = boost::get<1>(t);
 		}
 		catch (...) {
-	        exceptionControl("sendHeartbeat", API_FAILURE);
+	        oam.exceptionControl("sendHeartbeat", API_FAILURE);
 		}
 
         ByteStream msg;
@@ -9000,7 +5617,7 @@ namespace procheartbeat
         msg << (ByteStream::byte) HEARTBEAT_SEND;
         msg << Module;
         msg << processName;
-        msg << getCurrentTime();
+        msg << oam.getCurrentTime();
         msg << (ByteStream::byte) ID;
         msg << (ByteStream::byte) ackFlag;
 
@@ -9025,20 +5642,20 @@ namespace procheartbeat
 					if ( type != HEARTBEAT_SEND ) {
 						//Ack not received
 	           			procmgr.shutdown();
-	        			exceptionControl("sendHeartbeat", API_TIMEOUT);
+	        			oam.exceptionControl("sendHeartbeat", API_TIMEOUT);
 					}
 				}
 				else
 				{
 	           		procmgr.shutdown();
-	        		exceptionControl("sendHeartbeat", API_TIMEOUT);
+	        		oam.exceptionControl("sendHeartbeat", API_TIMEOUT);
 				}
 			}
             procmgr.shutdown();
         }
         catch(...)
         {
-	        exceptionControl("sendHeartbeat", API_FAILURE);
+	        oam.exceptionControl("sendHeartbeat", API_FAILURE);
         }
 	}
 */

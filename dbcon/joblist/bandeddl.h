@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /******************************************************************************
- * $Id: bandeddl.h 8476 2012-04-25 22:28:15Z xlou $
+ * $Id: bandeddl.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include <boost/thread/condition.hpp>
 
 #include "largedatalist.h"
-//#include "bucketdl.h"
+#include "bucketdl.h"
 
 #include <time.h>
 
@@ -48,7 +48,7 @@ class BandedDL : public LargeDataList<std::vector<element_t>, element_t>
 
 	public:
 		BandedDL(uint numConsumers, const ResourceManager& rm);
-//		BandedDL(BucketDL<element_t> &, uint numConsumers, const ResourceManager& rm);
+		BandedDL(BucketDL<element_t> &, uint numConsumers, const ResourceManager& rm);
 		virtual ~BandedDL();
 
 		int64_t saveBand();
@@ -86,7 +86,7 @@ template<typename element_t>
 	waitingConsumers = 0;
 }
 	
-#if 0
+
 template<typename element_t>
   BandedDL<element_t>::BandedDL(BucketDL<element_t> &b, uint nc, const ResourceManager& rm) : base(nc, sizeof(uint64_t), sizeof(uint64_t), rm)
 {
@@ -96,6 +96,11 @@ template<typename element_t>
 
 	//pthread_cond_init(&nextSetLoaded, NULL);
 	waitingConsumers = 0;
+
+#ifdef PROFILE
+	struct timespec ts1, ts2;
+	clock_gettime(CLOCK_REALTIME, &ts1);
+#endif
 
 	for (i = 0; i < b.bucketCount(); i++) {
 		it = b.getIterator(i);
@@ -107,8 +112,13 @@ template<typename element_t>
 		saveBand();
 	}
 	endOfInput();
-}
+
+#ifdef PROFILE
+	clock_gettime(CLOCK_REALTIME, &ts2);
+	/* What should we do with this profile info? */
 #endif
+
+}
 
 template<typename element_t>
 BandedDL<element_t>::~BandedDL()

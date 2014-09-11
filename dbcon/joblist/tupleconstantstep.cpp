@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: tupleconstantstep.cpp 8526 2012-05-17 02:28:10Z xlou $
+//  $Id: tupleconstantstep.cpp 7396 2011-02-03 17:54:36Z rdempsey $
 
 
 //#define NDEBUG
@@ -171,7 +171,7 @@ void TupleConstantStep::initialize(const JobInfo& jobInfo, const RowGroup* rgIn)
 			{
 				throw IDBExcept(ERR_NO_FROM);
 			}
-			idbassert(j < oidsIn.size());
+			assert(j < oidsIn.size());
 
 			oids.push_back(oidsIn[j]);
 			keys.push_back(keysIn[j]);
@@ -419,11 +419,9 @@ void TupleConstantStep::execute()
 			fOutputJobStepAssociation.status(tupleConstantStepErr);
 	}
 
-//	if (!fEndOfResult)
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+	if (!fEndOfResult)
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
-	// Bug 3136, let mini stats to be formatted if traceOn.
 	if (traceOn())
 	{
 		dlTimes.setLastReadTime();
@@ -431,6 +429,7 @@ void TupleConstantStep::execute()
 		printCalTrace();
 	}
 
+	// Bug 3136, let mini stats to be formatted if traceOn.
 	fEndOfResult = true;
 	fOutputDL->endOfInput();
 }
@@ -530,7 +529,7 @@ void TupleConstantStep::printCalTrace()
 	time_t t = time (0);
 	char timeString[50];
 	ctime_r (&t, timeString);
-	timeString[strlen (timeString )-1] = '\0';
+	timeString[ strlen (timeString )-1] = '\0';
 	ostringstream logStr;
 	logStr  << "ses:" << fSessionId << " st: " << fStepId << " finished at "<< timeString
 			<< "; total rows returned-" << fRowsReturned << endl

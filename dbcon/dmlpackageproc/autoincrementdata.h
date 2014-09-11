@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2009-2012 Calpont Corporation.
+  Copyright (C) 2009 Calpont Corp.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -35,8 +35,8 @@ public:
 	typedef std::map<uint32_t, long long> OIDNextValue;
 	static AutoincrementData* makeAutoincrementData(uint32_t sessionID = 0);
 	static void removeAutoincrementData(uint32_t sessionID = 0);
-	void setNextValue(uint32_t columnOid, long long nextValue);
-	long long getNextValue(uint32_t columnOid);
+	void setNextValue(uint32_t tableOid, long long nextValue);
+	long long getNextValue(uint32_t tableOid);
 	OIDNextValue & getOidNextValueMap();
 
 private:

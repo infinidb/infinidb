@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-//  $Id: rowgroup.cpp 3171 2012-06-27 22:44:11Z pleblanc $
+//  $Id: rowgroup.cpp 2978 2012-01-16 20:16:44Z zzhu $
 
 //
 // C++ Implementation: rowgroup
@@ -87,7 +87,7 @@ string Row::toString() const
 			switch (types[i]) {
 				case CalpontSystemCatalog::CHAR:
 				case CalpontSystemCatalog::VARCHAR:
-					os << getStringField(i).c_str() << " ";
+					os << getStringField(i) << " ";
 					break;
 				case CalpontSystemCatalog::FLOAT:
 					os << getFloatField(i) << " ";
@@ -439,7 +439,6 @@ void RowGroup::resetRowGroup(uint64_t rid)
 	*((uint32_t *) &data[rowCountOffset]) = 0;
 	*((uint64_t *) &data[baseRidOffset]) = rid & ~0x1fff;  // mask off lower 13 bits
 	*((uint16_t *) &data[statusOffset]) = 0;
-	*((uint32_t *) &data[dbRootOffset]) = 0;
 }
 
 const vector<uint> & RowGroup::getOffsets() const
@@ -643,11 +642,6 @@ RowGroup operator+(const RowGroup& lhs, const RowGroup& rhs)
 	return temp += rhs;
 }
 
-uint RowGroup::getDBRoot() const
-{
-	return *((uint *) &data[dbRootOffset]);
-}
-
 void RowGroup::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& sysDataList)
 {
 	execplan::ColumnResult *cr;
@@ -714,12 +708,6 @@ void RowGroup::addToSysDataList(execplan::CalpontSystemCatalog::NJLSysDataList& 
 	}
 }
 
-void RowGroup::setDBRoot(uint dbroot)
-{
-	*((uint *) &data[dbRootOffset]) = dbroot;
 }
-
-}
-
 // vim:ts=4 sw=4:
 

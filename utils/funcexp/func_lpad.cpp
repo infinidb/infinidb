@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /****************************************************************************
-* $Id: func_lpad.cpp 3743 2013-04-26 14:40:06Z bpaul $
+* $Id: func_lpad.cpp 2675 2011-06-04 04:58:07Z xlou $
 *
 *
 ****************************************************************************/
@@ -26,7 +26,6 @@ using namespace std;
 
 #include "functor_str.h"
 #include "functioncolumn.h"
-#include "utils_utf8.h"
 using namespace execplan;
 
 #include "rowgroup.h"
@@ -51,109 +50,114 @@ std::string Func_lpad::getStrVal(rowgroup::Row& row,
 						bool& isNull,
 						execplan::CalpontSystemCatalog::ColType&)
 {
-	unsigned i;
-	// The number of characters (not bytes) in our input str.
-	// Not all of these are necessarily significant. We need to search for the 
-	// NULL terminator to be sure.
-	size_t strwclen; 
-	// this holds the number of characters (not bytes) in our pad str.
-	size_t padwclen;
-
-	// The original string
+#ifdef STRCOLL_ENH__
 	string tstr = fp[0]->data()->getStrVal(row, isNull);
 
-	// The result length in number of characters
+	size_t strwclen = mbstowcs(0, tstr.c_str(), 0) + 1;
+	wchar_t* wcbuf = (wchar_t*)alloca(strwclen * sizeof(wchar_t));
+	strwclen = mbstowcs(wcbuf, tstr.c_str(), strwclen);
+	wstring str(wcbuf, strwclen);
+
 	unsigned int len = fp[1]->data()->getIntVal(row, isNull);
-	if (len < 1)
+	if (len < 0)
 		return "";
 
-	// The pad characters.
 	string pad = fp[2]->data()->getStrVal(row, isNull);
-
 	if (isNull)
 		return "";
 
-    // Rather than calling the wideconvert functions with a null buffer to 
-    // determine the size of buffer to allocate, we can be sure the wide
-    // char string won't be longer than
-    strwclen = tstr.length(); // a guess to start with. This will be >= to the real count.
-    int alen = len;
-	if(strwclen > len)
-		alen = strwclen;
-	int bufsize = (alen+1) * sizeof(wchar_t);
-    
-	// Convert to wide characters. Do all further work in wide characters
-    wchar_t* wcbuf = (wchar_t*)alloca(bufsize);
-    strwclen = utf8::idb_mbstowcs(wcbuf, tstr.c_str(), strwclen+1);
-
-	unsigned int strSize = strwclen;    // The number of significant characters
-	const wchar_t* pWChar = wcbuf;
-	for (i = 0; *pWChar != '\0' && i < strwclen; ++pWChar, ++i)
+	unsigned int strSize = strwclen;
+	for ( unsigned int i = 0 ; i < strwclen ; i++ )
 	{
-	}
-	strSize = i;
-
-	// If the incoming str is exactly the len of the result str,
-	// return the original
-	if (strSize == len)
-	{
-		return tstr;
-	}
-
-	// If the incoming str is too big for the result str
-	// truncate the widechar buffer and return as a string
-	if (strSize > len)
-	{
-		// Trim the excess length of the buffer
-		wstring trimmed = wstring(wcbuf, len);
-		return utf8::wstring_to_utf8(trimmed.c_str());
-	}
-
-	// This is the case where there's room to pad.
-
-    // Convert the pad string to wide
-    padwclen = pad.length();  // A guess to start.
-    int padbufsize = (padwclen+1) * sizeof(wchar_t);
-    wchar_t* wcpad = (wchar_t*)alloca(padbufsize);
-	// padwclen+1 is for giving count for the terminating null
-    size_t padlen = utf8::idb_mbstowcs(wcpad, pad.c_str(), padwclen+1);
-     
-    // How many chars do we need?
-    unsigned int padspace = len - strSize;
-
-	// Shift the contents of wcbuf to the right.
-	wchar_t* startofstr = wcbuf + padspace;
-
-	// Move the original string to the right to make room for the pad chars
-	// Testing has shown that this loop is faster than memmove
-	wchar_t* newchar = wcbuf + len;     // Last spot to put a char in buf
-	wchar_t* pChar = wcbuf + strSize;   // terminal NULL of our str
-	while (pChar >= wcbuf)
-	{
-		*newchar-- = *pChar--;
-	}
-
-	// Fill in the front of the buffer with the pad chars
-	wchar_t* firstpadchar = wcbuf;
-	for (wchar_t* pch = wcbuf; pch < startofstr && padlen > 0;)
-	{
-		// Truncate the number of fill chars if running out of space
-		if (padlen > padspace)
-		{
-			padlen = padspace;
+		if ( str[i] == '\0' ) {
+			strSize = i;
+			break;
 		}
-		// Move the fill chars to buffer
-		for (wchar_t* padchar = wcpad; padchar < wcpad + padlen; ++padchar)
-		{
-			*firstpadchar++ = *padchar;
-		}
-		padspace -= padlen;
-		pch += padlen;
 	}
 
-	wstring padded = wstring(wcbuf, len);
-	// Turn back to a string
-	return utf8::wstring_to_utf8(padded.c_str());
+	if ( strSize == len )
+		return string(tstr.c_str(), len);
+
+	int64_t pos = len - 1;
+	if (isNull)
+		return "";
+
+	if (pos == -1)  // pos == 0
+		return "";
+
+	if ( strSize > len ) {
+		wstring out = str.substr(0,len);
+		size_t strmblen = wcstombs(0, out.c_str(), 0) + 1;
+		char* outbuf = (char*)alloca(strmblen * sizeof(char));
+		strmblen = wcstombs(outbuf, out.c_str(), strmblen);
+	
+		return string(outbuf, strmblen);
+}
+
+	string fullpad;
+	for(unsigned int i = 0 ; i < len-strSize;) {
+		for(unsigned int j = 0 ; j < pad.size() ; j++)
+		{
+			fullpad = fullpad + pad.substr (j,1);
+			i++;
+			if (i >= len-strSize)
+				break;
+		}
+	}
+
+	string newStr = fullpad + tstr;
+	size_t strwclen1 = mbstowcs(0, newStr.c_str(), 0) + 1;
+	wchar_t* wcbuf1 = (wchar_t*)alloca(strwclen1 * sizeof(wchar_t));
+	strwclen1 = mbstowcs(wcbuf1, newStr.c_str(), strwclen1);
+	wstring nstr(wcbuf1, strwclen1);
+
+	wstring out = nstr.substr(0,len);
+	size_t strmblen = wcstombs(0, out.c_str(), 0) + 1;
+	char* outbuf = (char*)alloca(strmblen * sizeof(char));
+	strmblen = wcstombs(outbuf, out.c_str(), strmblen);
+
+	return string(outbuf, strmblen);
+#else
+	string str = fp[0]->data()->getStrVal(row, isNull);
+
+	unsigned int len = fp[1]->data()->getIntVal(row, isNull);
+	if (len < 0)
+		return "";
+
+	string pad = fp[2]->data()->getStrVal(row, isNull);
+	if (isNull)
+		return "";
+
+	unsigned int strSize = str.size();
+	for ( unsigned int i = 0 ; i < str.size() ; i++ )
+	{
+		if ( str[i] == '\0' ) {
+			strSize = i;
+			break;
+		}
+	}
+
+	if ( strSize == len )
+		return str;
+
+	if ( strSize > len )
+		return str.substr(0,len);
+
+	string fullpad;
+	for(unsigned int i = 0 ; i < len-strSize;) {
+		for(unsigned int j = 0 ; j < pad.size() ; j++)
+		{
+			fullpad = fullpad + pad.substr (j,1);
+			i++;
+			if (i >= len-strSize)
+				break;
+		}
+	}
+
+	string newStr = fullpad + str;
+
+	return newStr.substr(0,len);
+#endif
 }
 
 

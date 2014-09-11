@@ -16,15 +16,21 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: cpimport.cpp 4702 2013-07-08 20:06:14Z bpaul $
+* $Id: cpimport.cpp 4289 2012-10-30 14:30:06Z dcathey $
 *
 *******************************************************************************/
 
 #include <iostream>
 #include <sstream>
-#include <fstream>
 #include <clocale>
 
+#include <we_bulkload.h>
+#include <we_bulkstatus.h>
+#include <we_config.h>
+#include <we_xmljob.h>
+#include <we_xmlgenproc.h>
+#include <we_tempxmlgendata.h>
+#include <liboamcpp.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <csignal>
@@ -32,62 +38,27 @@
 #include <string>
 #include <cerrno>
 #include <cstdlib>
+#include "sessionmanager.h"
 #include <sys/time.h>
 #ifndef _MSC_VER
 #include <sys/resource.h>
-#else
-#include <cstdio>
 #endif
 #include <boost/filesystem/path.hpp>
 #include "idberrorinfo.h"
 #include "we_simplesyslog.h"
-#include "we_bulkload.h"
-#include "we_bulkstatus.h"
-#include "we_config.h"
-#include "we_xmljob.h"
-#include "we_xmlgenproc.h"
-#include "we_tempxmlgendata.h"
-#include "liboamcpp.h"
-#include "utils_utf8.h"
+
+//@bug 1963: re-enable parallel imports by disabling the serialization code
+//#define SERIALIZE_DDL_DML_CPIMPORT 1
 
 using namespace std;
 using namespace WriteEngine;
 using namespace execplan;
+using namespace oam;
 
 namespace
 {
     char* pgmName = 0;
     const std::string IMPORT_PATH_CWD  (".");
-    bool  bDebug  = false;
-
-    //@bug 4643: cpimport job ended during setup w/o any err msg.
-    //           Added a try/catch with logging to main() in case 
-    //           the process was dying with an uncaught exception.
-    enum TASK
-    {
-        TASK_CMD_LINE_PARSING     = 1,
-        TASK_INIT_CONFIG_CACHE    = 2,
-        TASK_BRM_STATE_READY      = 3,
-        TASK_BRM_STATE_READ_WRITE = 4,
-        TASK_SHUTDOWN_PENDING     = 5,
-        TASK_SUSPEND_PENDING      = 6,
-        TASK_ESTABLISH_JOBFILE    = 7,
-        TASK_LOAD_JOBFILE         = 8,
-        TASK_PROCESS_DATA         = 9
-    };
-    const char* taskLabels[] =
-    {
-        "",
-        "parsing command line options",
-        "initializing config cache",
-        "checking BRM Ready state",
-        "checking BRM Read/Write state",
-        "checking for pending shutdown",
-        "checking for pending suspend",
-        "establishing job file",
-        "loading job file",
-        "processing data"
-    };
 }
 
 //------------------------------------------------------------------------------
@@ -97,34 +68,29 @@ void printUsage()
 {
     cerr << endl << "Simple usage using positional parameters "
       "(no XML job file):" << endl <<
-      "    cpimport.bin dbName tblName [loadFile] [-j jobID] " << endl <<
+      "    cpimport dbName tblName [loadFile] [-j jobID] " << endl <<
       "    [-h] [-r readers] [-w parsers] [-s c] [-f path] " << endl <<
-      "    [-b readBufs] [-c readBufSize] [-e maxErrs] [-B libBufSize]" <<endl<<
-      "    [-n NullOption] [-E encloseChar] [-C escapeChar] [-S]" << 
+      "    [-n NullOption] [-E encloseChar] [-C escapeChar] " << 
       "[-d debugLevel] [-i]" << endl;
 
     cerr << endl << "Traditional usage without positional parameters "
       "(XML job file required):" << endl <<
-      "    cpimport.bin -j jobID " << endl <<
+      "    cpimport -j jobID " << endl <<
       "    [-h] [-r readers] [-w parsers] [-s c] [-f path]" << endl <<
-      "    [-b readBufs] [-c readBufSize] [-e maxErrs] [-B libBufSize]" <<endl<<
-      "    [-n NullOption] [-E encloseChar] [-C escapeChar] [-S]" <<
+      "    [-n NullOption] [-E encloseChar] [-C escapeChar] " <<
       "[-d debugLevel] [-i]" << endl <<
       "    [-p path] [-l loadFile]" << endl << endl;
 
     cerr << "    Positional parameters:" << endl <<
         "        dbName    Name of database to load" << endl <<
         "        tblName   Name of table to load"   << endl <<
-        "        loadFile  Optional input file name in current directory, " <<
+        "        loadFile  Optional import file name in current directory, " <<
         "unless a fully" << endl <<
         "                  qualified name is given.  If not given, " << 
         "input read from stdin." << endl << endl;
 
     cerr << "    Options:" << endl <<
-        "        -b Number of read buffers" << endl <<
-        "        -c Application read buffer size (in bytes)" << endl <<
         "        -d Print different level (1-3) debug message " << endl <<
-        "        -e Maximum number of allowable errors per table" << endl <<
         "        -f Data file directory path; " << endl <<
         "           In simple usage:" << endl <<
         "             Default is current working directory." << endl <<
@@ -136,31 +102,29 @@ void printUsage()
         "        -i Print extended info to console, else this info only goes "
         "to log file." << endl <<
         "        -j Job id.  In simple usage, default is the table OID."<<endl<<
-        "        -l Name of input file to be loaded, relative to -f path,"
+        "        -l Name of import file to be loaded, relative to -f path,"
         << endl <<
-        "           unless a fully qualified input file name is given."<<endl<<
+        "           unless a fully qualified import file name is given."<<endl<<
         "        -n NullOption (0-treat the string NULL as data (default);" <<
         endl <<
         "                       1-treat the string NULL as a NULL value)" <<
         endl <<
-        "        -p Path for XML job description file" << endl <<
-        "        -r Number of readers" << endl <<
+        "        -p path for XML job description file" << endl <<
+        "        -r number of readers" << endl <<
         "        -s 'c' is the delimiter between column values" << endl <<
-        "        -w Number of parsers" << endl <<
-        "        -B I/O library read buffer size (in bytes)" << endl <<
+        "        -w number of parsers" << endl <<
         "        -E Enclosed by character if field values are enclosed"<<endl<<
         "        -C Escape character used in conjunction with 'enclosed by'" <<
         endl <<
-        "           character (default is '\\')" << endl << 
-        "        -S Treat string truncations as errors" << endl << endl;
+        "           character (default is '\\')" << endl << endl;
 
     cerr << "    Example1:" << endl <<
-        "        cpimport.bin -j 1234" << endl <<
+        "        cpimport -j 1234" << endl <<
         "    Example2: Some column values are enclosed within double quotes." <<
         endl <<
-        "        cpimport.bin -j 3000 -E '\"'" << endl <<
+        "        cpimport -j 3000 -E '\"'" << endl <<
         "    Example3: Import a nation table without a Job XML file"<< endl <<
-        "        cpimport.bin -j 301 tpch nation nation.tbl" << endl;
+        "        cpimport -j 301 tpch nation nation.tbl" << endl;
 
     exit( EXIT_SUCCESS );
 }
@@ -233,11 +197,6 @@ void setupSignalHandlers()
     ign.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &ign, 0);
 
-	//Ignore SIGHUP signals
-    memset(&ign, 0, sizeof(ign));
-    ign.sa_handler = SIG_IGN;
-    sigaction(SIGHUP, &ign, 0);
-
     // @bug 4344 enable Control-C by disabling this section of code
     // Ignore SIGINT (Control-C) signal
     //memset(&ign, 0, sizeof(ign));
@@ -267,56 +226,25 @@ void parseCmdLineArgs(
     BulkLoad&    curJob,
     std::string& sJobIdStr,
     std::string& sXMLJobDir,
-    std::string& sModuleIDandPID,
     bool&        bLogInfo2ToConsole,
     std::string& xmlGenSchema,
     std::string& xmlGenTable,
     bool&        bValidateColumnList )
 {
+    int        option;
     std::string importPath;
-    std::string rptFileName;
-    int         option;
-    bool        bImportFileArg   = false;
-    BulkModeType bulkMode = BULK_MODE_LOCAL;
+    bool       bImportFileArg = false;
 
-    while( (option=getopt(
-        argc,argv,"b:c:d:e:f:hij:kl:m:n:p:r:w:s:B:C:DE:P:R:X:S")) != EOF )
+    while( (option=getopt(argc,argv,"d:j:r:w:s:f:ihkl:E:C:n:p:X:")) != EOF )
     {
         switch(option)
         {
-            case 'b':                                // -b: no. of read buffers
+            case 'j':                                // -j: jobID
             {
-                errno = 0;
-                long lValue = strtol(optarg, 0, 10);
-                if ((errno != 0) ||
-                    (lValue < 1) || (lValue > INT_MAX))
-                {
-                    startupError ( std::string(
-                        "Option -b is invalid or out of range."), true );
-                }
-
-                int noOfReadBuffers = lValue;
-                curJob.setReadBufferCount( noOfReadBuffers );
+                sJobIdStr = optarg;
                 break;
-            }
-
-            case 'c':                                // -c: read buffer size
-            {
-                errno = 0;
-                long lValue = strtol(optarg, 0, 10);
-                if ((errno != 0) ||
-                    (lValue < 1) || (lValue > INT_MAX))
-                {
-                    startupError ( std::string(
-                        "Option -c is invalid or out of range."), true );
-                }
-
-                int readBufferSize = lValue;
-                curJob.setReadBufferSize( readBufferSize );
-                break;
-            }
-
-            case 'd':                                // -d: debug level
+            }                                        // -d debug
+            case 'd':
             {
                 errno = 0;
                 long lValue = strtol(optarg, 0, 10);
@@ -330,104 +258,11 @@ void parseCmdLineArgs(
                 int debugLevel = lValue;
                 if( debugLevel > 0 && debugLevel <= 3 ) 
                 {
-                    bDebug = true;
                     curJob.setAllDebug( (DebugLevel) debugLevel );
                     cout << "\nDebug level is set to " << debugLevel << endl;
                 }
                 break;
             }
-
-            case 'e':                                // -e: max allowed errors
-            {
-                errno = 0;
-                long lValue = strtol(optarg, 0, 10);
-                if ((errno != 0) ||
-                    (lValue < 0) || (lValue > INT_MAX))
-                {
-                    startupError ( std::string(
-                        "Option -e is invalid or out of range."), true );
-                }
-
-                int maxErrors = lValue;
-                curJob.setMaxErrorCount( maxErrors );
-                break;
-            }
-
-            case 'f':                                // -f: import path
-            {
-                importPath = optarg;
-                std::string setAltErrMsg;
-                if (curJob.setAlternateImportDir(importPath,
-                    setAltErrMsg) != NO_ERROR)
-                    startupError( setAltErrMsg, false );
-                break;
-            }
-
-            case 'h':                                // -h: help
-            {
-                printUsage();
-            }
-
-            case 'i':                                // -i: log info to console
-            {
-                bLogInfo2ToConsole = true;
-                break;
-            }
-
-            case 'j':                                // -j: jobID
-            {
-                sJobIdStr = optarg;
-                break;
-            }
-
-            case 'k':                  // -k: hidden option to keep (not delete)
-            {                          //     bulk rollback meta-data files
-                curJob.setKeepRbMetaFiles( true );
-                break;
-            }
-
-            case 'l':                                // -l: import load file(s)
-            {
-                bImportFileArg = true;
-                curJob.addToCmdLineImportFileList( std::string(optarg) );
-                break;
-            }
-
-            case 'm':                                // -m: bulk load mode
-            {
-                bulkMode = (BulkModeType)atoi( optarg );
-                if ((bulkMode != BULK_MODE_REMOTE_SINGLE_SRC)   &&
-                    (bulkMode != BULK_MODE_REMOTE_MULTIPLE_SRC) &&
-                    (bulkMode != BULK_MODE_LOCAL))
-                {
-                    startupError ( std::string(
-                        "Invalid bulk mode; can be 1,2, or 3"), true );
-                }
-                break;
-            }
-
-            case 'n':                                // -n: treat "NULL" as null
-            {
-                int nullStringMode = atoi( optarg );
-                if ((nullStringMode != 0) &&
-                    (nullStringMode != 1))
-                {
-                    startupError ( std::string(
-                        "Invalid NULL option; value can be 0 or 1"), true );
-                }
-                if (nullStringMode)
-                    curJob.setNullStringMode(true);
-                else
-                    curJob.setNullStringMode(false);
-                break;
-            }
-
-            case 'p':                                // -p: Job XML path
-            {
-                sXMLJobDir = optarg;
-                break;
-            }
-
             case 'r':                                // -r: num read threads
             {
                 errno = 0;
@@ -452,27 +287,6 @@ void parseCmdLineArgs(
                 cout << "number of read threads : " << numOfReaders << endl;
                 break;
             }
-
-            case 's':                                // -s: column delimiter
-            {
-                char delim;
-                if (!strcmp(optarg,"\\t"))
-                {
-                    delim = '\t';
-                    cout << "Column delimiter : " << "\\t" << endl;
-                }
-                else
-                {
-                    delim = optarg[0];
-                    if (delim == '\t') // special case to print a <TAB>
-                        cout << "Column delimiter : '\\t'" << endl;
-                    else
-                        cout << "Column delimiter : " << delim << endl;
-                }
-                curJob.setColDelimiter( delim );
-                break;
-            }
-
             case 'w':                                // -w: num parse threads
             {
                 errno = 0;
@@ -497,67 +311,93 @@ void parseCmdLineArgs(
                 cout << "number of parse threads : " << numOfParser << endl;
                 break;
             }
-
-            case 'B':                                // -B: setvbuf read size
+            case 's':                                // -s: column delimiter
             {
-                errno = 0;
-                long lValue = strtol(optarg, 0, 10);
-                if ((errno != 0) ||
-                    (lValue < 1) || (lValue > INT_MAX))
+                char delim;
+                if (!strcmp(optarg,"\\t"))
+                {
+                    delim = '\t';
+                    cout << "Column delimiter : " << "\\t" << endl;
+                }
+                else
+                {
+                    delim = optarg[0];
+                    cout << "Column delimiter : " << delim << endl;
+                }
+                curJob.setColDelimiter( delim );
+                break;
+            }
+            case 'f':                                // -f: import path
+            {
+                importPath = optarg;
+                std::string setAltErrMsg;
+                if (curJob.setAlternateImportDir(importPath,
+                    setAltErrMsg) != NO_ERROR)
+                    startupError( setAltErrMsg, false );
+                break;
+            }
+            case 'i':                                // -i: log info to console
+            {
+                bLogInfo2ToConsole = true;
+                break;
+            }
+            case 'k':                  // -k: hidden option to keep (not delete)
+            {                          //     bulk rollback meta-data files
+                curJob.setKeepRbMetaFiles( true );
+                break;
+            }
+            case 'n':                                // -n: treat "NULL" as null
+            {
+                int nullStringMode = atoi( optarg );
+                if ((nullStringMode != 0) &&
+                    (nullStringMode != 1))
                 {
                     startupError ( std::string(
-                        "Option -B is invalid or out of range."), true );
+                        "Invalid NULL option; value can be 0 or 1"), true );
                 }
-
-                int vbufReadSize = lValue;
-                curJob.setVbufReadSize( vbufReadSize );
+                if (nullStringMode)
+                    curJob.setNullStringMode(true);
+                else
+                    curJob.setNullStringMode(false);
                 break;
             }
-
-            case 'C':                                // -C: enclosed escape char
+            case 'p':                                // -p: Job XML path
             {
-                curJob.setEscapeChar( optarg[0] );
-                cout << "Escape Character  : " << optarg[0] << endl;
+                sXMLJobDir = optarg;
                 break;
             }
-
             case 'E':                                // -E: enclosed by char
             {
                 curJob.setEnclosedByChar( optarg[0] );
                 cout << "Enclosed by Character : " << optarg[0] << endl;
                 break;
             }
-
-            case 'P':                                // -P: Calling moduleid
-            {                                        //     and PID
-                sModuleIDandPID = optarg;
+            case 'C':                                // -C: enclosed escape char
+            {
+                curJob.setEscapeChar( optarg[0] );
+                cout << "Escape Character  : " << optarg[0] << endl;
                 break;
             }
-
-            case 'R':                                // -R: distributed mode
-            {                                        //     report file
-                rptFileName = optarg;
+            case 'l':                                // -l: import load file(s)
+            {
+                bImportFileArg = true;
+                curJob.addToCmdLineImportFileList( std::string(optarg) );
                 break;
             }
-
-            case 'S':                                // -S: Char & VarChar data
-            {                                        //     greater than col def
-                curJob.setTruncationAsError(true);   //     are reported as err
-                break;
+            case 'h':                                // -h: help
+            {
+                printUsage();
             }
-
             case 'X':                                // Hidden extra options
             {
                 if (!strcmp(optarg,"AllowMissingColumn"))
                     bValidateColumnList = false;
                 break;
             }
-
             default :
             {
-                ostringstream oss;
-                oss << "Unrecognized command line option (" << option << ")";
-                startupError( oss.str(), true );
+                startupError( std::string(
+                    "Unrecognized command line option"), true );
             }
         }
     }
@@ -567,30 +407,6 @@ void parseCmdLineArgs(
     {
         startupError( std::string(
             "-f STDIN is invalid with -l importFile."), true );
-    }
-
-    // If distributed mode, make sure report filename is specified and that we
-    // can create the file using the specified path.
-    if ((bulkMode == BULK_MODE_REMOTE_SINGLE_SRC) ||
-        (bulkMode == BULK_MODE_REMOTE_MULTIPLE_SRC))
-    {
-        if (rptFileName.empty())
-        {
-            startupError( std::string(
-                "Bulk modes 1 and 2 require -R rptFileName."), true );
-        }
-        else
-        {
-            std::ofstream rptFile( rptFileName.c_str() );
-            if ( rptFile.fail() )
-            {
-                std::ostringstream oss;
-                oss << "Unable to open report file " << rptFileName;
-                startupError( oss.str(), false );
-            }
-            rptFile.close();
-        }
-        curJob.setBulkLoadMode( bulkMode, rptFileName );
     }
 
     // Get positional arguments, User can provide:
@@ -608,6 +424,7 @@ void parseCmdLineArgs(
             // parameter mode, which means we are using temp Job XML file.
             if (bImportFileArg)
             {
+                std::ostringstream oss;
                 startupError( std::string(
                     "-l importFile is invalid with positional parameters"),
                     true );
@@ -675,6 +492,119 @@ void parseCmdLineArgs(
     }
 }
 
+#ifdef SERIALIZE_DDL_DML_CPIMPORT
+//------------------------------------------------------------------------------
+// Try and grab exclusive transaction from session manager
+//------------------------------------------------------------------------------
+int getTransactionId( execplan::SessionManager& sessionManager,
+                      SessionManager::TxnID&    txnID )
+{
+    //Check whether there is any other active transaction
+    u_int32_t sessionID = 0; //Hard code a sessionID
+    execplan::SessionManager sessionManager;
+    bool bIsDbrmUp = true;
+    bool anyOtherActiveTransaction = sessionManager.checkActiveTransaction(
+                                     sessionID, bIsDbrmUp );
+    if (!bIsDbrmUp)
+    {
+        cerr << "Problem acquiring transaction from DBRM.  "
+                "Make sure DBRM is up." << endl;
+        return ERR_UNKNOWN;
+    }
+
+    int i = 0;
+    int waitPeriod = 10;
+    if ( anyOtherActiveTransaction )
+    {
+        waitPeriod = Config::getWaitPeriod();
+
+        for ( ; i < waitPeriod; i++ )
+        {
+            sleep(1);
+            anyOtherActiveTransaction = sessionManager.checkActiveTransaction(
+                                        sessionID, bIsDbrmUp );
+            if ( !anyOtherActiveTransaction || !bIsDbrmUp )
+                break;
+        }
+    }
+    if (!bIsDbrmUp)
+    {
+        cerr << "Problem acquiring transaction from DBRM.  "
+                "Make sure DBRM is up." << endl;
+        return ERR_UNKNOWN;
+    }
+    if ( i >= waitPeriod )      //timeout. return a error message
+    {
+        cerr << "Database is busy at this time due to other active transaction."
+                "  Please try again later." << endl;
+        return ERR_UNKNOWN;
+    }
+   
+    SessionManager::TxnID txnID;
+    txnID = sessionManager.getTxnID ( sessionID );
+    if ( txnID.valid )
+    {
+        cerr << "There is an active cpimport process in progress already."
+             << endl;
+        return ERR_UNKNOWN;
+    }
+    else
+    {
+        txnID = sessionManager.newTxnID( sessionID );
+        if ( !txnID.valid )
+        {
+            cerr << "Database is busy at this time due to other active "
+                    "transaction.  Please try again later." << endl;
+            return ERR_UNKNOWN;
+        }
+    }
+
+    return NO_ERROR;
+}
+#endif
+
+//------------------------------------------------------------------------------
+// Estimate memory usage.
+// Try to determine how much memory to use for sorting.  We use a
+// a calculation that takes into account the memory on the local
+// host, the likely number of concurrent jobs, and the size of the
+// struct we will be sorting (SortTuple).  We use the 1.5 devisor
+// as an overall fudge factor to allow for other memory use.
+//
+// Currently of little use, as the algorithm is severely outdated.
+//------------------------------------------------------------------------------
+long long estimateMemoryUsage()
+{
+    //long sysMemory = sysconf(_SC_AVPHYS_PAGES);
+#ifdef _MSC_VER
+    long long totalMemSize = 1024LL * 1024LL * 1024LL * 2LL;
+    MEMORYSTATUSEX memStat;
+    memStat.dwLength = sizeof(memStat);
+    if (GlobalMemoryStatusEx(&memStat) == 0)
+        //FIXME: Assume 2GB?
+        (void)0;
+    else
+	{
+#ifndef _WIN64
+		memStat.ullTotalPhys = std::min(memStat.ullTotalVirtual,
+                                        memStat.ullTotalPhys);
+#endif
+        //We now have the total phys mem in bytes
+        //FIXME: should we use avail phys mem instead?
+        totalMemSize = memStat.ullTotalPhys;
+	}
+#else
+    long sysMemory = sysconf(_SC_PHYS_PAGES);
+    long sysPageSize = sysconf(_SC_PAGE_SIZE);
+    long long totalMemSize = sysMemory*sysPageSize;
+#endif
+    long long maxMemSize = 0;
+    const int numOfJobs  = 5;
+    maxMemSize = (long long)(totalMemSize/(numOfJobs*sizeof(SortTuple)*1.5));
+
+    return maxMemSize;
+}
+
 //------------------------------------------------------------------------------
 // Print the path of the input load file(s), and the name of the job xml file.
 //------------------------------------------------------------------------------
@@ -736,7 +666,7 @@ void constructTempXmlFile(
     if (rc != NO_ERROR)
     {
         std::ostringstream oss;
-        oss << "cpimport.bin error creating temporary Job XML file name: " <<
+        oss << "cpimport error creating temporary Job XML file name: " <<
             xmlErrMsg;
         startupError( oss.str(), false );
     }
@@ -762,21 +692,21 @@ void constructTempXmlFile(
     catch (runtime_error& ex)
     {
         std::ostringstream oss;
-        oss << "cpimport.bin runtime exception constructing temporary "
+        oss << "cpimport runtime exception constructing temporary "
                "Job XML file: " << ex.what();
         startupError( oss.str(), false );
     }
     catch (exception& ex)
     {
         std::ostringstream oss;
-        oss << "cpimport.bin exception constructing temporary "
+        oss << "cpimport exception constructing temporary "
                 "Job XML file: " << ex.what();
         startupError( oss.str(), false );
     }
     catch (...)
     {
-        startupError( std::string( "cpimport.bin "
-            "unknown exception constructing temporary Job XML file"),
+        startupError( std::string(
+            "cpimport unknown exception constructing temporary Job XML file"),
             false );
     }
 
@@ -796,7 +726,7 @@ void getTableOID(const std::string& xmlGenSchema,
         xmlGenSchema, xmlGenTable );
     try
     {
-        boost::shared_ptr<CalpontSystemCatalog> cat =
+        CalpontSystemCatalog* cat =
             CalpontSystemCatalog::makeCalpontSystemCatalog(
             BULK_SYSCAT_SESSION_ID);
         cat->identity(CalpontSystemCatalog::EC);
@@ -825,49 +755,29 @@ void getTableOID(const std::string& xmlGenSchema,
 }
 
 //------------------------------------------------------------------------------
-// Verify we are running from a PM node.
-//------------------------------------------------------------------------------
-void verifyNode()
-{
-    std::string localModuleType = Config::getLocalModuleType();
-
-    // Validate running on a PM
-    if (localModuleType != "pm")
-    {
-        startupError( std::string( "Exiting, "
-            "cpimport.bin can only be run on a PM node"),
-            true );
-    }
-}
-
-//------------------------------------------------------------------------------
-// Log initiate message
-//------------------------------------------------------------------------------
-void logInitiateMsg( const char* initText )
-{
-    logging::Message::Args initMsgArgs;
-    initMsgArgs.add( initText );
-    SimpleSysLog::instance()->logMsg(
-        initMsgArgs,
-        logging::LOG_TYPE_INFO,
-        logging::M0086);
-}
-
-//------------------------------------------------------------------------------
-// Main entry point into the cpimport.bin program
+// Main entry point into the cpimport program
 //------------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
 #ifdef _MSC_VER
-    _setmaxstdio(2048);
+    //FIXME
 #else
     setuid( 0 ); // set effective ID to root; ignore return status
 #endif
     setupSignalHandlers();
 
-    // Set up LOCALE - BUG 5362
+    // Set up LOCALE
     std::string systemLang("C");
-	systemLang = funcexp::utf8::idb_setlocale();
+    try {
+        oam::Oam oam;
+        oam.getSystemConfig("SystemLang", systemLang);
+    }
+    catch(...)
+    {
+        systemLang = "C";
+    }
+    setlocale(LC_ALL, systemLang.c_str());
+    setlocale(LC_NUMERIC, "C"); // @debug 3949
 
     // Initialize singleton instance of syslogging
     if (argc > 0)
@@ -875,7 +785,7 @@ int main(int argc, char **argv)
     logging::IDBErrorInfo::instance();
     SimpleSysLog::instance();
 
-    // Log job initiation unless user is asking for help
+    // Log job initiation unless user is askig for help
     std::ostringstream ossArgList;
     bool bHelpFlag = false;
     for (int m=1; m<argc; m++)
@@ -885,38 +795,32 @@ int main(int argc, char **argv)
             bHelpFlag = true;
             break;
         }
-        if (!strcmp(argv[m],"\t")) // special case to print a <TAB>
-            ossArgList << "'\\t'" << ' ';   
-        else
-            ossArgList << argv[m] << ' ';   
+        ossArgList << argv[m] << ' ';   
     }
     if (!bHelpFlag)
     {
-        logInitiateMsg( ossArgList.str().c_str() );
+        logging::Message::Args initMsgArgs;
+        initMsgArgs.add(ossArgList.str());
+        SimpleSysLog::instance()->logMsg(
+            initMsgArgs,
+            logging::LOG_TYPE_INFO,
+            logging::M0086);
     }
 
     BulkLoad   curJob;
     string     sJobIdStr;
     string     sXMLJobDir;
-    string     sModuleIDandPID;
     bool       bLogInfo2ToConsole = false;
     bool       bValidateColumnList= true;
-    bool       bRollback          = false;
-    bool       bForce             = false;
-    int        rc                 = NO_ERROR;
-    std::string exceptionMsg;
-    TASK       task;                // track tasks being performed
+    int        rc;
 
-    try
-    {
     //--------------------------------------------------------------------------
     // Parse the command line arguments
     //--------------------------------------------------------------------------
-    task = TASK_CMD_LINE_PARSING;
     string xmlGenSchema;
     string xmlGenTable;
     parseCmdLineArgs( argc, argv,
-        curJob, sJobIdStr, sXMLJobDir, sModuleIDandPID, bLogInfo2ToConsole,
+        curJob, sJobIdStr, sXMLJobDir, bLogInfo2ToConsole,
         xmlGenSchema, xmlGenTable, bValidateColumnList );
 
     //--------------------------------------------------------------------------
@@ -929,14 +833,32 @@ int main(int argc, char **argv)
     else
         base.assign( argv[0]+startBase+1 );
     curJob.setProcessName( base );
-    if (bDebug)
-        logInitiateMsg( "Command line arguments parsed" );
+
+    //--------------------------------------------------------------------------
+    // Get local module info; validate running on Active Parent OAM Module
+    //--------------------------------------------------------------------------
+    Oam oam;
+    oamModuleInfo_t t;
+    bool parentOAMModuleFlag = false;
+
+    try {
+        t = oam.getModuleInfo();
+        parentOAMModuleFlag = boost::get<4>(t);
+    }
+    catch (exception&) {
+        parentOAMModuleFlag = true;
+    }
+
+    if ( !parentOAMModuleFlag )
+    {
+        startupError( std::string(
+          "Exiting, cpimport can only be run on the Active Parent OAM Module"),
+            true );
+    }
 
     //--------------------------------------------------------------------------
     // Init singleton classes (other than syslogging that we already setup)
     //--------------------------------------------------------------------------
-    task = TASK_INIT_CONFIG_CACHE;
-
     // Initialize cache used to store configuration parms from Calpont.xml
     Config::initConfigCache();
 
@@ -945,87 +867,61 @@ int main(int argc, char **argv)
     BRMWrapper::getInstance()->getInstance()->getExtentRows();
 
     //--------------------------------------------------------------------------
-    // Validate running on valid node
-    //--------------------------------------------------------------------------
-    verifyNode( );
-
-    //--------------------------------------------------------------------------
-    // Set scheduling priority for this cpimport.bin process
+    // Set scheduling priority for this cpimport process
     //--------------------------------------------------------------------------
 #ifdef _MSC_VER
     //FIXME
 #else
     setpriority( PRIO_PROCESS, 0, Config::getBulkProcessPriority() );
 #endif
-    if (bDebug)
-        logInitiateMsg( "Config cache initialized" );
 
     //--------------------------------------------------------------------------
-    // Make sure DMLProc startup has completed before running a cpimport.bin job
+    // Make sure DMLProc startup has completed before running a cpimport job
     //--------------------------------------------------------------------------
-    task = TASK_BRM_STATE_READY;
     if (!BRMWrapper::getInstance()->isSystemReady())
     {
         startupError( std::string(
             "System is not ready.  Verify that InfiniDB is up and ready "
             "before running cpimport."), false );
     }
-    if (bDebug)
-        logInitiateMsg( "BRM state verified: state is Ready" );
 
     //--------------------------------------------------------------------------
     // Verify that the state of BRM is read/write
     //--------------------------------------------------------------------------
-    task = TASK_BRM_STATE_READ_WRITE;
     int brmReadWriteStatus = BRMWrapper::getInstance()->isReadWrite();
     if (brmReadWriteStatus != NO_ERROR)
     {
         WErrorCodes ec;
         std::ostringstream oss;
         oss << ec.errorString(brmReadWriteStatus) <<
-               "  cpimport.bin is terminating.";
+               "  cpimport is terminating.";
         startupError( oss.str(), false );
     }
-    if (bDebug)
-        logInitiateMsg( "BRM state is Read/Write" );
 
     //--------------------------------------------------------------------------
-    // Make sure we're not about to shutdown
+    // Serialize db access by grabbing an exclusive transaction
     //--------------------------------------------------------------------------
-    task = TASK_SHUTDOWN_PENDING;
-    int brmShutdownPending = BRMWrapper::getInstance()->isShutdownPending(
-        bRollback, bForce);
-    if (brmShutdownPending != NO_ERROR)
+#ifdef SERIALIZE_DDL_DML_CPIMPORT
+    execplan::SessionManager sessionManager;
+    SessionManager::TxnID    txnID;
+    rc = getTransactionId( sessionManager, txnID );
+    if (rc != NO_ERROR)
     {
-        WErrorCodes ec;
-        std::ostringstream oss;
-        oss << ec.errorString(brmShutdownPending) <<
-               "  cpimport.bin is terminating.";
-        startupError( oss.str(), false );
+        exit( EXIT_FAILURE );
     }
-    if (bDebug)
-        logInitiateMsg( "Verified no shutdown operation is pending" );
+
+    curJob.setTxnID(txnID);
+#endif
 
     //--------------------------------------------------------------------------
-    // Make sure we're not write suspended
+    // Estimate memory usage.
     //--------------------------------------------------------------------------
-    task = TASK_SUSPEND_PENDING;
-    int brmSuspendPending = BRMWrapper::getInstance()->isSuspendPending();
-    if (brmSuspendPending != NO_ERROR)
-    {
-        WErrorCodes ec;
-        std::ostringstream oss;
-        oss << ec.errorString(brmSuspendPending) <<
-               "  cpimport.bin is terminating.";
-        startupError( oss.str(), false );
-    }
-    if (bDebug)
-        logInitiateMsg( "Verified no suspend operation is pending" );
+    long long maxMemSize = estimateMemoryUsage();
+    curJob.setMaxMemSize( maxMemSize );
 
     //--------------------------------------------------------------------------
     // Set some flags
     //--------------------------------------------------------------------------
-    task = TASK_ESTABLISH_JOBFILE;
     BRMWrapper::setUseVb( false );
     Cache::setUseCache  ( false );
 
@@ -1037,10 +933,6 @@ int main(int argc, char **argv)
     bool bUseTempJobFile = false;
 
     cout << std::endl; // print blank line before we start
-
-    // Start tracking time to create/load jobfile;
-    // The elapsed time for this step is logged at the end of loadJobInfo()
-    curJob.startTimer();
     if (!xmlGenSchema.empty()) // create temporary job file name
     {
         // If JobID is not provided, then default to the table OID
@@ -1057,7 +949,7 @@ int main(int argc, char **argv)
         }
 
         // No need to validate column list in job XML file for user errors,
-        // if cpimport.bin just generated the job XML file on-the-fly.
+        // if cpimport just generated the job XML file on-the-fly.
         bValidateColumnList = false;
 
         bUseTempJobFile     = true;
@@ -1083,86 +975,61 @@ int main(int argc, char **argv)
         if (rc != NO_ERROR)
         {
             std::ostringstream oss;
-            oss << "cpimport.bin error creating Job XML file name: " <<
+            oss << "cpimport error creating Job XML file name: " <<
                 xmlErrMsg;
             startupError( oss.str(), false );
         }
         printInputSource( curJob.getAlternateImportDir(), sFileName.string() );
     }
-    if (bDebug)
-        logInitiateMsg( "Job xml file is established" );
 
     //--------------------------------------------------------------------------
     // This is the real business
     //--------------------------------------------------------------------------
-    task = TASK_LOAD_JOBFILE;
     rc = curJob.loadJobInfo( sFileName.string(), bUseTempJobFile,
         systemLang, argc, argv, bLogInfo2ToConsole, bValidateColumnList );
-    if( rc != NO_ERROR )
-    {
-        WErrorCodes ec;
-        std::ostringstream oss;
-        oss << "Error in loading job information; " <<
-            ec.errorString(rc) << "; cpimport.bin is terminating.";
-        startupError( oss.str(), false );
-    }
-    if (bDebug)
-        logInitiateMsg( "Job xml file is loaded" );
-    task = TASK_PROCESS_DATA;
+    bool bLogStartAndEnd = false;
 
-    // Log start of job to INFO log
-    logging::Message::Args startMsgArgs;
-    startMsgArgs.add(sJobIdStr);
-    startMsgArgs.add(curJob.getSchema());
-    SimpleSysLog::instance()->logMsg(
-        startMsgArgs,
-        logging::LOG_TYPE_INFO,
-        logging::M0081);
+    if( rc == NO_ERROR ) {
+        // Log start of job to INFO log
+        logging::Message::Args startMsgArgs;
+        startMsgArgs.add(sJobIdStr);
+        startMsgArgs.add(curJob.getSchema());
+        SimpleSysLog::instance()->logMsg(
+            startMsgArgs,
+            logging::LOG_TYPE_INFO,
+            logging::M0081);
+        bLogStartAndEnd = true;
 
-    curJob.printJob();
+        curJob.printJob();
+        rc = curJob.processJob( );
+        if( rc != NO_ERROR )
+            cerr << endl << "Error in loading job data" << endl;
+    }
+    else
+        cerr << endl << "Error in loading job information, error code : "
+             << rc << endl;
 
-    rc = curJob.processJob( );
-    if( rc != NO_ERROR )
-        cerr << endl << "Error in loading job data" << endl;
-    }
-    catch (std::exception& ex)
-    {
-        std::ostringstream oss;
-        oss << "Uncaught exception caught in cpimport.bin main() while " <<
-            taskLabels[ task ] << "; " <<
-            ex.what();
-        exceptionMsg = oss.str();
-        if (task != TASK_PROCESS_DATA)
-        {
-            startupError( exceptionMsg, false );
-        }
-        rc = ERR_UNKNOWN;
-    }
+    // cleanup
+#ifdef SERIALIZE_DDL_DML_CPIMPORT
+    sessionManager.committed(txnID);  
+#endif
 
     //--------------------------------------------------------------------------
     // Log end of job to INFO log
     //--------------------------------------------------------------------------
-    logging::Message::Args endMsgArgs;
-    endMsgArgs.add(sJobIdStr);
-    if (rc != NO_ERROR)
-    {
-        std::string failMsg("FAILED");
-        if (exceptionMsg.length() > 0)
-        {
-            failMsg += "; ";
-            failMsg += exceptionMsg;
-        }
-        endMsgArgs.add(failMsg.c_str());
+    if (bLogStartAndEnd) {
+        logging::Message::Args endMsgArgs;
+        endMsgArgs.add(sJobIdStr);
+        if (rc != NO_ERROR)
+            endMsgArgs.add("FAILED");
+        else
+            endMsgArgs.add("SUCCESS");
+        SimpleSysLog::instance()->logMsg(
+            endMsgArgs,
+            logging::LOG_TYPE_INFO,
+            logging::M0082);
     }
-    else
-    {
-        endMsgArgs.add("SUCCESS");
-    }
-    SimpleSysLog::instance()->logMsg(
-        endMsgArgs,
-        logging::LOG_TYPE_INFO,
-        logging::M0082);
-    
+
     if (rc != NO_ERROR)
         return ( EXIT_FAILURE );
     else

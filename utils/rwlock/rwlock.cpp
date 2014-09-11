@@ -31,8 +31,7 @@
 #else
 #include <tr1/unordered_map>
 #endif
-
-#define NDEBUG
+//#define NDEBUG
 #include <cassert>
 using namespace std;
 
@@ -56,12 +55,9 @@ namespace
 {
 using namespace rwlock;
 
-//This mutex needs to be fully instantiated by the runtime static object
-// init mechanism or the lock in makeRWLockShmImpl() will fail
 boost::mutex instanceMapMutex;
 typedef std::tr1::unordered_map<int, RWLockShmImpl*> LockMap_t;
-//Windows doesn't init static objects the same as Linux, so make this a ptr
-LockMap_t* lockMapPtr=0;
+LockMap_t lockMap;
 
 }
 
@@ -114,15 +110,12 @@ RWLockShmImpl* RWLockShmImpl::makeRWLockShmImpl(int key, bool excl)
 {
 	boost::mutex::scoped_lock lk(instanceMapMutex);
 
-	if (!lockMapPtr)
-		lockMapPtr = new LockMap_t();
-
-	if (lockMapPtr->find(key) == lockMapPtr->end())
-		lockMapPtr->insert(make_pair(key, new RWLockShmImpl(key, excl)));
+	if (lockMap.find(key) == lockMap.end())
+		lockMap.insert(make_pair(key, new RWLockShmImpl(key, excl)));
 	else if (excl)
 		throw not_excl();
 
-	return lockMapPtr->find(key)->second;
+	return lockMap[key];
 }
 
 RWLockShmImpl::RWLockShmImpl(int key, bool excl)
@@ -249,7 +242,7 @@ again:
 				usleep(100000);
 		} while (!gotTheLock && microsec_clock::local_time() < delay);
 	}
-	catch (boost::thread_interrupted&) {
+	catch (boost::thread_interrupted &e) {
 		// no need to do anything here
 	}
 	catch (bi::interprocess_exception& bipe) {
@@ -452,7 +445,7 @@ bool RWLock::timed_write_lock(const struct timespec &ts, struct LockState *state
 				try {
 					down(WRITERS, false);
 				}
-				catch(const wouldblock&) {
+				catch(const wouldblock &e) {
 					// Somehow another writer was able to jump in front.  This is "impossible".
 					RETURN_STATE(false, state);
 					up(MUTEX);

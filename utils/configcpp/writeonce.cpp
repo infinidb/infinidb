@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-// $Id: writeonce.cpp 3079 2012-05-07 18:18:20Z rdempsey $
+// $Id: writeonce.cpp 2386 2011-02-03 17:56:55Z rdempsey $
 
 #include "writeonce.h"
 
@@ -36,11 +36,13 @@ using namespace boost;
 #include "bytestream.h"
 using namespace messageqcpp;
 
-#include "installdir.h"
-
 namespace
 {
-const string DefaultWriteOnceConfigFilename("woparms.dat");
+#ifdef _MSC_VER
+	string DefaultWriteOnceConfigFilename("C:\\Calpont\\etc\\woparms.dat");
+#else
+	string DefaultWriteOnceConfigFilename("/usr/local/Calpont/etc/woparms.dat");
+#endif
 }
 
 namespace config
@@ -126,7 +128,7 @@ ByteStream WriteOnceConfig::load()
 		return bs;
 	}
 
-	idbassert(access(fConfigFileName.c_str(), F_OK) == 0);
+	assert(access(fConfigFileName.c_str(), F_OK) == 0);
 
 	ifstream ifs(fConfigFileName.c_str());
 	int e = errno;
@@ -160,7 +162,7 @@ WriteOnceConfig::WriteOnceConfig(const char* cf)
 	if (cf != 0)
 		cfs = cf;
 	else
-		cfs = startup::StartUp::installDir() + "/etc/" + DefaultWriteOnceConfigFilename;
+		cfs = DefaultWriteOnceConfigFilename;
 
 	fConfigFileName = cfs;
 

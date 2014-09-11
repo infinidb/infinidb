@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /*******************************************************************************
-* $Id: we_bulkload.h 4250 2012-10-12 17:57:53Z dcathey $
+* $Id: we_bulkload.h 3778 2012-04-20 19:08:56Z dcathey $
 *
 *******************************************************************************/
 /** @file */
@@ -47,35 +47,28 @@
 #include <boost/bind.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#if 0 //defined(_MSC_VER) && defined(WE_BULKLOAD_DLLEXPORT)
-#define EXPORT __declspec(dllexport)
-#else
-#define EXPORT
-#endif
-
 /** Namespace WriteEngine */
 namespace WriteEngine
 {
-
 /** Class BulkLoad */
 class BulkLoad : public FileOp
 {
 public:
 
    /**
-    * @brief BulkLoad onstructor
+    * @brief Constructor
     */
-    EXPORT              BulkLoad();
+    BulkLoad();
 
    /**
-    * @brief BulkLoad destructor
+    * @brief Default Destructor
     */
-    EXPORT              ~BulkLoad();
+    ~BulkLoad();
 
    /**
     * @brief Load job information
     */
-    EXPORT int          loadJobInfo( const std::string& fullFileName,
+    int         loadJobInfo( const std::string& fullFileName,
                              bool  bUseTempJobFile,
                              const std::string& systemLang,
                              int   argc,
@@ -86,86 +79,91 @@ public:
    /**
     * @brief Pre process jobs to validate and assign values to the job structure
     */
-    int                 preProcess(Job& job, int tableNo, TableInfo* tableInfo);
+    int         preProcess( Job& job, int tableNo, TableInfo* tableInfo );
 
    /**
     * @brief Print job information
     */
-    void                printJob( );
+    void        printJob() { if (isDebug(DEBUG_1))
+                                 m_jobInfo.printJobInfo(m_log);
+                             else
+                                 m_jobInfo.printJobInfoBrief(m_log); }
 
    /**
     * @brief Process job
     */
-    EXPORT int          processJob( );
+    int         processJob( );
 
    /**
     * @brief Set Debug level for this BulkLoad object and any data members
     */
-    void                setAllDebug( DebugLevel level );
+    void        setAllDebug( DebugLevel level );
 
    /**
     * @brief Update next autoincrement value for specified OID.
-    *  @param columnOID  oid of autoincrement column to be updated
+    *  @param tableOID  table whose autoincrement column is to be updated
     *  @param nextValue next autoincrement value to assign to tableOID
     */
-    static int          updateNextValue(OID columnOID, long long nextValue);
+    static int  updateNextValue(OID tableOID, long long nextValue);
 
-    // Accessors and mutators
-    void                addToCmdLineImportFileList(const std::string& importFile);
-    const std::string&  getAlternateImportDir( ) const;
-    const std::string&  getJobDir            ( ) const;
-    const std::string&  getSchema            ( ) const;
-    const std::string&  getTempJobDir        ( ) const;
-    bool                getTruncationAsError ( ) const;
-    BulkModeType        getBulkLoadMode      ( ) const;
-    bool                getContinue          ( ) const;
+   /**
+    * @brief Setter for the private members
+    */
+    const std::string& getAlternateImportDir() { return fAlternateImportDir; }
+    int         setAlternateImportDir(const std::string& loadDir,
+                                      std::string& errMsg);
+    void        setColDelimiter( char delim ) { m_colDelim = delim; }
+    const std::string& getJobDir() {return DIR_BULK_JOB;}
+    const std::string& getTempJobDir() {return DIR_BULK_TEMP_JOB;}
+    const std::string& getSchema() {return m_jobInfo.getJob().schema;}
+    void        setKeepRbMetaFiles(bool keepMeta) {fKeepRbMetaFiles = keepMeta;}
+    void        setMaxMemSize( long long& maxMemSize) {m_maxMemSize=maxMemSize;}
+    void        setNoOfParseThreads(int parseThreads)
+                { fNoOfParseThreads = parseThreads; }
+    void        setNoOfReadThreads( int readThreads)
+                { fNoOfReadThreads = readThreads; }
+    void        setNullStringMode( bool bMode ) { fNullStringMode = bMode; }
+    void        setEnclosedByChar( char enChar) { fEnclosedByChar = enChar;}
+    void        setEscapeChar    ( char esChar) { fEscapeChar     = esChar;}
+    void        setParserNum( int parser ) { m_numOfParser = parser; }
+    void        setProcessName(const std::string& processName)
+                { fProcessName = processName; }
+    void        setTxnID(BRM::TxnID txnID) {fTxnID = txnID;}
+    void        addToCmdLineImportFileList(const std::string& importFile)
+                { fCmdLineImportFiles.push_back( importFile ); }
 
-    EXPORT int          setAlternateImportDir( const std::string& loadDir,
-                                               std::string& errMsg);
-    void                setColDelimiter      ( char delim );
-    void                setBulkLoadMode      ( BulkModeType bulkMode,
-                                               const std::string& rptFileName );
-    void                setEnclosedByChar    ( char enChar);
-    void                setEscapeChar        ( char esChar);
-    void                setKeepRbMetaFiles   ( bool keepMeta );
-    void                setMaxErrorCount     ( unsigned int maxErrors );
-    void                setNoOfParseThreads  ( int parseThreads );
-    void                setNoOfReadThreads   ( int readThreads );
-    void                setNullStringMode    ( bool bMode );
-    void                setParseErrorOnTable (int tableId, bool lockParseMutex);
-    void                setParserNum         ( int parser );
-    void                setProcessName       ( const std::string& processName );
-    void                setReadBufferCount   ( int noOfReadBuffers );
-    void                setReadBufferSize    ( int readBufferSize );
-    void                setTxnID             ( BRM::TxnID txnID );
-    void                setVbufReadSize      ( int vbufReadSize );
-    void                setTruncationAsError ( bool bTruncationAsError );
     // Timer functions
-    void                startTimer           ( );
-    void                stopTimer            ( );
-    double              getTotalRunTime      ( ) const;
+    void        startTimer() { gettimeofday( &fStartTime, 0 ); }
+    void        stopTimer()  { gettimeofday( &fEndTime, 0 );
+                    fTotalTime =
+                    (fEndTime.tv_sec   + (fEndTime.tv_usec   / 1000000.0)) -
+                    (fStartTime.tv_sec + (fStartTime.tv_usec / 1000000.0)); }
+    double      getTotalRunTime() const { return fTotalTime; }
+
+    std::vector<std::string> tokenizeStr(const std::string& location,
+                                         const std::string& filename);
 
 private:
 
     //--------------------------------------------------------------------------
     // Private Data Members
     //--------------------------------------------------------------------------
-    XMLJob      fJobInfo;                 // current job information
+    XMLJob      m_jobInfo;                 // current job information
 
-    boost::scoped_ptr<ColumnOp> fColOp;   // column operation
+    boost::scoped_ptr<ColumnOp> m_colOp;   // column operation
 
-    std::string fRootDir;                 // job process root directory
-    std::string fJobFileName;             // job description file name
+    std::string m_rootDir;                 // job process root directory
+    std::string m_jobFileName;             // job description file name
 
-    Log         fLog;                     // logger
+    Log         m_log;                     // logger
 
-    int         fNumOfParser;             // total number of parser
-    char        fColDelim;                // delimits col values within a row
+    int         m_numOfParser;             // total number of parser
+    char        m_colDelim;                // delimits col values within a row
+    long long   m_maxMemSize;
 
     int         fNoOfBuffers;              // Number of read buffers
     int         fBufferSize;               // Read buffer size
-    int         fFileVbufSize;             // Internal file system buffer size
-    long long   fMaxErrors;                // Max allowable errors per job
+    int         fFileBufferSize;           // Internal file system buffer size
     std::string fAlternateImportDir;       // Alternate bulk import directory
     std::string fProcessName;              // Application process name
     boost::ptr_vector<TableInfo> fTableInfo;// Vector of Table information
@@ -186,15 +184,17 @@ private:
     timeval     fEndTime;                  // job end time
     double      fTotalTime;                // elapsed time for current phase
     std::vector<std::string> fCmdLineImportFiles; // Import Files from cmd line
-    BulkModeType fBulkMode;                // Distributed bulk mode (1,2, or 3)
-    std::string fBRMRptFileName;           // Name of distributed mode rpt file
-    bool        fbTruncationAsError;       // Treat string truncation as error
-    bool        fbContinue;                // true when read and parse r running
-                                           //
-    static boost::mutex*       fDDLMutex;  // Insure only 1 DDL op at a time
 
-    EXPORT static const std::string   DIR_BULK_JOB;     // Bulk job directory
-    EXPORT static const std::string   DIR_BULK_TEMP_JOB;// Dir for tmp job files
+    static WriteEngineWrapper* fWEWrapper; // Access to WE Wrapper functions
+
+    // WriteEngineWrapper functions were written for DML/DDL which is
+    // not geared for thread safety, so we employ our own mutex around any
+    // calls to WriteEngineWrapper functions.  Don't foresee using many Wrap-
+    // per functions, but if we do, we should revisit the impact of this mutex.
+    static boost::mutex*       fWEWrapperMutex;
+
+    static const std::string   DIR_BULK_JOB;     // Bulk job directory
+    static const std::string   DIR_BULK_TEMP_JOB;// Directory for temp job files
     static const std::string   DIR_BULK_IMPORT;  // Bulk job import dir
     static const std::string   DIR_BULK_LOG;     // Bulk job log directory
 
@@ -202,180 +202,86 @@ private:
     // Private Functions
     //--------------------------------------------------------------------------
 
-    // Spawn the worker threads.
+    /** @brief Spawn the worker threads.
+     */
     void spawnWorkers();
 
-    // Checks if all tables have the status set
+    /** @brief Method checks if all tables have the status set
+     *  @param Status to be checked
+     */
     bool allTablesDone(Status status);
 
-    // Lock the table for read. Called by the read thread.
+    /** @brief Lock the table for read. Called by the read thread.
+     *  @param Thread id
+     */
     int lockTableForRead(int id);
 
-    // Get column for parsing. Called by the parse thread.
+    /** @brief Get column for parsing. Called by the parse thread.
+     * @param Thread id
+     * @param Table id set by the method
+     * @param Column id set by the method
+     * @param Parse buffer id set by the method.
+     */
     // @bug 2099 - Temporary hack to diagnose deadlock. Added report parm below.
-    bool lockColumnForParse(int id,             // thread id
-                            int &tableId,       // selected table id
-                            int &columnId,      // selected column id
-                            int &myParseBuffer, // selected parse buffer
+    bool lockColumnForParse(int id,
+                            int &tableId,
+                            int &columnId,
+                            int &myParseBuffer,
                             bool report);
 
-    // Map specified DBRoot to it's first segment file number
-    int mapDBRootToFirstSegment(OID columnOid,
-                            u_int16_t  dbRoot,
-                            u_int16_t& segment);
-
-    // The thread method for the read thread.
+    /** @brief The thread method for the read thread.
+     *  @param Thread id.
+     */
     void read(int id);
 
-    // The thread method for the parse thread.
+    /** @brief The thread method for the parse thread.
+     *  @param Thread id.
+     */
     void parse(int  id);
 
-    // Sleep method
+    /** @brief Sleep method
+     */
     void sleepMS(long int ms);
 
-    // Initialize auto-increment column for specified schema and table.
-    int preProcessAutoInc(
-        const std::string& fullTableName,// schema.table
-        ColumnInfo* colInfo);            // ColumnInfo associated with AI column
+    /** @brief Initialize auto-increment column for specified schema and table.
+     *  @param fullTableName Schema and table name separated by a period.
+     *  @param colInfo ColumnInfo associated with auto-increment column.
+     */
+    int preProcessAutoInc( const std::string& fullTableName,
+        ColumnInfo* colInfo);
 
-    // Determine starting HWM and LBID after block skipping added to HWM
-    int preProcessHwmLbid( const ColumnInfo* info,
-                               int          minWidth,
-                               u_int32_t    partition,
-                               u_int16_t    segment,
-                               HWM&         hwm,
-                               BRM::LBID_t& lbid,
-                               bool&        bSkippedToNewExtent);
-
-    // Rollback any tables that are left in a locked state at EOJ.
+    /**
+     * @brief Rollback any tables that are left in a locked state at EOJ.
+     */
     int rollbackLockedTables( );
 
-    // Rollback a table left in a locked state.
+    /**
+     * @brief Rollback a table left in a locked state.
+     */
     int rollbackLockedTable( TableInfo& tableInfo );
 
-    // Save metadata info required for shared-nothing bulk rollback.
-    int saveBulkRollbackMetaData( Job& job,   // current job
-        TableInfo* tableInfo,                 // TableInfo for table of interest
-        const std::vector<File>& segFileInfo, // vector of segment files info
-        const std::vector<BRM::EmDbRootHWMInfo_v>& dbRootHWMInfoPM);
+    /**
+     * @brief Save metadata info required for bulk rollback.
+     *  @param job Current job
+     *  @param tableNo Table number in current job
+     *  @param tableInfo TableInfo associated with table of interest
+     *  @param segFileInfo Vector of segment File info for columns in tableNo
+     */
+    int saveBulkRollbackMetaData( Job& job,
+        int tableNo,
+        TableInfo* tableInfo,
+        const std::vector<File>& segFileInfo );
 
-    // Manage/validate the list of 1 or more import data files
-    int manageImportDataFileList(Job& job,    // current job
-        int tableNo,                          // table number of current job
-        TableInfo* tableInfo);                // TableInfo for table of interest
-
-    // Break up list of file names into a vector of filename strings
-    int buildImportDataFileList(
-        const std::string& location,
-        const std::string& filename,
-        std::vector<std::string>& importFileNames);
+    /**
+     * @brief Validate existence of import data files.
+     *  @param job Current job
+     *  @param tableNo Table number in current job
+     *  @param tableInfo TableInfo associated with table of interest
+     */
+    int validateImportDataFiles(Job& job,
+        int tableNo, TableInfo* tableInfo);
 };
 
-//------------------------------------------------------------------------------
-// Inline functions
-//------------------------------------------------------------------------------
-inline void BulkLoad::addToCmdLineImportFileList(const std::string& importFile){
-    fCmdLineImportFiles.push_back( importFile ); }
-
-inline const std::string& BulkLoad::getAlternateImportDir( ) const {
-    return fAlternateImportDir; }
-
-inline const std::string& BulkLoad::getJobDir( ) const {
-    return DIR_BULK_JOB; }
-
-inline const std::string& BulkLoad::getSchema( ) const {
-    return fJobInfo.getJob().schema; }
-
-inline const std::string& BulkLoad::getTempJobDir( ) const {
-    return DIR_BULK_TEMP_JOB; }
-
-inline bool BulkLoad::getTruncationAsError ( ) const {
-    return fbTruncationAsError; }
-
-inline BulkModeType BulkLoad::getBulkLoadMode ( ) const {
-    return fBulkMode; }
-
-inline bool BulkLoad::getContinue ( ) const {
-    return fbContinue; }
-
-inline void BulkLoad::printJob() {
-    if (isDebug(DEBUG_1))
-        fJobInfo.printJobInfo(fLog);
-    else
-        fJobInfo.printJobInfoBrief(fLog); }
-
-inline void BulkLoad::setAllDebug( DebugLevel level ) {
-    setDebugLevel( level );
-    fLog.setDebugLevel( level ); }
-
-inline void BulkLoad::setColDelimiter( char delim ) {
-    fColDelim = delim; }
-
-inline void BulkLoad::setBulkLoadMode(
-    BulkModeType       bulkMode,
-    const std::string& rptFileName ) {
-    fBulkMode       = bulkMode;
-    fBRMRptFileName = rptFileName; }
-
-inline void BulkLoad::setEnclosedByChar( char enChar ) {
-    fEnclosedByChar = enChar; }
-
-inline void BulkLoad::setEscapeChar( char esChar ) {
-    fEscapeChar     = esChar; }
-
-inline void BulkLoad::setKeepRbMetaFiles( bool keepMeta ) {
-    fKeepRbMetaFiles = keepMeta; }
-
-// Mutator takes an unsigned int, but we store in a long long, because...
-// TableInfo which eventually needs this attribute, takes an unsigned int,
-// but we want to be able to init to -1, to indicate when it has not been set.
-inline void BulkLoad::setMaxErrorCount( unsigned int maxErrors ) {
-    fMaxErrors = maxErrors; }
-
-inline void BulkLoad::setNoOfParseThreads(int parseThreads ) {
-    fNoOfParseThreads = parseThreads; }
-
-inline void BulkLoad::setNoOfReadThreads( int readThreads ) {
-    fNoOfReadThreads = readThreads; }
-
-inline void BulkLoad::setNullStringMode( bool bMode ) {
-    fNullStringMode = bMode; }
-
-inline void BulkLoad::setParserNum( int parser ) {
-    fNumOfParser = parser; }
-
-inline void BulkLoad::setProcessName( const std::string& processName ) {
-    fProcessName = processName; }
-
-inline void BulkLoad::setReadBufferCount( int noOfReadBuffers ) {
-    fNoOfBuffers = noOfReadBuffers; }
-
-inline void BulkLoad::setReadBufferSize( int readBufferSize ) {
-    fBufferSize = readBufferSize; }
-
-inline void BulkLoad::setTxnID( BRM::TxnID txnID ) {
-    fTxnID = txnID; }
-
-inline void BulkLoad::setVbufReadSize( int vbufReadSize ) {
-    fFileVbufSize = vbufReadSize; }
-
-inline void BulkLoad::setTruncationAsError(bool bTruncationAsError) {
-    fbTruncationAsError = bTruncationAsError; }
-
-inline void BulkLoad::startTimer( ) {
-    gettimeofday( &fStartTime, 0 ); }
-
-inline void BulkLoad::stopTimer() {
-    gettimeofday( &fEndTime, 0 );
-    fTotalTime = (fEndTime.tv_sec   + (fEndTime.tv_usec   / 1000000.0)) -
-                 (fStartTime.tv_sec + (fStartTime.tv_usec / 1000000.0)); }
-
-inline double BulkLoad::getTotalRunTime() const {
-    return fTotalTime; }
-
-
-} // end of namespace
-
-#undef EXPORT
+}//end of namespace
 
 #endif // _WE_BULKLOAD_H_

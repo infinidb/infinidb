@@ -110,7 +110,7 @@ void BPPSendThread::sendResults(const vector<Msg_t> &msgs, bool newConnection)
 	if (gotException)
 		throw runtime_error(exceptionString);
 	if (!sawAllConnections && newConnection) {
-		idbassert(msgs.size() > 0);
+		assert(msgs.size() > 0);
 		Connection_t ins(msgs[0].sockLock, msgs[0].sock);
 		bool inserted = connections_s.insert(ins).second;
 		if (inserted) {
@@ -214,7 +214,6 @@ void BPPSendThread::mainLoop()
 				try {
 					mutex::scoped_lock sl2(*lock);
 					sock->write(*msg[msgsSent].msg);
-					//cout << "sent 1 msg\n";
 				}
 				catch (std::exception &e) {
 					sl.lock();
@@ -246,6 +245,11 @@ void BPPSendThread::abort()
 	okToSend.notify_one();
 	sl.unlock();
 	sl2.unlock();
+}
+
+bool BPPSendThread::aborted()
+{
+	return die;
 }
 
 }

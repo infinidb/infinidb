@@ -52,7 +52,7 @@ string toString(int64_t t1, unsigned scale)
 	if (int_val < 0)
 	{
 		ptr++;
-		idbassert(l1 >= 2);
+		assert(l1 >= 2);
 		l1--;
 	}
 	if (scale > l1)
@@ -79,31 +79,31 @@ int main(int argc, char** argv)
 
 	x = 10001LL;
 	xstr = toString(x, 2);
-	idbassert(xstr == "100.01");
+	assert(xstr == "100.01");
 
 	x = -10001LL;
 	xstr = toString(x, 2);
-	idbassert(xstr == "-100.01");
+	assert(xstr == "-100.01");
 
 	x = 999999999999999999LL;
 	xstr = toString(x, 2);
-	idbassert(xstr == "9999999999999999.99");
+	assert(xstr == "9999999999999999.99");
 
 	x = -999999999999999999LL;
 	xstr = toString(x, 2);
-	idbassert(xstr == "-9999999999999999.99");
+	assert(xstr == "-9999999999999999.99");
 
 	x = 1LL;
 	xstr = toString(x, 5);
-	idbassert(xstr == ".00001");
+	assert(xstr == ".00001");
 
 	x = -1LL;
 	xstr = toString(x, 5);
-	idbassert(xstr == "-.00001");
+	assert(xstr == "-.00001");
 
 	x = -1LL;
 	xstr = toString(x, 16);
-	idbassert(xstr == "-.0000000000000001");
+	assert(xstr == "-.0000000000000001");
 
 	return 0;
 }

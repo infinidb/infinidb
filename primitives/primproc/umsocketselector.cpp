@@ -211,10 +211,8 @@ UmSocketSelector::addConnection(
 {
 	bool bConnAdded = false;
 
-	sockaddr sa = ios->sa();
-	const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
 	IpAddressUmMap_t::iterator mapIter =
-		fIpAddressUmMap.find ( sinp->sin_addr.s_addr );
+		fIpAddressUmMap.find ( ios->sa().sin_addr.s_addr );
 
 	// Add this socket/port connection to the UM connection list it belongs to.
 	if ( mapIter != fIpAddressUmMap.end() )
@@ -243,10 +241,8 @@ UmSocketSelector::addConnection(
 void
 UmSocketSelector::delConnection( const IOSocket& ios )
 {
-	sockaddr sa = ios.sa();
-	const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
 	IpAddressUmMap_t::iterator mapIter =
-		fIpAddressUmMap.find ( sinp->sin_addr.s_addr );
+		fIpAddressUmMap.find ( ios.sa().sin_addr.s_addr );
 
 	if ( mapIter != fIpAddressUmMap.end() )
 	{
@@ -273,10 +269,8 @@ UmSocketSelector::nextIOSocket(
 	SP_UM_IOSOCK&   outIos,
 	SP_UM_MUTEX&    writeLock )
 {
-	sockaddr sa = ios.sa();
-	const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
 	IpAddressUmMap_t::iterator mapIter =
-		fIpAddressUmMap.find ( sinp->sin_addr.s_addr );
+		fIpAddressUmMap.find ( ios.sa().sin_addr.s_addr );
 
 	if ( mapIter != fIpAddressUmMap.end() )
 	{
@@ -367,9 +361,7 @@ UmModuleIPs::addSocketConn(
 	boost::mutex::scoped_lock lock( fUmModuleMutex );
 	for (unsigned int i=0; i<fUmIPSocketConns.size(); ++i)
 	{
-		sockaddr sa = ioSock->sa();
-		const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
-		if (fUmIPSocketConns[i]->ipAddress() == sinp->sin_addr.s_addr)
+		if (fUmIPSocketConns[i]->ipAddress() == ioSock->sa().sin_addr.s_addr)
 		{
 
 #ifdef MOD_CONN_DEBUG
@@ -403,9 +395,7 @@ UmModuleIPs::delSocketConn( const IOSocket& ioSock )
 	boost::mutex::scoped_lock lock( fUmModuleMutex );
 	for (unsigned int i=0; i<fUmIPSocketConns.size(); ++i)
 	{
-		sockaddr sa = ioSock.sa();
-		const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
-		if (fUmIPSocketConns[i]->ipAddress() == sinp->sin_addr.s_addr)
+		if (fUmIPSocketConns[i]->ipAddress() == ioSock.sa().sin_addr.s_addr)
 		{
 
 #ifdef MOD_CONN_DEBUG
@@ -555,11 +545,7 @@ UmIPSocketConns::delSocketConn( const IOSocket& ioSock )
 {
 	for (unsigned int i=0; i<fIOSockets.size(); ++i)
 	{
-		sockaddr sa1 = fIOSockets[i].fSock->sa();
-		const sockaddr_in* sinp1 = reinterpret_cast<const sockaddr_in*>(&sa1);
-		sockaddr sa2 = ioSock.sa();
-		const sockaddr_in* sinp2 = reinterpret_cast<const sockaddr_in*>(&sa2);
-		if (sinp1->sin_port == sinp2->sin_port)
+		if (fIOSockets[i].fSock->sa().sin_port == ioSock.sa().sin_port)
 		{
 			fIOSockets.erase ( fIOSockets.begin()  + i );
 
@@ -638,9 +624,7 @@ UmIPSocketConns::toString() const
 
 	for (unsigned int i=0; i<fIOSockets.size(); ++i)
 	{
-		sockaddr sa = fIOSockets[i].fSock->sa();
-		const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&sa);
-		oss << "    port: " << ntohs(sinp->sin_port) <<
+		oss << "    port: " << ntohs(fIOSockets[i].fSock->sa().sin_port) <<
 			std::endl;
 	}
 

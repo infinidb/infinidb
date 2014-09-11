@@ -13,10 +13,6 @@
 //  See http://www.boost.org/libs/utility/assert.html for documentation.
 //
 
-#if __FreeBSD__
-#define IDB_BOOST_ENABLE_ASSERTS
-#endif
-
 #if defined(IDB_BOOST_ENABLE_ASSERTS)
 #undef BOOST_DISABLE_ASSERTS
 #else

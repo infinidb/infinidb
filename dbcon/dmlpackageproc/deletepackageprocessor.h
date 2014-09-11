@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: deletepackageprocessor.h 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: deletepackageprocessor.h 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -40,6 +40,39 @@
 
 namespace dmlpackageprocessor
 {
+
+	struct deleteExtentInfo 
+{
+	uint16_t dbRoot;
+	uint32_t partition;
+	uint16_t segment;
+};
+typedef struct deleteExtentInfo delextentInfo;
+typedef std::vector<uint64_t> RidList;
+typedef struct deleteExtentInfo delextentInfo;
+
+struct delextentInfoCompare // lt operator
+{
+    bool operator()(const delextentInfo& lhs, const delextentInfo& rhs) const
+    {
+        if( lhs.dbRoot < rhs.dbRoot ) {
+          return true;
+        }
+        if(lhs.dbRoot==rhs.dbRoot && lhs.partition < rhs.partition ) {
+          return true;
+        }
+        if(lhs.dbRoot==rhs.dbRoot && lhs.partition==rhs.partition && lhs.segment < rhs.segment ) {
+          return true;
+        }
+
+        return false;
+
+    } // operator
+}; // struct
+
+//typedef std::vector<joblist::TableBand> tableBands;
+//typedef std::vector<uint64_t> rids;
+typedef std::map< delextentInfo, dmlpackageprocessor::rids, delextentInfoCompare > ridsListsByExtent;
 /** @brief concrete implementation of a DMLPackageProcessor.
  * Specifically for interacting with the Write Engine to
  * process DELETE dml statements.
@@ -49,12 +82,14 @@ class DeletePackageProcessor : public DMLPackageProcessor
 
 public:
 
-    DeletePackageProcessor() : DMLPackageProcessor(){}
+    DeletePackageProcessor() : DMLPackageProcessor(), fMaxDeleteRows(5000000) {}
     /** @brief process a DeleteDMLPackage
       *
       * @param cpackage the delete dml package to process
       */
    EXPORT DMLResult processPackage(dmlpackage::CalpontDMLPackage& cpackage);
+   void setMaxDeleteRows(uint64_t maxDeleteRows) { fMaxDeleteRows = maxDeleteRows; }
+   typedef std::vector<void *> VoidValuesList;
 
 protected:
 
@@ -71,15 +106,23 @@ private:
                    WriteEngine::RIDList& rowIDList, WriteEngine::ColValueList& colOldValuesList,
                    DMLResult& result);
 	  */
-    bool processRowgroup(messageqcpp::ByteStream & aRowGroup, DMLResult& result, const uint64_t uniqueId, dmlpackage::CalpontDMLPackage& cpackage, bool isMeta = false, uint dbroot=1);
+    bool deleteRows(u_int32_t sessionID, execplan::CalpontSystemCatalog::SCN txnID, const std::string& schema,
+		    const std::string& table,
+		    std::vector<WriteEngine::RIDList>& rowidLists,
+		    std::vector<void *>& colOldValuesList, DMLResult& result, ridsListsByExtent& ridsListsMap);
 
 
     /** @brief add all rows if we have no filter for the delete
       *
       * @param tablePtr a pointer to the table that is being operated on
       */
-   uint64_t fixUpRows(dmlpackage::CalpontDMLPackage& cpackage, DMLResult& result, const uint64_t uniqueId);
-   bool receiveAll(DMLResult& result, const uint64_t uniqueId, std::vector<int>& fPMs);
+    bool fixUpRows(u_int32_t sessionID, dmlpackage::CalpontDMLPackage& cpackage, const std::string& schema, 
+			const std::string& table, std::vector<dicStrValues>& dicStrValCols,
+			bool & firstCall, joblist::SJLP & jbl, ridsListsByExtent& ridsListsMap, DMLResult& result);
+
+    void clearVoidValuesList(VoidValuesList& valuesList);
+
+    uint64_t fMaxDeleteRows; 
    
 	//bandListsByExtent bandListsMap;
 

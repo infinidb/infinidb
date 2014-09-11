@@ -24,7 +24,7 @@ AM_CXXFLAGS = $(idb_cxxflags)
 AM_LDFLAGS = $(idb_ldflags)
 bin_PROGRAMS = clearShm
 clearShm_SOURCES = main.cpp
-clearShm_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(idb_exec_libs) $(AM_LDFLAGS)
+clearShm_LDFLAGS = $(idb_common_ldflags) $(idb_brm_libs) $(AM_LDFLAGS)
 
 test:
 

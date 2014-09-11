@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: dmlpackageprocessor.h 8839 2012-08-28 21:49:45Z dhall $
+ *   $Id: dmlpackageprocessor.h 7720 2011-05-20 14:28:14Z chao $
  *
  *
  ***********************************************************************/
@@ -38,10 +38,6 @@
 #include "sessionmanager.h"
 #include "distributedenginecomm.h"
 #include "brmtypes.h"
-#include "we_clients.h"
-#include "liboamcpp.h"
-#include "oamcache.h"
-#include "querystats.h"
 
 #if defined(_MSC_VER) && defined(DMLPKGPROC_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -49,7 +45,6 @@
 #define EXPORT
 #endif
 
-//#define IDB_DML_DEBUG
 namespace dmlpackageprocessor
 {
 typedef std::vector<std::string> dicStrValues;
@@ -84,10 +79,10 @@ public:
      */
     enum  ResultCode
     {
-        NO_ERROR, INSERT_ERROR, NETWORK_ERROR, NOTNULL_VIOLATION,
+        NO_ERROR, INSERT_ERROR, UNIQUE_VIOLATION, NOTNULL_VIOLATION,
         CHECK_VIOLATION, DELETE_ERROR, UPDATE_ERROR, INDEX_UPDATE_ERROR,
         COMMAND_ERROR, TOKEN_ERROR, NOT_ACCEPTING_PACKAGES, DEAD_LOCK_ERROR, REFERENCE_VIOLATION,
-        IDBRANGE_WARNING, VB_OVERFLOW_ERROR, ACTIVE_TRANSACTION_ERROR, TABLE_LOCK_ERROR, JOB_ERROR, JOB_CANCELED
+        IDBRANGE_WARNING, VB_OVERFLOW_ERROR, ACTIVE_TRANSACTION_ERROR, JOB_ERROR
     };
 
     enum DebugLevel                   /** @brief Debug level type enumeration */
@@ -111,13 +106,7 @@ public:
         /** @brief the rowCount
          */
         long long rowCount; 
-        std::string tableLockInfo;
-        // query stats;
-        std::string queryStats;
-        std::string extendedStats;
-        std::string miniStats;
-        querystats::QueryStats stats;
-        	
+		std::string tableLockInfo;
         DMLResult():result(NO_ERROR),rowCount(0){};
     };
     /** @brief a structure to hold a date
@@ -146,19 +135,9 @@ public:
         dateTime( )   { year = 0xFFFF; month = 0xF; day = 0x3F; hour = 0x3F; minute = 0x3F; second = 0x3F;
 			msecond = 0xFFFFE; }
     };
-	
     /** @brief ctor
-     */ 
-    DMLPackageProcessor() : fEC(0), DMLLoggingId(21), fRollbackPending(false), fDebugLevel(NONE)
-	{
-		fWEClient = WriteEngine::WEClients::instance(WriteEngine::WEClients::DMLPROC);
-		fPMCount = fWEClient->getPmCount();
-		fExeMgr.reset(new messageqcpp::MessageQueueClient("ExeMgr1"));
-		oam::OamCache * oamCache = oam::OamCache::makeOamCache();
-		fDbRootPMMap = oamCache->getDBRootToPMMap();
-	}
-
-
+     */
+    DMLPackageProcessor() : fEC(0), DMLLoggingId(21), fDebugLevel( NONE ) {}
 
     /** @brief destructor
      */
@@ -172,7 +151,7 @@ public:
      * @brief Get debug level
      */
     inline const DebugLevel getDebugLevel() const { return fDebugLevel; }
-    //int rollBackTransaction(u_int64_t uniqueId, u_int32_t txnID, u_int32_t sessionID, std::string & errorMsg);
+
     /**
      * @brief Set debug level
      */
@@ -190,10 +169,6 @@ public:
     virtual DMLResult processPackage(dmlpackage::CalpontDMLPackage& cpackage) = 0;
 	
 	inline void setRM ( joblist::ResourceManager* frm) { fRM = frm; };
-
-	EXPORT int rollBackTransaction(uint64_t uniqueId, BRM::TxnID txnID, uint32_t sessionID, std::string & errorMsg);
-	
-	EXPORT int rollBackBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
     /**
      * @brief convert a columns data, represnted as a string, to it's native
      * data type
@@ -246,14 +221,6 @@ public:
      * @param data
      */
     //static void tokenTime (std::string data, std::vector<std::string>& dataList);
-
-    /** @brief Access the rollback pending flag
-     */
-    bool getRollbackPending() {return fRollbackPending;}
-
-    /** @brief Set the rollback pending flag
-     */
-    void setRollbackPending(bool rollback) {fRollbackPending = rollback;}
 
 protected:
     /** @brief update the indexes on the target table
@@ -425,44 +392,39 @@ protected:
      * @param rid  in:the absolute rid  out:  relative rid in a segement file
      * @param dbRoot,partition, segment   the extent information obtained from rid
      * @param filesPerColumnPartition,extentRows, extentsPerSegmentFile   the extent map parameters
-     * @param startDBRoot the dbroot this table starts
-     * @param dbrootCnt the number of dbroot in db
-     */
-    void convertRidToColumn(u_int64_t& rid, unsigned& dbRoot, unsigned& partition, 
-                                                    unsigned& segment, unsigned filesPerColumnPartition, 
-                                                    unsigned  extentsPerSegmentFile, unsigned extentRows, 
-                                                    unsigned startDBRoot, unsigned dbrootCnt,
-                                                    const unsigned startPartitionNum );
+	 * @param startDBRoot the dbroot this table starts
+	 * @param dbrootCnt the number of dbroot in db
+	 */
+	void convertRidToColumn(u_int64_t& rid, unsigned& dbRoot, unsigned& partition, 
+							unsigned& segment, unsigned filesPerColumnPartition, 
+							unsigned  extentsPerSegmentFile, unsigned extentRows, 
+							unsigned startDBRoot, unsigned dbrootCnt,
+							const unsigned startPartitionNum );
 
-    inline bool isDictCol ( execplan::CalpontSystemCatalog::ColType colType )
-    {
-            if (((colType.colDataType == execplan::CalpontSystemCatalog::CHAR) && (colType.colWidth > 8)) 
-       || ((colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR) && (colType.colWidth > 7)) 
-       || ((colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL) && (colType.precision > 18))
-               || (colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY)) 
-             {
-                    return true;
-             }
-             else
-                    return false;
-    }
+	inline bool isDictCol ( execplan::CalpontSystemCatalog::ColType colType )
+	{
+		if (((colType.colDataType == execplan::CalpontSystemCatalog::CHAR) && (colType.colWidth > 8)) 
+           || ((colType.colDataType == execplan::CalpontSystemCatalog::VARCHAR) && (colType.colWidth > 7)) 
+           || ((colType.colDataType == execplan::CalpontSystemCatalog::DECIMAL) && (colType.precision > 18))
+		   || (colType.colDataType == execplan::CalpontSystemCatalog::VARBINARY)) 
+		 {
+			return true;
+		 }
+		 else
+			return false;
+	}
 
 
-    /** @brief convert an error code to a string
+	/** @brief convert an error code to a string
      *
      * @param   ec in:the error code received
      * @returns error string
      */
-    std::string projectTableErrCodeToMsg(uint ec);
-    
-    bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
-    
-    bool validateVarbinaryVal( std::string & inStr);
-    int commitTransaction(u_int64_t uniqueId, BRM::TxnID txnID);
-    int commitBatchAutoOnTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
-    int commitBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, const u_int32_t tableOid, std::string & errorMsg);
-    int rollBackBatchAutoOffTransaction(u_int64_t uniqueId, BRM::TxnID txnID, u_int32_t sessionID, const u_int32_t tableOid, std::string & errorMsg);
-    int flushDataFiles (int rc, std::map<u_int32_t,u_int32_t> & columnOids, u_int64_t uniqueId, BRM::TxnID txnID);
+	std::string projectTableErrCodeToMsg(uint ec);
+	
+	bool validateNextValue(execplan::CalpontSystemCatalog::ColType colType, int64_t value, bool & offByOne);
+	
+	bool validateVarbinaryVal( std::string & inStr);
 
     /** @brief the write engine wrapper interface
      */
@@ -472,19 +434,13 @@ protected:
      */
     execplan::SessionManager fSessionManager;
     joblist::DistributedEngineComm *fEC;
-    joblist::ResourceManager* fRM;
+	joblist::ResourceManager* fRM;
     char* strlower(char* in);
     u_int32_t fSessionID;
     const unsigned DMLLoggingId;
-    uint fPMCount;
-    WriteEngine::WEClients* fWEClient;
-    BRM::DBRM fDbrm;
-    boost::shared_ptr<messageqcpp::MessageQueueClient> fExeMgr;
-    boost::shared_ptr<std::map<int, int> > fDbRootPMMap;
-    oam::Oam fOam;
-    bool fRollbackPending;         // When set, any derived object should stop what it's doing and cleanup in preparation for a Rollback
 
 private:
+    void executePlan(execplan::CalpontSelectExecutionPlan& csep, execplan::CalpontSystemCatalog::NJLSysDataList& valueList, const execplan::CalpontSystemCatalog::OID& tableOID);
     
    /** @brief clean beginning and ending glitches and spaces from string
       *

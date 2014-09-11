@@ -12,15 +12,10 @@
 		<IPAddr>127.0.0.1</IPAddr>
 		<Port>8614</Port>
 	</DMLProc>
-	<pm1_WriteEngineServer>
-		<IPAddr>127.0.0.1</IPAddr>
-		<Port>8630</Port>
-	</pm1_WriteEngineServer>
 	<BatchInsert>
 		<RowsPerBatch>10000</RowsPerBatch>
 	</BatchInsert>
 	<PrimitiveServers>
-		<Count>1</Count>
 		<ConnectionsPerPrimProc>2</ConnectionsPerPrimProc>
 		<ProcessorThreshold>128</ProcessorThreshold>
 		<ProcessorQueueSize>10K</ProcessorQueueSize>
@@ -43,15 +38,19 @@
 	<SystemConfig>
 		<SystemName>WInfiniDB</SystemName>
 		<ParentOAMModuleName>pm1</ParentOAMModuleName>
+		<StandbyOAMModuleName>unassigned</StandbyOAMModuleName>
 		<ModuleHeartbeatPeriod>10</ModuleHeartbeatPeriod>
 		<ModuleHeartbeatCount>3</ModuleHeartbeatCount>
 		<DBRootCount>1</DBRootCount>
 		<DBRoot1>##INSTDIR##/data1</DBRoot1>
 		<DBRMRoot>##INSTDIR##/dbrm/BRM_saves</DBRMRoot>
+		<RAIDCriticalThreshold>90</RAIDCriticalThreshold>
+		<RAIDMajorThreshold>80</RAIDMajorThreshold>
+		<RAIDMinorThreshold>70</RAIDMinorThreshold>
 		<TempDiskPath>##INSTDIR##/tmp</TempDiskPath>
 		<WorkingDir>##INSTDIR##</WorkingDir>
-		<TableLockSaveFile>##INSTDIR##/dbrm/tablelocks</TableLockSaveFile>
 		<TransactionArchivePeriod>10</TransactionArchivePeriod>
+		<NMSIPAddress>0.0.0.0</NMSIPAddress>
 		<TempSaveSize>128M</TempSaveSize>
 		<WaitPeriod>10</WaitPeriod>
 	</SystemConfig>
@@ -77,8 +76,6 @@
 		<ModuleSwapMajorThreshold1>80</ModuleSwapMajorThreshold1>
 		<ModuleSwapMinorThreshold1>70</ModuleSwapMinorThreshold1>
 		<ModuleDiskMonitorFileSystem1-1>/</ModuleDiskMonitorFileSystem1-1>
-		<ModuleDBRootCount1-1>0</ModuleDBRootCount1-1>
-		<ModuleDBRootID1-1-1>0</ModuleDBRootID1-1-1>
 		<ModuleType2>um</ModuleType2>
 		<ModuleDesc2>User Module</ModuleDesc2>
 		<RunType2>LOADSHARE</RunType2>
@@ -100,8 +97,6 @@
 		<ModuleSwapMajorThreshold2>80</ModuleSwapMajorThreshold2>
 		<ModuleSwapMinorThreshold2>70</ModuleSwapMinorThreshold2>
 		<ModuleDiskMonitorFileSystem1-2>/</ModuleDiskMonitorFileSystem1-2>	
-		<ModuleDBRootCount1-2>0</ModuleDBRootCount1-2>
-		<ModuleDBRootID1-1-2>0</ModuleDBRootID1-1-2>
 		<ModuleType3>pm</ModuleType3>
 		<ModuleDesc3>Performance Module</ModuleDesc3>
 		<RunType3>SIMPLEX</RunType3>
@@ -123,8 +118,48 @@
 		<ModuleSwapMajorThreshold3>80</ModuleSwapMajorThreshold3>
 		<ModuleSwapMinorThreshold3>70</ModuleSwapMinorThreshold3>
 		<ModuleDiskMonitorFileSystem1-3>/</ModuleDiskMonitorFileSystem1-3>
-		<ModuleDBRootCount1-3>1</ModuleDBRootCount1-3>
-		<ModuleDBRootID1-1-3>1</ModuleDBRootID1-1-3>
+		<ModuleType4>mm</ModuleType4>
+		<ModuleDesc4>Management Module</ModuleDesc4>
+		<RunType4>SIMPLEX</RunType4>
+		<ModuleCount4>0</ModuleCount4>
+		<ModuleIPAddr1-1-4>0.0.0.0</ModuleIPAddr1-1-4>
+		<ModuleHostName1-1-4>unassigned</ModuleHostName1-1-4>
+		<ModuleDisableState1-4>ENABLED</ModuleDisableState1-4>
+		<ModuleCPUCriticalThreshold4>90</ModuleCPUCriticalThreshold4>
+		<ModuleCPUMajorThreshold4>80</ModuleCPUMajorThreshold4>
+		<ModuleCPUMinorThreshold4>70</ModuleCPUMinorThreshold4>
+		<ModuleCPUMinorClearThreshold4>60</ModuleCPUMinorClearThreshold4>
+		<ModuleDiskCriticalThreshold4>90</ModuleDiskCriticalThreshold4>
+		<ModuleDiskMajorThreshold4>80</ModuleDiskMajorThreshold4>
+		<ModuleDiskMinorThreshold4>70</ModuleDiskMinorThreshold4>
+		<ModuleMemCriticalThreshold4>90</ModuleMemCriticalThreshold4>
+		<ModuleMemMajorThreshold4>80</ModuleMemMajorThreshold4>
+		<ModuleMemMinorThreshold4>70</ModuleMemMinorThreshold4>
+		<ModuleSwapCriticalThreshold4>90</ModuleSwapCriticalThreshold4>
+		<ModuleSwapMajorThreshold4>80</ModuleSwapMajorThreshold4>
+		<ModuleSwapMinorThreshold4>70</ModuleSwapMinorThreshold4>
+		<ModuleDiskMonitorFileSystem1-4>/</ModuleDiskMonitorFileSystem1-4>
+		<ModuleType5>xm</ModuleType5>
+		<ModuleDesc5>External Module</ModuleDesc5>
+		<RunType5>SIMPLEX</RunType5>
+		<ModuleCount5>0</ModuleCount5>
+		<ModuleIPAddr1-1-5>0.0.0.0</ModuleIPAddr1-1-5>
+		<ModuleHostName1-1-5>unassigned</ModuleHostName1-1-5>
+		<ModuleDisableState1-5>ENABLED</ModuleDisableState1-5>
+		<ModuleCPUCriticalThreshold5>90</ModuleCPUCriticalThreshold5>
+		<ModuleCPUMajorThreshold5>80</ModuleCPUMajorThreshold5>
+		<ModuleCPUMinorThreshold5>70</ModuleCPUMinorThreshold5>
+		<ModuleCPUMinorClearThreshold5>60</ModuleCPUMinorClearThreshold5>
+		<ModuleDiskCriticalThreshold5>90</ModuleDiskCriticalThreshold5>
+		<ModuleDiskMajorThreshold5>80</ModuleDiskMajorThreshold5>
+		<ModuleDiskMinorThreshold5>70</ModuleDiskMinorThreshold5>
+		<ModuleMemCriticalThreshold5>90</ModuleMemCriticalThreshold5>
+		<ModuleMemMajorThreshold5>80</ModuleMemMajorThreshold5>
+		<ModuleMemMinorThreshold5>70</ModuleMemMinorThreshold5>
+		<ModuleSwapCriticalThreshold5>90</ModuleSwapCriticalThreshold5>
+		<ModuleSwapMajorThreshold5>80</ModuleSwapMajorThreshold5>
+		<ModuleSwapMinorThreshold5>70</ModuleSwapMinorThreshold5>
+		<ModuleDiskMonitorFileSystem1-5>/</ModuleDiskMonitorFileSystem1-5>
 	</SystemModuleConfig>
 	<SystemExtDeviceConfig>
 		<Count>0</Count>
@@ -142,6 +177,7 @@
 		<TransactionAgeLimit>10</TransactionAgeLimit>
 	</SessionMonitor>
 	<VersionBuffer>
+		<NumVersionBufferFiles>4</NumVersionBufferFiles>
 		<VersionBufferFileSize>1GB</VersionBufferFileSize>
 	</VersionBuffer>
 	<OIDManager>
@@ -175,8 +211,14 @@
 		<SystemStartupOffline>n</SystemStartupOffline>
 		<InitialInstallFlag>y</InitialInstallFlag>
 		<ServerTypeInstall>2</ServerTypeInstall>
-		<DBRootStorageType>internal</DBRootStorageType>
-		<UMStorageType>internal</UMStorageType>
+		<CoreEnableFlag>n</CoreEnableFlag>
+		<OAMStorageType>local</OAMStorageType>
+		<OAMStorageLoc>unassigned</OAMStorageLoc>
+		<UserStorageType>local</UserStorageType>
+		<UserStorageLoc1>unassigned</UserStorageLoc1>
+		<DBRootStorageType>local</DBRootStorageType>
+		<DBRootStorageLoc1>unassigned</DBRootStorageLoc1>
+		<SharedNothing>n</SharedNothing>
 	</Installation>
 	<ExtentMap>
 		<FilesPerColumnPartition>4</FilesPerColumnPartition>
@@ -196,6 +238,10 @@
 		<RequestSize>1</RequestSize>
 		<MaxOutstandingRequests>5</MaxOutstandingRequests>
 	</JobList>
+	<ZDL>
+		<ZDL_MaxElementsInMem>32M</ZDL_MaxElementsInMem>
+		<ZDL_MaxElementsPerBucket>8M</ZDL_MaxElementsPerBucket>
+	</ZDL>
 	<TupleWSDL>
 		<MaxSize>1M</MaxSize>
 		<InitialCapacity>1M</InitialCapacity>

@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
- *   $Id: dropindexprocessor.cpp 8436 2012-04-04 18:18:21Z rdempsey $
+ *   $Id: dropindexprocessor.cpp 7409 2011-02-08 14:38:50Z rdempsey $
  *
  *
  ***********************************************************************/
@@ -34,7 +34,7 @@ DropIndexProcessor::DDLResult DropIndexProcessor::processPackage(ddlpackage::Dro
 {
     SUMMARY_INFO("DropIndexProcessor::processPackage");
 
-    boost::shared_ptr<CalpontSystemCatalog> sysCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( dropIndexStmt.fSessionID );
+    CalpontSystemCatalog *sysCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( dropIndexStmt.fSessionID );
     CalpontSystemCatalog::IndexName indexName;
     CalpontSystemCatalog::IndexOID indexOID;
 

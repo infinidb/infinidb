@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 //
-// $Id: batchprimitiveprocessor.h 1917 2012-08-01 15:58:55Z dhall $
+// $Id: batchprimitiveprocessor.h 1915 2012-08-01 15:54:40Z dhall $
 // C++ Interface: batchprimitiveprocessor
 //
 // Description: 
@@ -97,11 +97,8 @@ class BatchPrimitiveProcessor
 		/* Duplicate() returns a deep copy of this object as it was init'd by initBPP.
 			It's thread-safe wrt resetBPP. */
 		SBPP duplicate();
-		bool operator==(const BatchPrimitiveProcessor&) const;
-		inline bool operator!=(const BatchPrimitiveProcessor& bpp) const
-		{
-			return !(*this == bpp);
-		}
+		bool operator==(const BatchPrimitiveProcessor &) const;
+		bool operator!=(const BatchPrimitiveProcessor &) const;
 
 		inline uint getSessionID() { return sessionID; }
 		inline uint getStepID() { return stepID; }
@@ -333,9 +330,6 @@ class BatchPrimitiveProcessor
 
 		/* To ensure all packets of an LBID go out the same socket */
 		int sockIndex;
-
-		/* Shared nothing vars */
-		uint dbRoot;
 
 		friend class Command;
 		friend class ColumnCommand;

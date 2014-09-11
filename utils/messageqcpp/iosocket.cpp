@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 /***********************************************************************
-*   $Id: iosocket.cpp 3234 2012-08-15 21:02:43Z dhall $
+*   $Id: iosocket.cpp 3014 2012-03-08 14:51:56Z rdempsey $
 *
 *
 ***********************************************************************/
@@ -43,7 +43,7 @@ using namespace std;
 namespace messageqcpp {
 
 IOSocket::IOSocket(Socket* socket) :
-	fSocket(socket), sockID(0)
+	fSocket(socket)
 {
 	memset(&fSa, 0, sizeof(fSa));
 }
@@ -57,7 +57,6 @@ void IOSocket::doCopy(const IOSocket& rhs)
 {
 	fSocket = rhs.fSocket->clone();
 	fSa = rhs.fSa;
-	sockID = rhs.sockID;
 }
 
 IOSocket::IOSocket(const IOSocket& rhs)
@@ -84,12 +83,11 @@ const string IOSocket::toString() const
 	ostringstream oss;
 	char buf[INET_ADDRSTRLEN];
 	SocketParms sp = fSocket->socketParms();
-	const sockaddr_in* sinp = reinterpret_cast<const sockaddr_in*>(&fSa);
 	oss << "IOSocket: sd: " << sp.sd() <<
 #ifndef _MSC_VER
-	       " inet: " << inet_ntop(AF_INET, &sinp->sin_addr, buf, INET_ADDRSTRLEN) <<
+	       " inet: " << inet_ntop(AF_INET, &fSa.sin_addr, buf, INET_ADDRSTRLEN) <<
 #endif
-	       " port: " << ntohs(sinp->sin_port);
+	       " port: " << ntohs(fSa.sin_port);
 	return oss.str();
 #endif
 }

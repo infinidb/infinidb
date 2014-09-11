@@ -15,7 +15,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
-# $Id: Makefile.am 3720 2012-04-04 18:18:49Z rdempsey $
+# $Id: Makefile.am 2967 2011-05-12 16:30:07Z rdempsey $
 ## Process this file with automake to produce Makefile.in
 
 AM_CPPFLAGS = $(idb_cppflags) $(idb_common_includes)
@@ -27,7 +27,6 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 	we_colop.cpp \
 	we_colopcompress.cpp \
 	we_dctnrycompress.cpp \
-	we_tablemetadata.cpp \
 	../shared/we_blockop.cpp \
 	../shared/we_brm.cpp \
 	../shared/we_cache.cpp \
@@ -43,8 +42,6 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 	../shared/we_simplesyslog.cpp \
 	../shared/we_bulkrollbackfilecompressed.cpp \
 	../shared/we_bulkrollbackfile.cpp \
-	../shared/we_rbmetawriter.cpp \
-	../shared/we_dbrootextenttracker.cpp \
 	../dictionary/we_dctnry.cpp \
 	../xml/we_xmlop.cpp \
 	../xml/we_xmljob.cpp \
@@ -53,7 +50,7 @@ libwriteengine_la_SOURCES = writeengine.cpp \
 libwriteengine_la_LDFLAGS = -version-info 1:0:0 $(AM_LDFLAGS)
 libwriteengine_la_CPPFLAGS = -D_FILE_OFFSET_BITS=64 $(AM_CPPFLAGS)
 libwriteengine_la_LIBADD =
-include_HEADERS = writeengine.h we_colop.h we_colopcompress.h we_dctnrycompress.h we_tablemetadata.h
+include_HEADERS = writeengine.h we_colop.h we_colopcompress.h we_dctnrycompress.h
 
 test:
 
