@@ -32,6 +32,7 @@
 #include "we_stats.h"
 #include "we_colopbulk.h"
 #include "brmtypes.h"
+#include "cacheutils.h"
 #include "we_columnautoinc.h"
 #include "we_dbrootextenttracker.h"
 #include "we_brmreporter.h"
@@ -1153,7 +1154,7 @@ void ColumnInfo::lastInputRowInExtentInc( )
 //------------------------------------------------------------------------------
 // Parsing is complete for this column.  Flush pending data.  Close the current
 // segment file, and corresponding dictionary store file (if applicable).  Also
-// clears memory taken up by this ColumnInfo object.
+// flushes PrimProc cache, and clears memory taken up by this ColumnInfo object.
 //------------------------------------------------------------------------------
 int ColumnInfo::finishParsing( )
 {
@@ -1206,6 +1207,19 @@ int ColumnInfo::finishParsing( )
             column.colName << "; " << ec.errorString(rc);
         fLog->logMsg( oss.str(), rc, MSGLVL_ERROR);
         return rc;
+    }
+
+    // After closing the column and dictionary store files,
+    // flush any updated dictionary blocks in PrimProc
+    if (fDictBlocks.size() > 0)
+    {
+#ifdef PROFILE
+        Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+#endif
+        cacheutils::flushPrimProcAllverBlocks ( fDictBlocks );
+#ifdef PROFILE
+        Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
+#endif
     }
 
     clearMemory();

@@ -3349,7 +3349,6 @@ int WE_DMLCommandProc::validateColumnHWMs(
 
         // Find out column width
         colType = systemCatalogPtr->colType(ridList[k].objnum);
-        
 		colType.colWidth = convertor.getCorrectRowWidth((WriteEngine::ColDataType)colType.colDataType, colType.colWidth);
         // Find the first 1-byte, 2-byte, 4-byte, and 8-byte columns.
         // Use those as our reference HWM for the respective column widths.

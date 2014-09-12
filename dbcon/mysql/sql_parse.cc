@@ -7967,14 +7967,6 @@ int idb_vtable_process(THD* thd, Statement* statement)
 		thd->infinidb_vtable.autoswitch = false;
 	}
 
-        // for KKA debug
-        if (thd->query)
-        {
-          printf("IDB STMT LOG: %s\n", thd->query);
-          fflush(stdout);
-        }
-
-
 	// @bug 3014. Infinidb does not support lock tables. So if the tables are locked,
 	// they must be myisam tables. Change vtable to disable_vtable to make it through.
 	if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE || thd->locked_tables)
@@ -8443,10 +8435,9 @@ int idb_vtable_process(THD* thd, Statement* statement)
 				// Execution starts
 				// Phase 1.
 				alloc_query(thd, thd->infinidb_vtable.create_vtable_query.c_ptr(), thd->infinidb_vtable.create_vtable_query.length());
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+#ifdef SAFE_MUTEX
 				printf("<<< V-TABLE Phase 1: %s\n", thd->query);
-//#endif
+#endif
 				thd->infinidb_vtable.vtable_state = THD::INFINIDB_CREATE_VTABLE;
 				mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 				close_thread_tables(thd);
@@ -8478,10 +8469,9 @@ int idb_vtable_process(THD* thd, Statement* statement)
 						thd->query = thd->infinidb_vtable.create_vtable_query.c_ptr();
 						thd->query_length = thd->infinidb_vtable.create_vtable_query.length();
 						thd->infinidb_vtable.isUnion = false; // make state change to create_vtable in sql_select
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+#ifdef SAFE_MUTEX
 						printf("<<< V-TABLE Redo Phase 1: %s\n", thd->query);
-//#endif
+#endif
 						mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 						close_thread_tables(thd);
 						if (thd->infinidb_vtable.mysql_optimizer_off)
@@ -8516,10 +8506,9 @@ int idb_vtable_process(THD* thd, Statement* statement)
 						mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 						thd->infinidb_vtable.vtable_state = THD::INFINIDB_DISABLE_VTABLE;
 						alloc_query(thd, thd->infinidb_vtable.original_query.c_ptr(), thd->infinidb_vtable.original_query.length());
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+#ifdef SAFE_MUTEX
 						printf("<<< V-TABLE unsupported components encountered. Auto switch to table mode\n");
-//#endif
+#endif
 						mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 						thd->infinidb_vtable.vtable_state = THD::INFINIDB_INIT;
 					}
@@ -8533,10 +8522,9 @@ int idb_vtable_process(THD* thd, Statement* statement)
 				else if ( thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE )
 				{
 					alloc_query(thd, thd->infinidb_vtable.alter_vtable_query.c_ptr(), thd->infinidb_vtable.alter_vtable_query.length());
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+#ifdef SAFE_MUTEX
 					printf("<<< V-TABLE Phase 2: %s\n", thd->query);
-//#endif
+#endif
 					thd->infinidb_vtable.vtable_state = THD::INFINIDB_ALTER_VTABLE;
 					mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 					close_thread_tables(thd);
@@ -8552,19 +8540,17 @@ int idb_vtable_process(THD* thd, Statement* statement)
 						
 						alloc_query(thd, thd->infinidb_vtable.insert_vtable_query.c_ptr(), thd->infinidb_vtable.insert_vtable_query.length());
 						thd->infinidb_vtable.vtable_state = THD::INFINIDB_SELECT_VTABLE;
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+#ifdef SAFE_MUTEX
 						printf("<<< V-TABLE Phase 3: %s\n", thd->query);
-//#endif
+#endif
 					}
 					else
 					{
 						alloc_query(thd, thd->infinidb_vtable.select_vtable_query.c_ptr(), thd->infinidb_vtable.select_vtable_query.length());
 						thd->infinidb_vtable.vtable_state = THD::INFINIDB_SELECT_VTABLE;
-// temporarily turn on debug print for KKA
-//#ifdef SAFE_MUTEX
+		#ifdef SAFE_MUTEX
 						printf("<<< V-TABLE Phase 3: %s\n", thd->query);
-//#endif
+		#endif
 					}
 					mysql_parse(thd, thd->query, thd->query_length, &end_of_stmt);
 				}

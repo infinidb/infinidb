@@ -348,10 +348,6 @@ struct ColumnInfo
      */
     void updateBytesWrittenCounts( unsigned int numBytesWritten );
 
-    /** @brief Returns the list of HWM dictionary blks to be cached
-     */
-    void getDictFlushBlks( std::vector<BRM::LBID_t>& blks ) const;
-
     /** @brief Returns the current file size in bytes
      */
     int64_t getFileSize( ) const;
@@ -519,11 +515,6 @@ struct ColumnInfo
 inline boost::mutex& ColumnInfo::colMutex()
 {
     return fColMutex;
-}
-
-inline void ColumnInfo::getDictFlushBlks( std::vector<BRM::LBID_t>& blks ) const
-{
-    blks = fDictBlocks;
 }
 
 inline int64_t ColumnInfo::getFileSize( ) const

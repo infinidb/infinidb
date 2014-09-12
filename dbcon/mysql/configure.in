@@ -1832,7 +1832,7 @@ if test "$with_comment" != "no"
 then
   COMPILATION_COMMENT=$with_comment
 else
-  COMPILATION_COMMENT="Calpont InfiniDB Enterprise 3.5.10-2 GA (Commercial)"
+  COMPILATION_COMMENT="Calpont InfiniDB Enterprise 3.5.9-2 GA (Commercial)"
 fi
 AC_SUBST(COMPILATION_COMMENT)
 

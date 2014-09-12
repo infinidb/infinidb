@@ -44,8 +44,6 @@ using namespace boost;
 #include "we_simplesyslog.h"
 #include "we_bulkrollbackmgr.h"
 
-#include "cacheutils.h"
-
 namespace
 {
     const std::string  BAD_FILE_SUFFIX = ".bad"; // Reject data file suffix
@@ -600,14 +598,6 @@ int TableInfo::setParseComplete(const int &columnId,
         // allBuffersDoneForAColumn==TRUE means we are finished parsing columnId
         if(allBuffersDoneForAColumn)
         {
-            // Accumulate list of HWM dictionary blocks to be flushed from cache
-            std::vector<BRM::LBID_t> dictBlksToFlush;
-            fColumns[columnId].getDictFlushBlks( dictBlksToFlush );
-            for (unsigned kk=0; kk<dictBlksToFlush.size(); kk++)
-            {
-                fDictFlushBlks.push_back( dictBlksToFlush[kk] );
-            }
-
             int rc = fColumns[columnId].finishParsing( );
             if (rc != NO_ERROR)
             {
@@ -628,20 +618,6 @@ int TableInfo::setParseComplete(const int &columnId,
             //
             if(fNumberOfColsParsed >= fNumberOfColumns)
             {
-                // After closing the column and dictionary store files,
-                // flush any updated dictionary blocks in PrimProc.
-                if (fDictFlushBlks.size() > 0)
-                {
-#ifdef PROFILE
-                    Stats::startParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    cacheutils::flushPrimProcAllverBlocks(fDictFlushBlks);
-#ifdef PROFILE
-                    Stats::stopParseEvent(WE_STATS_FLUSH_PRIMPROC_BLOCKS);
-#endif
-                    fDictFlushBlks.clear();
-                }
-
                 // Update auto-increment next value if applicable.
                 rc = synchronizeAutoInc( );
                 if (rc != NO_ERROR)
