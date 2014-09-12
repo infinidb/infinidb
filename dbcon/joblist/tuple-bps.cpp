@@ -2232,7 +2232,7 @@ out:
 			formatMiniStats();
 		}
 
-		if (ffirstStepType == SCAN && bop == BOP_AND && !(fInputJobStepAssociation.status() != 0 || die))
+		if (ffirstStepType == SCAN && bop == BOP_AND)
 		{
 			cpMutex.lock(); //pthread_mutex_lock(&cpMutex);
  			lbidList->UpdateAllPartitionInfo();

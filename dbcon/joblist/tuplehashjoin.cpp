@@ -981,8 +981,6 @@ void TupleHashJoinStep::joinRunnerFcn(uint threadID)
 		joinedRowData.clear();
 		grabSomeWork(&inputData);
 	}
-	while (!inputData.empty())
-		grabSomeWork(&inputData);
 }
 
 void TupleHashJoinStep::makeDupList(const RowGroup &rg)
