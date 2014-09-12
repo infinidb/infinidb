@@ -3476,7 +3476,7 @@ namespace oam
 		unsigned int stateColumnWidth     = 9;  // "State"
 
         // Initialize System Catalog object used to get table name
-        boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
+        execplan::CalpontSystemCatalog* systemCatalogPtr =
             execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(0);
 
         std::string fullTblName;

@@ -64,7 +64,7 @@ public:
 	 * @warning this class takes ownership of the passed-in pointers.
 	 */
 	ThreadSafeQueue(boost::mutex* pimplLock=0, boost::condition* pimplCond=0) :
-		fShutdown(false), bytes(0), zeroCount(0)
+		fShutdown(false), bytes(0)
 	{
 		fPimplLock.reset(pimplLock);
 		fPimplCond.reset(pimplCond);

@@ -160,7 +160,7 @@ namespace joblist
 TupleAggregateStep::TupleAggregateStep(
 	const JobStepAssociation& inputJobStepAssociation,
 	const JobStepAssociation& outputJobStepAssociation,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
+	execplan::CalpontSystemCatalog* syscat,
 	uint32_t sessionId,
 	uint32_t txnId,
 	uint32_t statementId,
@@ -355,10 +355,10 @@ void TupleAggregateStep::doThreadedSecondPhaseAggregate(uint8_t threadID)
 		// reset bucketDone[] to be false
 		//memset(bucketDone, 0, sizeof(bucketDone));
 		fill(&bucketDone[0], &bucketDone[fNumOfBuckets], false);
-		while (!done && !(die || fInputJobStepAssociation.status()))
+		while (!done)
 		{
 			done = true;
-			for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+			for (uint c = 0; c < fNumOfBuckets; c++)
 			{
 				if (!bucketDone[c] && agg_mutex[c]->try_lock())
 				{
@@ -3950,22 +3950,20 @@ void TupleAggregateStep::addConstangAggregate(vector<ConstantAggData>& constAggD
 void TupleAggregateStep::aggregateRowGroups()
 {
 	shared_array<uint8_t> rgData;
-	bool more = true;
-	RowGroupDL *dlIn = NULL;
 
 	if (!fDoneAggregate)
 	{
 		if (fInputJobStepAssociation.outSize() == 0)
 			throw logic_error("No input data list for delivery.");
 
-		dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+		RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 		if (dlIn == NULL)
 			throw logic_error("Input is not RowGroup data list in delivery step.");
 
 		if (fInputIter < 0)
 			fInputIter = dlIn->getIterator();
 
-		more = dlIn->next(fInputIter, &rgData);
+		bool more = dlIn->next(fInputIter, &rgData);
 		if (traceOn()) dlTimes.setFirstReadTime();
 
 		try
@@ -4075,11 +4073,6 @@ void TupleAggregateStep::aggregateRowGroups()
 
 		fDoneAggregate = true;
 	}
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o having
-	   drained the input.  Prevents the feeding JobStep from exiting & hangs the session.
-	*/
-	while (more) 
-		more = dlIn->next(fInputIter, &rgData);
 }
 
 
@@ -4103,9 +4096,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 	//buildBucket << "buildBucket" << (int)threadID;
 	//buildMap << "buildMap" << (int)threadID;
 
-	bool more = true;
-	RowGroupDL *dlIn = NULL;
-	
 	RowAggregationMultiDistinct *multiDist = NULL;
 
 	if (!fDoneAggregate)
@@ -4113,11 +4103,12 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		if (fInputJobStepAssociation.outSize() == 0)
 			throw logic_error("No input data list for delivery.");
 
-		dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+		RowGroupDL *dlIn = fInputJobStepAssociation.outAt(0)->rowGroupDL();
 		if (dlIn == NULL)
 			throw logic_error("Input is not RowGroup data list in delivery step.");
 
 		vector<shared_array<uint8_t> > rgDatas;
+		bool more = true;
 
 		try
 		{
@@ -4271,7 +4262,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 				{
 					bool didWork = false;
 					done = true;
-					for (uint c = 0; c < fNumOfBuckets && !(die || fInputJobStepAssociation.status()); c++)
+					for (uint c = 0; c < fNumOfBuckets; c++)
 					{
 						if (!fEndOfResult && !bucketDone[c] && agg_mutex[c]->try_lock())
 						{
@@ -4293,7 +4284,7 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 						}
 					}
 					if (!didWork)
-						usleep(1000);   // avoid using all CPU during busy wait
+						usleep(500);   // avoid using all CPU during busy wait
 				}
 				rgDatas.clear();
 				rm->returnMemory(memUsage[threadID]);
@@ -4393,14 +4384,6 @@ void TupleAggregateStep::threadedAggregateRowGroups(uint8_t threadID)
 		dlTimes.setLastReadTime();
 		dlTimes.setEndOfInputTime();
 	}
-
-	/* Bug 5698.  A catch-all.  It seems that control can get here w/o
-	   having drained the input.  Prevents the feeding JobStep from exiting & hangs the session. 
-	*/
-	mutex.lock();
-	while (more) 
-		more = dlIn->next(fInputIter, &rgData);
-	mutex.unlock();
 }
 
 

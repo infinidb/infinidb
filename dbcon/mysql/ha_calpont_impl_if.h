@@ -107,7 +107,7 @@ struct gp_walk_info
 	std::vector<execplan::AggregateColumn*> count_asterisk_list;
 	std::vector<execplan::FunctionColumn*> no_parm_func_list;
 	TableMap tableMap;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog *csc;
 	int8_t internalDecimalScale;
 	THD* thd;
 	uint64_t subSelectType; // the type of sub select filter that owns the gwi
@@ -124,7 +124,8 @@ struct gp_walk_info
 		               fatalParseError(false), 
 		               condPush(false), 
 		               dropCond(false), 
-		               expressionId(0),
+		               expressionId(0), 
+		               csc(0), 
 		               internalDecimalScale(4),
 		               thd(0),
 		               subSelectType(uint64_t(-1)),

@@ -5301,12 +5301,26 @@ void ExtentMap::setReadOnly()
 	r_only = true;
 }
 
+inline void ExtentMap::makeUndoRecord(void *start, int size)
+{
+	ImageDelta d;
+
+ 	d.start = start;
+ 	d.size = size;
+ 	memcpy(d.data, start, size);
+  	undoRecords.push_back(d);
+}
+
 void ExtentMap::undoChanges()
 {
 #ifdef BRM_INFO
   	if (fDebug) TRACER_WRITENOW("undoChanges");
 #endif
-	Undoable::undoChanges();
+	vector<ImageDelta>::iterator it;
+
+	for (it = undoRecords.begin(); it != undoRecords.end(); it++)
+		memcpy((*it).start, (*it).data, (*it).size);
+
 	finishChanges();
 }
 
@@ -5315,12 +5329,13 @@ void ExtentMap::confirmChanges()
 #ifdef BRM_INFO
   	if (fDebug) TRACER_WRITENOW("confirmChanges");
 #endif
-	Undoable::confirmChanges();
 	finishChanges();
 }
 
 void ExtentMap::finishChanges()
 {
+
+	undoRecords.clear();
 	if (flLocked)
 		releaseFreeList(WRITE);
 	if (emLocked)

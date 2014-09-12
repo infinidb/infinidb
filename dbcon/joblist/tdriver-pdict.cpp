@@ -51,7 +51,7 @@ public:
 	void pDictStep_1()
 	{
 		DistributedEngineComm* dec;
-		boost::shared_ptr<CalpontSystemCatalog> cat;
+		CalpontSystemCatalog *cat;
 		ElementType e;
 		uint i, it;
 		bool more;

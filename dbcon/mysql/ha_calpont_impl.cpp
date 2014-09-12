@@ -283,7 +283,7 @@ int fetchNextRow(uchar *buf, cal_table_info& ti, cal_connection_info* ci)
 {
 	int rc = HA_ERR_END_OF_FILE;
 	int num_attr = ti.msTablePtr->s->fields;
-	boost::shared_ptr<CalpontSystemCatalog> csc;
+	CalpontSystemCatalog* csc = 0;
 	sm::status_t sm_stat;
 
 	try {
@@ -992,8 +992,7 @@ uint doUpdateDelete(THD *thd)
 	}
 	//save table oid for commit/rollback to use
 	uint32_t sessionID = tid2sid(thd->thread_id);
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	csc->identity(execplan::CalpontSystemCatalog::FE);
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	CalpontSystemCatalog::TableName aTableName;
 	TABLE_LIST *first_table = 0;
 	if (( (thd->lex)->sql_command == SQLCOM_UPDATE ) || ( (thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) )
@@ -1902,8 +1901,8 @@ long long callastinsertid(UDF_INIT* initid, UDF_ARGS* args,
 		}
 	}
 
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
-	csc->identity(execplan::CalpontSystemCatalog::FE);
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
+	
 	nextVal = csc->nextAutoIncrValue(tableName);	
 	
 	if (nextVal == -2)
@@ -2153,7 +2152,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
 		return doUpdateDelete(thd);
 	
 	uint32_t sessionID = tid2sid(thd->thread_id);
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);	
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);	
 	csc->identity(CalpontSystemCatalog::FE);
 	if (!thd->infinidb_vtable.cal_conn_info)
 		thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
@@ -3056,8 +3055,7 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 			return;
 		}
 			
-		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
-		csc->identity(execplan::CalpontSystemCatalog::FE);
+		CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(thd->thread_id));
 		CalpontSystemCatalog::TableName tableName;
 		tableName.schema = table->s->db.str;
 		tableName.table = table->s->table_name.str;

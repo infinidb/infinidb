@@ -2,6 +2,8 @@
 #
 # $Id: post-mysqld-install 1995 2010-07-02 13:59:21Z rdempsey $
 #
+# $Id: post-mysqld-install 3663 2013-06-25 22:04:58Z dhill $
+#
 # Post-install steps for calpont-mysqld install
 
 prefix=/usr/local

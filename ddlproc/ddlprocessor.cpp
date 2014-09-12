@@ -89,7 +89,7 @@ struct PackageHandler
 
         DDLPackageProcessor::DDLResult result;
         result.result = DDLPackageProcessor::NO_ERROR;
-        //boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+        //CalpontSystemCatalog* systemCatalogPtr;
                
         try
         {
@@ -100,7 +100,7 @@ struct PackageHandler
                     {
                         CreateTableStatement createTableStmt;
                         createTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
                         CreateTableProcessor processor;
                         PKNameMap::iterator it = pkNameMap.find(createTableStmt.fSessionID);
                         if (it == pkNameMap.end())
@@ -124,7 +124,7 @@ struct PackageHandler
                     {
                         CreateIndexStatement createIndexStmt;
                         createIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createIndexStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createIndexStmt.fSessionID );
                         CreateIndexProcessor processor;
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid..valid = true;
@@ -139,7 +139,7 @@ struct PackageHandler
                     {
                     	AlterTableStatement alterTableStmt;
                     	alterTableStmt.unserialize(fByteStream);
-                    	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
+                    	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
                     	AlterTableProcessor processor;   
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid.valid = true;
@@ -162,7 +162,7 @@ struct PackageHandler
                     {
                         DropTableStatement dropTableStmt;
                         dropTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
                         boost::scoped_ptr<DropTableProcessor> processor(new DropTableProcessor());
 						(processor->fTxnid).id = fTxnid.id;
 						(processor->fTxnid).valid = true;
@@ -176,7 +176,7 @@ struct PackageHandler
                     {
                         TruncTableStatement truncTableStmt;
                         truncTableStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
                         boost::scoped_ptr<TruncTableProcessor> processor(new TruncTableProcessor());
 						(processor->fTxnid).id = fTxnid.id;
@@ -190,7 +190,7 @@ struct PackageHandler
                     {
                         MarkPartitionStatement markPartitionStmt;
                         markPartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
                         CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
                         boost::scoped_ptr<MarkPartitionProcessor> processor(new MarkPartitionProcessor());
 						(processor->fTxnid).id = fTxnid.id;
@@ -204,7 +204,7 @@ struct PackageHandler
                     {
                         RestorePartitionStatement restorePartitionStmt;
                         restorePartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(restorePartitionStmt.fSessionID);
                         boost::scoped_ptr<RestorePartitionProcessor> processor(new RestorePartitionProcessor());
 						(processor->fTxnid).id = fTxnid.id;
@@ -218,7 +218,7 @@ struct PackageHandler
                     {
                         DropPartitionStatement dropPartitionStmt;
                         dropPartitionStmt.unserialize(fByteStream);
-                        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+                        CalpontSystemCatalog* systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(dropPartitionStmt.fSessionID);
                         boost::scoped_ptr<DropPartitionProcessor> processor(new DropPartitionProcessor());
 						(processor->fTxnid).id = fTxnid.id;
@@ -233,7 +233,7 @@ struct PackageHandler
                     {
                         DropIndexStatement dropIndexStmt;
                         dropIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
+						CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
                         DropIndexProcessor processor;
                         result = processor.processPackage(dropIndexStmt);
                         systemCatalogPtr->CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );

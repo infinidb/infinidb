@@ -360,11 +360,6 @@ void SubAdapterStep::execute()
 		{
 			fRowGroupIn.setData(rgDataIn.get());
 			rgDataOut.reset(new uint8_t[fRowGroupOut.getDataSize(fRowGroupIn.getRowCount())]);
-#ifdef VALGRIND
-			/* As of 1/21/14, some columns are left uninitialized.  Valgrind doesn't like that. 
-			Nothing seems broken, this would be a minor optimization opportunity. */
-			memset(rgDataOut.get(), 0, fRowGroupOut.getDataSize(fRowGroupIn.getRowCount()));
-#endif
 			fRowGroupOut.setData(rgDataOut.get());
 
 			fRowGroupIn.getRow(0, &rowIn);

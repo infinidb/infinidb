@@ -127,7 +127,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 				if ((stmt == "COMMIT") && (cpackage.get_isBatchInsert()))
 				{
 					//update syscolumn for the next value 
-					boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+					CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 					CalpontSystemCatalog::TableName tableName;
 					tableName = systemCatalogPtr->tableName(cpackage.getTableOid());
 					long long nextVal = systemCatalogPtr->nextAutoIncrValue(tableName);
@@ -188,7 +188,7 @@ CommandPackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 				{
 					//cout << "success in commitTransaction" << endl;
 					//update syscolumn for the next value 
-					boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+					CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 					CalpontSystemCatalog::TableName tableName;
 					uint32_t tableOid = cpackage.getTableOid();
 					std::vector<TableLockInfo> tableLocks = fDbrm.getAllTableLocks();
@@ -575,7 +575,7 @@ void CommandPackageProcessor::viewTableLock(
 	DMLPackageProcessor::DMLResult& result)
 {
 	// Initialize System Catalog object used to get table name
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+	CalpontSystemCatalog *systemCatalogPtr =
 		CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	CalpontSystemCatalog::TableName tableName;

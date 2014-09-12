@@ -179,7 +179,7 @@ void XMLGenProc::makeTableData(const CalpontSystemCatalog::TableName& table)
     {
         try
         {
-            boost::shared_ptr<CalpontSystemCatalog> cat =
+            CalpontSystemCatalog* cat =
                 CalpontSystemCatalog::makeCalpontSystemCatalog(
                 BULK_SYSCAT_SESSION_ID);
             cat->identity(CalpontSystemCatalog::EC);
@@ -377,7 +377,7 @@ void XMLGenProc::getColumnsForTable(
 
     try
     {
-        boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+        CalpontSystemCatalog* systemCatalogPtr =
             CalpontSystemCatalog::makeCalpontSystemCatalog(
             BULK_SYSCAT_SESSION_ID);
         systemCatalogPtr->identity(CalpontSystemCatalog::EC);

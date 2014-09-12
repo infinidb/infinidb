@@ -74,7 +74,7 @@ namespace ddlpackageprocessor
 
     SJLP jbl = joblist::JobListFactory::makeJobList(&csep, rm);
 
-    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
+    CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
     csc->identity(CalpontSystemCatalog::EC);
 
     jbl->putEngineComm(fEC);
@@ -142,7 +142,7 @@ namespace ddlpackageprocessor
  	CalpontSystemCatalog::OID oid;
  	tableColName.schema = fTable.fSchema;
  	tableColName.table = fTable.fName;
- 	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
+ 	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog( fSessionID );
     string tableName(fTable.fSchema + "." + fTable.fName + ".");
 
     ColumnNameList::const_iterator cend = fColNames.end();
@@ -161,7 +161,7 @@ namespace ddlpackageprocessor
   }
 
 	   
- CalpontSystemCatalog::ColType DDLIndexPopulator::makeIdxStruct(const ColumnResult* cr, size_t cols, boost::shared_ptr<CalpontSystemCatalog> csc )
+ CalpontSystemCatalog::ColType DDLIndexPopulator::makeIdxStruct(const ColumnResult* cr, size_t cols, CalpontSystemCatalog* csc )
   {
     IdxStruct idx;
     idx.treeOid = fIdxOID.treeOID;

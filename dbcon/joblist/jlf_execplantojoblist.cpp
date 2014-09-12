@@ -179,28 +179,8 @@ int64_t valueNullNum(const CalpontSystemCatalog::ColType& ct)
 			(ct.colDataType == CalpontSystemCatalog::VARBINARY && ct.colWidth <= 7) ||
 			(ct.colDataType == CalpontSystemCatalog::CHAR && ct.colWidth <= 8) )
 		{
-
-			const string &i = boost::any_cast<string>(anyVal);
-			//n = *((uint64_t *) i.c_str());
-			/* this matches what dataconvert is returning; not valid to copy
-			 * 8 bytes every time. */
-			if (ct.colDataType == CalpontSystemCatalog::CHAR) {
-				switch (ct.colWidth) {
-					case 1: n = *((uint8_t *) i.data()); break;
-					case 2: n = *((uint16_t *) i.data()); break;
-					case 3:
-					case 4: n = *((uint32_t *) i.data()); break;
-					default: n = *((uint64_t *) i.data()); break;
-				}
-			}
-			else {
-				switch (ct.colWidth) {
-					case 1: n = *((uint16_t *) i.data()); break;
-					case 2: n = *((uint32_t *) i.data()); break;
-					default: n = *((uint64_t *) i.data()); break;
-				}
-			}
-
+			string i = boost::any_cast<string>(anyVal);
+		  	n = *((uint64_t *) i.c_str());
 		}
 		else
 		{

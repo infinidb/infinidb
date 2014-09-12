@@ -52,7 +52,6 @@ public:
     //typedef boost::function0<int> Functor;
 
 	struct Job {
-		Job() : weight(1), priority(0), id(0) { }
 		boost::shared_ptr<Functor> functor;
 		uint weight;
 		uint priority;

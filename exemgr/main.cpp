@@ -362,6 +362,7 @@ struct SessionThread
 		{
 			if (--mapIter->second == 0)
 			{
+				cout << "remove sys" << endl;
 				threadCntPerSessionMap.erase(mapIter);
 				CalpontSystemCatalog::removeCalpontSystemCatalog(sessionId);
 				CalpontSystemCatalog::removeCalpontSystemCatalog((sessionId ^ 0x80000000));
@@ -444,7 +445,7 @@ private:
 		}
 	}
 	
-	void buildSysCache(const CalpontSelectExecutionPlan& csep, boost::shared_ptr<CalpontSystemCatalog> csc)
+	void buildSysCache(const CalpontSelectExecutionPlan& csep, CalpontSystemCatalog* csc)
 	{
 		const CalpontSelectExecutionPlan::ColumnMap& colMap = csep.columnMap();
 		CalpontSelectExecutionPlan::ColumnMap::const_iterator it;
@@ -548,7 +549,7 @@ new_plan:
 				// skip system catalog queries.
 				if ((csep.sessionID()&0x80000000)==0)
 				{
-					boost::shared_ptr<CalpontSystemCatalog> csc =
+					CalpontSystemCatalog* csc =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(csep.sessionID());
 					buildSysCache(csep, csc);
 				}

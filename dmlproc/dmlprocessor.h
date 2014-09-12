@@ -141,7 +141,7 @@ public:
 private:
 	messageqcpp::IOSocket fIos;
 	execplan::SessionManager sessionManager;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog* csc;
 
 	// A map to hold pointers to all active PackageProcessors
 	static std::map<uint32_t, PackageHandler*> packageHandlerMap;

@@ -135,7 +135,7 @@ uint8_t WE_DDLCommandProc::writeSystable(ByteStream& bs, std::string &err)
 	WriteEngine::RIDList ridList;
 	CalpontSystemCatalog::TableName tableName;
 	CalpontSystemCatalog::ROPair sysTableROPair;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	ColumnList columns;
 	ColumnList::const_iterator column_iterator;
 	DDLColumn column;
@@ -1173,7 +1173,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumn(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1265,7 +1265,7 @@ uint8_t WE_DDLCommandProc::deleteSyscolumnRow(ByteStream& bs, std::string & err)
 	tableColName.table = tablename;
 	tableColName.column = columnname;
 
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1355,7 +1355,7 @@ uint8_t WE_DDLCommandProc::deleteSystable(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	u_int16_t  dbRoot;
@@ -1444,7 +1444,7 @@ uint8_t WE_DDLCommandProc::deleteSystables(ByteStream& bs, std::string & err)
 	userTableName.schema = schema;
 	userTableName.table = tablename;
 
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	WriteEngine::ColStruct colStruct;
@@ -1633,7 +1633,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnAuto(ByteStream& bs, std::string & err
 	uint16_t segment;
 	uint32_t partition;
 	CalpontSystemCatalog::RIDList roList;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	try {
 		roList = systemCatalogPtr->columnRIDs(tableName);
@@ -1763,7 +1763,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnNextvalCol(ByteStream& bs, std::string
 	uint32_t partition;
 
 	CalpontSystemCatalog::RIDList roList;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	try {
 		roList = systemCatalogPtr->columnRIDs(tableName);
@@ -1898,7 +1898,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnTablename(ByteStream& bs, std::string 
 	uint32_t partition;
 
 	CalpontSystemCatalog::RIDList roList;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	
 	try {
@@ -2069,7 +2069,7 @@ uint8_t WE_DDLCommandProc::updateSystableAuto(ByteStream& bs, std::string & err)
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	
 	try {
@@ -2201,7 +2201,7 @@ uint8_t WE_DDLCommandProc::updateSystableTablename(ByteStream& bs, std::string &
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	
 	try {
@@ -2354,7 +2354,7 @@ uint8_t WE_DDLCommandProc::updateSystablesTablename(ByteStream& bs, std::string 
 	uint32_t partition;
 
 	CalpontSystemCatalog::ROPair ropair;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	
 	//@bug 4592 Error handling for syscat call
@@ -2645,7 +2645,7 @@ uint8_t WE_DDLCommandProc::updateSyscolumnColumnposCol(messageqcpp::ByteStream& 
 	CalpontSystemCatalog::TableName tableName;
 	tableName.table = atableName;
 	tableName.schema = schema;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+	CalpontSystemCatalog* systemCatalogPtr =
 	CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	CalpontSystemCatalog::RIDList rids;
@@ -3190,7 +3190,8 @@ uint8_t WE_DDLCommandProc::updateSyscolumnSetDefault(messageqcpp::ByteStream& bs
 	bs >> tableName;
 	bs >> colName;
 	bs >> defaultvalue;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	
@@ -3399,7 +3400,8 @@ uint8_t WE_DDLCommandProc::updateSyscolumnRenameColumn(messageqcpp::ByteStream& 
 	bs >> nextVal;
 	bs >> nullable;
 	bs >> defaultvalue;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	
+	CalpontSystemCatalog* systemCatalogPtr;
 	systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 	

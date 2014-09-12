@@ -820,9 +820,10 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 	uint i;
 	uint8_t flags = 0;
 
+	memset((void*)&ism, 0, sizeof(ism));
 	ism.Command = BATCH_PRIMITIVE_CREATE;
 
-	bs.load((uint8_t *) &ism, sizeof(ism));
+	bs.append((uint8_t *) &ism, sizeof(ism));
 	bs << (uint8_t) ot;
 	bs << (messageqcpp::ByteStream::quadbyte)versionNum;
 	bs << (messageqcpp::ByteStream::quadbyte)txnID;
@@ -891,9 +892,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 			for (i = 0; i < PMJoinerCount; i++) {
 				bs << (uint32_t) tJoiners[i]->size();
 				bs << tJoiners[i]->getJoinType();
-				
-				//bs << (uint64_t) tJoiners[i]->smallNullValue();
-				
+				bs << (uint64_t) tJoiners[i]->smallNullValue();
 				bs << (uint8_t) tJoiners[i]->isTypelessJoin();
 				if (tJoiners[i]->hasFEFilter()) {
 					atLeastOneFE = true;
@@ -903,7 +902,6 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 					bs << *tJoiners[i]->getFcnExpFilter();
 				}
 				if (!tJoiners[i]->isTypelessJoin()) {
-					bs << (uint64_t) tJoiners[i]->smallNullValue();
 					bs << (messageqcpp::ByteStream::quadbyte)tJoiners[i]->getLargeKeyColumn();
  					//cout << "large key column is " << (uint) tJoiners[i]->getLargeKeyColumn() << endl;
 				}

@@ -2104,7 +2104,7 @@ int WESDHandler::leastDataSendPm() {
 int WESDHandler::getTableOID(std::string Schema, std::string Table) {
 	execplan::CalpontSystemCatalog::ROPair roPair;
 	CalpontSystemCatalog::TableName tableName(Schema, Table);
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+	CalpontSystemCatalog *systemCatalogPtr =
 			CalpontSystemCatalog::makeCalpontSystemCatalog();
 	roPair = systemCatalogPtr->tableRID(tableName);
 

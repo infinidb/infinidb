@@ -1627,7 +1627,7 @@ SJLP makeJobList_(
 	unsigned& errCode, string& emsg)
 {
 	CalpontSelectExecutionPlan* csep = dynamic_cast<CalpontSelectExecutionPlan*>(cplan);
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(csep->sessionID());
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(csep->sessionID());
 
 	// We have to go ahead and create JobList now so we can store the joblist's
 	// projectTableOID pointer in JobInfo for use during jobstep creation.

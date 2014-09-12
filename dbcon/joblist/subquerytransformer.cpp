@@ -468,11 +468,10 @@ void SimpleScalarTransformer::getScalarResult()
 {
 	shared_array<uint8_t> rgData;
 	bool more = fInputDl->next(fDlIterator, &rgData);
+	fRowGroup.setData(rgData.get());
 
-	while (more)
+	if (more)
 	{
-		fRowGroup.setData(rgData.get());
-
 		// Only need one row for scalar filter
 		if (fEmptyResultSet && fRowGroup.getRowCount() == 1)
 		{
@@ -498,10 +497,10 @@ void SimpleScalarTransformer::getScalarResult()
 		}
 
 		// For scalar filter, have to check all blocks to ensure only one row.
-		if (fStatus->errCode != 0)
-			 while (more) more = fInputDl->next(fDlIterator, &rgData);
+		if (fStatus->errCode == 0)
+			getScalarResult();
 		else
-	    	more = fInputDl->next(fDlIterator, &rgData);
+			while (fInputDl->next(fDlIterator, &rgData));
 	}
 }
 

@@ -287,8 +287,7 @@ bool validateNextValue( int type, int64_t value )
 bool anyRowInTable(string& schema, string& tableName, int sessionID)
 {
 	//find a column in the table
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-	csc->identity(execplan::CalpontSystemCatalog::FE);
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	CalpontSystemCatalog::TableName aTableName;
 	algorithm::to_lower(schema);
 	algorithm::to_lower(tableName);
@@ -1084,8 +1083,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1290,8 +1288,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;
@@ -1427,8 +1424,7 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
 					if (autoIncre)
 					{
 						//Check if the table already has autoincrement column
-						boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
-						csc->identity(execplan::CalpontSystemCatalog::FE);
+						CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 						CalpontSystemCatalog::TableName tableName;
 						tableName.schema = alterTable->fTableName->fSchema;
 						tableName.table = alterTable->fTableName->fName;

@@ -216,8 +216,6 @@ public:
 								//cout << "Batch insert got error code:errormsg = " << (uint)tmp8<<":"<<errorMsg<<endl;
 								fBatchInsertProc->setError(rc, errorMsg);
 								pmState[tmp32] = true;
-								while(!fBatchInsertProc->getInsertQueue()->empty()) fBatchInsertProc->getInsertQueue()->pop();								
-								cond.notify_one();
 								//fWEClient->removeQueue(uniqueId);
 								break;
 							}

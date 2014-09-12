@@ -612,7 +612,7 @@ void JobList::graph(uint32_t sessionID)
 	JobStepVector::iterator qsi;
 	JobStepVector::iterator psi;
 	DeliveredTableMap::iterator dsi;
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	CalpontSystemCatalog::TableColName tcn;
 	uint64_t outSize = 0;
 	uint64_t msgs = 0;

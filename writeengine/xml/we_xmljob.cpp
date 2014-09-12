@@ -773,7 +773,7 @@ void XMLJob::postProcessTableNode()
 void XMLJob::fillInXMLDataAsLoaded(
     execplan::CalpontSystemCatalog::RIDList& colRidList)
 {
-    boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+    execplan::CalpontSystemCatalog* cat =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
         BULK_SYSCAT_SESSION_ID);
     cat->identity(execplan::CalpontSystemCatalog::EC);
@@ -1023,7 +1023,7 @@ void XMLJob::validateAllColumnsHaveTags(
             retVal = colOIDList.insert( col.mapOid );
             if (!retVal.second)
             {
-                boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+                execplan::CalpontSystemCatalog* cat =
                     execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
                     BULK_SYSCAT_SESSION_ID);
                 cat->identity(execplan::CalpontSystemCatalog::EC);
@@ -1051,7 +1051,7 @@ void XMLJob::validateAllColumnsHaveTags(
             }
             else
             {
-                boost::shared_ptr<execplan::CalpontSystemCatalog> cat =
+                execplan::CalpontSystemCatalog* cat =
                     execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
                     BULK_SYSCAT_SESSION_ID);
                 cat->identity(execplan::CalpontSystemCatalog::EC);

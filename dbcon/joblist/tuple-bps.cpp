@@ -724,7 +724,7 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
 		for (uint i = 0; i < cpColVec.size(); i++)
 		{
 			colCmd = cpColVec[i];
-			const EMEntry &extent = colCmd->getExtents()[idx];
+			EMEntry &extent = colCmd->getExtents()[idx];
 
 			/* If any column filter eliminates an extent, it doesn't get scanned */
 			scanFlags[idx] = scanFlags[idx] &&
@@ -918,7 +918,7 @@ void TupleBPS::reloadExtentLists()
 		if (cc == NULL)
 			continue;
 
-		const vector<EMEntry> &extents = cc->getExtents();
+		vector<EMEntry> &extents = cc->getExtents();
 		oid = cc->getOID();
 
 		extentsMap[oid] = tr1::unordered_map<int64_t, struct BRM::EMEntry>();
@@ -932,7 +932,7 @@ void TupleBPS::reloadExtentLists()
 		if (cc == NULL)
 			continue;
 
-		const vector<EMEntry> &extents = cc->getExtents();
+		vector<EMEntry> &extents = cc->getExtents();
 		oid = cc->getOID();
 
 		extentsMap[oid] = tr1::unordered_map<int64_t, struct BRM::EMEntry>();

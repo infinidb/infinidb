@@ -68,7 +68,7 @@ CreateIndexProcessor::DDLResult CreateIndexProcessor::processPackage(ddlpackage:
     tableName.schema = (createIndexStmt.fTableName)->fSchema;
     tableName.table = (createIndexStmt.fTableName)->fName;
     CalpontSystemCatalog::ROPair roPair;
-    boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( createIndexStmt.fSessionID );
+    CalpontSystemCatalog* systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog( createIndexStmt.fSessionID );
     try {
     	roPair = systemCatalogPtr->tableRID( tableName );
     }

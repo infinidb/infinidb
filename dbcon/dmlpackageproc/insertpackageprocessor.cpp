@@ -124,7 +124,7 @@ namespace dmlpackageprocessor
 			//cout << "single insert get transaction id " << txnid.id << endl;
 			// get the table object from the package
 			DMLTable *tablePtr = cpackage.get_Table();
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 			//cout << "DMLProc using syscatptr:sessionid = " << systemCatalogPtr <<":" << fSessionID<< endl;
 			CalpontSystemCatalog::TableName tableName;
 			execplan::CalpontSystemCatalog::ROPair roPair;
@@ -400,7 +400,7 @@ cout << "Single insert got unknown exception" << endl;
 		tableName.table = tableColName.table = table;
 		tableName.schema = tableColName.schema = schema;
 
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		
 		AutoincrementData *autoincrementData = AutoincrementData::makeAutoincrementData(fSessionID);
@@ -668,7 +668,7 @@ cout << "Single insert got unknown exception" << endl;
 		{
 			ColumnList addedColumns;
 
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 			systemCatalogPtr->sessionID(fSessionID);
 

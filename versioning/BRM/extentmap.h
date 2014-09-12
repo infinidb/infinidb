@@ -896,6 +896,7 @@ private:
 	void growFLShmseg();
 	void readData(int fd, u_int8_t* data, off_t offset, int size);
 	void writeData(int fd, u_int8_t* data, off_t offset, int size) const;
+	virtual void makeUndoRecord(void *start, int size);
 	void finishChanges();
 	EXPORT unsigned getFilesPerColumnPartition();
 	unsigned getExtentsPerSegmentFile();

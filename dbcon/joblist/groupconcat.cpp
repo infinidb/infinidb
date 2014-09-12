@@ -373,6 +373,7 @@ void GroupConcator::initialize(const rowgroup::SP_GroupConcat& gcc)
 {
 	fGroupConcatLen = gcc->fSize;
 	fCurrentLength -= strlen(gcc->fSeparator.c_str());
+
 	fConstCols = gcc->fConstCols;
 	fConstantLen = strlen(gcc->fSeparator.c_str());
 	for (uint64_t i = 0; i < fConstCols.size(); i++)
@@ -523,7 +524,8 @@ int64_t GroupConcator::lengthEstimate(const rowgroup::Row& row)
 			{
 				int64_t colWidth = row.getColumnWidth(*i);
 				uint8_t* pStr = row.getData() + row.getOffset(*i);
-				fieldLen = strnlen((char *) pStr, colWidth);
+				while ((*pStr++ > 0) && (fieldLen < colWidth))
+					fieldLen++;
 				break;
 			}
 			case CalpontSystemCatalog::DOUBLE:

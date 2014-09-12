@@ -77,7 +77,7 @@ MarkPartitionProcessor::DDLResult MarkPartitionProcessor::processPackage(ddlpack
 	try 
 	{
 		//check table lock
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
+		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(markPartitionStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(markPartitionStmt.fSessionID);
 		CalpontSystemCatalog::TableName tableName;

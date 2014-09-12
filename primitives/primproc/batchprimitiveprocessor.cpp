@@ -255,6 +255,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				bs >> tJoinerSizes[i];
  				//cout << "joiner size = " << tJoinerSizes[i] << endl;
 				bs >> joinTypes[i];
+				bs >> joinNullValues[i];
 				bs >> tmp8;
 				typelessJoin[i] = (bool) tmp8;
 				if (joinTypes[i] & WITHFCNEXP) {
@@ -265,7 +266,6 @@ void BatchPrimitiveProcessor::initBPP(ByteStream &bs)
 				if (joinTypes[i] & SMALLOUTER)
 					hasSmallOuterJoin = true;
 				if (!typelessJoin[i]) {
-					bs >> joinNullValues[i];
 					bs >> largeSideKeyColumns[i];
  					//cout << "large side key is " << largeSideKeyColumns[i] << endl;
 					_pools[i].reset(new utils::SimplePool());

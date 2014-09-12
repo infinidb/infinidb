@@ -309,7 +309,7 @@ int RedistributeWorkerThread::buildEntryList()
 	try
 	{
 		// get all column oids
-		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
+		CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(0);
 		const CalpontSystemCatalog::TableName table = csc->tableName(fPlanEntry.table);
 		CalpontSystemCatalog::RIDList cols = csc->columnRIDs(table, true);
 		for (CalpontSystemCatalog::RIDList::iterator i = cols.begin(); i != cols.end(); i++)

@@ -120,7 +120,7 @@ namespace joblist
 pColScanStep::pColScanStep(const JobStepAssociation& inputJobStepAssociation,
 	const JobStepAssociation& outputJobStepAssociation,
 	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> syscat,
+	CalpontSystemCatalog* syscat,
 	CalpontSystemCatalog::OID o,
 	CalpontSystemCatalog::OID t,
 	const CalpontSystemCatalog::ColType& ct,

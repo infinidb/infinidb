@@ -495,7 +495,7 @@ status_t get_tblinfo (
     // TODO: need a dharma version for ODBC solution.
     cpsm_conhdl_t* hndl = static_cast<cpsm_conhdl_t*>(conn_hdl);
     uint32_t  sessionid = hndl->sessionID;
-    boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
+    CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionid);
     csc->sessionID(sessionid);
     csc->identity(CalpontSystemCatalog::FE);
     

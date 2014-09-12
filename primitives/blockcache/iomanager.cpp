@@ -389,8 +389,16 @@ char* alignTo(const char* in, int av)
 
 void waitForRetry(long count)
 {
-	usleep(5000 * count); 
-	return;
+	return;  // neutered for 3.0
+
+	timespec ts;
+	ts.tv_sec = 5L*count/10L;
+	ts.tv_nsec = (5L*count%10L)*100000000L;
+#ifdef _MSC_VER
+	Sleep(ts.tv_sec * 1000 + ts.tv_nsec / 1000 / 1000);
+#else
+	nanosleep(&ts, 0);
+#endif
 }
 
 
@@ -399,7 +407,6 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 {
 	ssize_t i;
 	struct stat statbuf;
-	ssize_t progress;
 
 	// ptr is taken from buffer, already been checked: realbuff.get() == 0
 	if (ptr == 0)
@@ -428,7 +435,6 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 		i = bytesRead;
 	else
 		i = -1;
-	progress = i;
 #else
 	int fd = fdit->second->fd;
 	if (fd < 0)
@@ -441,15 +447,9 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 	//We need to read one extra block because we need the first ptr in the 3rd block
 	// to know if we're done.
 	//FIXME: re-work all of this so we don't have to re-read the 3rd block.
-	progress = 0;
-	while (progress < 4096 * 3) {
-		i = pread(fd, &ptr[progress], (4096 * 3) - progress, progress);
-		if (i <= 0)
-			break;
-		progress += i;
-	}
+	i = pread(fd, ptr, 4096 * 3, 0);
 #endif
-	if (progress != 4096 * 3)
+	if (i != 4096 * 3)
 		return -4;   // let it retry. Not likely, but ...
 
 #ifdef _MSC_VER
@@ -491,19 +491,9 @@ int updateptrs(char* ptr, FdCacheType_t::iterator fdit, const IDBCompressInterfa
 			i = bytesRead;
 		else
 			i = -1;
-		progress = i;
 #else
-		progress = 0;
-		while (progress < numHdrs * 4096) {
-			i = pread(fd, &nextHdrBufPtr[progress], (numHdrs * 4096) - progress, 
-			  (4096 * 2) + progress);
-			if (i <= 0)
-				break;
-			progress += i;
-		}
+		i = pread(fd, &nextHdrBufPtr[0], numHdrs * 4096, 4096 * 2);
 #endif
-		if (progress != numHdrs * 4096)
-			return -8;
 		CompChunkPtrList nextPtrList;
 		gplRc = decompressor.getPtrList(&nextHdrBufPtr[0], numHdrs * 4096, nextPtrList);
 		if (gplRc != 0)

@@ -880,10 +880,6 @@ blockReadRetry:
 				mlp->logInfoMessage(logging::M0006, args);
 			}
 
-			if (pWasBlockInCache)
-				*pWasBlockInCache = false;
-			if (rCount)
-				*rCount = 1; 
 			return;
 		}
 
@@ -1162,13 +1158,11 @@ private:
 	SP_UM_IOSOCK fIos;
 	SBS fByteStream;
 	SP_UM_MUTEX fWriteLock;
-	posix_time::ptime dieTime;
 };
 
 DictScanJob::DictScanJob(SP_UM_IOSOCK ios, SBS bs, SP_UM_MUTEX writeLock) :
 		fIos(ios), fByteStream(bs), fWriteLock(writeLock)
 {
-	dieTime = posix_time::second_clock::universal_time() + posix_time::seconds(100);
 }
 
 DictScanJob::~DictScanJob()
@@ -1191,7 +1185,7 @@ int DictScanJob::operator()()
 	uint32_t blocksRead = 0;
 	uint16_t runCount;
 
-	shared_ptr<DictEqualityFilter> eqFilter;
+	map<uint32_t, shared_ptr<DictEqualityFilter> >::iterator eqFilter;
 	ByteStream results(output_buf_size);
 	TokenByScanRequestHeader *cmd = (TokenByScanRequestHeader *) fByteStream->buf();
 	PrimitiveProcessor pproc(gDebugLevel);
@@ -1206,28 +1200,16 @@ int DictScanJob::operator()()
 		uniqueId = cmd->Hdr.UniqueID;
 		runCount = cmd->Count;
 		output = (TokenByScanResultHeader *) results.getInputPtr();
+		eqFilter = dictEqualityFilters.end();
 
 		/* Grab the equality filter if one is specified */
 		if (cmd->flags & HAS_EQ_FILTER) {
-			while (!eqFilter) {
-				map<uint32_t, shared_ptr<DictEqualityFilter> >::iterator it;
+			while (eqFilter == dictEqualityFilters.end()) {
 				mutex::scoped_lock sl(eqFilterMutex);
-				it = dictEqualityFilters.find(uniqueId);
-				if (it != dictEqualityFilters.end())
-					eqFilter = it->second;
-				else {
-					sl.unlock();
-					if (posix_time::second_clock::universal_time() > dieTime) 
-						return 0;   // timeout, might have been aborted
-					else {
-						if (session & 0x80000000) {   // can't return on a syscat job in 3.6
-							usleep(10000);
-							continue;
-						}
-						fByteStream->rewind();
-						return -1;   // still being built, reschedule
-					}
-				}
+				eqFilter = dictEqualityFilters.find(uniqueId);
+				sl.unlock();
+				if (eqFilter == dictEqualityFilters.end())
+					usleep(10000);    // it's still being built, wait for it
 			}
 		}
 
@@ -1242,7 +1224,11 @@ int DictScanJob::operator()()
 				fLBIDTraceOn,
 				session);
 			pproc.setBlockPtr((int*) data);
-			pproc.p_TokenByScan(cmd, output, output_buf_size, utf8, eqFilter);
+
+			boost::shared_ptr<DictEqualityFilter> defp;
+			if (eqFilter != dictEqualityFilters.end())
+				defp = eqFilter->second;  // doing this assignment is more portable
+			pproc.p_TokenByScan(cmd, output, output_buf_size, utf8, defp);
 
 			if (wasBlockInCache)
 				output->CacheIO++;

@@ -1577,7 +1577,7 @@ void debug_walk(const Item *item, void *arg)
 #endif
 
 /* get the smallest column of a table. Used for filling columnmap */
-SimpleColumn* getSmallestColumn(boost::shared_ptr<CalpontSystemCatalog> csc,
+SimpleColumn* getSmallestColumn(CalpontSystemCatalog *csc,
 								CalpontSystemCatalog::TableName& tn,
 								CalpontSystemCatalog::TableAliasName& tan,
 								TABLE* table,
@@ -3849,7 +3849,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 	}
 	uint32_t sessionID = csep->sessionID();
 	gwi.sessionid = sessionID;
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 	gwi.csc = csc;
 
@@ -5749,7 +5749,7 @@ int cp_get_table_plan(THD* thd, SCSEP& csep, cal_table_info& ti)
 	uint32_t sessionID = csep->sessionID();
 	gwi->sessionid = sessionID;
 	TABLE* table = ti.msTablePtr;
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 
 	// get all columns that mysql needs to fetch

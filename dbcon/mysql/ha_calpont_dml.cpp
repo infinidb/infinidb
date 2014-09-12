@@ -778,7 +778,7 @@ int ha_calpont_impl_write_row_(uchar *buf, TABLE* table, cal_connection_info& ci
 			return tableLockInfo;
 		}
 
-		boost::shared_ptr<execplan::CalpontSystemCatalog> csc =
+		execplan::CalpontSystemCatalog* csc =
 			execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 		csc->identity(execplan::CalpontSystemCatalog::FE);
 

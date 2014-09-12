@@ -76,7 +76,7 @@ namespace ddlpackageprocessor
 		try 
 		{
 			//check table lock
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(restorePartitionStmt.fSessionID);
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(restorePartitionStmt.fSessionID);
 			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 			systemCatalogPtr->sessionID(restorePartitionStmt.fSessionID);
 			CalpontSystemCatalog::TableName tableName;

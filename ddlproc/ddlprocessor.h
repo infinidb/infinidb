@@ -79,7 +79,7 @@ private:
     int fPackageWorkQueueSize;  /** @brief max number of ddl packages waiting in the work queue */
 
     messageqcpp::MessageQueueServer fMqServer;
-    boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+    execplan::CalpontSystemCatalog* csc;
 	WriteEngine::WEClients* fWEClient;
 	uint fPMCount;
 };

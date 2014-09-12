@@ -1505,16 +1505,16 @@ const CalpontSystemCatalog::SCN CalpontSystemCatalog::scn(void) const
 #endif
 
 /* static */
-boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemCatalog(u_int32_t sessionID) 
+CalpontSystemCatalog* CalpontSystemCatalog::makeCalpontSystemCatalog(u_int32_t sessionID) 
 {
     boost::mutex::scoped_lock lock(map_mutex);
-    boost::shared_ptr<CalpontSystemCatalog> instance;
+    CalpontSystemCatalog* instance;
     CatalogMap::const_iterator it = fCatalogMap.find(sessionID);
     if (sessionID == 0)
     {
         if (it == fCatalogMap.end())
         {
-            instance.reset(new CalpontSystemCatalog());
+            instance = new CalpontSystemCatalog();
             fCatalogMap[0] = instance;
             return instance;
         }
@@ -1536,7 +1536,7 @@ boost::shared_ptr<CalpontSystemCatalog> CalpontSystemCatalog::makeCalpontSystemC
 
     if (it == fCatalogMap.end())
     {
-        instance.reset(new CalpontSystemCatalog());
+        instance = new CalpontSystemCatalog();
         instance->sessionID(sessionID);
 	    instance->fExeMgr->setSessionId(sessionID);
         fCatalogMap[sessionID] = instance;
@@ -1551,15 +1551,12 @@ void CalpontSystemCatalog::removeCalpontSystemCatalog(u_int32_t sessionID)
 {
     boost::mutex::scoped_lock lock(map_mutex);
     DEBUG << "remove calpont system catalog for session " << sessionID << endl;
-	fCatalogMap.erase(sessionID);
-/*
     CatalogMap::iterator it = fCatalogMap.find(sessionID);
     if (it != fCatalogMap.end())
     {
         delete (*it).second;
         fCatalogMap.erase(it);
     }    
-*/
 }
 
 CalpontSystemCatalog::CalpontSystemCatalog():

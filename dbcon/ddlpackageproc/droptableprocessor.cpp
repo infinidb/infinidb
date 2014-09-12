@@ -92,7 +92,7 @@ namespace ddlpackageprocessor
         try 
         {	
 			//check table lock
-			boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
+			CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID);
 			systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 			systemCatalogPtr->sessionID(dropTableStmt.fSessionID);
 			CalpontSystemCatalog::TableName tableName;
@@ -543,7 +543,7 @@ cout << "Drop table removing column files" << endl;
 		std::string  processName("DDLProc");
 		u_int32_t  processID = ::getpid();;
 		int32_t   txnid = txnID.id;
-		boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
+		CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
 		systemCatalogPtr->identity(CalpontSystemCatalog::EC);
 		systemCatalogPtr->sessionID(truncTableStmt.fSessionID);
 		CalpontSystemCatalog::TableInfo tableInfo;

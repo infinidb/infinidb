@@ -536,7 +536,7 @@ void partitionByValue_common(UDF_ARGS* args,                               // in
 
 	try
 	{
-		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
+		CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
 		csc->identity(CalpontSystemCatalog::FE);
 		OID_t oid = csc->lookupOID(tcn);
@@ -808,7 +808,7 @@ const char* calshowpartitions(UDF_INIT* initid, UDF_ARGS* args,
 	
 	//try
 	//{
-		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
+		CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
 		csc->identity(CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
 		OID_t oid = csc->lookupOID(tcn);
@@ -1467,7 +1467,7 @@ const char* calshowpartitionsbyvalue(UDF_INIT* initid, UDF_ARGS* args,
 			column = (char*)(args->args[1]);
 		}
 	
-		boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
+		CalpontSystemCatalog* csc = CalpontSystemCatalog::makeCalpontSystemCatalog(tid2sid(current_thd->thread_id));
 		csc->identity(CalpontSystemCatalog::FE);
 		CalpontSystemCatalog::TableColName tcn = make_tcn(schema, table, column);
 		OID_t oid = csc->lookupOID(tcn);

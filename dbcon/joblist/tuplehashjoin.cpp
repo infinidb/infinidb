@@ -1025,20 +1025,6 @@ void TupleHashJoinStep::processFE2(RowGroup &input, RowGroup &output, Row &inRow
 	bool ret;
 
 	result.reset(new uint8_t[output.getMaxDataSize()]);
-
-/* Another case where it seems there is an unused column in the RowGroup;
-   valgrind complains that it doesn't get initialized before it's sent
-   over the network for this query against tpch 1G
-
-select sub1.c1 s1c1, sub2.c1 s2c1, sub3.c1 s3c1 from sub1 left join sub2 
-	on sub1.c1 = sub2.c1 left join sub3 on sub2.c1 = sub3.c1 where sub3.c1 
-	is null order by 1, 2, 3;
-
-  Minor optimization opportunity. */
-#ifdef VALGRIND
-	memset(result.get(), 0, output.getMaxDataSize());
-#endif
-
 	output.setData(result.get());
 	output.resetRowGroup(0);
 	output.getRow(0, &outRow);

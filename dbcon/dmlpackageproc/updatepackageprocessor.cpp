@@ -79,7 +79,7 @@ UpdatePackageProcessor::processPackage(dmlpackage::CalpontDMLPackage& cpackage)
 	TablelockData * tablelockData = TablelockData::makeTablelockData(fSessionID);
 	uint64_t uniqueId = fDbrm.getUnique64();
 	uint64_t tableLockId = 0;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
+	CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionID);
 	CalpontSystemCatalog::TableName tableName;		
 	// get the table object from the package
     DMLTable* tablePtr =  cpackage.get_Table();

@@ -592,11 +592,6 @@ void PackageHandler::run()
 							else if ( rc !=0) 
 							{
 								result.result = dmlpackageprocessor::DMLPackageProcessor::VB_OVERFLOW_ERROR;
-								logging::Message::Args args;
-								logging::Message message(1);
-								args.add(errMsg);
-								message.format(args);
-								result.message = message;
 								break;
 							}
 							

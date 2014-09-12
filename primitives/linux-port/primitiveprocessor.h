@@ -50,7 +50,6 @@
 #include "calpontsystemcatalog.h"
 #include "stats.h"
 #include "primproc.h"
-#include "hasher.h"
 
 class PrimTest;
 
@@ -82,7 +81,7 @@ class pcfEqual
 };
 
 typedef std::tr1::unordered_set<int64_t, pcfHasher, pcfEqual> prestored_set_t;
-typedef std::tr1::unordered_set<std::string, utils::Hasher> DictEqualityFilter;
+typedef std::tr1::unordered_set<std::string> DictEqualityFilter;
 
 struct idb_regex_t
 {

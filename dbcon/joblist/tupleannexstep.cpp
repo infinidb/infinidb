@@ -208,8 +208,7 @@ uint TupleAnnexStep::nextBand(messageqcpp::ByteStream &bs)
 		}
 		else
 		{
-			while (more)
-				more = fOutputDL->next(fOutputIterator, &rgDataOut);
+			if (more) more = fOutputDL->next(fOutputIterator, &rgDataOut);
 			fEndOfResult = true;
 		}
 	}

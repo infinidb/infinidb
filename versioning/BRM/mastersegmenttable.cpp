@@ -137,26 +137,27 @@ MasterSegmentTable::MasterSegmentTable()
 	RWLockKeys[3] = fShmKeys.KEYRANGE_VSS_BASE;
 	RWLockKeys[4] = fShmKeys.KEYRANGE_CL_BASE;
 		
+	rwlock[0] = NULL;
 	try {
-		rwlock[0].reset(new RWLock(RWLockKeys[0], true));
+		rwlock[0] = new RWLock(RWLockKeys[0], true);
 		initializer = true;
 	}
 	catch(rwlock::not_excl& e) {
 		try {
-			rwlock[0].reset(new RWLock(RWLockKeys[0]));
+			rwlock[0] = new RWLock(RWLockKeys[0]);
 		}
 		catch (exception &e) {
 			cerr << "ControllerSegmentTable: RWLock() threw: " << e.what() << endl;
 			throw;
 		}
 	}
-	if (!rwlock[0]) {
+	if (rwlock[0] == NULL) {
 		cerr << "ControllerSegmentTable(): RWLock() failed..?" << endl;
 		throw runtime_error("ControllerSegmentTable(): RWLock() failed..?");
 	}
 	
 	for (i = 1; i < nTables; i++)
-		rwlock[i].reset(new RWLock(RWLockKeys[i]));
+		rwlock[i] = new RWLock(RWLockKeys[i]);
 	
 	makeMSTSegment();
 	if (initializer) {
@@ -171,6 +172,10 @@ MasterSegmentTable::MasterSegmentTable()
 
 MasterSegmentTable::~MasterSegmentTable()
 {
+	int i;
+	
+	for (i = 0; i < nTables; i++)
+		delete rwlock[i];
 }
 	
 void MasterSegmentTable::makeMSTSegment()

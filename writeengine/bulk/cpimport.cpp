@@ -796,7 +796,7 @@ void getTableOID(const std::string& xmlGenSchema,
         xmlGenSchema, xmlGenTable );
     try
     {
-        boost::shared_ptr<CalpontSystemCatalog> cat =
+        CalpontSystemCatalog* cat =
             CalpontSystemCatalog::makeCalpontSystemCatalog(
             BULK_SYSCAT_SESSION_ID);
         cat->identity(CalpontSystemCatalog::EC);

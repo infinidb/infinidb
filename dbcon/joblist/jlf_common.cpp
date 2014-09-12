@@ -345,7 +345,7 @@ bool isCharCol(const CalpontSystemCatalog::ColType& colType)
 //------------------------------------------------------------------------------
 // Returns OID associated with a table
 //------------------------------------------------------------------------------
-CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, boost::shared_ptr<CalpontSystemCatalog> cat)
+CalpontSystemCatalog::OID tableOid(const SimpleColumn* sc, CalpontSystemCatalog* cat)
 {
 	if (sc->schemaName().empty())
 		return execplan::CNX_VTABLE_ID;

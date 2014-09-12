@@ -165,6 +165,7 @@ struct JobInfo
 		txnId(0),
 		verId(0),
 		statementId(0),
+		csc(0),
 		maxBuckets(rm.getHjMaxBuckets()),
 		maxElems(rm.getHjMaxElems()),
 		flushInterval(rm.getJLFlushInterval()),
@@ -202,7 +203,7 @@ struct JobInfo
 	uint32_t  txnId;
 	uint32_t  verId;
 	uint32_t  statementId;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
+	execplan::CalpontSystemCatalog* csc;
 	DeliveredTablesSet tables;
 	int       maxBuckets;
 	uint64_t maxElems;
@@ -364,7 +365,7 @@ bool isCharCol(const execplan::CalpontSystemCatalog::ColType& colType);
  *
  */
 execplan::CalpontSystemCatalog::OID tableOid(const execplan::SimpleColumn* sc,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> cat);
+	execplan::CalpontSystemCatalog* cat);
 
 /** @brief Returns the unique ID to be used in tupleInfo
  *

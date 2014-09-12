@@ -94,7 +94,7 @@ pDictionaryStep::pDictionaryStep(
 	const JobStepAssociation& inputJobStepAssociation,
 	const JobStepAssociation& outputJobStepAssociation,
 	DistributedEngineComm* dec,
-	boost::shared_ptr<CalpontSystemCatalog> cat,
+	CalpontSystemCatalog* cat,
 	CalpontSystemCatalog::OID o,
 	int ct,
 	CalpontSystemCatalog::OID t,

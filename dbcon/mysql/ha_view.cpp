@@ -71,7 +71,7 @@ void View::transform()
 
 	uint32_t sessionID = csep->sessionID();
 	gwi.sessionid = sessionID;
-	boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
+	CalpontSystemCatalog *csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
 	csc->identity(CalpontSystemCatalog::FE);
 	gwi.csc = csc;
 

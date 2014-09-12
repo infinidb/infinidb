@@ -31,7 +31,7 @@ typedef CalpontSystemCatalog::OID OID_t;
 typedef CalpontSystemCatalog::ColType ColType_t;
 typedef CalpontSystemCatalog::ROPair ROPair_t;
 
-boost::shared_ptr<CalpontSystemCatalog> csc;
+CalpontSystemCatalog* csc;
 
 string toString(const string& tb, const string& col)
 {

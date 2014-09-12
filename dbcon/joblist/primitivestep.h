@@ -141,7 +141,7 @@ public:
     pColStep(const JobStepAssociation& in, 
 		const JobStepAssociation& out, 
 		DistributedEngineComm* ec,
-		boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat,
+		execplan::CalpontSystemCatalog *syscat,
 		execplan::CalpontSystemCatalog::OID oid,
 		execplan::CalpontSystemCatalog::OID tableOid,
 		const execplan::CalpontSystemCatalog::ColType& ct,
@@ -352,7 +352,7 @@ private:
     JobStepAssociation fInputJobStepAssociation;
     JobStepAssociation fOutputJobStepAssociation;
     DistributedEngineComm* fDec;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
+	execplan::CalpontSystemCatalog *sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	execplan::CalpontSystemCatalog::ColType fColType;
@@ -442,7 +442,7 @@ public:
     pColScanStep(const JobStepAssociation& inputJobStepAssociation,
 	const JobStepAssociation& outputJobStepAssociation,
 	DistributedEngineComm* dec,
-	boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
+	execplan::CalpontSystemCatalog* syscat,
 	execplan::CalpontSystemCatalog::OID oid,
 	execplan::CalpontSystemCatalog::OID tableOid,
 	const execplan::CalpontSystemCatalog::ColType& ct,
@@ -735,7 +735,7 @@ public:
     pDictionaryStep(const JobStepAssociation& in, 
 		const JobStepAssociation& out, 
 		DistributedEngineComm* ec,
-		boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat,
+		execplan::CalpontSystemCatalog *syscat,
 		execplan::CalpontSystemCatalog::OID oid,
 		int ct,
 		execplan::CalpontSystemCatalog::OID tabelOid,
@@ -835,7 +835,7 @@ private:
     JobStepAssociation fInputJobStepAssociation;
     JobStepAssociation fOutputJobStepAssociation;
     DistributedEngineComm* fDec;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
+	execplan::CalpontSystemCatalog* sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	uint32_t fSessionId;
@@ -903,7 +903,7 @@ public:
     pDictionaryScan(const JobStepAssociation& in, 
 		const JobStepAssociation& out, 
 		DistributedEngineComm* ec,
-		boost::shared_ptr<execplan::CalpontSystemCatalog> syscat,
+		execplan::CalpontSystemCatalog *syscat,
 		execplan::CalpontSystemCatalog::OID oid,
 		int ct,
 		execplan::CalpontSystemCatalog::OID tableOid,
@@ -1022,7 +1022,7 @@ private:
     JobStepAssociation fInputJobStepAssociation;
     JobStepAssociation fOutputJobStepAssociation;
     DistributedEngineComm* fDec;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> sysCat;
+	execplan::CalpontSystemCatalog* sysCat;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;
 	BRM::HWM_t fDictBlkCount;
@@ -1717,7 +1717,7 @@ private:
 
     JobStepAssociation fInputJobStepAssociation;
     JobStepAssociation fOutputJobStepAssociation;
-	boost::shared_ptr<execplan::CalpontSystemCatalog> catalog;
+	execplan::CalpontSystemCatalog *catalog;
 	DistributedEngineComm *fDec;
 	execplan::CalpontSystemCatalog::OID fOid;
 	execplan::CalpontSystemCatalog::OID fTableOid;

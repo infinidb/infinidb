@@ -87,7 +87,7 @@ int BatchLoader::selectFirstPM ( uint& PMId, bool& startFromNextPM)
 {
     startFromNextPM = false;
 	int rc = 0;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
+	CalpontSystemCatalog *systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(fSessionId);
 	//cout << "calling tableName for oid " << fTableOid << endl;
 	CalpontSystemCatalog::TableName aTableName = systemCatalogPtr->tableName(fTableOid);
 	

@@ -30,7 +30,7 @@ using namespace execplan;
 int main(int argc, char** argv)
 {
 	DistributedEngineComm* dec;
-	boost::shared_ptr<CalpontSystemCatalog> cat;
+	CalpontSystemCatalog *cat;
 
 	ResourceManager rm;
 	dec = DistributedEngineComm::instance(rm);

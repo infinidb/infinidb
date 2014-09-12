@@ -419,9 +419,8 @@ void TupleConstantStep::execute()
 			fOutputJobStepAssociation.status(tupleConstantStepErr);
 	}
 
-//	if (!fEndOfResult)
-		while (more)
-			more = fInputDL->next(fInputIterator, &rgDataIn);
+	if (!fEndOfResult)
+		while (more) more = fInputDL->next(fInputIterator, &rgDataIn);
 
 	// Bug 3136, let mini stats to be formatted if traceOn.
 	if (traceOn())

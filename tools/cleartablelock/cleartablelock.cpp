@@ -548,7 +548,7 @@ int main(int argc, char** argv)
 
 		uint32_t sessionID = 1;
 		task = taskSysCat;
-		boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
+		execplan::CalpontSystemCatalog* systemCatalogPtr =
 			execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(
 				sessionID );
 		systemCatalogPtr->identity(execplan::CalpontSystemCatalog::EC);

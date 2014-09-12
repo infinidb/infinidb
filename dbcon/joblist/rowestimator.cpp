@@ -368,7 +368,7 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 	uint64_t totalRowsToBeScanned = 0;
 	uint32_t estimatedExtentRowCount = 0;
 	uint64_t estimatedRowCount = 0;
-	//vector<EMEntry> *extents = NULL;
+	vector<EMEntry> *extents = NULL;
 
 	// Nothing to do if no scanFlags.
 	if(scanFlags.size() == 0 || cpColVec.size() == 0)
@@ -379,8 +379,8 @@ uint64_t RowEstimator::estimateRows(const vector<ColumnCommandJL*>& cpColVec,
 
 	// Use the HWM for the estimated row count in the last extent.
 	colCmd = cpColVec[0];
-	const vector<EMEntry> &extents = colCmd->getExtents();
-	hwm = extents.back().HWM;   // extents is sorted by "global" fbo
+	extents = &colCmd->getExtents();
+	hwm = (*extents)[extents->size() - 1].HWM;   // extents is sorted by "global" fbo
 	rowsInLastExtent = ((hwm+1) * fBlockSize/ colCmd->getColType().colWidth)%fRowsPerExtent;
 
 	// Sum up the total number of scanned rows.

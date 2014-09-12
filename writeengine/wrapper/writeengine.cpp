@@ -3828,7 +3828,7 @@ int WriteEngineWrapper::rollbackVersion(const TxnID& txnid, int sessionId)
 int WriteEngineWrapper::updateNextValue(const OID& columnoid, const long long nextVal, const uint32_t sessionID)
 {
 	int rc = NO_ERROR;
-	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
+	CalpontSystemCatalog* systemCatalogPtr;
 	RIDList ridList;
 	ColValueList colValueList;
 	WriteEngine::ColTupleList colTuples;

@@ -404,6 +404,7 @@ int DistributedEngineComm::Close()
     return 0;
   }
 
+
 void DistributedEngineComm::Listen ( boost::shared_ptr<MessageQueueClient> client, uint connIndex)
 {
 	SBS sbs;
@@ -814,15 +815,6 @@ void DistributedEngineComm::setFlowControl(bool enabled, uint32_t uniqueID, boos
 	ism->Interleave = uniqueID;
 	ism->Command = BATCH_PRIMITIVE_ACK;
 	ism->Size = (enabled ? 0 : -1);
-	
-#ifdef VALGRIND
-	/* XXXPAT: For testing in valgrind, init the vars that don't get used */
-	ism->Flags = 0;
-	ism->Type = 0;
-	ism->MsgCount = 0;
-	ism->Status = 0;
-#endif	
-
 	msg.advanceInputPtr(sizeof(ISMPacketHeader));
 
 	for (uint i = 0; i < mqe->pmCount; i++)

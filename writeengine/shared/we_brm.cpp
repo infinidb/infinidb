@@ -849,7 +849,7 @@ int BRMWrapper::rollBack(const VER_t transID, int sessionId)
     FILE*          pTargetFile;
     RETURN_ON_NULL((pSourceFile = openFile(sourceFileInfo, "r+b")), ERR_VB_FILE_NOT_EXIST);
 
-    boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
+    execplan::CalpontSystemCatalog* systemCatalogPtr =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(sessionId);
     systemCatalogPtr->identity(execplan::CalpontSystemCatalog::EC);
 
@@ -1087,7 +1087,7 @@ int BRMWrapper::rollBackBlocks(const VER_t transID, int sessionId)
             lbidList.size());
     }
 
-    boost::shared_ptr<execplan::CalpontSystemCatalog> systemCatalogPtr =
+    execplan::CalpontSystemCatalog* systemCatalogPtr =
         execplan::CalpontSystemCatalog::makeCalpontSystemCatalog(sessionId);
     systemCatalogPtr->identity(execplan::CalpontSystemCatalog::EC);
 
