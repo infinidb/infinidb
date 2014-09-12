@@ -3519,11 +3519,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
 
     if (thd->lex)
       thd->lex->result = 0;
-    // @bug5962. reset the in_use flag so the prepared stmt
-    // can be executed again in IDB.
-    //flags|= IS_IN_USE;
-    flags&= ~ (uint) IS_IN_USE;
-
+    flags|= IS_IN_USE;
     if (idb_vtable_process(thd, this)) // if failed, fall through to normal path
     {
       thd->infinidb_vtable.vtable_state = THD::INFINIDB_DISABLE_VTABLE;

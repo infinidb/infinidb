@@ -90,7 +90,7 @@ struct PackageHandler
         DDLPackageProcessor::DDLResult result;
         result.result = DDLPackageProcessor::NO_ERROR;
         //boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr;
-
+               
         try
         {
 			//cout << "DDLProc received package " << fPackageType << endl;
@@ -108,11 +108,11 @@ struct PackageHandler
                             // TODO: should check if this createtablestmt has primary key
                             processor.PKName("");
                         else
-                            processor.PKName((*it).second);
+                            processor.PKName((*it).second);    
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid.valid = true;
 						//cout << "create table using txnid " << fTxnid.id << endl;
-                        result = processor.processPackage(createTableStmt);
+                        result = processor.processPackage(createTableStmt);                        
                         if (it != pkNameMap.end())
                             pkNameMap.erase(it);
                         systemCatalogPtr->removeCalpontSystemCatalog( createTableStmt.fSessionID );
@@ -140,7 +140,7 @@ struct PackageHandler
                     	AlterTableStatement alterTableStmt;
                     	alterTableStmt.unserialize(fByteStream);
                     	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
-                    	AlterTableProcessor processor;
+                    	AlterTableProcessor processor;   
 						processor.fTxnid.id = fTxnid.id;
 						processor.fTxnid.valid = true;
                     	PKNameMap::iterator it = pkNameMap.find(alterTableStmt.fSessionID);
@@ -149,8 +149,8 @@ struct PackageHandler
                     	// TODO: should check if this createtablestmt has primary key
                     	processor.PKName("");
                     	else
-                    		processor.PKName((*it).second);
-                    	result = processor.processPackage(alterTableStmt);
+                    		processor.PKName((*it).second);  
+                    	result = processor.processPackage(alterTableStmt);                        
                     	if (it != pkNameMap.end())
                     	    pkNameMap.erase(it);
                         systemCatalogPtr->removeCalpontSystemCatalog( alterTableStmt.fSessionID );
@@ -254,12 +254,12 @@ struct PackageHandler
 
                 ml.logErrorMessage( result.message );
             }
-			//cleanPMSysCache();
+			cleanPMSysCache();
             messageqcpp::ByteStream results;
             messageqcpp::ByteStream::byte status =  result.result;
             results << status;
             results << result.message.msg();
-
+		
             fIos.write(results);
 
             fIos.close();
@@ -276,7 +276,7 @@ struct PackageHandler
 			messageqcpp::ByteStream::byte status = DDLPackageProcessor::CREATE_ERROR;
             results << status;
 			results << string(idbEx.what());
-
+		
             fIos.write(results);
 
             fIos.close();
@@ -292,7 +292,7 @@ struct PackageHandler
     messageqcpp::ByteStream fByteStream;
     messageqcpp::ByteStream::quadbyte fPackageType;
 	BRM::TxnID fTxnid;
-
+	
 
 };
 
@@ -319,7 +319,7 @@ void DDLProcessor::process()
     messageqcpp::ByteStream bs;
     PackageHandler handler;
     messageqcpp::ByteStream::quadbyte packageType;
-
+	
 	cout << "DDLProc is ready..." << endl;
 
     try
@@ -379,19 +379,19 @@ void DDLProcessor::process()
                 }
             }
 
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
+#ifdef SERIALIZE_DDL_DML_CPIMPORT                
             //Check if any other active transaction
             bool bIsDbrmUp = true;
             bool anyOtherActiveTransaction = true;
-            execplan::SessionManager sessionManager;
+            execplan::SessionManager sessionManager; 
             BRM::SIDTIDEntry blockingsid;
-#endif
+#endif          
             //check whether the system is ready to process statement.
             if (dbrm.getSystemReady() < 1)
             {
                 messageqcpp::ByteStream results;
                 messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
+            
                 results << status;
                 string msg ("System is not ready yet. Please try again." );
 
@@ -407,26 +407,26 @@ void DDLProcessor::process()
 
             int sleepTime = 100; // sleep 100 milliseconds between checks
             int numTries = 10;  // try 10 times per second
-
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
+            
+#ifdef SERIALIZE_DDL_DML_CPIMPORT 
             string waitPeriodStr = config::Config::makeConfig()->getConfig("SystemConfig", "WaitPeriod");
             if ( waitPeriodStr.length() != 0 )
                 waitPeriod = static_cast<int>(config::Config::fromText(waitPeriodStr));
-
+                
             numTries = 	waitPeriod * 10;
             struct timespec rm_ts;
 
-            rm_ts.tv_sec = sleepTime/1000;
+            rm_ts.tv_sec = sleepTime/1000; 
             rm_ts.tv_nsec = sleepTime%1000 *1000000;
             //cout << "starting i = " << i << endl;
             BRM::TxnID txnid;
             int rc = 0;
-            //anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp );
+            //anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp );	
             while (anyOtherActiveTransaction)
             {
                 anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
                     blockingsid );
-                if (anyOtherActiveTransaction)
+                if (anyOtherActiveTransaction) 
                 {
                     for ( ; i < numTries; i++ )
                     {
@@ -437,9 +437,9 @@ void DDLProcessor::process()
                         //cout << "session " << sessionID << " nanosleep on package type " << (int)packageType << endl;
                         do
                         {
-                            abs_ts.tv_sec = rm_ts.tv_sec;
+                            abs_ts.tv_sec = rm_ts.tv_sec; 
                             abs_ts.tv_nsec = rm_ts.tv_nsec;
-                        }
+                        } 
                         while(nanosleep(&abs_ts,&rm_ts) < 0);
 #endif
                         anyOtherActiveTransaction = sessionManager.checkActiveTransaction( sessionID, bIsDbrmUp,
@@ -515,7 +515,7 @@ void DDLProcessor::process()
                             anyOtherActiveTransaction = false;
                         }
                     }
-                    else
+                    else 
                     {
                         string errorMsg;
                         rc = commitTransaction(txnid.id, errorMsg);
@@ -536,7 +536,7 @@ void DDLProcessor::process()
                                     throw std::runtime_error(os.str());
                                 }
                             }
-                        }
+                        }	
                         sessionManager.committed(txnid);
                         txnid = sessionManager.newTxnID(sessionID, true, true);
                         if (!txnid.valid) {
@@ -549,20 +549,20 @@ void DDLProcessor::process()
                         }
                     }
                 }
-
+                    
                 if ((anyOtherActiveTransaction) && (i >= numTries))
                 {
                     //cout << " Erroring out on package type " << (int)packageType << endl;
-                    break;
+                    break;  
                 }
             }
 #endif
-#ifdef SERIALIZE_DDL_DML_CPIMPORT
+#ifdef SERIALIZE_DDL_DML_CPIMPORT	
             if ((anyOtherActiveTransaction) && (i >= numTries))
             {
                 messageqcpp::ByteStream results;
                 messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
+            
                 results << status;
                 Message::Args args;
                 args.add(static_cast<uint64_t>(blockingsid.sessionid));
@@ -576,7 +576,7 @@ void DDLProcessor::process()
 				msg.format( args1 );
 				logging::Logger logger(logid.fSubsysID);
 				logger.logMessage(LOG_TYPE_DEBUG, msg, logid);
-
+				
                 ios.write(results);
 
                 ios.close();
@@ -588,7 +588,7 @@ void DDLProcessor::process()
                 handler.fPackageType = packageType;
                 handler.fTxnid = txnid;
                 fDdlPackagepool.invoke(handler);
-
+        
             }
 #endif
         }
@@ -598,7 +598,7 @@ void DDLProcessor::process()
         cerr << ex.what() << endl;
 		messageqcpp::ByteStream results;
         messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
+                
         results << status;
         results << ex.what();
         ios.write(results);
@@ -610,7 +610,7 @@ void DDLProcessor::process()
         cerr << "Caught unknown exception!" << endl;
 		messageqcpp::ByteStream results;
         messageqcpp::ByteStream::byte status =  DDLPackageProcessor::NOT_ACCEPTING_PACKAGES;
-
+                
         results << status;
         results << "Caught unknown exception!";
         ios.write(results);
@@ -645,10 +645,10 @@ int DDLProcessor::commitTransaction(uint32_t txnID, std::string & errorMsg)
 		if ( bsIn->length() == 0 ) //read error
 		{
 			rc = 1;
-			errorMsg = "DDL cannot communicate with WES";
+			errorMsg = "DDL cannot communicate with WES"; 
 			fWEClient->removeQueue(uniqueId);
 			break;
-		}
+		}			
 		else {
 			*bsIn >> tmp8;
 			rc = tmp8;
@@ -658,7 +658,7 @@ int DDLProcessor::commitTransaction(uint32_t txnID, std::string & errorMsg)
 				break;
 			}
 			else
-				msgRecived++;
+				msgRecived++;						
 		}
 	}
 	return rc;
