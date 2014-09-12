@@ -895,25 +895,8 @@ bool combineJobStepsByTable(TableInfoMap::iterator& mit, JobInfo& jobInfo)
 		JobStepVector::iterator end = qsv.end();
 		JobStepVector::iterator it = begin;
 
-		// make sure there is a pcolscan if there is a pcolstep
-		while (it != end)
-		{
-			if (typeid(*(it->get())) == typeid(pColScanStep))
-				break;
-
-			if (typeid(*(it->get())) == typeid(pColStep))
-			{
-				pColStep* pcs = dynamic_cast<pColStep*>(it->get());
-				(*it).reset(new pColScanStep(*pcs));
-				break;
-			}
-
-			it++;
-		}
-
 		// ---- predicates ----
 		// setup TBPS and dictionaryscan
-		it = begin;
 		while (it != end)
 		{
 			if (typeid(*(it->get())) == typeid(pColScanStep))
@@ -1474,15 +1457,9 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 		if (tblInfo.fTableOid != CNX_VTABLE_ID)
 		{
 			JobStepVector::iterator k = tblInfo.fQuerySteps.begin();
-			JobStepVector onClauseFilterSteps;  //@bug5887, 5311
+			bool isOnClauseFilter = false;  // bug5311
 			for (; k != tblInfo.fQuerySteps.end(); k++)
 			{
-				if ((*k)->onClauseFilter())
-				{
-					onClauseFilterSteps.push_back(*k);
-					continue;
-				}
-
 				uint colKey = -1;
 				pColStep* pcs = dynamic_cast<pColStep*>(k->get());
 				pColScanStep* pcss = dynamic_cast<pColScanStep*>(k->get());
@@ -1517,15 +1494,31 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 
 				if (filters != NULL && filters->size() > 0)
 				{
+					for (size_t i = 0; i < filters->size() && !isOnClauseFilter; i++)
+					{
+						const TreeNode* tn = dynamic_cast<const TreeNode*>((*filters)[i]);
+						for (size_t j = 0; j < jobInfo.onClauseFilter.size(); j++)
+						{
+							// ok for small vector
+							if (tn == jobInfo.onClauseFilter[j]->data())
+							{
+								isOnClauseFilter = true;
+								break;
+							}
+						}
+					}
+
+					if (isOnClauseFilter)
+						continue;
+
 					ParseTree* pt = new ParseTree((*filters)[0]->clone());
 					for (size_t i = 1; i < filters->size(); i++)
 					{
 						ParseTree* left = pt;
-						ParseTree* right =
-							new ParseTree((*filters)[i]->clone());
+						ParseTree* right = new ParseTree((*filters)[i]->clone());
 						ParseTree* op = (BOP_OR == bop) ?
-							new ParseTree(new LogicOperator("or")) :
-							new ParseTree(new LogicOperator("and"));
+											new ParseTree(new LogicOperator("or")) :
+											new ParseTree(new LogicOperator("and"));
 						op->left(left);
 						op->right(right);
 
@@ -1538,7 +1531,7 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 															jobInfo.statementId);
 
 					if (es == NULL)
-						throw runtime_error ("Failed to new ExpressionStep 2");
+						throw runtime_error ("Failed to create ExpressionStep 2");
 
 					es->logger(jobInfo.logger);
 					es->expressionFilter(pt, jobInfo);
@@ -1551,8 +1544,9 @@ void outjoinPredicateAdjust(TableInfoMap& tableInfoMap, JobInfo& jobInfo)
 			}
 
 			// Do not apply the primitive filters if there is an "IS NULL" in where clause.
-			if (jobInfo.tableHasIsNull.find(*i) != jobInfo.tableHasIsNull.end())
-				tblInfo.fQuerySteps = onClauseFilterSteps;
+			if (!isOnClauseFilter &&
+				jobInfo.tableHasIsNull.find(*i) != jobInfo.tableHasIsNull.end())
+				tblInfo.fQuerySteps.clear();
 		}
 
 		jobInfo.outerJoinExpressions.insert(jobInfo.outerJoinExpressions.end(),
@@ -2340,7 +2334,6 @@ void joinTablesInOrder(uint largest, JobStepVector& joinSteps, TableInfoMap& tab
 			lastJoinId = joins[ns].fJoinId;
 			if (find(joinedTable.begin(), joinedTable.end(), small) == joinedTable.end())
 				joinedTable.push_back(small);
-			smallSideTid.insert(small);
 
 			joinIdIndexMap[joins[ns].fJoinId] = index++;
 			js++;
@@ -3204,10 +3197,6 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 		it++;
 	}
 
-	// @bug2634, delay isNull filter on outerjoin key
-	// @bug5374, delay predicates for outerjoin
-	outjoinPredicateAdjust(tableInfoMap, jobInfo);
-
 	// @bug3767, error out scalar subquery with aggregation and correlated additional comparison.
 	if (jobInfo.hasAggregation && (jobInfo.correlateSteps.size() > 0))
 	{
@@ -3233,6 +3222,10 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 						IDBErrorInfo::instance()->errorMsg(ERR_NON_SUPPORT_NEQ_AGG_SUB),
 						ERR_NON_SUPPORT_NEQ_AGG_SUB);
 	}
+
+	// @bug2634, delay isNull filter on outerjoin key
+	// @bug5374, delay predicates for outerjoin
+	outjoinPredicateAdjust(tableInfoMap, jobInfo);
 
 	it = projectSteps.begin();
 	end = projectSteps.end();

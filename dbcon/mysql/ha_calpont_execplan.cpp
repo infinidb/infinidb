@@ -545,9 +545,10 @@ void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 		}
 		cf->pushFilter(new SimpleFilter(sop, gwip->scsp->clone(), lhs));
 		cf->functionName(gwip->funcName);
+		//debug
+		string fullname;
 		String str;
-		// @bug5811
-		ifp->print(&str, QT_INFINIDB_DERIVED);
+		ifp->print(&str, QT_INFINIDB_NO_QUOTE);
 		IDEBUG(cout << str.c_ptr() << endl);
 		if (str.c_ptr())
 			cf->data(str.c_ptr());
@@ -623,9 +624,10 @@ void buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 			return;
 		}
 		cf->functionName(gwip->funcName);
+		//debug
+		string fullname;
 		String str;
-		// @bug5811
-		ifp->print(&str, QT_INFINIDB_DERIVED);
+		ifp->print(&str, QT_INFINIDB_NO_QUOTE);
 		IDEBUG(cout << str.c_ptr() << endl);
 		if (str.c_ptr())
 			cf->data(str.c_ptr());
@@ -4192,11 +4194,12 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
 
 	while ((item= it++))
 	{
-		string itemAlias = (item->name? item->name : "");
-		// @bug 5916. Need to keep checking until getting concrete item in case
-		// of nested view.
-		while (item->type() == Item::REF_ITEM)
+		string itemAlias;
+		if (item->type() == Item::REF_ITEM)
 		{
+			// MySQL is inconsistent on ref item alias. item->ref->->alias could be different from item->alias
+			if (item->name)
+				itemAlias = item->name;
 			Item_ref* ref = (Item_ref*)item;
 			item = (*(ref->ref));
 		}

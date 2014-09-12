@@ -3153,13 +3153,6 @@ int ha_calpont_impl_commit (handlerton *hton, THD *thd, bool all)
 	
 	if (ci->isAlter)
 		return 0;
-		
-	//@Bug 5823 check if any active transaction for this session
-    scoped_ptr<DBRM> dbrmp(new DBRM());
-    BRM::TxnID txnId = dbrmp->getTxnID(tid2sid(thd->thread_id));
-    if (!txnId.valid)
-       return 0;
-
 	if ( !ci->dmlProc )
 	{
 		ci->dmlProc = new MessageQueueClient("DMLProc");

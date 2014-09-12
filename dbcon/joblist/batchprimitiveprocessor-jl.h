@@ -176,9 +176,8 @@ public:
 	/* This fcn determines whether or not the containing TBPS obj will process results
 	from a join or put the RG data right in the output datalist. */
 	bool pmSendsFinalResult() const
-	{
-		//isn't aware of UM-only joins.  Function name is a bit misleading.
-		return (tJoiners.size() == 0 || (PMJoinerCount > 0 && (fe2 || aggregatorPM)));
+	{ 
+		return ((sendTupleJoinRowGroupData && tJoiners.size() > 0 && PMJoinerCount > 0) || tJoiners.size() == 0); 
 	}
 	const std::string toMiniString() const;
 

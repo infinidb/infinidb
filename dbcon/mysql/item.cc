@@ -1965,13 +1965,13 @@ void Item_ident::print(String *str, enum_query_type query_type)
   THD *thd= current_thd;
   char d_name_buff[MAX_ALIAS_NAME], t_name_buff[MAX_ALIAS_NAME];
   const char *d_name= db_name, *t_name= table_name;
-
+  
   // @infiniDB
-  if (query_type == QT_INFINIDB || query_type == QT_INFINIDB_NO_QUOTE || query_type == QT_INFINIDB_DERIVED)
+  if (query_type == QT_INFINIDB || query_type == QT_INFINIDB_NO_QUOTE)
   {
-  	if (query_type != QT_INFINIDB_NO_QUOTE && query_type != QT_INFINIDB_DERIVED)
+  	if (query_type != QT_INFINIDB_NO_QUOTE)
   		str->append('`');
-
+  		
   	// print referencing view name for IDB post process
   	if (cached_table)
   	{
@@ -1981,7 +1981,7 @@ void Item_ident::print(String *str, enum_query_type query_type)
 					str->append('.');
 			}
 			// IDB: table referenced by view is represented by "viewAlias_tableAlias"
-			if (cached_table->referencing_view && query_type != QT_INFINIDB_DERIVED)
+			if (cached_table->referencing_view)
 			{
 				str->append(cached_table->referencing_view->alias, (uint)strlen(cached_table->referencing_view->alias));
 				str->append("_");
@@ -2003,11 +2003,11 @@ void Item_ident::print(String *str, enum_query_type query_type)
 	  	}
 	  }
   	str->append(field_name, (uint) strlen(field_name));
-  	if (query_type != QT_INFINIDB_NO_QUOTE && query_type != QT_INFINIDB_DERIVED)
+  	if (query_type != QT_INFINIDB_NO_QUOTE)
   		str->append('`');
   	return;
   }
-
+  
   if (lower_case_table_names== 1 ||
       (lower_case_table_names == 2 && !alias_name_used))
   {

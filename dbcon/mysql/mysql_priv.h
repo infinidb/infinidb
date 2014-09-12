@@ -59,7 +59,6 @@ enum enum_query_type
   QT_IS,
   QT_INFINIDB, // this is for InfiniDB post process to customerize item::print() functions.
   QT_INFINIDB_NO_QUOTE, // customized item:print() without quote delimiter
-  QT_INFINIDB_DERIVED // for union view as derived table. no view name is appended to the table alias.
 };
 
 /* TODO convert all these three maps to Bitmap classes */

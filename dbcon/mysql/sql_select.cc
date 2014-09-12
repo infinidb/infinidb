@@ -16885,7 +16885,7 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
 
 	// InfiniDB skip WHERE clause and after. the print functions are
 	// Called just for post process vtable creation. 
-	if (query_type == QT_INFINIDB_NO_QUOTE  || query_type == QT_INFINIDB_DERIVED)
+	if (query_type == QT_INFINIDB_NO_QUOTE)
 		return;
   // Where
   //printf("before where: %s\n\n", str->ptr());

@@ -1046,7 +1046,6 @@ pColScanStep::pColScanStep(const pColStep& rhs) :
 	fMsgsToPm = 0;
 	fCardinality = rhs.cardinality();
 	fFilters = rhs.fFilters;
-	fOnClauseFilter = rhs.onClauseFilter();
 
 	if (fTableOid == 0)  // cross engine support
 		return;

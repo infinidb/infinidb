@@ -776,15 +776,10 @@ void TupleHashJoinStep::startJoinThreads()
 {
 	uint i;
 	uint smallSideCount = smallDLs.size();
-    bool more = true;
-	shared_array<uint8_t> oneRG;
 
 	//@bug4836, in error case, stop process, and unblock the next step.
 	if (die || inJSA.status() != 0) {
 		outputDL->endOfInput();
-		//@bug5785, memory leak on canceling complex queries
-		while (more)
-			more = largeDL->next(largeIt, &oneRG);
 		return;
 	}
 

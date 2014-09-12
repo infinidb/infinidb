@@ -126,8 +126,8 @@ struct JobStep
     /** constructor
      */
     JobStep() : fToSort(0), fTraceFlags(0), fCardinality(0), fError(0),
-		fDelayedRunFlag(false), fOnClauseFilter(false), fWaitToRunStepCnt(0),
-		die(false), fTupleId(-1), _priority(1) { }
+		fDelayedRunFlag(false), fWaitToRunStepCnt(0), die(false), fTupleId(-1),
+		_priority(1) { }
     /** destructor
      */
     virtual ~JobStep() { /*pthread_mutex_destroy(&mutex);*/ }
@@ -234,12 +234,8 @@ struct JobStep
 	const std::string& extendedInfo() const { return fExtendedInfo; }
 	const std::string& miniInfo() const { return fMiniInfo; }
 
-	uint priority() const { return _priority; }
-	void priority(uint p) { _priority = p;    }
-
-	//@bug5887, distinguish on clause filter and where clause filter
-	bool onClauseFilter() const { return fOnClauseFilter; }
-	void onClauseFilter(bool b) { fOnClauseFilter = b;    }
+	uint priority() { return _priority; }
+	void priority(uint p) { _priority = p; }
 
 protected:
     std::string fAlias;
@@ -251,7 +247,6 @@ protected:
 	uint64_t    fCardinality;
 	bool        fError;
 	bool        fDelayedRunFlag;
-	bool        fOnClauseFilter;
 #ifdef _MSC_VER
 	volatile long fWaitToRunStepCnt;
 #else
@@ -261,6 +256,7 @@ protected:
 	boost::mutex* fStatsMutexPtr;
 	std::string fExtendedInfo;
 	std::string fMiniInfo;
+
 	uint64_t fTupleId;
 	uint _priority;
 

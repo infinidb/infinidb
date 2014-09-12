@@ -512,11 +512,7 @@ class RowAggregationUM : public RowAggregation
 		void attachGroupConcatAg();
 		void updateEntry(const Row& row);
 		bool countSpecial(const RowGroup* pRG)
-		{ fRow.setIntField<8>(
-		    fRow.getIntField<8>(
-		        fFunctionCols[0]->fOutputColumnIndex) + pRG->getRowCount(),
-		        fFunctionCols[0]->fOutputColumnIndex);
-		  return true; }
+		{ fRow.setIntField<8>(fRow.getIntField<8>(0) + pRG->getRowCount(), 0); return true; }
 
 		bool newRowGroup();
 

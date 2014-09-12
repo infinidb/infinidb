@@ -74,7 +74,6 @@ BatchPrimitiveProcessorJL::BatchPrimitiveProcessorJL(const ResourceManager& rm) 
 	hasSmallOuterJoin(false),
 	_priority(1)
 {
-    PMJoinerCount = 0;
 }
 
 BatchPrimitiveProcessorJL::~BatchPrimitiveProcessorJL()
@@ -679,7 +678,7 @@ BatchPrimitiveProcessorJL::getRowGroupData(messageqcpp::ByteStream &in,
 	rowCount = org.getRowCount();
 //	cout << "rowCount = " << rowCount << endl;
 	bool pmSendsMatchesAnyway = (hasSmallOuterJoin && *countThis && PMJoinerCount > 0 &&
-			(fe2 || aggregatorPM));
+			sendTupleJoinRowGroupData);
 
 	if (!pmSendsFinalResult() || pmSendsMatchesAnyway) {
 		boost::shared_array<vector<uint32_t> > joinResults;
@@ -918,7 +917,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream &bs) const
 #endif
 				serializeVector<RowGroup>(bs, smallSideRGs);
 				bs << largeSideRG;
-				bs << joinedRG;    // TODO: I think we can omit joinedRG if (!(fe2 || aggregatorPM))
+				bs << joinedRG;
 // 				cout << "joined RG: " << joinedRG.toString() << endl;
 			}
 		}
