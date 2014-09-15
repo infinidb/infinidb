@@ -54,6 +54,11 @@ using namespace execplan;
 using namespace logging;
 using namespace WriteEngine;
 
+#include "querytele.h"
+using namespace querytele;
+
+#include "oamcache.h"
+
 namespace
 {
 typedef messageqcpp::ByteStream::quadbyte quadbyte;
@@ -88,45 +93,66 @@ struct PackageHandler
                     {
                         CreateTableStatement createTableStmt;
                         createTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
+						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+							CalpontSystemCatalog::makeCalpontSystemCatalog(createTableStmt.fSessionID );
 						boost::scoped_ptr<CreateTableProcessor> processor(new CreateTableProcessor(fDbrm));	
 						processor->fTxnid.id = fTxnid.id;
 						processor->fTxnid.valid = true;
 						//cout << "create table using txnid " << fTxnid.id << endl;
+
+						QueryTeleStats qts;
+						qts.query_uuid = QueryTeleClient::genUUID();
+						qts.msg_type = QueryTeleStats::QT_START;
+						qts.start_time = QueryTeleClient::timeNowms();
+						qts.session_id = createTableStmt.fSessionID;
+						qts.query_type = "CREATE";
+						qts.query = createTableStmt.fSql;
+						qts.system_name = fOamCache->getSystemName();
+						qts.module_name = fOamCache->getModuleName();
+						qts.schema_name = createTableStmt.schemaName();
+						fQtc.postQueryTele(qts);
+
                         result = processor->processPackage(createTableStmt);                        
                         
                         systemCatalogPtr->removeCalpontSystemCatalog( createTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog( createTableStmt.fSessionID | 0x80000000);
+
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.end_time = QueryTeleClient::timeNowms();
+						fQtc.postQueryTele(qts);
                     }
                     break;
-#if 0
-                case ddlpackage::DDL_CREATE_INDEX:
-                    {
-                        CreateIndexStatement createIndexStmt;
-                        createIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(createIndexStmt.fSessionID );
-                        CreateIndexProcessor processor;
-						processor.fTxnid.id = fTxnid.id;
-						processor.fTxnid..valid = true;
-                        result = processor.processPackage(createIndexStmt);
-                        //pkNameMap.insert(PKNameMap::value_type(createIndexStmt.fSessionID, processor.PKName()));
-                        systemCatalogPtr->removeCalpontSystemCatalog( createIndexStmt.fSessionID );
-                        systemCatalogPtr->removeCalpontSystemCatalog( createIndexStmt.fSessionID | 0x80000000);
-                    }
-                    break;
-#endif
+
                 case ddlpackage::DDL_ALTER_TABLE_STATEMENT:
                     {
                     	AlterTableStatement alterTableStmt;
                     	alterTableStmt.unserialize(fByteStream);
-                    	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
+                    	boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+							CalpontSystemCatalog::makeCalpontSystemCatalog(alterTableStmt.fSessionID );
 						boost::scoped_ptr<AlterTableProcessor> processor(new AlterTableProcessor(fDbrm));						
 						processor->fTxnid.id = fTxnid.id;
 						processor->fTxnid.valid = true;
+
+						QueryTeleStats qts;
+						qts.query_uuid = QueryTeleClient::genUUID();
+						qts.msg_type = QueryTeleStats::QT_START;
+						qts.start_time = QueryTeleClient::timeNowms();
+						qts.session_id = alterTableStmt.fSessionID;
+						qts.query_type = "ALTER";
+						qts.query = alterTableStmt.fSql;
+						qts.system_name = fOamCache->getSystemName();
+						qts.module_name = fOamCache->getModuleName();
+						qts.schema_name = alterTableStmt.schemaName();
+						fQtc.postQueryTele(qts);
+
                     	result = processor->processPackage(alterTableStmt);                        
                     	
                         systemCatalogPtr->removeCalpontSystemCatalog( alterTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog( alterTableStmt.fSessionID | 0x80000000);
+
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.end_time = QueryTeleClient::timeNowms();
+						fQtc.postQueryTele(qts);
                     }
                     break;
 
@@ -134,16 +160,37 @@ struct PackageHandler
                     {
                         DropTableStatement dropTableStmt;
                         dropTableStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
+						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
+							CalpontSystemCatalog::makeCalpontSystemCatalog(dropTableStmt.fSessionID );
                         boost::scoped_ptr<DropTableProcessor> processor(new DropTableProcessor(fDbrm));
-						(processor->fTxnid).id = fTxnid.id;
-						(processor->fTxnid).valid = true;
+
+						processor->fTxnid.id = fTxnid.id;
+						processor->fTxnid.valid = true;
+
+						QueryTeleStats qts;
+						qts.query_uuid = QueryTeleClient::genUUID();
+						qts.msg_type = QueryTeleStats::QT_START;
+						qts.start_time = QueryTeleClient::timeNowms();
+						qts.session_id = dropTableStmt.fSessionID;
+						qts.query_type = "DROP";
+						qts.query = dropTableStmt.fSql;
+						qts.system_name = fOamCache->getSystemName();
+						qts.module_name = fOamCache->getModuleName();
+						qts.schema_name = dropTableStmt.schemaName();
+						fQtc.postQueryTele(qts);
+
 						//cout << "Drop table using txnid " << fTxnid.id << endl;
                         result = processor->processPackage(dropTableStmt);
+
                         systemCatalogPtr->removeCalpontSystemCatalog( dropTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog( dropTableStmt.fSessionID | 0x80000000);
+
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.end_time = QueryTeleClient::timeNowms();
+						fQtc.postQueryTele(qts);
                     }
                     break;
+
                 case ddlpackage::DDL_TRUNC_TABLE_STATEMENT:
                     {
                         TruncTableStatement truncTableStmt;
@@ -151,13 +198,33 @@ struct PackageHandler
                         boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr =
 						CalpontSystemCatalog::makeCalpontSystemCatalog(truncTableStmt.fSessionID);
                         boost::scoped_ptr<TruncTableProcessor> processor(new TruncTableProcessor(fDbrm));
-						(processor->fTxnid).id = fTxnid.id;
-						(processor->fTxnid).valid = true;
+
+						processor->fTxnid.id = fTxnid.id;
+						processor->fTxnid.valid = true;
+
+						QueryTeleStats qts;
+						qts.query_uuid = QueryTeleClient::genUUID();
+						qts.msg_type = QueryTeleStats::QT_START;
+						qts.start_time = QueryTeleClient::timeNowms();
+						qts.session_id = truncTableStmt.fSessionID;
+						qts.query_type = "TRUNCATE";
+						qts.query = truncTableStmt.fSql;
+						qts.system_name = fOamCache->getSystemName();
+						qts.module_name = fOamCache->getModuleName();
+						qts.schema_name = truncTableStmt.schemaName();
+						fQtc.postQueryTele(qts);
+
                         result = processor->processPackage(truncTableStmt);
+
                         systemCatalogPtr->removeCalpontSystemCatalog(truncTableStmt.fSessionID );
                         systemCatalogPtr->removeCalpontSystemCatalog(truncTableStmt.fSessionID | 0x80000000);
+
+						qts.msg_type = QueryTeleStats::QT_SUMMARY;
+						qts.end_time = QueryTeleClient::timeNowms();
+						fQtc.postQueryTele(qts);
                     }
                     break;
+
 				case ddlpackage::DDL_MARK_PARTITION_STATEMENT:
                     {
                         MarkPartitionStatement markPartitionStmt;
@@ -172,6 +239,7 @@ struct PackageHandler
                         systemCatalogPtr->removeCalpontSystemCatalog(markPartitionStmt.fSessionID | 0x80000000);
                     }
                     break;
+
 				case ddlpackage::DDL_RESTORE_PARTITION_STATEMENT:
                     {
                         RestorePartitionStatement restorePartitionStmt;
@@ -186,6 +254,7 @@ struct PackageHandler
                         systemCatalogPtr->removeCalpontSystemCatalog(restorePartitionStmt.fSessionID | 0x80000000);
                     }
                     break;
+
 				case ddlpackage::DDL_DROP_PARTITION_STATEMENT:
                     {
                         DropPartitionStatement dropPartitionStmt;
@@ -200,21 +269,10 @@ struct PackageHandler
                         systemCatalogPtr->removeCalpontSystemCatalog(dropPartitionStmt.fSessionID | 0x80000000);
                     }
                     break;
-#if 0
-                case ddlpackage::DDL_DROP_INDEX_STATEMENT:
-                    {
-                        DropIndexStatement dropIndexStmt;
-                        dropIndexStmt.unserialize(fByteStream);
-						boost::shared_ptr<CalpontSystemCatalog> systemCatalogPtr = CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
-                        DropIndexProcessor processor;
-                        result = processor.processPackage(dropIndexStmt);
-                        systemCatalogPtr->CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID );
-                        systemCatalogPtr->CalpontSystemCatalog::makeCalpontSystemCatalog(dropIndexStmt.fSessionID | 0x80000000);
-                    }
-                    break;
-#endif
+
                 default:
-                    throw(UNRECOGNIZED_PACKAGE_TYPE);
+                    throw UNRECOGNIZED_PACKAGE_TYPE;
+					break;
             }
 
             //@Bug 3427. No need to log user rror, just return the message to user.
@@ -226,7 +284,9 @@ struct PackageHandler
 
                 ml.logErrorMessage( result.message );
             }
-			cleanPMSysCache();
+			string hdfstest = config::Config::makeConfig()->getConfig("Installation", "DBRootStorageType");
+			if (hdfstest == "hdfs" || hdfstest == "HDFS")
+				cleanPMSysCache();
             messageqcpp::ByteStream results;
             messageqcpp::ByteStream::byte status =  result.result;
             results << status;
@@ -263,16 +323,17 @@ struct PackageHandler
     messageqcpp::IOSocket fIos;
     messageqcpp::ByteStream fByteStream;
     messageqcpp::ByteStream::quadbyte fPackageType;
-	BRM::TxnID fTxnid;
-	BRM::DBRM* fDbrm;
-	
-
+    BRM::TxnID fTxnid;
+    BRM::DBRM* fDbrm;
+    QueryTeleClient fQtc;
+    oam::OamCache* fOamCache;
 };
 
 }
 
 namespace ddlprocessor
 {
+
 DDLProcessor::DDLProcessor( int packageMaxThreads, int packageWorkQueueSize )
         :fPackageMaxThreads(packageMaxThreads), fPackageWorkQueueSize(packageWorkQueueSize),
          fMqServer(DDLProcName)
@@ -281,7 +342,17 @@ DDLProcessor::DDLProcessor( int packageMaxThreads, int packageWorkQueueSize )
     fDdlPackagepool.setQueueSize(fPackageWorkQueueSize);
 	csc = CalpontSystemCatalog::makeCalpontSystemCatalog();
 	csc->identity(CalpontSystemCatalog::EC);
+	string teleServerHost(config::Config::makeConfig()->getConfig("QueryTele", "Host"));
+	if (!teleServerHost.empty())
+	{
+		int teleServerPort = config::Config::fromText(config::Config::makeConfig()->getConfig("QueryTele", "Port"));
+		if (teleServerPort > 0)
+		{
+			fQtc.serverParms(QueryTeleServerParms(teleServerHost, teleServerPort));
+		}
+	}
 }
+
 DDLProcessor::~DDLProcessor()
 {
 
@@ -567,6 +638,8 @@ void DDLProcessor::process()
 					handler.fPackageType = packageType;
 					handler.fTxnid = txnid;
 					handler.fDbrm = &dbrm;
+					handler.fQtc = fQtc;
+					handler.fOamCache = oam::OamCache::makeOamCache();
 					fDdlPackagepool.invoke(handler);
         
 				}
@@ -614,6 +687,8 @@ void DDLProcessor::process()
 				handler.fPackageType = packageType;
 				handler.fTxnid = txnid;
 				handler.fDbrm = &dbrm;
+				handler.fQtc = fQtc;
+				handler.fOamCache = oam::OamCache::makeOamCache();
 				fDdlPackagepool.invoke(handler);
 			}
         }

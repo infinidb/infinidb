@@ -24,6 +24,8 @@
 
 #include <libxml/xmlwriter.h>
 
+#include <boost/filesystem.hpp>
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <iostream>
@@ -48,6 +50,60 @@ int main(int argc, char **argv)
 #endif
     setlocale(LC_ALL, "");
     WriteEngine::Config::initConfigCache(); // load Calpont.xml config settings
+
+	//Bug 6137
+	std::string aBulkRoot = WriteEngine::Config::getBulkRoot();
+	if (!aBulkRoot.empty())
+	{
+		if (!boost::filesystem::exists(aBulkRoot.c_str()))
+		{
+			cout << "Creating directory : " << aBulkRoot <<endl;
+			boost::filesystem::create_directories(aBulkRoot.c_str());
+		}
+		
+		if (boost::filesystem::exists(aBulkRoot.c_str()))
+		{
+			std::ostringstream aSS;
+			aSS << aBulkRoot;
+			aSS << "/job";
+			std::string jobDir = aSS.str();
+			if (!boost::filesystem::exists(jobDir.c_str()))
+			{
+				cout << "Creating directory : " << jobDir << endl;
+				bool aSuccess = boost::filesystem::create_directories(jobDir.c_str());
+				if (!aSuccess)
+				{
+					cout << "\nFailed to create job directory, please check permissions\n" << endl;
+					return -1;
+				}
+			}
+
+			std::ostringstream aSS2;
+			aSS2 << aBulkRoot;
+			aSS2 << "/log";
+			std::string logDir = aSS2.str();
+			if (!boost::filesystem::exists(logDir.c_str()))
+			{
+				cout << "Creating directory : " << logDir << endl;
+				bool aSuccess = boost::filesystem::create_directories(logDir.c_str());
+				if (!aSuccess)
+				{
+					cout << "\nFailed to create directory, please check permissions\n" << endl;
+					return -1;
+				}
+			}
+		}
+		else
+		{
+			cout << "\nFailed to create bulk directory, check for permissions\n" << endl;
+			return -1;	
+		}
+	}
+	else
+	{
+		cout << "\nBulkRoot is empty in config file. Failed to create job file.\n\n";
+		return -1;	
+	}
 
     InputMgr mgr("299"); //@bug 391
     if (! mgr.input(argc, argv))

@@ -27,6 +27,7 @@
 #include "ddlproc.h"
 #include "threadpool.h"
 #include "calpontsystemcatalog.h"
+#include "querytele.h"
 
 namespace ddlprocessor
 {
@@ -80,8 +81,9 @@ private:
 
     messageqcpp::MessageQueueServer fMqServer;
     boost::shared_ptr<execplan::CalpontSystemCatalog> csc;
-	WriteEngine::WEClients* fWEClient;
-	uint32_t fPMCount;
+    WriteEngine::WEClients* fWEClient;
+    uint32_t fPMCount;
+    querytele::QueryTeleClient fQtc;
 };
 
 

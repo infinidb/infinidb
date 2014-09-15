@@ -263,7 +263,7 @@ void RGData::serialize(ByteStream &bs, uint32_t amount) const
 	bs << (uint32_t) RGDATA_SIG;
 	bs << (uint32_t) amount;
 	bs.append(rowData.get(), amount);
-	if (strings && !strings->isEmpty()) {
+	if (strings) {
 		bs << (uint8_t) 1;
 		strings->serialize(bs);
 	}

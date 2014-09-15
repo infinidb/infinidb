@@ -1614,12 +1614,15 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 	vector<uint32_t>& adjList = tableInfoMap[large].fAdjacentList;
 	uint32_t prevLarge = (uint32_t) getPrevLarge(large, tableInfoMap);
 	bool root = (prevLarge == (uint32_t) -1) ? true : false;
+	uint32_t link = large;
+	uint32_t cId = -1;
 
 	// Get small sides ready.
 	for (vector<uint32_t>::iterator i = adjList.begin(); i != adjList.end(); i++)
 	{
 		if (tableInfoMap[*i].fVisited == false)
 		{
+			cId = *i;
 			smallSides.push_back(joinToLargeTable(*i, tableInfoMap, jobInfo, joinOrder));
 
 			tableSet.insert(tableInfoMap[*i].fJoinedTables.begin(),
@@ -1635,6 +1638,41 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 		BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(spjs.get());
 		SubAdapterStep* tsas = dynamic_cast<SubAdapterStep*>(spjs.get());
 		TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(spjs.get());
+
+		// @bug6158, try to put BPS on large side if possible
+		if (tsas && smallSides.size() == 1)
+		{
+			SJSTEP sspjs = tableInfoMap[cId].fQuerySteps.back(),get();
+			BatchPrimitive* sbps = dynamic_cast<BatchPrimitive*>(sspjs.get());
+			TupleHashJoinStep* sthjs = dynamic_cast<TupleHashJoinStep*>(sspjs.get());
+			if (sbps || (sthjs && sthjs->tokenJoin() == cId))
+			{
+				SP_JoinInfo largeJoinInfo(new JoinInfo);
+				largeJoinInfo->fTableOid = tableInfoMap[large].fTableOid;
+				largeJoinInfo->fAlias = tableInfoMap[large].fAlias;
+				largeJoinInfo->fView = tableInfoMap[large].fView;
+				largeJoinInfo->fSchema = tableInfoMap[large].fSchema;
+
+				largeJoinInfo->fDl = tableInfoMap[large].fDl;
+				largeJoinInfo->fRowGroup = tableInfoMap[large].fRowGroup;
+
+				TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(large, cId));
+				if (mit == jobInfo.tableJoinMap.end())
+					throw runtime_error("Join step not found.");
+				largeJoinInfo->fJoinData = mit->second;
+
+				// switch large and small sides
+				joinOrder.back() = large;
+				large = cId;
+				smallSides[0] = largeJoinInfo;
+				tableInfoMap[large].fJoinedTables = tableSet;
+
+				bps = sbps;
+				thjs = sthjs;
+				tsas = NULL;
+			}
+		}
+
 		if (!bps && !thjs && !tsas)
 		{
 			if (dynamic_cast<SubQueryStep*>(spjs.get()))
@@ -1788,7 +1826,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 		}
 
 		RowGroup rg;
-		constructJoinedRowGroup(rg, large, prevLarge, root, tableSet, tableInfoMap, jobInfo);
+		constructJoinedRowGroup(rg, link, prevLarge, root, tableSet, tableInfoMap, jobInfo);
 		thjs->setOutputRowGroup(rg);
 		tableInfoMap[large].fRowGroup = rg;
 		if (jobInfo.trace)
@@ -1812,8 +1850,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 			uint64_t i = 0;
 			for (; i < tables.size(); i++)
 			{
-				if (tableInfoMap[large].fJoinedTables.find(tables[i]) ==
-						tableInfoMap[large].fJoinedTables.end())
+				if (tableSet.find(tables[i]) == tableSet.end())
 					break;
 			}
 
@@ -1965,7 +2002,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
 			// update the fColsInExp2 and construct the output RG
 			updateExp2Cols(readyExpSteps, tableInfoMap, jobInfo);
-			constructJoinedRowGroup(rg, large, prevLarge, root, tableSet, tableInfoMap, jobInfo);
+			constructJoinedRowGroup(rg, link, prevLarge, root, tableSet, tableInfoMap, jobInfo);
 			if (thjs->hasFcnExpGroup2())
 				thjs->setFE23Output(rg);
 			else
@@ -1992,7 +2029,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
 	if (root == false)  // not root
 	{
-		TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(large, prevLarge));
+		TableJoinMap::iterator mit = jobInfo.tableJoinMap.find(make_pair(link, prevLarge));
 		if (mit == jobInfo.tableJoinMap.end())
 			throw runtime_error("Join step not found.");
 

@@ -75,11 +75,6 @@ typedef boost::shared_ptr<CalpontSelectExecutionPlan> SCSEP;
 class CalpontSelectExecutionPlan : public CalpontExecutionPlan {
 
 /**
- *	Overloaded stream operator
- */
-friend std::ostream &operator<< (std::ostream &, const CalpontSelectExecutionPlan &);
-
-/**
  * Public stuff
  */
 public:
@@ -379,7 +374,7 @@ public:
 
 	// query type. return string for easy stats insert
 	void queryType(const uint32_t queryType) { fQueryType = queryType; }
-	const std::string queryType() const;
+	const std::string queryType() const { return queryTypeToString(fQueryType); }
 	static std::string queryTypeToString(const uint32_t queryType);
 
 	void priority(uint32_t p) { fPriority = p; }
@@ -427,6 +422,21 @@ public:
 	 * @return false iff every member of t is a duplicate copy of every member of this; true otherwise
 	 */
 	virtual bool operator!=(const CalpontSelectExecutionPlan& t) const;
+
+	/** @brief Return a string rep of the CSEP
+	 *
+	 * Return a string rep of the CSEP
+	 * @return a string
+	 */
+	virtual std::string toString() const;
+
+	/** @brief Is this an internal query?
+	 *
+	 * Is this an internal query (a syscat query performed on behalf of another query)
+	 * FIXME: add a setter and make this work for really big session ids
+	 * @return true/false
+	 */
+	virtual bool isInternal() const { return ((fSessionID & 0x80000000) != 0); }
 
 /**
  * Protected stuff
@@ -565,6 +575,13 @@ private:
 
 	boost::uuids::uuid fUuid;
 };
+
+/**
+ *	Output stream operator
+ */
+
+inline std::ostream& operator<<(std::ostream& os, const CalpontSelectExecutionPlan& rhs)
+	{ os << rhs.toString(); return os; }
 
 }
 #endif //CALPONTSELECTEXECUTIONPLAN_H

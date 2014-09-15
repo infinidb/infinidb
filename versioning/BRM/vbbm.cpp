@@ -305,6 +305,63 @@ void VBBM::growVBBM(bool addAFile)
 			vbbm->numHashBuckets*sizeof(int)]);
 }
 
+void VBBM::growForLoad(int count)
+{
+	int allocSize;
+	int nFiles;
+	key_t newshmkey;
+	char *newshmseg;
+	int i;
+
+	if (vbbm)
+		nFiles = vbbm->nFiles;
+	else
+		nFiles = 0;
+
+	if (count < VBSTORAGE_INITIAL_COUNT)
+		count = VBSTORAGE_INITIAL_COUNT;
+	// round up to next normal increment point out of paranoia.
+	if (count % VBSTORAGE_INCREMENT_COUNT)
+		count = ((count/VBSTORAGE_INCREMENT_COUNT) + 1) * VBSTORAGE_INCREMENT_COUNT;
+	allocSize = VBBM_SIZE(nFiles, count);
+
+	newshmkey = chooseShmkey();
+	if (fPVBBMImpl) {
+		BRMShmImpl newShm(newshmkey, allocSize);
+		newshmseg = static_cast<char*>(newShm.fMapreg.get_address());
+		// copy the file meta to the new segment
+		memcpy((char *) &newshmseg[sizeof(VBShmsegHeader)], files, sizeof(VBFileMetadata)*nFiles);
+		fPVBBMImpl->swapout(newShm);
+	}
+	else {
+		fPVBBMImpl = VBBMImpl::makeVBBMImpl(newshmkey, allocSize);
+	}
+
+	vbbm = fPVBBMImpl->get();
+	vbbm->nFiles = nFiles;
+	vbbm->vbCapacity = count;
+	vbbm->vbLWM = 0;
+	vbbm->numHashBuckets = count/4;
+
+	vbbmShminfo->tableShmkey = currentVBBMShmkey = newshmkey;
+	vbbmShminfo->allocdSize = allocSize;
+	newshmseg = (char *) vbbm;
+	files = reinterpret_cast<VBFileMetadata*>
+			(&newshmseg[sizeof(VBShmsegHeader)]);
+	hashBuckets = reinterpret_cast<int*>
+			(&newshmseg[sizeof(VBShmsegHeader) +
+			vbbm->nFiles*sizeof(VBFileMetadata)]);
+	storage = reinterpret_cast<VBBMEntry*>(&newshmseg[sizeof(VBShmsegHeader) +
+			vbbm->nFiles*sizeof(VBFileMetadata) +
+			vbbm->numHashBuckets*sizeof(int)]);
+
+	for (i = 0; i < vbbm->numHashBuckets; i++)
+		hashBuckets[i] = -1;
+	for (i = 0; i < vbbm->vbCapacity; i++)
+		storage[i].lbid = -1;
+	undoRecords.clear();
+}
+
 //assumes write lock is held and the src is vbbm
 //and that dest->{numHashBuckets, vbCapacity, vbLWM} have been set.
 void VBBM::copyVBBM(VBShmsegHeader *dest)
@@ -338,8 +395,8 @@ void VBBM::copyVBBM(VBShmsegHeader *dest)
 	//walk the storage & re-hash all entries;
 	for (i = 0; i < vbbm->vbCurrentSize; i++)
 		if (storage[i].lbid != -1) {
-			_insert(storage[i], dest, newHashtable, newStorage);
-			confirmChanges();
+			_insert(storage[i], dest, newHashtable, newStorage, true);
+			//confirmChanges();
 		}
 }
 
@@ -359,7 +416,7 @@ key_t VBBM::chooseShmkey() const
 }
 
 //write lock
-void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, uint32_t vbFBO)
+void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, uint32_t vbFBO, bool loading)
 {
 	VBBMEntry entry;
 
@@ -398,16 +455,16 @@ void VBBM::insert(LBID_t lbid, VER_t verID, OID_t vbOID, uint32_t vbFBO)
 	if (vbbm->vbCurrentSize == vbbm->vbCapacity)
 		growVBBM();
 
-	_insert(entry, vbbm, hashBuckets, storage);
-	makeUndoRecord(&vbbm->vbCurrentSize, sizeof(vbbm->vbCurrentSize));
+	_insert(entry, vbbm, hashBuckets, storage, loading);
+	if (!loading)
+		makeUndoRecord(&vbbm->vbCurrentSize, sizeof(vbbm->vbCurrentSize));
 	vbbm->vbCurrentSize++;
 }
 
 //assumes write lock is held and that it is properly sized already
 void VBBM::_insert(VBBMEntry& e, VBShmsegHeader *dest, int *destHash,
-				  VBBMEntry *destStorage)
+				  VBBMEntry *destStorage, bool loading)
 {
-
 	int hashIndex, cHashlen = sizeof(LBID_t) + sizeof(VER_t), insertIndex;
 	char* cHash = (char*)alloca(cHashlen);
 	utils::Hasher hasher;
@@ -428,9 +485,11 @@ void VBBM::_insert(VBBMEntry& e, VBShmsegHeader *dest, int *destHash,
 #endif
 	}
 
-	makeUndoRecord(dest, sizeof(VBShmsegHeader));
-	makeUndoRecord(&destStorage[insertIndex], sizeof(VBBMEntry));
-	makeUndoRecord(&destHash[hashIndex], sizeof(int));
+	if (!loading) {
+		makeUndoRecord(dest, sizeof(VBShmsegHeader));
+		makeUndoRecord(&destStorage[insertIndex], sizeof(VBBMEntry));
+		makeUndoRecord(&destHash[hashIndex], sizeof(int));
+	}
 
 	dest->vbLWM = insertIndex;
 
@@ -832,8 +891,8 @@ void VBBM::loadVersion1(IDBDataFile* in)
 			log_errno("VBBM::load()");
 			throw runtime_error("VBBM::load(): Failed to load entry");
 		}
-		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
-		confirmChanges();
+		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO, true);
+		//confirmChanges();
 		addVBFileIfNotExists(entry.vbOID);
 	}
 
@@ -881,6 +940,8 @@ void VBBM::loadVersion2(IDBDataFile* in)
 	while (vbbm->nFiles < nFiles)
 		growVBBM(true);  // this allocates one file, doesn't grow the main storage
 
+	growForLoad(vbbmEntries);
+
 	const int nfileSize = sizeof(VBFileMetadata) * nFiles;
 	if (in->read((char *)files, nfileSize) != nfileSize) {
 		log_errno("VBBM::load()");
@@ -892,10 +953,13 @@ void VBBM::loadVersion2(IDBDataFile* in)
 			log_errno("VBBM::load()");
 			throw runtime_error("VBBM::load(): Failed to load entry");
 		}
-		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO);
-		confirmChanges();
+		insert(entry.lbid, entry.verID, entry.vbOID, entry.vbFBO, true);
 	}
+
 }
+
+//#include "boost/date_time/posix_time/posix_time.hpp"
+//using namespace boost::posix_time;
 
 void VBBM::load(string filename)
 {
@@ -904,6 +968,11 @@ void VBBM::load(string filename)
 	scoped_ptr<IDBDataFile>  in(IDBDataFile::open(
 								IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
 								filename_p, "rb", 0));
+	//ptime time1, time2;
+
+	//time1 = microsec_clock::local_time();
+	//cout << "loading the VBBM " << time1 << endl;
+
 	if (!in) {
 		log_errno("VBBM::load()");
 		throw runtime_error("VBBM::load(): Failed to open the file");
@@ -922,6 +991,9 @@ void VBBM::load(string filename)
 			log("VBBM::load(): Bad magic.  Not a VBBM file?");
 			throw runtime_error("VBBM::load(): Bad magic.  Not a VBBM file?");
 	}
+
+	//time2 = microsec_clock::local_time();
+	//cout << "done loading " << time2 << " duration: " << time2-time1 << endl;
 }
 
 // read lock
