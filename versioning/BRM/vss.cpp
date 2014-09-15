@@ -25,7 +25,7 @@
 #include <sstream>
 //#define NDEBUG
 #include <cassert>
- 
+
 #include <sys/types.h>
 #include <cerrno>
 #include <fcntl.h>
@@ -59,7 +59,7 @@ using namespace idbdatafile;
 
 namespace BRM {
 
-VSSEntry::VSSEntry() 
+VSSEntry::VSSEntry()
 {
 	lbid = -1;
 	verID = 0;
@@ -101,7 +101,7 @@ VSSImpl::VSSImpl(unsigned key, off_t size, bool readOnly) :
 {
 }
 
-VSS::VSS() 
+VSS::VSS()
 {
 	vss = 0;
 	hashBuckets = 0;
@@ -113,7 +113,7 @@ VSS::VSS()
 	fPVSSImpl = 0;
 }
 
-VSS::~VSS() 
+VSS::~VSS()
 {
 }
 
@@ -126,9 +126,9 @@ void VSS::lock(OPS op)
 		vssShminfo = mst.getTable_read(MasterSegmentTable::VSSSegment);
 		mutex.lock();
 	}
-	else 
+	else
 		vssShminfo = mst.getTable_write(MasterSegmentTable::VSSSegment);
-	
+
 	// this means that either the VSS isn't attached or that it was resized
 	if (!fPVSSImpl || fPVSSImpl->key() != (unsigned)vssShminfo->tableShmkey) {
 		if (vssShminfo->allocdSize == 0)
@@ -164,7 +164,7 @@ void VSS::lock(OPS op)
 			shmseg = reinterpret_cast<char *>(vss);
 			hashBuckets = reinterpret_cast<int*>
 					(&shmseg[sizeof(VSSShmsegHeader)]);
-			storage = reinterpret_cast<VSSEntry*>(&shmseg[sizeof(VSSShmsegHeader) + 
+			storage = reinterpret_cast<VSSEntry*>(&shmseg[sizeof(VSSShmsegHeader) +
 					vss->numHashBuckets*sizeof(int)]);
 
 			if (op == READ)
@@ -177,7 +177,7 @@ void VSS::lock(OPS op)
 		shmseg = reinterpret_cast<char *>(vss);
 		hashBuckets = reinterpret_cast<int*>
 				(&shmseg[sizeof(VSSShmsegHeader)]);
-		storage = reinterpret_cast<VSSEntry*>(&shmseg[sizeof(VSSShmsegHeader) + 
+		storage = reinterpret_cast<VSSEntry*>(&shmseg[sizeof(VSSShmsegHeader) +
 				vss->numHashBuckets*sizeof(int)]);
 		if (op == READ)
 			mutex.unlock();
@@ -193,25 +193,25 @@ void VSS::release(OPS op)
 		mst.releaseTable_write(MasterSegmentTable::VSSSegment);
 }
 
-void VSS::initShmseg() 
+void VSS::initShmseg()
 {
 	int i;
 	char *newshmseg;
 	int *buckets;
 	VSSEntry *stor;
-	
+
 	vss->capacity = VSSSTORAGE_INITIAL_SIZE/sizeof(VSSEntry);
 	vss->currentSize = 0;
 	vss->lockedEntryCount = 0;
 	vss->LWM = 0;
 	vss->numHashBuckets = VSSTABLE_INITIAL_SIZE/sizeof(int);
 	newshmseg = reinterpret_cast<char*>(vss);
-	
+
 	buckets = reinterpret_cast<int*>
 			(&newshmseg[sizeof(VSSShmsegHeader)]);
-	stor = reinterpret_cast<VSSEntry*>(&newshmseg[sizeof(VSSShmsegHeader) + 
-			vss->numHashBuckets*sizeof(int)]);	
-	
+	stor = reinterpret_cast<VSSEntry*>(&newshmseg[sizeof(VSSShmsegHeader) +
+			vss->numHashBuckets*sizeof(int)]);
+
 	for (i = 0; i < vss->numHashBuckets; i++)
 		buckets[i] = -1;
 	for (i = 0; i < vss->capacity; i++)
@@ -224,12 +224,12 @@ void VSS::growVSS()
 	int allocSize;
 	key_t newshmkey;
 	char *newshmseg;
-	
+
 	if (vssShminfo->allocdSize == 0)
 		allocSize = VSS_INITIAL_SIZE;
 	else
 		allocSize = vssShminfo->allocdSize + VSS_INCREMENT;
-	
+
 	newshmkey = chooseShmkey();
 	idbassert((allocSize == VSS_INITIAL_SIZE && !fPVSSImpl) || fPVSSImpl);
 	if (fPVSSImpl)
@@ -265,8 +265,56 @@ void VSS::growVSS()
 	newshmseg = reinterpret_cast<char *>(vss);
 	hashBuckets = reinterpret_cast<int*>
 			(&newshmseg[sizeof(VSSShmsegHeader)]);
-	storage = reinterpret_cast<VSSEntry*>(&newshmseg[sizeof(VSSShmsegHeader) + 
+	storage = reinterpret_cast<VSSEntry*>(&newshmseg[sizeof(VSSShmsegHeader) +
 			vss->numHashBuckets*sizeof(int)]);
+}
+
+//assumes write lock is held
+void VSS::growForLoad(int elementCount)
+{
+	int allocSize;
+	key_t newshmkey;
+	char *newshmseg;
+	int i;
+
+	if (elementCount < VSSSTORAGE_INITIAL_COUNT)
+		elementCount = VSSSTORAGE_INITIAL_COUNT;
+	/* round up to the next normal increment out of paranoia */
+	if (elementCount % VSSSTORAGE_INCREMENT_COUNT)
+		elementCount = ((elementCount/VSSSTORAGE_INCREMENT_COUNT) + 1) * VSSSTORAGE_INCREMENT_COUNT;
+	allocSize = VSS_SIZE(elementCount);
+
+	newshmkey = chooseShmkey();
+	if (fPVSSImpl)
+	{
+		// isn't this the same as makeVSSImpl()?
+		BRMShmImpl newShm(newshmkey, allocSize);
+		fPVSSImpl->swapout(newShm);
+	}
+	else
+	{
+		fPVSSImpl = VSSImpl::makeVSSImpl(newshmkey, allocSize);
+	}
+
+	vss = fPVSSImpl->get();
+	vss->capacity = elementCount;
+	vss->currentSize = 0;
+	vss->LWM = 0;
+	vss->numHashBuckets = elementCount/4;
+	vss->lockedEntryCount = 0;
+	undoRecords.clear();
+	newshmseg = reinterpret_cast<char *>(vss);
+	hashBuckets = reinterpret_cast<int*>
+		(&newshmseg[sizeof(VSSShmsegHeader)]);
+	storage = reinterpret_cast<VSSEntry*>(&newshmseg[sizeof(VSSShmsegHeader) +
+		vss->numHashBuckets*sizeof(int)]);
+	for (i = 0; i < vss->capacity; i++)
+		storage[i].lbid = -1;
+	for (i = 0; i < vss->numHashBuckets; i++)
+		hashBuckets[i] = -1;
+
+	vssShminfo->tableShmkey = newshmkey;
+	vssShminfo->allocdSize = allocSize;
 }
 
 //assumes write lock is held and the src is vbbm
@@ -277,7 +325,7 @@ void VSS::copyVSS(VSSShmsegHeader *dest)
 	int *newHashtable;
 	VSSEntry *newStorage;
 	char *cDest = reinterpret_cast<char *>(dest);
-	
+
 	// copy metadata
 	dest->currentSize = vss->currentSize;
 	dest->lockedEntryCount = vss->lockedEntryCount;
@@ -285,19 +333,19 @@ void VSS::copyVSS(VSSShmsegHeader *dest)
 	newHashtable = reinterpret_cast<int*>(&cDest[sizeof(VSSShmsegHeader)]);
 	newStorage = reinterpret_cast<VSSEntry*>(&cDest[sizeof(VSSShmsegHeader) +
 			dest->numHashBuckets*sizeof(int)]);
-	
+
 	//initialize new storage & hash
 	for (i = 0; i < dest->numHashBuckets; i++)
 		newHashtable[i] = -1;
-	
+
 	for (i = 0; i < dest->capacity; i++)
 		newStorage[i].lbid = -1;
-	
+
 	//walk the storage & re-hash all entries;
 	for (i = 0; i < vss->currentSize; i++)
 		if (storage[i].lbid != -1) {
-			_insert(storage[i], dest, newHashtable, newStorage);
-			confirmChanges();
+			_insert(storage[i], dest, newHashtable, newStorage, true);
+			//confirmChanges();
 		}
 }
 
@@ -305,20 +353,20 @@ key_t VSS::chooseShmkey() const
 {
 	int fixedKeys = 1;
 	key_t ret;
-	
-	if (vssShminfo->tableShmkey + 1 == (key_t) (fShmKeys.KEYRANGE_VSS_BASE + 
+
+	if (vssShminfo->tableShmkey + 1 == (key_t) (fShmKeys.KEYRANGE_VSS_BASE +
 		   fShmKeys.KEYRANGE_SIZE - 1) || (unsigned)vssShminfo->tableShmkey < fShmKeys.KEYRANGE_VSS_BASE)
 		ret = fShmKeys.KEYRANGE_VSS_BASE + fixedKeys;
-	else 
+	else
 		ret = vssShminfo->tableShmkey + 1;
 
 	return ret;
-}	
+}
 
-void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked) 
+void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked, bool loading)
 {
 	VSSEntry entry;
-	
+
 #ifdef BRM_DEBUG
 	if (lbid < 0) {
 		log("VSS::insert(): lbid must be >= 0", logging::LOG_TYPE_DEBUG);
@@ -329,7 +377,7 @@ void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked)
 		throw invalid_argument("VSS::insert(): verID must be >= 0");
 	}
 #endif
-	
+
 	entry.lbid = lbid;
 	entry.verID = verID;
 	entry.vbFlag = vbFlag;
@@ -338,25 +386,26 @@ void VSS::insert(LBID_t lbid, VER_t verID, bool vbFlag, bool locked)
 	// check for resize
 	if (vss->currentSize == vss->capacity)
 		growVSS();
-	
-	_insert(entry, vss, hashBuckets, storage);
-	makeUndoRecord(&vss->currentSize, sizeof(vss->currentSize));
+
+	_insert(entry, vss, hashBuckets, storage, loading);
+	if (!loading)
+		makeUndoRecord(&vss->currentSize, sizeof(vss->currentSize));
 	vss->currentSize++;
 	if (locked)
 		vss->lockedEntryCount++;
 }
-	
-	
+
+
 
 //assumes write lock is held and that it is properly sized already
 //metadata is modified by the caller
-void VSS::_insert(VSSEntry& e, VSSShmsegHeader *dest, int *destHash, 
-				  VSSEntry *destStorage)
+void VSS::_insert(VSSEntry& e, VSSShmsegHeader *dest, int *destHash,
+				  VSSEntry *destStorage, bool loading)
 {
 	int hashIndex, insertIndex;
-	
-	hashIndex = e.lbid % dest->numHashBuckets;
-	
+
+	hashIndex = hasher((char*) &e.lbid, sizeof(e.lbid)) % dest->numHashBuckets;
+
 	insertIndex = dest->LWM;
 	while (destStorage[insertIndex].lbid != -1) {
 		insertIndex++;
@@ -368,16 +417,19 @@ void VSS::_insert(VSSEntry& e, VSSShmsegHeader *dest, int *destHash,
 		}
 #endif
 	}
-	makeUndoRecord(dest, sizeof(VSSShmsegHeader));
+	if (!loading)
+		makeUndoRecord(dest, sizeof(VSSShmsegHeader));
 	dest->LWM = insertIndex + 1;
 
-	makeUndoRecord(&destStorage[insertIndex], sizeof(VSSEntry));
-	makeUndoRecord(&destHash[hashIndex], sizeof(int));
+	if (!loading) {
+		makeUndoRecord(&destStorage[insertIndex], sizeof(VSSEntry));
+		makeUndoRecord(&destHash[hashIndex], sizeof(int));
+	}
 	e.next = destHash[hashIndex];
 	destStorage[insertIndex] = e;
 	destHash[hashIndex] = insertIndex;
 }
-	
+
 //assumes read lock is held
 int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t *outVer,
 				bool *vbFlag, bool vbOnly) const
@@ -400,7 +452,7 @@ int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t
 	}
 #endif
 
-	hashIndex = lbid % vss->numHashBuckets;
+	hashIndex = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
@@ -409,7 +461,7 @@ int VSS::lookup(LBID_t lbid, const QueryContext_vss &verInfo, VER_t txnID, VER_t
 
 			if (vbOnly && !listEntry->vbFlag)
 				goto next;
-			
+
 			/* "if it is/was part of a different transaction, ignore it"
 			 */
 			if (txnID != listEntry->verID &&
@@ -457,7 +509,7 @@ VER_t VSS::getCurrentVersion(LBID_t lbid, bool *isLocked) const
 	int hashIndex, currentIndex;
 	VSSEntry *listEntry;
 
-	hashIndex = lbid % vss->numHashBuckets;
+	hashIndex = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
 		listEntry = &storage[currentIndex];
@@ -479,7 +531,7 @@ VER_t VSS::getHighestVerInVB(LBID_t lbid, VER_t max) const
 	VER_t ret = -1;
 	VSSEntry *listEntry;
 
-	hashIndex = lbid % vss->numHashBuckets;
+	hashIndex = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
 		listEntry = &storage[currentIndex];
@@ -496,7 +548,7 @@ bool VSS::isVersioned(LBID_t lbid, VER_t version) const
 	int hashIndex, currentIndex;
 	VSSEntry *listEntry;
 
-	hashIndex = lbid % vss->numHashBuckets;
+	hashIndex = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 	currentIndex = hashBuckets[hashIndex];
 	while (currentIndex != -1) {
 		listEntry = &storage[currentIndex];
@@ -512,12 +564,12 @@ bool VSS::isLocked(const LBIDRange& range, VER_t transID) const
 	int hashIndex, currentIndex;
 	LBID_t currentBlock;
 	VSSEntry *listEntry;
-	
-	for (currentBlock = range.start; 
+
+	for (currentBlock = range.start;
 			currentBlock < range.start + range.size;
 			currentBlock++) {
 
-		hashIndex = currentBlock % vss->numHashBuckets;
+		hashIndex = hasher((char *) &currentBlock, sizeof(currentBlock)) % vss->numHashBuckets;
 
 		currentIndex = hashBuckets[hashIndex];
 		while (currentIndex != -1) {
@@ -526,7 +578,7 @@ bool VSS::isLocked(const LBIDRange& range, VER_t transID) const
 			{
 				if (listEntry->verID == transID)
 					return false;
-				else 
+				else
 					return true;
 			}
 			currentIndex = listEntry->next;
@@ -550,21 +602,21 @@ void VSS::removeEntry(LBID_t lbid, VER_t verID, vector<LBID_t> *flushList)
 		throw invalid_argument("VSS::removeEntry(): verID must be >= 0");
 	}
 #endif
-	
+
 	index = getIndex(lbid, verID, prev, bucket);
 	if (index == -1) {
 #ifdef BRM_DEBUG
 		ostringstream ostr;
 
-		ostr << "VSS::removeEntry(): that entry doesn't exist lbid = " << 
+		ostr << "VSS::removeEntry(): that entry doesn't exist lbid = " <<
 			lbid << " verID = " << verID;
 		log(ostr.str(), logging::LOG_TYPE_DEBUG);
 		throw logic_error(ostr.str());
 #else
 		return;
-#endif	
+#endif
 	}
-	
+
 	makeUndoRecord(&storage[index], sizeof(VSSEntry));
 	storage[index].lbid = -1;
 	if (prev != -1) {
@@ -582,15 +634,15 @@ void VSS::removeEntry(LBID_t lbid, VER_t verID, vector<LBID_t> *flushList)
 	if (index < vss->LWM)
 		vss->LWM = index;
 
-	// scan the list of entries with that lbid to see if there are others 
+	// scan the list of entries with that lbid to see if there are others
 	// to remove.
 	for (index = hashBuckets[bucket]; index != -1; index = storage[index].next)
 		if (storage[index].lbid == lbid && (storage[index].vbFlag || storage[index].locked))
 			return;
-	
+
 	// if execution gets here, we should be able to remove all entries
 	// with the given lbid because none point to the VB.
-	for (prev = -1, index = hashBuckets[bucket]; 
+	for (prev = -1, index = hashBuckets[bucket];
 		index != -1; index = storage[index].next) {
 		if (storage[index].lbid == lbid) {
 			makeUndoRecord(&storage[index], sizeof(VSSEntry));
@@ -621,7 +673,7 @@ bool VSS::isTooOld(LBID_t lbid, VER_t verID) const
 	VER_t minVer = 0;
 	VSSEntry *listEntry;
 
-	bucket = lbid % vss->numHashBuckets;
+	bucket = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 
 	index = hashBuckets[bucket];
 	while (index != -1) {
@@ -637,7 +689,7 @@ bool VSS::isEntryLocked(LBID_t lbid, VER_t verID) const
 {
 	int index;
 	int bucket;
-	
+
 	if (lbid == -1)
 		return false;
 /* See bug 3287 for info on these code blocks */
@@ -651,8 +703,8 @@ bool VSS::isEntryLocked(LBID_t lbid, VER_t verID) const
 
 /*  This version considers any locked entry for an LBID to mean the block is locked.
  	VSSEntry *listEntry;
-	bucket = lbid % vss->numHashBuckets;
-	
+	bucket = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
+
 	index = hashBuckets[bucket];
 	while (index != -1) {
 		listEntry = &storage[index];
@@ -678,7 +730,7 @@ bool VSS::isEntryLocked(LBID_t lbid, VER_t verID) const
 	bool hasALockedEntry = false;
 	VER_t rollbackVersion = 0;
 
-	bucket = lbid % vss->numHashBuckets;
+	bucket = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 
 	index = hashBuckets[bucket];
 	while (index != -1) {
@@ -699,9 +751,9 @@ int VSS::getIndex(LBID_t lbid, VER_t verID, int &prev, int &bucket) const
 {
 	int currentIndex;
 	VSSEntry *listEntry;
-	
+
 	prev = -1;
-	bucket = lbid % vss->numHashBuckets;
+	bucket = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
 
 	currentIndex = hashBuckets[bucket];
 	while (currentIndex != -1) {
@@ -715,7 +767,7 @@ int VSS::getIndex(LBID_t lbid, VER_t verID, int &prev, int &bucket) const
 }
 
 //write lock
-void VSS::setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag)		
+void VSS::setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag)
 {
 	int index, prev, bucket;
 
@@ -729,12 +781,12 @@ void VSS::setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag)
 		throw invalid_argument("VSS::setVBFlag(): verID must be >= 0");
 	}
 #endif
-	
+
  	index = getIndex(lbid, verID, prev, bucket);
 	if (index == -1) {
 		ostringstream ostr;
-	
-		ostr << "VSS::setVBFlag(): that entry doesn't exist lbid=" << lbid << 
+
+		ostr << "VSS::setVBFlag(): that entry doesn't exist lbid=" << lbid <<
 			" ver=" << verID;
 		log(ostr.str(), logging::LOG_TYPE_DEBUG);
 		throw logic_error(ostr.str());
@@ -747,14 +799,14 @@ void VSS::setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag)
 void VSS::commit(VER_t txnID)
 {
 	int i;
-	
+
 #ifdef BRM_DEBUG
 	if (txnID < 1) {
 		log("VSS::commit(): txnID must be > 0", logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::commit(): txnID must be > 0");
 	}
-#endif	
-	
+#endif
+
 	for (i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1 && storage[i].verID == txnID) {
 #ifdef BRM_DEBUG
@@ -773,23 +825,23 @@ void VSS::commit(VER_t txnID)
 				vss->lockedEntryCount--;
 		}
 }
-	
+
 //read lock
 void VSS::getUncommittedLBIDs(VER_t txnID, vector<LBID_t>& lbids)
 {
 	int i;
-	
+
 	lbids.clear();
-	
+
 #ifdef BRM_DEBUG
 	if (txnID < 1) {
-		log("VSS::getUncommittedLBIDs(): txnID must be > 0", 
+		log("VSS::getUncommittedLBIDs(): txnID must be > 0",
 			logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::getUncommittedLBIDs(): txnID must be > 0");
 	}
-#endif		
+#endif
 
-	for (i = 0; i < vss->capacity; i++) 
+	for (i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1 && storage[i].verID == txnID) {
 #ifdef BRM_DEBUG
 			if (storage[i].locked == false) {
@@ -805,14 +857,14 @@ void VSS::getUncommittedLBIDs(VER_t txnID, vector<LBID_t>& lbids)
 #endif
 			lbids.push_back(storage[i].lbid);
 		}
-		
+
 }
 
 void VSS::getUnlockedLBIDs(BlockList_t& lbids)
 {
 	lbids.clear();
 
-	for (int i = 0; i < vss->capacity; i++) 
+	for (int i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1 && !storage[i].locked)
 			lbids.push_back(LVP_t(storage[i].lbid, storage[i].verID));
 }
@@ -821,7 +873,7 @@ void VSS::getLockedLBIDs(BlockList_t& lbids)
 {
 	lbids.clear();
 
-	for (int i = 0; i < vss->capacity; i++) 
+	for (int i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1 && storage[i].locked)
 			lbids.push_back(LVP_t(storage[i].lbid, storage[i].verID));
 }
@@ -832,10 +884,10 @@ void VSS::removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm)
 {
 	int bucket, index, prev;
 	LBID_t lastLBID, lbid;
-	
+
 #ifdef BRM_DEBUG
 	if (range.start < 0) {
-		log("VSS::removeEntriesFromDB(): lbids must be positive.", 
+		log("VSS::removeEntriesFromDB(): lbids must be positive.",
 			logging::LOG_TYPE_DEBUG);
 		throw invalid_argument("VSS::removeEntriesFromDB(): lbids must be positive.");
 	}
@@ -849,8 +901,8 @@ void VSS::removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm)
 
 	lastLBID = range.start + range.size - 1;
 	for (lbid = range.start; lbid <= lastLBID; lbid++) {
-		bucket = lbid % vss->numHashBuckets;
-		
+		bucket = hasher((char *) &lbid, sizeof(lbid)) % vss->numHashBuckets;
+
 		for (prev = -1, index = hashBuckets[bucket]; index != -1;
 		  index = storage[index].next) {
 			if (storage[index].lbid == lbid) {
@@ -881,27 +933,27 @@ void VSS::removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm)
 int VSS::size() const
 {
 	int i, ret = 0;
-	
-	for (i = 0; i < vss->capacity; i++) 
+
+	for (i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1)
 			ret++;
-	
+
 	if (ret != vss->currentSize) {
 		ostringstream ostr;
 
-		ostr << "VSS: actual size & recorded size disagree.  actual size = " 
+		ostr << "VSS: actual size & recorded size disagree.  actual size = "
 			<< ret << " recorded size = " << vss->currentSize;
 		log(ostr.str(), logging::LOG_TYPE_DEBUG);
 		throw logic_error(ostr.str());
 	}
-	
+
 	return ret;
 }
 
 bool VSS::hashEmpty() const
 {
 	int i;
-	
+
 	for (i = 0; i < vss->numHashBuckets; i++)
 		if (hashBuckets[i] != -1)
 			return false;
@@ -909,7 +961,7 @@ bool VSS::hashEmpty() const
 }
 
 void VSS::clear()
-{	
+{
 	int allocSize;
 	key_t newshmkey;
 	char *newshmseg;
@@ -949,20 +1001,20 @@ int VSS::checkConsistency(const VBBM &vbbm, ExtentMap &em) const
 		c. each hash table entry points to a non-empty element or -1
 		d. verify that there are no empty entries below the LWM
 		e. verify uniqueness of the entries
-	
+
 	*/
-	
+
 	int i, j, k, err;
-	
+
 	/* Test 1 */
-	
+
 	OID_t oid;
 	uint32_t fbo;
-	
+
 	for (i = 0; i < vss->capacity; i++) {
 		if (storage[i].lbid != -1) {
 			if (storage[i].vbFlag) {
-				err = vbbm.lookup(storage[i].lbid, storage[i].verID, oid, 
+				err = vbbm.lookup(storage[i].lbid, storage[i].verID, oid,
 								   fbo);
 				if (err != 0) {
 					cerr << "VSS: lbid=" << storage[i].lbid << " verID=" <<
@@ -989,35 +1041,35 @@ int VSS::checkConsistency(const VBBM &vbbm, ExtentMap &em) const
 	}
 
 	/* Test 2a is already implemented */
-	size();  
-	
+	size();
+
 	/* Tests 2b & 2c - no empty elements reachable from the hash table */
-	
+
 	int nextElement;
-	
+
 	for (i = 0; i < vss->numHashBuckets; i++) {
 		if (hashBuckets[i] != -1)
-			for (nextElement = hashBuckets[i]; nextElement != -1; 
+			for (nextElement = hashBuckets[i]; nextElement != -1;
 				nextElement = storage[nextElement].next)
 				if (storage[nextElement].lbid == -1)
 					throw logic_error("VSS::checkConsistency(): an empty storage entry is reachable from the hash table");
 	}
-	
+
 	/* Test 2d - verify that there are no empty entries below the LWM */
-	
+
 	for (i = 0; i < vss->LWM; i++)
 		if (storage[i].lbid == -1) {
 			cerr << "VSS: LWM=" << vss->LWM << " first empty entry=" << i << endl;
 			throw logic_error("VSS::checkConsistency(): LWM accounting error");
 		}
-	
+
 	/* Test 2e - verify uniqueness of each entry */
 
-	for (i = 0;	i < vss->numHashBuckets; i++) 
+	for (i = 0;	i < vss->numHashBuckets; i++)
 		if (hashBuckets[i] != -1)
-			for (j = hashBuckets[i]; j != -1; j = storage[j].next) 
+			for (j = hashBuckets[i]; j != -1; j = storage[j].next)
 				for (k = storage[j].next; k != -1; k = storage[k].next)
-					if (storage[j].lbid == storage[k].lbid && 
+					if (storage[j].lbid == storage[k].lbid &&
 						storage[j].verID == storage[k].verID) {
 						cerr << "VSS: lbid=" << storage[j].lbid << " verID=" <<
 							storage[j].verID << endl;
@@ -1034,8 +1086,8 @@ void VSS::setReadOnly()
 void VSS::getCurrentTxnIDs(set<VER_t> &list) const
 {
 	int i;
-	
-	for (i = 0; i < vss->capacity; i++) 
+
+	for (i = 0; i < vss->capacity; i++)
 		if (storage[i].lbid != -1 && storage[i].locked)
 			list.insert(storage[i].verID);
 }
@@ -1069,7 +1121,7 @@ void VSS::save(string filename)
 			log_errno("VSS::save()");
 			throw runtime_error("VSS::save(): Failed to open the file");
 		}
-		
+
 		header.magic = VSS_MAGIC_V1;
 		header.entries = vss->currentSize;
 
@@ -1096,7 +1148,7 @@ void VSS::save(string filename)
 			throw runtime_error("VSS::save(): Failed to open the file");
 		}
 		out.exceptions(ios_base::badbit);
-		
+
 		header.magic = VSS_MAGIC_V1;
 		header.entries = vss->currentSize;
 
@@ -1141,12 +1193,19 @@ bool VSS::isEmpty(bool useLock)
 	return rc;
 }
 
+
+//#include "boost/date_time/posix_time/posix_time.hpp"
+//using namespace boost::posix_time;
+
 void VSS::load(string filename)
 {
 	int i;
 	struct Header header;
 	struct VSSEntry entry;
+	//ptime time1, time2;
 
+	//time1 = microsec_clock::local_time();
+	//cout << "loading the VSS " << time1 << endl;
 	const char* filename_p = filename.c_str();
 	scoped_ptr<IDBDataFile>  in(IDBDataFile::open(
 								IDBPolicy::getType(filename_p, IDBPolicy::WRITEENG),
@@ -1170,6 +1229,9 @@ void VSS::load(string filename)
 		throw runtime_error("VSS::load(): Bad size.  Not a VSS file?");
 	}
 
+	growForLoad(header.entries);
+
+/*
 	for (i = 0; i < vss->capacity; i++)
 		storage[i].lbid = -1;
 	for (i = 0; i < vss->numHashBuckets; i++)
@@ -1177,15 +1239,18 @@ void VSS::load(string filename)
 	vss->currentSize = 0;
 	vss->lockedEntryCount = 0;
 	vss->LWM = 0;
+*/
 
 	for (i = 0; i < header.entries; i++) {
 		if (in->read((char *)&entry, sizeof(entry)) != sizeof(entry)) {
 			log_errno("VSS::load()");
 			throw runtime_error("VSS::load(): Failed to read entry");
 		}
-		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
-		confirmChanges();
+		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked, true);
 	}
+
+	//time2 = microsec_clock::local_time();
+	//cout << "done loading " << time2 << " duration: " << time2-time1 << endl;
 }
 
 #ifndef __LP64__
@@ -1241,8 +1306,7 @@ void VSS::load64(string filename)
 			log_errno("VSS::load()");
 			throw runtime_error("VSS::load(): Failed to read entry");
 		}
-		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked);
-		confirmChanges();
+		insert(entry.lbid, entry.verID, entry.vbFlag, entry.locked, true);
 	}
 }
 #endif

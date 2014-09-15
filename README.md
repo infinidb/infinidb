@@ -1,4 +1,4 @@
-# This is InfiniDB 4.6.1
+# This is InfiniDB 4.6.2
 
 ## Build prerequisites
 To build InfiniDB from source you will need:
@@ -22,9 +22,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 
 ### InfiniDB MySQL
 
-    wget -Omysql-4.6.1-1.tar.gz https://github.com/infinidb/mysql/archive/4.6.1-1.tar.gz
-    tar -zxf mysql-4.6.1-1.tar.gz
-    ln -s mysql-4.6.1-1 mysql
+    wget -Omysql-4.6.2-1.tar.gz https://github.com/infinidb/mysql/archive/4.6.2-1.tar.gz
+    tar -zxf mysql-4.6.2-1.tar.gz
+    ln -s mysql-4.6.2-1 mysql
     cd mysql
     ./configure --prefix=$HOME/infinidb/mysql
     make
@@ -33,9 +33,9 @@ Along with a working C++ compiler and GNU software development tools you will ne
 ### InfiniDB
 
     cd ..
-    wget -Oinfinidb-4.6.1-1.tar.gz https://github.com/infinidb/infinidb/archive/4.6.1-1.tar.gz
-    tar -zxf infinidb-4.6.1-1.tar.gz
-    ln -s infinidb-4.6.1-1 infinidb
+    wget -Oinfinidb-4.6.2-1.tar.gz https://github.com/infinidb/infinidb/archive/4.6.2-1.tar.gz
+    tar -zxf infinidb-4.6.2-1.tar.gz
+    ln -s infinidb-4.6.2-1 infinidb
     cd infinidb
     ./configure --prefix=$HOME/infinidb
     make

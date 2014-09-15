@@ -20,7 +20,7 @@
  *
  *****************************************************************************/
 
-/** @file 
+/** @file
  * class XXX interface
  */
 
@@ -38,6 +38,7 @@
 #include "undoable.h"
 #include "mastersegmenttable.h"
 #include "shmkeys.h"
+#include "hasher.h"
 
 #ifdef NONE
 #undef NONE
@@ -52,17 +53,22 @@
 // These config parameters need to be loaded
 
 //will get a small hash function performance boost by using powers of 2
-#define VSSSTORAGE_INITIAL_SIZE (200000*sizeof(VSSEntry))
-#define VSSSTORAGE_INCREMENT (20000*sizeof(VSSEntry))
+#define VSSSTORAGE_INITIAL_COUNT 200000
+#define VSSSTORAGE_INITIAL_SIZE (VSSSTORAGE_INITIAL_COUNT*sizeof(VSSEntry))
+#define VSSSTORAGE_INCREMENT_COUNT 20000
+#define VSSSTORAGE_INCREMENT (VSSSTORAGE_INCREMENT_COUNT*sizeof(VSSEntry))
 
 // (average list length = 4)
-#define VSSTABLE_INITIAL_SIZE (50000*sizeof(int)) 
+#define VSSTABLE_INITIAL_SIZE (50000*sizeof(int))
 #define VSSTABLE_INCREMENT (5000*sizeof(int))
 
 #define VSS_INITIAL_SIZE (sizeof(VSSShmsegHeader) + \
 	VSSSTORAGE_INITIAL_SIZE + VSSTABLE_INITIAL_SIZE)
-	
+
 #define VSS_INCREMENT (VSSTABLE_INCREMENT + VSSSTORAGE_INCREMENT)
+
+#define VSS_SIZE(entries) \
+	((entries*sizeof(VSSEntry)) + (entries/4 * sizeof(int)) + sizeof(VSSShmsegHeader))
 
 #if defined(_MSC_VER) && defined(xxxVSS_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -90,7 +96,7 @@ struct VSSShmsegHeader {
 	int LWM;
 	int numHashBuckets;
 	int lockedEntryCount;
-	
+
 //  the rest of the overlay looks like this
 // 	int hashBuckets[numHashBuckets];
 // 	VSSEntry storage[capacity];
@@ -143,7 +149,7 @@ class ExtentMap;
 /** @brief The Version Substitution Structure (VSS)
  *
  * At a high level, the VSS maintains a table that associates an LBID with
- * a version number and 2 flags that indicate whether or not the block 
+ * a version number and 2 flags that indicate whether or not the block
  * identified by the <LBID, VerID> pair exists in the main database files
  * or the Version Buffer.  The VSS's main purpose is to resolve the version of
  * a specified block the caller can safely use given that there may be concurrent
@@ -154,16 +160,16 @@ class ExtentMap;
  * each valid entry points to the head of a unique list.  Each list element
  * contains the LBID, VerID, & the two flags that encapsulate "an entry in the
  * VSS table".  Every list contains all elements that collide on that hash table
- * entry that points to it, "load factor" has no bearing on performance, 
+ * entry that points to it, "load factor" has no bearing on performance,
  * and lists can grow arbitrarily large.
  * Technically lookups are O(n), but in normal circumstances it'll
- * be constant time.  As things are right now, we expect there to be about 
+ * be constant time.  As things are right now, we expect there to be about
  * 200k VSS entries.  The hash table is sized such that on average there will be 4
  * entries per list when it's at capacity.
  *
  * The memory management & structure manipulation code is nearly identical
  * to that in the VBBM, so any bugs found here are likely there as well.
- * 
+ *
  * Shared memory is managed using code similar to the ExtentMap & VBBM.  When
  * the shared memory segment needs to grow, it is write-locked, a new one
  * is created, the contents are reinserted to the new one, the key is
@@ -173,19 +179,19 @@ class ExtentMap;
 
 class VSS : public Undoable {
 	public:
-		
+
 		enum OPS {
 			NONE,
 			READ,
 			WRITE
 		};
-		
+
 		EXPORT VSS();
 		EXPORT ~VSS();
- 		
+
 		EXPORT bool isLocked(const LBIDRange& l, VER_t txnID = -1) const;
 		EXPORT void removeEntry(LBID_t lbid, VER_t verID, std::vector<LBID_t> *flushList);
-		
+
 		// Note, the use_vbbm switch should be used for unit testing the VSS only
 		EXPORT void removeEntriesFromDB(const LBIDRange& range, VBBM& vbbm, bool use_vbbm = true);
 		EXPORT int lookup(LBID_t lbid, const QueryContext_vss &, VER_t txnID, VER_t *outVer,
@@ -201,14 +207,14 @@ class VSS : public Undoable {
 		EXPORT bool isVersioned(LBID_t lbid, VER_t version) const;
 
 		EXPORT void setVBFlag(LBID_t lbid, VER_t verID, bool vbFlag);
-		EXPORT void insert(LBID_t, VER_t, bool vbFlag, bool locked);
+		EXPORT void insert(LBID_t, VER_t, bool vbFlag, bool locked, bool loading=false);
 		EXPORT void commit(VER_t txnID);
 		EXPORT void getUncommittedLBIDs(VER_t txnID, std::vector<LBID_t>& lbids);
 		EXPORT void getUnlockedLBIDs(BlockList_t& lbids);
 		EXPORT void getLockedLBIDs(BlockList_t& lbids);
 		EXPORT void lock(OPS op);
 		EXPORT void release(OPS op);
-		EXPORT void setReadOnly();		
+		EXPORT void setReadOnly();
 
 		EXPORT int checkConsistency(const VBBM &vbbm, ExtentMap &em) const;
 		EXPORT int size() const;
@@ -228,8 +234,8 @@ class VSS : public Undoable {
 #endif
 
 		EXPORT bool isEmpty(bool doLock = true);
-		
-		/* Bug 2293.  VBBM will use this fcn to determine whether a block is 
+
+		/* Bug 2293.  VBBM will use this fcn to determine whether a block is
 		 * currently in use. */
 		EXPORT bool isEntryLocked(LBID_t lbid, VER_t verID) const;
 		EXPORT bool isTooOld(LBID_t lbid, VER_t verID) const;
@@ -237,7 +243,7 @@ class VSS : public Undoable {
 	private:
 		VSS(const VSS &);
 		VSS& operator=(const VSS &);
-		
+
 		struct VSSShmsegHeader *vss;
 		int *hashBuckets;
 		VSSEntry *storage;
@@ -247,20 +253,22 @@ class VSS : public Undoable {
 		key_t currentVSSShmkey;
 		int vssShmid;
 		MSTEntry *vssShminfo;
-		MasterSegmentTable mst;		
+		MasterSegmentTable mst;
 		static const int MAX_IO_RETRIES=10;
 
 		key_t chooseShmkey() const;
 		void growVSS();
+		void growForLoad(int count);
 		void initShmseg();
 		void copyVSS(VSSShmsegHeader *dest);
-		
+
 		int getIndex(LBID_t lbid, VER_t verID, int& prev, int& bucket) const;
 		void _insert(VSSEntry& e, VSSShmsegHeader* dest, int* destTable, VSSEntry*
-				destStorage);
+				destStorage, bool loading=false);
 		ShmKeys fShmKeys;
 
 		VSSImpl* fPVSSImpl;
+		utils::Hasher hasher;
 };
 
 }
