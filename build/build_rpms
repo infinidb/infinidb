@@ -120,9 +120,9 @@ sed -i  -e "s/@@PACKAGER@@/Packager: $packager/" \
 echo done.
 
 if [ -d /usr/local/gcc45/lib64 ]; then
-	cp /usr/local/gcc45/lib64/libgcc_s.so.1 $buildroot/Calpont/lib
-	cp /usr/local/gcc45/lib64/libstdc++.so.6.0.14 $buildroot/Calpont/lib
-	cp /usr/local/gdb71/bin/gdb $buildroot/Calpont/bin
+	cp ./build/libgcc_s.so.1 $buildroot/Calpont/lib
+	cp ./build/libstdc++.so.6.0.14 $buildroot/Calpont/lib
+	cp ./build/gdb $buildroot/Calpont/bin
 fi
 
 echo -n "Building rpms..."
