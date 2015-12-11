@@ -44,7 +44,7 @@ Along with a working C++ compiler and GNU software development tools you will ne
 This will leave you with `$HOME/infinidb` as a binary tree. Follow the Binary Download
 instructions in the InfiniDB 4.6 Installation Guide 
 (available on https://mariadb.com/services/infinidb-services).
-Also an InfiniDB Enterprise version is provided and support by MariaDB. You can also 
+Also an InfiniDB Enterprise version is provided and supported by MariaDB. You can also 
 get additional information here: https://mariadb.com/services/infinidb-services
 
 ## How to Contribute
